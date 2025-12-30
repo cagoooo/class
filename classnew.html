@@ -713,6 +713,18 @@
             </div>
             <div class="mt-6">
                 <h3 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">學生名單</h3>
+
+                <!-- 搜尋功能區塊 -->
+                <div class="mb-4">
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+                        <input type="search" id="studentSearch" placeholder="搜尋姓名或座號..."
+                            class="w-full pl-10 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-shadow">
+                        <button id="clearSearch"
+                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 hidden transition-colors">✕</button>
+                    </div>
+                    <div id="searchStats" class="text-sm text-gray-600 mt-2 h-5"></div>
+                </div>
                 <div id="studentsList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4"></div>
             </div>
         </div>
