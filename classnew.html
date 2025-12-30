@@ -178,49 +178,44 @@
 
         /* 數位時鐘 (預設) */
         .clock-style-digital .time-display {
-            font-size: clamp(8rem, 25vw, 20rem);
+            font-size: clamp(3rem, 18vw, 20rem);
             font-weight: 700;
             color: #1f2937;
-            /* gray-800 */
+            white-space: nowrap;
         }
 
         .clock-style-digital .date-display {
-            font-size: clamp(2rem, 6vw, 4rem);
+            font-size: clamp(1rem, 5vw, 4rem);
             color: #4b5563;
-            /* gray-600 */
         }
 
         #clock-modal.dark .clock-style-digital .time-display {
             color: #f3f4f6;
-            /* gray-100 */
         }
 
         #clock-modal.dark .clock-style-digital .date-display {
             color: #9ca3af;
-            /* gray-400 */
         }
 
         /* LED 時鐘 */
         .clock-style-led .time-display {
             font-family: 'Chakra Petch', 'Noto Sans TC', sans-serif;
-            font-size: clamp(7rem, 22vw, 18rem);
+            font-size: clamp(2.5rem, 16vw, 18rem);
             font-weight: 700;
             color: #16a34a;
-            /* green-600 */
-            text-shadow: 0 0 5px rgba(22, 163, 74, 0.3), 0 0 10px rgba(22, 163, 74, 0.3), 0 0 15px rgba(22, 163, 74, 0.3);
+            text-shadow: 0 0 5px rgba(22, 163, 74, 0.3), 0 0 10px rgba(22, 163, 74, 0.3);
             background: #111827;
-            /* gray-900 */
-            padding: 1rem 2rem;
+            padding: 0.5rem 1rem;
             border-radius: 1rem;
+            white-space: nowrap;
         }
 
         .clock-style-led .date-display {
             font-family: 'Chakra Petch', 'Noto Sans TC', sans-serif;
-            font-size: clamp(1.75rem, 5vw, 3.5rem);
+            font-size: clamp(1rem, 4vw, 3.5rem);
             color: #ca8a04;
-            /* yellow-600 */
             text-shadow: 0 0 5px rgba(202, 138, 4, 0.3);
-            margin-top: 1rem;
+            margin-top: 0.5rem;
         }
 
         #clock-modal.dark .clock-style-led .time-display {
@@ -546,26 +541,43 @@
     <!-- 頂部導航 -->
     <nav class="bg-white shadow-lg border-b-4 border-blue-500">
         <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-            <div class="flex flex-col sm:flex-row justify-between items-center py-3 sm:py-0 sm:h-16">
+            <!-- 手機版：垂直排列 / 電腦版：三欄置中 -->
+            <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center py-3 lg:py-0 lg:h-16">
+                <!-- 左側 Logo -->
                 <div class="flex flex-col sm:flex-row items-center text-center sm:text-left">
                     <div class="text-xl sm:text-2xl font-bold text-blue-600">📚 班級小管家</div>
                     <div class="mt-1 sm:mt-0 sm:ml-4 text-xs sm:text-sm text-gray-600">讓課堂管理變得簡單有趣</div>
                 </div>
-                <!-- 優化：將時間顯示和時鐘圖示合併為一個按鈕，使其功能更清晰 -->
-                <div class="flex items-center gap-2 sm:gap-4 mt-2 sm:mt-0">
-                    <button onclick="openBigClock()" title="開啟全螢幕時鐘"
-                        class="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors p-2 rounded-lg hover:bg-blue-50 active:scale-95">
+
+                <!-- 中間：時鐘按鈕（置中顯示） -->
+                <div class="flex justify-center mt-3 lg:mt-0 lg:absolute lg:left-1/2 lg:transform lg:-translate-x-1/2">
+                    <button onclick="openBigClock()" title="點擊展開全螢幕時鐘"
+                        class="group flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-4 py-2 rounded-xl shadow-md hover:shadow-lg hover:from-blue-600 hover:to-indigo-600 transition-all duration-300 active:scale-95">
                         <!-- 時間顯示 -->
-                        <div class="text-xs sm:text-sm font-medium" id="currentTime"></div>
-                        <!-- 時鐘圖示 -->
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-6 sm:w-6" viewBox="0 0 20 20"
-                            fill="currentColor">
-                            <path fill-rule="evenodd"
-                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l3 3a1 1 0 001.414-1.414L11 10.586V6z"
-                                clip-rule="evenodd" />
-                        </svg>
+                        <div class="text-sm sm:text-base font-bold" id="currentTime"></div>
+                        <!-- 時鐘圖示 + 動畫 -->
+                        <div class="relative">
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                class="h-5 w-5 sm:h-6 sm:w-6 group-hover:scale-110 transition-transform"
+                                viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd"
+                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l3 3a1 1 0 001.414-1.414L11 10.586V6z"
+                                    clip-rule="evenodd" />
+                            </svg>
+                            <!-- 閃爍提示點 -->
+                            <span class="absolute -top-1 -right-1 flex h-3 w-3">
+                                <span
+                                    class="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-300 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-3 w-3 bg-yellow-400"></span>
+                            </span>
+                        </div>
+                        <!-- 展開提示文字 -->
+                        <span class="text-xs font-medium opacity-90">⤢ 全螢幕</span>
                     </button>
                 </div>
+
+                <!-- 右側空白（保持三欄平衡） -->
+                <div class="hidden lg:block w-48"></div>
             </div>
         </div>
     </nav>
