@@ -1,0 +1,39 @@
+/**
+ * 班級小管家 - 主要樣式
+ * main.css - 基礎樣式與UI組件
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@700&family=Mochiyochi+Pop+One&display=swap');
+
+body {
+    font-family: 'Noto Sans TC', sans-serif;
+    overflow-x: hidden;
+}
+
+/* 快速加扣分按鈕 */
+.quick-point-btn.active,
+.quick-value-btn.active {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+    background-color: #2563eb;
+    color: white;
+    border-color: #2563eb;
+}
+
+/* 統計區塊選中狀態 */
+.stat-block-active {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+    border-color: #3b82f6;
+}
+
+/* 拖曳樣式 */
+.notebook-item.dragging {
+    opacity: 0.4;
+    border-style: dashed;
+    background: #eef2ff; /* indigo-50 */
+}
+
+.drag-handle {
+    touch-action: none; /* 避免在觸控裝置上拖曳時觸發滾動 */
+}

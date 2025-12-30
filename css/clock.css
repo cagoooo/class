@@ -1,0 +1,304 @@
+/**
+ * 班級小管家 - 全螢幕時鐘樣式
+ * clock.css - 時鐘相關所有樣式
+ */
+
+/* --- 全螢幕時鐘基礎樣式 --- */
+#clock-modal {
+    background: #ffffff;
+    transition: opacity 0.3s ease;
+}
+
+#clock-modal.dark {
+    background: #111827;
+    /* gray-900 */
+}
+
+/* 時鐘控制列 */
+#clock-controls {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+#clock-modal:not(:hover) #clock-controls:not(:focus-within) {
+    opacity: 0;
+    transform: translateY(100%);
+}
+
+/* 樣式切換按鈕 */
+.clock-style-btn.active {
+    background-color: #3b82f6;
+    /* blue-500 */
+    color: white;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+}
+
+.clock-toggle-btn.active {
+    background-color: #3b82f6;
+    /* blue-500 */
+    color: white;
+}
+
+.clock-toggle-btn.active .toggle-dot {
+    transform: translateX(100%);
+    background-color: white;
+}
+
+/* === 數位時鐘 (預設) === */
+.clock-style-digital .time-display {
+    font-size: clamp(8rem, 25vw, 20rem);
+    font-weight: 700;
+    color: #1f2937;
+    /* gray-800 */
+}
+
+.clock-style-digital .date-display {
+    font-size: clamp(2rem, 6vw, 4rem);
+    color: #4b5563;
+    /* gray-600 */
+}
+
+#clock-modal.dark .clock-style-digital .time-display {
+    color: #f3f4f6;
+    /* gray-100 */
+}
+
+#clock-modal.dark .clock-style-digital .date-display {
+    color: #9ca3af;
+    /* gray-400 */
+}
+
+/* === LED 時鐘 === */
+.clock-style-led .time-display {
+    font-family: 'Chakra Petch', 'Noto Sans TC', sans-serif;
+    font-size: clamp(7rem, 22vw, 18rem);
+    font-weight: 700;
+    color: #16a34a;
+    /* green-600 */
+    text-shadow: 0 0 5px rgba(22, 163, 74, 0.3), 0 0 10px rgba(22, 163, 74, 0.3), 0 0 15px rgba(22, 163, 74, 0.3);
+    background: #111827;
+    /* gray-900 */
+    padding: 1rem 2rem;
+    border-radius: 1rem;
+}
+
+.clock-style-led .date-display {
+    font-family: 'Chakra Petch', 'Noto Sans TC', sans-serif;
+    font-size: clamp(1.75rem, 5vw, 3.5rem);
+    color: #ca8a04;
+    /* yellow-600 */
+    text-shadow: 0 0 5px rgba(202, 138, 4, 0.3);
+    margin-top: 1rem;
+}
+
+#clock-modal.dark .clock-style-led .time-display {
+    color: #22c55e;
+    /* green-500 */
+    text-shadow: 0 0 5px #22c55e, 0 0 10px #22c55e;
+}
+
+#clock-modal.dark .clock-style-led .date-display {
+    color: #eab308;
+    /* yellow-500 */
+    text-shadow: 0 0 5px #eab308;
+}
+
+/* === 可愛時鐘 === */
+.clock-style-cute .time-display {
+    font-family: 'Mochiyochi Pop One', 'Noto Sans TC', sans-serif;
+    font-size: clamp(7rem, 20vw, 16rem);
+    font-weight: 400;
+    color: #ec4899;
+    /* pink-500 */
+    text-shadow: 4px 4px 0 #ffffff, 6px 6px 0 rgba(0, 0, 0, 0.1);
+}
+
+.clock-style-cute .date-display {
+    font-family: 'Mochiyochi Pop One', 'Noto Sans TC', sans-serif;
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    color: #8b5cf6;
+    /* violet-500 */
+}
+
+#clock-modal.dark .clock-style-cute {
+    background: #fdf2f8;
+    /* pink-50 */
+}
+
+#clock-modal.dark .clock-style-cute .time-display {
+    color: #db2777;
+    /* pink-600 */
+    text-shadow: 4px 4px 0 #ffffff;
+}
+
+#clock-modal.dark .clock-style-cute .date-display {
+    color: #7c3aed;
+    /* violet-600 */
+}
+
+/* === 翻轉時鐘 === */
+.clock-style-flip .flipper-group {
+    display: inline-flex;
+    margin: 0 clamp(0.1em, 1.5vw, 0.5em);
+}
+
+.clock-style-flip .flipper {
+    position: relative;
+    font-family: 'Noto Sans TC', sans-serif;
+    font-weight: 700;
+    font-size: clamp(6rem, 20vw, 16rem);
+    line-height: 1.1;
+    perspective: 1000px;
+    display: inline-block;
+    color: white;
+    width: 0.6em;
+    text-align: center;
+}
+
+.clock-style-flip .flipper-card {
+    position: relative;
+    width: 100%;
+    height: 1.1em;
+    transform-style: preserve-3d;
+    transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.clock-style-flip .flipper.flip .flipper-card {
+    transform: rotateX(-180deg);
+}
+
+.clock-style-flip .flipper-face {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    backface-visibility: hidden;
+    background: #374151;
+    /* gray-700 */
+    border-radius: 0.1em;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.clock-style-flip .flipper-face::before {
+    content: attr(data-digit);
+    position: absolute;
+    left: 0;
+    right: 0;
+}
+
+/* 前卡 - 上半部 */
+.clock-style-flip .flipper-face-front {
+    transform: rotateX(0deg);
+    height: 50%;
+}
+
+.clock-style-flip .flipper-face-front::before {
+    top: 0;
+    padding-top: 0.05em;
+}
+
+/* 後卡 - 上半部 */
+.clock-style-flip .flipper-face-back {
+    transform: rotateX(180deg);
+    height: 50%;
+}
+
+.clock-style-flip .flipper-face-back::before {
+    top: 0;
+    padding-top: 0.05em;
+}
+
+/* 靜態底板 - 下半部 */
+.clock-style-flip .flipper-static-bottom {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 50%;
+    background: #4b5563;
+    /* gray-600 */
+    border-radius: 0.1em;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.clock-style-flip .flipper-static-bottom::before {
+    content: attr(data-digit);
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding-bottom: 0.05em;
+}
+
+/* 翻轉卡 - 下半部 */
+.clock-style-flip .flipper-face-bottom {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 50%;
+    backface-visibility: hidden;
+    background: #374151;
+    /* gray-700 */
+    border-radius: 0.1em;
+    overflow: hidden;
+    transform: rotateX(0deg);
+}
+
+.clock-style-flip .flipper-face-bottom::before {
+    content: attr(data-digit-new);
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding-bottom: 0.05em;
+}
+
+.clock-style-flip .flipper.flip .flipper-face-bottom {
+    /* 翻轉時維持狀態 */
+    transform: rotateX(0deg);
+}
+
+/* 翻轉時鐘分隔符 */
+.clock-style-flip .flipper-colon {
+    font-size: clamp(5rem, 18vw, 14rem);
+    line-height: 1.0;
+    font-weight: 700;
+    color: #4b5563;
+    /* gray-600 */
+    padding-bottom: 0.1em;
+}
+
+.clock-style-flip .date-display {
+    font-size: clamp(2rem, 6vw, 4rem);
+    color: #4b5563;
+    /* gray-600 */
+    font-weight: 500;
+    margin-top: 1rem;
+}
+
+/* 翻轉時鐘深色模式 */
+#clock-modal.dark .clock-style-flip .flipper-face,
+#clock-modal.dark .clock-style-flip .flipper-face-bottom {
+    background: #d1d5db;
+    /* gray-300 */
+    color: #1f2937;
+    /* gray-800 */
+}
+
+#clock-modal.dark .clock-style-flip .flipper-static-bottom {
+    background: #9ca3af;
+    /* gray-400 */
+    color: #1f2937;
+    /* gray-800 */
+}
+
+#clock-modal.dark .clock-style-flip .flipper-colon {
+    color: #9ca3af;
+    /* gray-400 */
+}
+
+#clock-modal.dark .clock-style-flip .date-display {
+    color: #9ca3af;
+    /* gray-400 */
+}

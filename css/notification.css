@@ -1,0 +1,76 @@
+/**
+ * 班級小管家 - 通知系統樣式
+ * notification.css - 通知、載入指示器、對話框樣式
+ */
+
+/* === 統一通知系統樣式 === */
+.notification {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    min-width: 300px;
+    max-width: 500px;
+    padding: 1rem 1.5rem;
+    border-radius: 0.5rem;
+    color: white;
+    font-weight: 500;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    transform: translateX(calc(100% + 2rem));
+    transition: transform 0.3s ease-out;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.notification.show {
+    transform: translateX(0);
+}
+
+.notification.success {
+    background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.notification.error {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.notification.warning {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.notification.info {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+.notification-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.notification-message {
+    flex: 1;
+}
+
+/* === 載入指示器樣式 === */
+#loading-overlay {
+    backdrop-filter: blur(4px);
+}
+
+.loader {
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    border-top: 4px solid #3b82f6;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+}
+
+/* === 確認對話框樣式 === */
+.confirm-dialog-overlay {
+    backdrop-filter: blur(2px);
+}
+
+.confirm-dialog {
+    animation: dialogSlideIn 0.3s ease-out;
+}

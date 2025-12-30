@@ -1,0 +1,117 @@
+/**
+ * 班級小管家 - 動畫效果
+ * animations.css - 所有動畫相關樣式
+ */
+
+/* 彈跳進入動畫 */
+.animate-bounce-in {
+    animation: bounceIn 0.6s ease-out;
+}
+
+@keyframes bounceIn {
+    0% {
+        transform: scale(0.3);
+        opacity: 0;
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+
+    70% {
+        transform: scale(0.9);
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* 抽籤滾動動畫 */
+@keyframes slot-machine-roll {
+    0% {
+        transform: translateY(-50%);
+        opacity: 0;
+    }
+
+    20%,
+    80% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateY(50%);
+        opacity: 0;
+    }
+}
+
+.slot-item {
+    display: inline-block;
+    animation: slot-machine-roll 0.1s ease-in-out;
+}
+
+/* 中獎揭曉動畫 */
+@keyframes winner-reveal {
+    0% {
+        transform: scale(0.5) rotate(-15deg);
+        opacity: 0;
+    }
+
+    100% {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
+    }
+}
+
+.winner {
+    animation: winner-reveal 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* 彩花掉落動畫 */
+.confetti {
+    position: fixed;
+    width: 10px;
+    height: 10px;
+    opacity: 0.9;
+    z-index: 1000;
+    pointer-events: none;
+    animation: fall 3s ease-out forwards;
+}
+
+@keyframes fall {
+    0% {
+        transform: translateY(0vh) rotate(0deg);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateY(105vh) rotate(720deg);
+        opacity: 0;
+    }
+}
+
+/* 載入旋轉動畫 */
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* 對話框滑入動畫 */
+@keyframes dialogSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
