@@ -4,6 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icons/icon.svg">
     <title>班級小管家</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 新增 Excel 讀取套件 -->
@@ -884,6 +889,25 @@
                             <input type="number" id="lotteryCount" value="2" min="1"
                                 class="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm sm:text-base">
                         </div>
+                        <div class="bg-purple-50 p-3 rounded-lg">
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="flex items-center cursor-pointer">
+                                    <input type="checkbox" id="noRepeatToggle" checked onchange="toggleNoRepeat()"
+                                        class="w-4 h-4 text-purple-600 rounded focus:ring-purple-500">
+                                    <span class="ml-2 text-sm font-medium text-gray-700">不重複抽取</span>
+                                </label>
+                                <button onclick="resetDrawnStudents()"
+                                    class="text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded-lg transition-colors">
+                                    🔄 重置
+                                </button>
+                            </div>
+                            <div id="lotteryStats" class="text-xs text-gray-600">
+                                <span>剩餘：<span id="remainingCount" class="font-semibold text-purple-600">0</span>
+                                    人</span>
+                                <span class="mx-2">|</span>
+                                <span>已抽：<span id="drawnCount" class="font-semibold text-gray-500">0</span> 人</span>
+                            </div>
+                        </div>
                         <button id="startLotteryBtn" onclick="startLottery()"
                             class="w-full bg-purple-500 text-white py-3 rounded-lg hover:bg-purple-600 transition-colors text-base sm:text-lg font-semibold active:scale-95">🎲
                             開始抽籤</button>
@@ -1199,6 +1223,11 @@
         let originalSeconds = 300; // 用於倒數計時的進度條
         let timerMode = 'countdown'; // 'countdown' 或 'stopwatch'
         // --- 結束計時器變數 ---
+
+        // --- 抽籤系統變數 ---
+        let drawnStudentIds = JSON.parse(localStorage.getItem('drawnStudentIds')) || []; // 已抽取過的學生 ID
+        let noRepeatLottery = JSON.parse(localStorage.getItem('noRepeatLottery')) ?? true; // 預設開啟不重複抽取
+        // --- 結束抽籤系統變數 ---
 
         // --- 全螢幕時鐘變數 ---
         let bigClockInterval = null;
@@ -1992,25 +2021,84 @@
             const count = parseInt(document.getElementById('lotteryCount').value) || 2;
             let result = [];
 
+            // 取得可抽取的學生（排除已抽過的）
+            let availableStudents;
+            if (noRepeatLottery && type !== 'group') {
+                availableStudents = students.filter(s => !drawnStudentIds.includes(s.id));
+
+                // 如果所有人都抽過了，自動重置
+                if (availableStudents.length === 0) {
+                    drawnStudentIds = [];
+                    localStorage.setItem('drawnStudentIds', JSON.stringify(drawnStudentIds));
+                    availableStudents = [...students];
+                    NotificationSystem.info('所有學生都抽過了，已自動重置！');
+                }
+            } else {
+                availableStudents = [...students];
+            }
+
             if (type === 'single') {
-                const availableStudents = [...students];
                 const randomIndex = Math.floor(Math.random() * availableStudents.length);
                 result = [availableStudents[randomIndex]];
             } else if (type === 'multiple') {
-                const availableStudents = [...students];
                 const selectCount = Math.min(count, availableStudents.length);
+                if (selectCount < count && noRepeatLottery) {
+                    NotificationSystem.warning(`只剩 ${availableStudents.length} 位可抽取的學生`);
+                }
+                const tempAvailable = [...availableStudents];
                 for (let i = 0; i < selectCount; i++) {
-                    const randomIndex = Math.floor(Math.random() * availableStudents.length);
-                    result.push(availableStudents.splice(randomIndex, 1)[0]);
+                    const randomIndex = Math.floor(Math.random() * tempAvailable.length);
+                    result.push(tempAvailable.splice(randomIndex, 1)[0]);
                 }
             } else if (type === 'group') {
                 const randomIndex = Math.floor(Math.random() * groups.length);
                 result = [groups[randomIndex]];
             }
 
+            // 記錄已抽取的學生（僅限學生抽籤且開啟不重複）
+            if (noRepeatLottery && type !== 'group') {
+                result.forEach(s => {
+                    if (!drawnStudentIds.includes(s.id)) {
+                        drawnStudentIds.push(s.id);
+                    }
+                });
+                localStorage.setItem('drawnStudentIds', JSON.stringify(drawnStudentIds));
+                updateLotteryStats();
+            }
+
             runLotteryAnimation(result, type);
-            saveLotteryHistory(result, type);
+            // 歷史記錄將在動畫結束後才儲存，避免提前洩漏結果
         }
+
+        // 切換不重複抽取模式
+        function toggleNoRepeat() {
+            noRepeatLottery = document.getElementById('noRepeatToggle').checked;
+            localStorage.setItem('noRepeatLottery', JSON.stringify(noRepeatLottery));
+            updateLotteryStats();
+        }
+
+        // 重置已抽取的學生
+        function resetDrawnStudents() {
+            drawnStudentIds = [];
+            localStorage.setItem('drawnStudentIds', JSON.stringify(drawnStudentIds));
+            updateLotteryStats();
+            NotificationSystem.success('已重置抽籤記錄，所有學生都可以被抽取！');
+        }
+
+        // 更新抽籤統計顯示
+        function updateLotteryStats() {
+            const remainingEl = document.getElementById('remainingCount');
+            const drawnEl = document.getElementById('drawnCount');
+
+            if (remainingEl && drawnEl) {
+                const remaining = noRepeatLottery ? students.filter(s => !drawnStudentIds.includes(s.id)).length : students.length;
+                const drawn = noRepeatLottery ? drawnStudentIds.length : 0;
+
+                remainingEl.textContent = remaining;
+                drawnEl.textContent = drawn;
+            }
+        }
+
         function runLotteryAnimation(finalResult, type) {
             const container = document.getElementById('lotteryResult');
             const btn = document.getElementById('startLotteryBtn');
@@ -2047,6 +2135,8 @@
                     displayLotteryResult(finalResult, type);
                     playLotteryWinSound();
                     triggerConfetti();
+                    // 動畫結束後才儲存歷史記錄
+                    saveLotteryHistory(finalResult, type);
                     btn.disabled = false;
                     btn.classList.remove('bg-gray-400', 'hover:bg-gray-400');
                 }
@@ -3223,6 +3313,8 @@
     <script src="js/notebook-enhancement.js"></script>
     <script src="js/leaderboard-enhancement.js"></script>
     <script src="js/timer-enhancement.js"></script>
+    <script src="js/theme-toggle.js"></script>
+    <script src="js/lottery-enhancement.js"></script>
 
 </body>
 
