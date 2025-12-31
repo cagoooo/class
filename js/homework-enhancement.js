@@ -64,6 +64,7 @@
                 z-index: 10;
                 background: white;
                 padding: 1rem;
+                padding-right: 4rem; /* 預留空間給主題切換按鈕 */
                 border-bottom: 1px solid #e2e8f0;
                 display: flex;
                 flex-wrap: wrap;
