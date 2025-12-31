@@ -29,11 +29,11 @@
             visibility: visible;
         }
 
-        /* 關閉按鈕 */
+        /* 關閉按鈕 - 左上角 */
         .timer-fullscreen-close {
             position: absolute;
             top: 1rem;
-            right: 1rem;
+            left: 1rem;
             background: rgba(255, 255, 255, 0.15);
             border: none;
             color: white;
@@ -52,6 +52,31 @@
         .timer-fullscreen-close:hover {
             background: rgba(255, 255, 255, 0.3);
             transform: scale(1.1);
+        }
+
+        /* 主題切換按鈕 - 右上角 */
+        .timer-fullscreen-theme {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: rgba(255, 255, 255, 0.15);
+            border: none;
+            color: white;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            font-size: 1.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            z-index: 10;
+        }
+
+        .timer-fullscreen-theme:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.1) rotate(15deg);
         }
 
         /* 標題 */
@@ -224,6 +249,13 @@
         @media (max-width: 640px) {
             .timer-fullscreen-close {
                 top: 0.5rem;
+                left: 0.5rem;
+                width: 44px;
+                height: 44px;
+            }
+
+            .timer-fullscreen-theme {
+                top: 0.5rem;
                 right: 0.5rem;
                 width: 44px;
                 height: 44px;
@@ -255,7 +287,8 @@
     // Modal HTML 模板
     const modalHTML = `
         <div id="timerFullscreenModal" class="timer-fullscreen-modal" onclick="closeTimerFullscreen()">
-            <button class="timer-fullscreen-close" onclick="event.stopPropagation(); closeTimerFullscreen();">&times;</button>
+            <button class="timer-fullscreen-close" title="關閉" onclick="event.stopPropagation(); closeTimerFullscreen();">✕</button>
+            <button class="timer-fullscreen-theme" id="timerFullscreenThemeBtn" title="切換主題" onclick="event.stopPropagation(); toggleTimerFullscreenTheme();">🌙</button>
             
             <div onclick="event.stopPropagation();">
                 <div class="timer-fullscreen-title">
@@ -329,6 +362,9 @@
 
         // 同步當前狀態
         syncTimerState();
+
+        // 同步主題按鈕圖示
+        updateThemeButtonIcon();
 
         modal.classList.add('active');
         document.body.style.overflow = 'hidden';
@@ -435,6 +471,26 @@
             setTimeout(syncTimerState, 100);
         }
     };
+
+    // 全螢幕計時器主題切換
+    window.toggleTimerFullscreenTheme = function () {
+        // 使用全域的主題切換功能
+        if (typeof window.toggleTheme === 'function') {
+            window.toggleTheme();
+        }
+        // 更新按鈕圖示
+        updateThemeButtonIcon();
+    };
+
+    // 更新主題按鈕圖示
+    function updateThemeButtonIcon() {
+        const btn = document.getElementById('timerFullscreenThemeBtn');
+        if (!btn) return;
+
+        const isDark = document.documentElement.classList.contains('dark');
+        btn.innerHTML = isDark ? '☀️' : '🌙';
+        btn.title = isDark ? '切換淺色模式' : '切換深色模式';
+    }
 
     // 初始化
     function init() {
