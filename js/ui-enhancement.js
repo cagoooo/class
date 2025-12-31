@@ -643,17 +643,19 @@
      * 添加座位表按鈕
      */
     function addSeatingButton() {
-        const studentSection = document.getElementById('student-section');
+        // 修正：使用 students-section（有 s）
+        const studentSection = document.getElementById('students-section');
         if (!studentSection || document.getElementById('seating-chart-btn')) return;
 
-        const statsArea = studentSection.querySelector('.grid.grid-cols-2');
+        // 找到班級統計區域
+        const statsArea = studentSection.querySelector('.bg-gray-50.p-3');
         if (statsArea) {
             const btn = document.createElement('button');
             btn.id = 'seating-chart-btn';
-            btn.className = 'col-span-2 mt-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg hover:from-blue-600 hover:to-indigo-600 transition-all flex items-center justify-center gap-2';
+            btn.className = 'w-full mt-3 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg hover:from-blue-600 hover:to-indigo-600 transition-all flex items-center justify-center gap-2';
             btn.innerHTML = '🪑 座位表';
             btn.onclick = showSeatingChart;
-            statsArea.parentNode.insertBefore(btn, statsArea.nextSibling);
+            statsArea.appendChild(btn);
         }
     }
 
