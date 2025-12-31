@@ -179,6 +179,58 @@
                 0%, 100% { opacity: 0.3; transform: scale(0.8); }
                 50% { opacity: 1; transform: scale(1.2); }
             }
+
+            /* === RWD 響應式樣式 === */
+            
+            /* 平板以下 (768px) */
+            @media (max-width: 768px) {
+                .lottery-rolling-name {
+                    font-size: 1.8rem;
+                }
+                
+                .lottery-winner-name {
+                    font-size: 2rem;
+                    line-height: 1.3;
+                    word-break: keep-all;
+                    padding: 0 0.5rem;
+                }
+                
+                .lottery-question-marks {
+                    font-size: 3rem;
+                }
+                
+                .lottery-star {
+                    font-size: 1.2rem;
+                }
+            }
+            
+            /* 手機 (480px) */
+            @media (max-width: 480px) {
+                .lottery-rolling-name {
+                    font-size: 1.5rem;
+                }
+                
+                .lottery-winner-name {
+                    font-size: 1.5rem;
+                    line-height: 1.4;
+                }
+                
+                .lottery-question-marks {
+                    font-size: 2.5rem;
+                }
+                
+                .lottery-star {
+                    font-size: 1rem;
+                }
+                
+                .lottery-winner-reveal .text-5xl {
+                    font-size: 2.5rem;
+                }
+                
+                .lottery-winner-reveal .text-xl {
+                    font-size: 1rem;
+                }
+            }
         `;
         document.head.appendChild(styles);
     }
