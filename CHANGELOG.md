@@ -55,12 +55,27 @@
   - D：深色模式，?：顯示說明
   - ESC：關閉彈窗
 
+#### 🎨 深色模式完善
+- Modal、通知、標籤全面支援深色主題
+
+#### 🔀 拖拽排序
+- 學生列表支援拖拽重新排序
+
+#### 🪑 座位表
+- **視覺化座位安排**
+  - 可調整行列數量
+  - 📋 依座號排：按座號順序安排
+  - 🎲 隨機排座位：Fisher-Yates 洗牌演算法
+  - 手動點擊分配座位
+  - 座位配置保存
+
 ### 📁 新增檔案
 - `js/student-enhancement.js` - 學生增強模組
 - `js/app-state.js` - 狀態管理模組
 - `css/rwd-breakpoints.css` - RWD 斷點樣式
 - `js/pomodoro.js` - 番茄鐘模組
 - `js/keyboard-shortcuts.js` - 鍵盤快捷鍵模組
+- `js/ui-enhancement.js` - UI 增強模組（深色模式、拖拽、座位表）
 
 ---
 
