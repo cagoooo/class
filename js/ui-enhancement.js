@@ -410,7 +410,8 @@
                             <input type="number" id="seating-cols" value="${seatingConfig.cols}" min="1" max="10"
                                 class="px-2 py-1 border rounded-lg" onchange="updateSeatingGrid()">
                         </label>
-                        <button onclick="autoAssignSeats()" class="seating-btn seating-btn-primary">🔄 自動安排</button>
+                        <button onclick="autoAssignSeats()" class="seating-btn seating-btn-secondary">📋 依座號排</button>
+                        <button onclick="randomAssignSeats()" class="seating-btn seating-btn-primary">🎲 隨機排座位</button>
                         <button onclick="clearSeats()" class="seating-btn seating-btn-secondary">🗑️ 清除</button>
                         <button onclick="saveSeatingChart()" class="seating-btn seating-btn-primary">💾 儲存</button>
                     </div>
@@ -547,9 +548,59 @@
 
         renderSeatingGrid();
         if (typeof NotificationSystem !== 'undefined') {
-            NotificationSystem.success('已自動安排座位');
+            NotificationSystem.success('已按座號安排座位');
         }
     };
+
+    /**
+     * 隨機安排座位（洗牌演算法）
+     */
+    window.randomAssignSeats = function () {
+        seatingConfig.layout = {};
+
+        // 複製學生陣列並洗牌
+        const shuffledStudents = [...(students || [])];
+
+        // Fisher-Yates 洗牌演算法
+        for (let i = shuffledStudents.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffledStudents[i], shuffledStudents[j]] = [shuffledStudents[j], shuffledStudents[i]];
+        }
+
+        // 分配座位
+        let index = 0;
+        for (let row = 0; row < seatingConfig.rows && index < shuffledStudents.length; row++) {
+            for (let col = 0; col < seatingConfig.cols && index < shuffledStudents.length; col++) {
+                seatingConfig.layout[`${row}-${col}`] = shuffledStudents[index].id;
+                index++;
+            }
+        }
+
+        // 播放動畫效果
+        playShuffleAnimation();
+
+        renderSeatingGrid();
+        if (typeof NotificationSystem !== 'undefined') {
+            NotificationSystem.success('🎲 已隨機安排座位！');
+        }
+    };
+
+    /**
+     * 播放洗牌動畫
+     */
+    function playShuffleAnimation() {
+        const seats = document.querySelectorAll('.seat');
+        seats.forEach((seat, i) => {
+            seat.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
+            seat.style.transform = 'scale(0.8) rotate(' + (Math.random() * 20 - 10) + 'deg)';
+            seat.style.opacity = '0.5';
+
+            setTimeout(() => {
+                seat.style.transform = 'scale(1) rotate(0deg)';
+                seat.style.opacity = '1';
+            }, 100 + i * 30);
+        });
+    }
 
     /**
      * 清除座位
