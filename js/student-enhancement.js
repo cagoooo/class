@@ -227,6 +227,8 @@ function renderStudentsEnhanced() {
                             <div class="flex items-center gap-1 ml-2">
                                 <button onclick="showTagEditor(${student.id})" 
                                     class="text-blue-500 hover:text-blue-700 text-lg p-1 active:scale-95" title="編輯標籤">🏷️</button>
+                                <button onclick="showStudentReport(${student.id})" 
+                                    class="text-green-500 hover:text-green-700 text-lg p-1 active:scale-95" title="查看報告">📊</button>
                                 <button onclick="removeStudent(${student.id})" 
                                     class="text-red-500 hover:text-red-700 text-lg p-1 active:scale-95" title="刪除學生">🗑️</button>
                             </div>
