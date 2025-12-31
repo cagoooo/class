@@ -45,6 +45,84 @@ const NOTEBOOK_TYPE_ICONS = {
     'other': '📌'
 };
 
+// ==================== P1 新增：範本系統 ====================
+const NOTEBOOK_TEMPLATES = {
+    'homework': {
+        name: '📚 今日作業',
+        content: `【今日作業】
+
+國語：
+數學：
+英語：
+其他：
+
+※ 請家長簽名確認`
+    },
+    'weekend': {
+        name: '🏠 週末通知',
+        content: `【週末通知】
+
+📅 週末愉快！
+
+本週作業：
+1. 
+2. 
+3. 
+
+下週注意事項：
+• 
+
+祝 週末愉快！`
+    },
+    'exam': {
+        name: '📝 考試提醒',
+        content: `【考試提醒】
+
+📅 考試日期：
+📖 考試科目：
+📚 考試範圍：
+
+準備事項：
+✅ 
+✅ 
+✅ 
+
+加油！祝考試順利！`
+    },
+    'activity': {
+        name: '🎉 活動通知',
+        content: `【活動通知】
+
+📅 活動日期：
+🕐 活動時間：
+📍 活動地點：
+🎯 活動內容：
+
+需準備物品：
+• 
+• 
+
+注意事項：
+1. 
+2. `
+    },
+    'meeting': {
+        name: '👨‍👩‍👧 家長會通知',
+        content: `【家長會通知】
+
+敬愛的家長您好：
+
+📅 日期：
+🕐 時間：
+📍 地點：
+📋 議程：
+
+請務必撥冗出席，謝謝！
+
+敬祝 順心`
+    }
+};
+
 /**
  * 增強版新增聯絡簿函數
  */
@@ -163,6 +241,201 @@ function filterNotebookByPriority(priority) {
     });
 }
 
+// ==================== P1 新增：範本應用 ====================
+
+/**
+ * 應用聯絡簿範本
+ */
+function applyNotebookTemplate(templateKey) {
+    if (!templateKey) return;
+
+    const template = NOTEBOOK_TEMPLATES[templateKey];
+    if (!template) return;
+
+    const contentEl = document.getElementById('notebookContent');
+    if (contentEl) {
+        // 如果已有內容，詢問是否覆蓋
+        if (contentEl.value.trim() && !confirm('目前已有內容，確定要使用範本覆蓋嗎？')) {
+            document.getElementById('notebook-template-select').value = '';
+            return;
+        }
+        contentEl.value = template.content;
+        contentEl.focus();
+    }
+
+    // 重置選擇器
+    document.getElementById('notebook-template-select').value = '';
+
+    if (typeof NotificationSystem !== 'undefined') {
+        NotificationSystem.info(`已套用「${template.name}」範本`);
+    }
+}
+
+// ==================== P1 新增：全螢幕編輯 ====================
+
+/**
+ * 開啟全螢幕編輯器
+ */
+function openFullscreenEditor() {
+    const existingModal = document.getElementById('fullscreen-editor-modal');
+    if (existingModal) existingModal.remove();
+
+    const currentContent = document.getElementById('notebookContent')?.value || '';
+    const currentDate = document.getElementById('notebookDate')?.value || new Date().toISOString().split('T')[0];
+    const currentType = document.getElementById('notebookType')?.value || 'other';
+    const currentPriority = document.getElementById('notebookPriority')?.value || 'normal';
+
+    const modal = document.createElement('div');
+    modal.id = 'fullscreen-editor-modal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50';
+
+    modal.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-2xl w-full h-full max-w-4xl max-h-[90vh] m-4 flex flex-col animate-bounce-in">
+            <div class="flex items-center justify-between p-4 border-b bg-gradient-to-r from-indigo-500 to-purple-500 rounded-t-2xl">
+                <h3 class="text-xl font-bold text-white flex items-center gap-2">
+                    📝 全螢幕編輯模式
+                </h3>
+                <div class="flex items-center gap-2">
+                    <span class="text-white text-sm opacity-75">Ctrl+Enter 儲存</span>
+                    <button onclick="closeFullscreenEditor()" class="text-white hover:text-gray-200 text-2xl">✕</button>
+                </div>
+            </div>
+            
+            <div class="p-4 flex gap-4 bg-gray-50">
+                <div class="flex items-center gap-2">
+                    <label class="text-sm font-medium text-gray-700">日期：</label>
+                    <input type="date" id="fs-date" value="${currentDate}"
+                        class="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="text-sm font-medium text-gray-700">類型：</label>
+                    <select id="fs-type" class="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        <option value="homework" ${currentType === 'homework' ? 'selected' : ''}>📚 作業</option>
+                        <option value="exam" ${currentType === 'exam' ? 'selected' : ''}>📝 考試</option>
+                        <option value="activity" ${currentType === 'activity' ? 'selected' : ''}>🎉 活動</option>
+                        <option value="notice" ${currentType === 'notice' ? 'selected' : ''}>📢 通知</option>
+                        <option value="other" ${currentType === 'other' ? 'selected' : ''}>📌 其他</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="text-sm font-medium text-gray-700">優先級：</label>
+                    <select id="fs-priority" class="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        <option value="normal" ${currentPriority === 'normal' ? 'selected' : ''}>🟡 一般</option>
+                        <option value="high" ${currentPriority === 'high' ? 'selected' : ''}>🔴 高優先</option>
+                        <option value="low" ${currentPriority === 'low' ? 'selected' : ''}>🟢 低優先</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-2 ml-auto">
+                    <select id="fs-template" onchange="applyFsTemplate(this.value)"
+                        class="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 bg-purple-50">
+                        <option value="">📋 範本...</option>
+                        ${Object.entries(NOTEBOOK_TEMPLATES).map(([key, tpl]) =>
+        `<option value="${key}">${tpl.name}</option>`
+    ).join('')}
+                    </select>
+                </div>
+            </div>
+            
+            <div class="flex-1 p-4 overflow-hidden">
+                <textarea id="fs-content" placeholder="在此輸入聯絡簿內容..."
+                    class="w-full h-full p-4 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none text-lg leading-relaxed"
+                    style="min-height: 300px;">${currentContent}</textarea>
+            </div>
+            
+            <div class="flex gap-3 p-4 border-t bg-gray-50 rounded-b-2xl">
+                <button onclick="closeFullscreenEditor()" 
+                    class="flex-1 px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium">
+                    取消
+                </button>
+                <button onclick="saveFromFullscreen()" 
+                    class="flex-1 px-4 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-colors font-medium">
+                    💾 儲存並新增
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // 對焦到內容輸入框
+    setTimeout(() => document.getElementById('fs-content')?.focus(), 100);
+
+    // 綁定快捷鍵
+    document.getElementById('fs-content').addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.key === 'Enter') {
+            e.preventDefault();
+            saveFromFullscreen();
+        }
+    });
+}
+
+/**
+ * 在全螢幕模式中應用範本
+ */
+function applyFsTemplate(templateKey) {
+    if (!templateKey) return;
+
+    const template = NOTEBOOK_TEMPLATES[templateKey];
+    if (!template) return;
+
+    const contentEl = document.getElementById('fs-content');
+    if (contentEl) {
+        if (contentEl.value.trim() && !confirm('目前已有內容，確定要使用範本覆蓋嗎？')) {
+            document.getElementById('fs-template').value = '';
+            return;
+        }
+        contentEl.value = template.content;
+        contentEl.focus();
+    }
+
+    document.getElementById('fs-template').value = '';
+}
+
+/**
+ * 從全螢幕模式儲存
+ */
+function saveFromFullscreen() {
+    const date = document.getElementById('fs-date')?.value;
+    const type = document.getElementById('fs-type')?.value;
+    const priority = document.getElementById('fs-priority')?.value;
+    const content = document.getElementById('fs-content')?.value.trim();
+
+    if (!date || !content) {
+        if (typeof NotificationSystem !== 'undefined') {
+            NotificationSystem.error('請填寫日期和內容');
+        } else {
+            alert('請填寫日期和內容');
+        }
+        return;
+    }
+
+    const entry = {
+        id: Date.now(),
+        date: date,
+        type: type,
+        content: content,
+        priority: priority,
+        timestamp: new Date().toLocaleString('zh-TW')
+    };
+
+    notebookEntries.unshift(entry);
+    localStorage.setItem('notebookEntries', JSON.stringify(notebookEntries));
+
+    closeFullscreenEditor();
+    renderNotebookEnhanced();
+
+    if (typeof NotificationSystem !== 'undefined') {
+        NotificationSystem.success('已新增聯絡事項');
+    }
+}
+
+/**
+ * 關閉全螢幕編輯器
+ */
+function closeFullscreenEditor() {
+    document.getElementById('fullscreen-editor-modal')?.remove();
+}
+
 /**
  * 注入增強 UI 元素
  */
@@ -200,6 +473,27 @@ function injectNotebookEnhancements() {
         notebookListHeader.style.display = 'inline-block';
     }
 
+    // P1 新增：添加範本選擇器
+    const notebookContent = document.getElementById('notebookContent');
+    if (notebookContent && !document.getElementById('notebook-template-select')) {
+        const templateHTML = `
+            <div class="flex gap-2 mb-2">
+                <select id="notebook-template-select" onchange="applyNotebookTemplate(this.value)"
+                    class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm bg-purple-50">
+                    <option value="">📋 選擇範本...</option>
+                    ${Object.entries(NOTEBOOK_TEMPLATES).map(([key, tpl]) =>
+            `<option value="${key}">${tpl.name}</option>`
+        ).join('')}
+                </select>
+                <button type="button" onclick="openFullscreenEditor()" 
+                    class="px-3 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors text-sm flex items-center gap-1">
+                    ⤢ 全螢幕
+                </button>
+            </div>
+        `;
+        notebookContent.insertAdjacentHTML('beforebegin', templateHTML);
+    }
+
     // 覆蓋原本的函數
     if (typeof window.addNotebook === 'function') {
         window._originalAddNotebook = window.addNotebook;
@@ -220,8 +514,16 @@ function injectNotebookEnhancements() {
 // 在 DOM 載入完成後自動注入增強功能
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-        setTimeout(injectNotebookEnhancements, 150);
+        setTimeout(injectNotebookEnhancements, 300);
     });
 } else {
-    setTimeout(injectNotebookEnhancements, 150);
+    setTimeout(injectNotebookEnhancements, 300);
 }
+
+// P1 新增：掛載函數到全域範圍，使 HTML onclick 可調用
+window.applyNotebookTemplate = applyNotebookTemplate;
+window.openFullscreenEditor = openFullscreenEditor;
+window.applyFsTemplate = applyFsTemplate;
+window.saveFromFullscreen = saveFromFullscreen;
+window.closeFullscreenEditor = closeFullscreenEditor;
+window.NOTEBOOK_TEMPLATES = NOTEBOOK_TEMPLATES;
