@@ -63,6 +63,10 @@
     // 淺色模式
     let isLightMode = JSON.parse(localStorage.getItem('examLightMode')) || false;
 
+    // 類比時鐘模式
+    let isAnalogClock = JSON.parse(localStorage.getItem('examAnalogClock')) || false;
+
+
     // ========================================
     // 注入 CSS 樣式 - 增強版 v4
     // ========================================
@@ -130,6 +134,195 @@
         .light-mode .exam-time-display {
             color: #0f172a;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.05);
+        }
+
+        /* 隱藏數位時鐘（當類比時鐘模式開啟時） */
+        .analog-mode .exam-time-display,
+        .analog-mode .exam-date-display {
+            display: none;
+        }
+
+        /* 類比時鐘樣式 - 保持正圓形 */
+        .exam-analog-clock {
+            display: none;
+            position: relative;
+            width: min(50vh, 45vw, 320px);
+            height: min(50vh, 45vw, 320px);
+            aspect-ratio: 1 / 1;
+            border-radius: 50%;
+            background: linear-gradient(145deg, #2a3347 0%, #1a1f2e 100%);
+            box-shadow: 
+                0 0 40px rgba(0, 0, 0, 0.3),
+                inset 0 0 30px rgba(255, 255, 255, 0.03),
+                0 4px 15px rgba(0, 0, 0, 0.4);
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            flex-shrink: 0;
+        }
+
+        .analog-mode .exam-analog-clock {
+            display: block;
+        }
+
+        .light-mode .exam-analog-clock {
+            background: linear-gradient(145deg, #ffffff 0%, #f1f5f9 100%);
+            border: 4px solid #e2e8f0;
+            box-shadow: 
+                0 0 40px rgba(0, 0, 0, 0.08),
+                inset 0 0 20px rgba(0, 0, 0, 0.02),
+                0 8px 25px rgba(0, 0, 0, 0.12);
+        }
+
+        /* 時鐘中心點 */
+        .exam-clock-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            z-index: 10;
+            box-shadow: 0 2px 6px rgba(59, 130, 246, 0.5);
+        }
+
+        .light-mode .exam-clock-center {
+            background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+            box-shadow: 0 2px 6px rgba(30, 64, 175, 0.5);
+        }
+
+        /* 時鐘刻度容器 */
+        .exam-clock-marks {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+        }
+
+        /* 刻度線 - 從時鐘邊緣向內 */
+        .exam-clock-mark {
+            position: absolute;
+            top: 4%;
+            left: 50%;
+            width: 2px;
+            height: 3%;
+            margin-left: -1px;
+            background: rgba(255, 255, 255, 0.3);
+            transform-origin: 50% 1150%;
+            border-radius: 1px;
+        }
+
+        .exam-clock-mark.hour-mark {
+            width: 3px;
+            height: 5%;
+            margin-left: -1.5px;
+            background: rgba(255, 255, 255, 0.6);
+            transform-origin: 50% 900%;
+        }
+
+        .light-mode .exam-clock-mark {
+            background: rgba(0, 0, 0, 0.15);
+        }
+
+        .light-mode .exam-clock-mark.hour-mark {
+            background: rgba(0, 0, 0, 0.4);
+        }
+
+        /* 時鐘數字 - 使用絕對定位環繞圓心 */
+        .exam-clock-numbers {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .exam-clock-number {
+            position: absolute;
+            font-size: clamp(0.9rem, 1.5vw, 1.25rem);
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.85);
+            text-align: center;
+            width: 30px;
+            height: 30px;
+            line-height: 30px;
+            margin-left: -15px;
+            margin-top: -15px;
+        }
+
+        .light-mode .exam-clock-number {
+            color: #475569;
+        }
+
+        /* 時針 - 使用百分比確保比例正確 */
+        .exam-clock-hand-hour {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 6px;
+            height: 22%;
+            margin-left: -3px;
+            transform-origin: 50% 100%;
+            background: linear-gradient(to top, #94a3b8 0%, #e2e8f0 100%);
+            border-radius: 3px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+            z-index: 3;
+        }
+
+        .light-mode .exam-clock-hand-hour {
+            background: linear-gradient(to top, #1e293b 0%, #475569 100%);
+        }
+
+        /* 分針 */
+        .exam-clock-hand-minute {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 4px;
+            height: 32%;
+            margin-left: -2px;
+            transform-origin: 50% 100%;
+            background: linear-gradient(to top, #3b82f6 0%, #93c5fd 100%);
+            border-radius: 2px;
+            box-shadow: 0 2px 6px rgba(59, 130, 246, 0.4);
+            z-index: 4;
+        }
+
+        .light-mode .exam-clock-hand-minute {
+            background: linear-gradient(to top, #1d4ed8 0%, #3b82f6 100%);
+        }
+
+        /* 秒針 */
+        .exam-clock-hand-second {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 2px;
+            height: 38%;
+            margin-left: -1px;
+            transform-origin: 50% 100%;
+            background: #ef4444;
+            border-radius: 1px;
+            box-shadow: 0 2px 4px rgba(239, 68, 68, 0.5);
+            z-index: 5;
+        }
+
+        /* 類比模式下的日期顯示 */
+        .exam-analog-date {
+            display: none;
+            margin-top: 1.5rem;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: clamp(1rem, 1.8vw, 1.4rem);
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .analog-mode .exam-analog-date {
+            display: block;
+        }
+
+        .light-mode .exam-analog-date {
+            color: #475569;
         }
 
         /* 右上區域 - 狀態條與進度條 */
@@ -1525,6 +1718,113 @@
     };
 
     // ========================================
+    // 時鐘模式切換（數位/類比）
+    // ========================================
+
+    window.toggleExamClockMode = function () {
+        const modal = document.getElementById('examFullscreenModal');
+        if (!modal) return;
+
+        isAnalogClock = !isAnalogClock;
+        modal.classList.toggle('analog-mode', isAnalogClock);
+        localStorage.setItem('examAnalogClock', JSON.stringify(isAnalogClock));
+
+        // 更新按鈕圖示
+        const btn = document.getElementById('examClockModeBtn');
+        if (btn) {
+            btn.textContent = isAnalogClock ? '🔢' : '🕐';
+            btn.title = isAnalogClock ? '切換數位時鐘' : '切換圓形時鐘';
+        }
+
+        // 如果是類比時鐘模式，初始化時鐘
+        if (isAnalogClock) {
+            initAnalogClock();
+            updateAnalogClock();
+        }
+    };
+
+    // 初始化類比時鐘（生成刻度和數字）
+    function initAnalogClock() {
+        const marksContainer = document.getElementById('examClockMarks');
+        const numbersContainer = document.getElementById('examClockNumbers');
+
+        if (!marksContainer || marksContainer.children.length > 0) return;
+
+        // 生成 60 個刻度（只生成小時刻度，分鐘刻度太密集）
+        for (let i = 0; i < 60; i++) {
+            // 只生成每5分鐘的刻度（12個小時刻度）
+            if (i % 5 === 0) {
+                const mark = document.createElement('div');
+                mark.className = 'exam-clock-mark hour-mark';
+                mark.style.transform = `rotate(${i * 6}deg)`;
+                marksContainer.appendChild(mark);
+            }
+        }
+
+        // 生成 12 個數字
+        if (numbersContainer && numbersContainer.children.length === 0) {
+            const radius = 38; // 數字距離中心的百分比
+            for (let i = 1; i <= 12; i++) {
+                const number = document.createElement('div');
+                number.className = 'exam-clock-number';
+                const angle = (i * 30 - 90) * (Math.PI / 180);
+                const x = 50 + radius * Math.cos(angle);
+                const y = 50 + radius * Math.sin(angle);
+                number.style.left = x + '%';
+                number.style.top = y + '%';
+                number.textContent = i;
+                numbersContainer.appendChild(number);
+            }
+        }
+    }
+
+    // 更新類比時鐘指針
+    function updateAnalogClock() {
+        const now = new Date();
+        const hours = now.getHours() % 12;
+        const minutes = now.getMinutes();
+        const seconds = now.getSeconds();
+        const milliseconds = now.getMilliseconds();
+
+        const hourHand = document.getElementById('examHourHand');
+        const minuteHand = document.getElementById('examMinuteHand');
+        const secondHand = document.getElementById('examSecondHand');
+        const analogDate = document.getElementById('examAnalogDate');
+
+        // 時針：每小時30度 + 每分鐘0.5度
+        if (hourHand) {
+            const hourDeg = (hours * 30) + (minutes * 0.5);
+            hourHand.style.transform = `translateY(-100%) rotate(${hourDeg}deg)`;
+        }
+
+        // 分針：每分鐘6度 + 每秒0.1度
+        if (minuteHand) {
+            const minuteDeg = (minutes * 6) + (seconds * 0.1);
+            minuteHand.style.transform = `translateY(-100%) rotate(${minuteDeg}deg)`;
+        }
+
+        // 秒針：每秒6度（加上毫秒讓動畫更順滑）
+        if (secondHand) {
+            const secondDeg = (seconds * 6) + (milliseconds * 0.006);
+            secondHand.style.transform = `translateY(-100%) rotate(${secondDeg}deg)`;
+        }
+
+        if (analogDate) {
+            analogDate.textContent = formatROCDate();
+        }
+    }
+
+    // 確保在每秒更新時也更新類比時鐘
+    const originalUpdateFullscreenStatus = updateFullscreenStatus;
+    updateFullscreenStatus = function () {
+        originalUpdateFullscreenStatus();
+        if (isAnalogClock) {
+            updateAnalogClock();
+        }
+    };
+
+
+    // ========================================
     // 點擊輸入人數功能
     // ========================================
 
@@ -1817,8 +2117,15 @@
         const modal = document.getElementById('examFullscreenModal');
         if (!modal) return;
 
+        // 動態新增時鐘切換按鈕（如果不存在）
+        injectClockModeButton();
+
+        // 動態新增類比時鐘 HTML（如果不存在）
+        injectAnalogClockHTML();
+
         modal.classList.add('active');
         modal.classList.toggle('light-mode', isLightMode);
+        modal.classList.toggle('analog-mode', isAnalogClock);
         document.body.style.overflow = 'hidden';
 
         const noteInput = document.getElementById('examAbsentNote');
@@ -1829,6 +2136,19 @@
         if (lightBtn) {
             lightBtn.textContent = isLightMode ? '🌙' : '☀️';
             lightBtn.title = isLightMode ? '切換深色模式' : '切換淺色模式';
+        }
+
+        // 更新時鐘模式按鈕
+        const clockBtn = document.getElementById('examClockModeBtn');
+        if (clockBtn) {
+            clockBtn.textContent = isAnalogClock ? '🔢' : '🕐';
+            clockBtn.title = isAnalogClock ? '切換數位時鐘' : '切換圓形時鐘';
+        }
+
+        // 如果是類比時鐘模式，初始化時鐘
+        if (isAnalogClock) {
+            initAnalogClock();
+            updateAnalogClock();
         }
 
         currentReminderIndex = 0;
@@ -1845,6 +2165,51 @@
             }
         }, 10000);
     };
+
+    // 動態插入時鐘切換按鈕
+    function injectClockModeButton() {
+        if (document.getElementById('examClockModeBtn')) return;
+
+        const controls = document.querySelector('.exam-fullscreen-controls');
+        if (!controls) return;
+
+        const btn = document.createElement('button');
+        btn.id = 'examClockModeBtn';
+        btn.className = 'exam-control-btn';
+        btn.onclick = window.toggleExamClockMode;
+        btn.title = isAnalogClock ? '切換數位時鐘' : '切換圓形時鐘';
+        btn.textContent = isAnalogClock ? '🔢' : '🕐';
+        controls.appendChild(btn);
+    }
+
+    // 動態插入類比時鐘 HTML
+    function injectAnalogClockHTML() {
+        if (document.getElementById('examAnalogClock')) return;
+
+        const clockArea = document.querySelector('.exam-clock-area');
+        if (!clockArea) return;
+
+        // 創建類比時鐘容器
+        const analogClock = document.createElement('div');
+        analogClock.id = 'examAnalogClock';
+        analogClock.className = 'exam-analog-clock';
+        analogClock.innerHTML = `
+            <div class="exam-clock-marks" id="examClockMarks"></div>
+            <div class="exam-clock-numbers" id="examClockNumbers"></div>
+            <div id="examHourHand" class="exam-clock-hand-hour"></div>
+            <div id="examMinuteHand" class="exam-clock-hand-minute"></div>
+            <div id="examSecondHand" class="exam-clock-hand-second"></div>
+            <div class="exam-clock-center"></div>
+        `;
+        clockArea.appendChild(analogClock);
+
+        // 創建類比模式下的日期顯示
+        const analogDate = document.createElement('div');
+        analogDate.id = 'examAnalogDate';
+        analogDate.className = 'exam-analog-date';
+        analogDate.textContent = formatROCDate();
+        clockArea.appendChild(analogDate);
+    }
 
     window.closeExamFullscreen = function () {
         const modal = document.getElementById('examFullscreenModal');
