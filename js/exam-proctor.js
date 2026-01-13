@@ -439,7 +439,7 @@
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            padding-top: 0.5rem;
         }
 
         .exam-subject-item {
@@ -467,7 +467,6 @@
 
         .exam-subject-item:hover {
             background: rgba(255, 255, 255, 0.1);
-            transform: scale(1.02);
         }
 
         .light-mode .exam-subject-item:hover {
@@ -480,8 +479,7 @@
             color: #1a1f2e;
             font-weight: 700;
             border-color: #facc15;
-            transform: scale(1.05);
-            box-shadow: 0 8px 25px rgba(250, 204, 21, 0.3);
+            box-shadow: 0 4px 15px rgba(250, 204, 21, 0.3);
         }
 
         .light-mode .exam-subject-item.active {
