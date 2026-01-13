@@ -626,6 +626,11 @@
                 <div class="text-2xl sm:text-3xl mb-1 sm:mb-2">📋</div>
                 <div class="font-semibold text-gray-700 text-sm sm:text-base">作業檢查</div>
             </button>
+            <button onclick="showSection('exam')"
+                class="bg-white p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-teal-500 active:scale-95">
+                <div class="text-2xl sm:text-3xl mb-1 sm:mb-2">🖥️</div>
+                <div class="font-semibold text-gray-700 text-sm sm:text-base">考試監考</div>
+            </button>
         </div>
 
         <!-- 學生管理區域 -->
@@ -1092,6 +1097,147 @@
             <div class="mt-6">
                 <h3 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">作業統計</h3>
                 <div id="homeworkStats" class="bg-gray-50 p-3 sm:p-4 rounded-lg"></div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- 考試監考系統 -->
+    <div id="exam-section" class="section bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6 hidden">
+        <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-6 flex items-center">
+            <span class="text-2xl sm:text-3xl mr-2 sm:mr-3">🖥️</span>考試監考系統
+        </h2>
+        <div class="space-y-6 lg:grid lg:grid-cols-2 lg:gap-6 lg:space-y-0">
+            <!-- 左側：考試科目設定 -->
+            <div>
+                <h3 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">考試科目設定</h3>
+                <div class="space-y-3 sm:space-y-4 bg-gray-50 p-4 rounded-lg">
+                    <input type="text" id="examSubjectName" placeholder="科目名稱（例：國語）"
+                        class="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 text-sm sm:text-base">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs text-gray-600 mb-1">開始時間</label>
+                            <input type="time" id="examSubjectStart"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-600 mb-1">結束時間</label>
+                            <input type="time" id="examSubjectEnd"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 text-sm">
+                        </div>
+                    </div>
+                    <button onclick="addExamSubject()"
+                        class="w-full bg-teal-500 text-white py-2 rounded-lg hover:bg-teal-600 transition-colors text-sm sm:text-base active:scale-95">➕
+                        新增科目</button>
+                </div>
+                <div class="mt-4">
+                    <h4 class="text-sm font-medium text-gray-700 mb-2 flex items-center justify-between">
+                        科目列表
+                        <span class="text-gray-400 text-xs font-normal">點擊時間可快速編輯</span>
+                    </h4>
+                    <div id="examSubjectList" class="max-h-48 overflow-y-auto"></div>
+                </div>
+            </div>
+            <!-- 右側：自訂提醒語 -->
+            <div>
+                <h3 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">考試注意事項</h3>
+                <div class="bg-teal-50 p-4 rounded-lg">
+                    <label class="block text-sm text-gray-700 mb-2">新增提醒語</label>
+                    <textarea id="examReminderText" rows="2" placeholder="考卷記得寫上班級姓名座號"
+                        class="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 resize-none text-sm sm:text-base"></textarea>
+                    <div class="grid grid-cols-2 gap-2 mt-2">
+                        <button onclick="saveExamReminder()"
+                            class="bg-teal-500 text-white py-2 rounded-lg hover:bg-teal-600 transition-colors text-sm active:scale-95">💾
+                            儲存提醒</button>
+                        <button onclick="openExamSettings()"
+                            class="bg-gray-600 text-white py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm active:scale-95">⚙️
+                            管理提醒</button>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <h4 class="text-sm font-medium text-gray-700 mb-2">📋 提醒預覽 <span
+                            class="text-gray-400 text-xs">點擊管理可編輯順序</span></h4>
+                    <div id="examReminderPreview"
+                        class="bg-gray-50 p-3 rounded-lg max-h-32 overflow-y-auto text-sm text-gray-600 space-y-1">
+                    </div>
+                </div>
+                <div class="mt-4 bg-blue-50 p-3 rounded-lg">
+                    <div class="text-sm text-blue-700">💡 全螢幕會自動輪播提醒（每10秒），考試/休息時間顯示不同類別。</div>
+                </div>
+            </div>
+        </div>
+        <div class="mt-6">
+            <button onclick="openExamFullscreen()"
+                class="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white py-3 rounded-lg hover:from-teal-600 hover:to-cyan-600 transition-all duration-300 text-base sm:text-lg font-semibold active:scale-95 shadow-lg">
+                🖥️ 啟動全螢幕監考模式
+            </button>
+        </div>
+    </div>
+    </div>
+
+    <!-- 全螢幕考試監考 Modal -->
+    <div id="examFullscreenModal" class="exam-fullscreen-modal">
+        <!-- 控制按鈕 -->
+        <div class="exam-fullscreen-controls">
+            <button class="exam-control-btn" onclick="closeExamFullscreen()" title="關閉">✕</button>
+            <button id="examLightModeBtn" class="exam-control-btn" onclick="toggleExamLightMode()"
+                title="切換淺色模式">☀️</button>
+        </div>
+        <div class="exam-fullscreen-hint">按 ESC 或點擊 ✕ 關閉</div>
+
+        <!-- 左上：時鐘區域 -->
+        <div class="exam-clock-area">
+            <div id="examFullscreenDate" class="exam-date-display">民國115年1月13日 星期二</div>
+            <div id="examFullscreenTime" class="exam-time-display">09:30:00</div>
+        </div>
+
+        <!-- 右上：狀態條與進度條 -->
+        <div class="exam-status-area">
+            <div id="examFullscreenStatus" class="exam-status-bar">考試進行中 - 剩餘 30 分鐘</div>
+            <div class="exam-progress-container">
+                <div class="exam-progress-label">
+                    <span id="examProgressElapsed">已進行 10 分鐘</span>
+                    <span id="examProgressRemaining">剩餘 30 分鐘</span>
+                </div>
+                <div class="exam-progress-bar">
+                    <div id="examProgressFill" class="exam-progress-fill" style="width: 25%;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 左下：科目列表與缺考記錄 -->
+        <div class="exam-subjects-area">
+            <div class="exam-subjects-list">
+                <div id="examFullscreenSubjects"></div>
+            </div>
+            <!-- 缺考記錄區 -->
+            <div class="exam-attendance-area">
+                <div class="exam-attendance-box" onclick="editExamAttendance('expected')">
+                    <div class="exam-attendance-label">應到人數</div>
+                    <div id="examExpectedCount" class="exam-attendance-value">0</div>
+                </div>
+                <div class="exam-attendance-box" onclick="editExamAttendance('present')">
+                    <div class="exam-attendance-label">實到人數</div>
+                    <div id="examPresentCount" class="exam-attendance-value">0</div>
+                </div>
+                <div class="exam-attendance-note-container">
+                    <div class="exam-attendance-note-label">未到 / 備註</div>
+                    <textarea id="examAbsentNote" class="exam-attendance-note" placeholder="輸入座號或原因..."></textarea>
+                </div>
+                <div class="exam-attendance-buttons">
+                    <button class="exam-attendance-btn settings" onclick="openExamSettings()" title="提醒設定">⚙️</button>
+                    <button class="exam-attendance-btn hide"
+                        onclick="document.querySelector('.exam-attendance-area').style.display='none'"
+                        title="隱藏">👁️</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右下：提醒語 -->
+        <div class="exam-reminder-area">
+            <div class="exam-reminder-card">
+                <div class="exam-reminder-title">考試注意事項</div>
+                <div id="examFullscreenReminder" class="exam-reminder-text">有問題舉手問老師，需要撿東西請監考老師幫忙</div>
             </div>
         </div>
     </div>
@@ -3324,6 +3470,7 @@
     <script src="js/keyboard-shortcuts.js"></script>
     <script src="js/ui-enhancement.js"></script>
     <script src="js/data-reports.js"></script>
+    <script src="js/exam-proctor.js"></script>
 </body>
 
 </html>
