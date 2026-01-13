@@ -1,12 +1,63 @@
 # 班級小管家 - 開發進度記錄
 
-## 📅 最後更新：2026-01-13
+## 📅 最後更新：2026-01-13 17:00
 
-## 🎯 當前版本：v2.5.1
+## 🎯 當前版本：v2.6.1
 
 ---
 
-## ✅ 已完成功能（本次工作階段）
+## ✅ 今日工作階段 (2026-01-13) 修復與優化
+
+### 🔧 P0 核心模組新增
+- [x] **EventBus 事件總線** (`js/event-bus.js`)
+  - 統一的模組間通訊機制
+  - 功能：on, once, off, emit
+  - 事件歷史記錄和除錯模式
+  
+- [x] **ErrorHandler 錯誤處理** (`js/error-handler.js`)
+  - 統一錯誤處理和友善中文訊息
+  - 全域錯誤捕獲 (unhandledrejection, window.error)
+  - 錯誤包裝函數：wrap, wrapAsync, safeExecute
+
+### 🌐 PWA 支援
+- [x] **manifest.json** - PWA 設定檔
+- [x] **favicon.ico** - 網站圖示
+- [x] **icons/icon-192.png, icon-512.png** - 應用圖示
+- [x] **Meta tags 更新**
+  - 新增 `mobile-web-app-capable`
+  - 更新 `apple-touch-icon` 路徑
+  - 新增 `shortcut icon` 連結
+
+### 🐛 錯誤修復
+- [x] **storage-manager.js JSON 解析錯誤**
+  - `AppState.settings` undefined 問題
+  - 非 JSON 格式字串處理
+  
+- [x] **監考模式 RWD 修復**
+  - 斷點調整：1024px → 1200px
+  - 科目區域：新增 `overflow-y: auto`
+  - 提醒區域：新增 `max-height` + 滾動
+  - 科目列表：修復無法滾動到頂端問題
+  - hover 抖動：移除 `transform: scale`
+
+### 🎨 大時鐘 RWD 優化
+- [x] **可愛時鐘**：`clamp(7rem→4rem, 20vw→15vw, 16rem→22rem)`
+- [x] **數位時鐘**：`clamp(8rem→6rem, 25vw→20vw, 20rem→26rem)`
+- [x] **深色模式**：時鐘顏色 `#f3f4f6` → `#ffffff`
+
+### 📝 最新 Git Commits
+| Commit | 說明 |
+|--------|------|
+| `42916ab` | fix: 修復深色模式數位時鐘顏色 |
+| `e9b7da5` | fix: 修復科目列表無法滾動到頂端和 hover 抖動 |
+| `4706f0d` | fix: 修復監考模式大螢幕佈局 |
+| `c727eaa` | style: 優化監考模式 RWD |
+| `03e3f35` | style: 優化大時鐘 RWD |
+| `5208278` | feat: 新增 PWA 支援 |
+
+---
+
+## ✅ 已完成功能（之前工作階段）
 
 ### 📊 作業總覽儀表板 (`js/homework-enhancement.js`)
 
@@ -180,7 +231,7 @@ const examStyles = `...`; // 約 1000 行 CSS
 
 - 本地測試伺服器：`npx http-server -p 8080 -c-1`
 - GitHub 倉庫：https://github.com/cagoooo/class.git
-- 最新 commit：79575e6
+- 最新 commit：`42916ab` (2026-01-13 17:00)
 
 ---
 
