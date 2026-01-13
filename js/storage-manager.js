@@ -41,7 +41,15 @@
             try {
                 const item = localStorage.getItem(key);
                 if (item === null) return defaultValue;
-                return JSON.parse(item);
+
+                // 嘗試解析 JSON
+                try {
+                    return JSON.parse(item);
+                } catch (parseError) {
+                    // 如果無法解析為 JSON，直接返回原始字串
+                    // 這處理了舊版本直接儲存字串的情況
+                    return item;
+                }
             } catch (error) {
                 console.error(`[StorageManager] 讀取 "${key}" 失敗:`, error);
                 return defaultValue;
