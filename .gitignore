@@ -1,5 +1,7 @@
 # 班級小管家備份
 *.json
+!manifest.json
+!package.json
 
 # 系統檔案
 .DS_Store
