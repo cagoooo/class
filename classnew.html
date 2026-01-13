@@ -15,6 +15,7 @@
     <title>班級小管家</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/rwd-breakpoints.css">
+    <link rel="stylesheet" href="css/pwa-install.css">
     <!-- 新增 Excel 讀取套件 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <!-- Firebase SDK -->
@@ -1106,7 +1107,8 @@
 
 
     <!-- 考試監考系統 -->
-    <div id="exam-section" class="section bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6 hidden">
+    <div id="exam-section"
+        class="section bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6 hidden max-w-7xl mx-auto">
         <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-6 flex items-center">
             <span class="text-2xl sm:text-3xl mr-2 sm:mr-3">🖥️</span>考試監考系統
         </h2>
@@ -3476,6 +3478,8 @@
     <script src="js/ui-enhancement.js"></script>
     <script src="js/data-reports.js"></script>
     <script src="js/exam-proctor.js"></script>
+    <!-- PWA 支援 -->
+    <script src="js/pwa-install.js"></script>
 </body>
 
 </html>

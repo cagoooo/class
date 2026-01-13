@@ -1,7 +1,7 @@
 # 班級小管家 - 未來開發建議 📋
 
-> 最後更新：2026-01-13  
-> 當前版本：v2.5.1  
+> 最後更新：2026-01-13 17:30  
+> 當前版本：v2.6.1  
 > 本文件提供詳細的未來優化與開發方向建議，供開發參考
 
 ---
@@ -31,103 +31,39 @@
 
 ## 短期優化 (1-2 週)
 
-### 🔴 P0：程式碼品質提升
+### ✅ P0：程式碼品質提升（已完成）
 
-#### 1. JavaScript 模組化重構
-**現狀問題**：
-- 多個模組直接操作全域變數（如 `window.students`）
-- 模組間依賴關係不明確
-- 缺乏統一的事件通訊機制
+#### 1. ✅ JavaScript 模組化重構（已完成）
 
-**建議方案**：
-```javascript
-// 建立統一的事件總線
-// 新增檔案：js/event-bus.js
-const EventBus = {
-  events: {},
-  on(event, callback) {
-    if (!this.events[event]) this.events[event] = [];
-    this.events[event].push(callback);
-    return () => this.off(event, callback);
-  },
-  off(event, callback) {
-    if (!this.events[event]) return;
-    this.events[event] = this.events[event].filter(cb => cb !== callback);
-  },
-  emit(event, data) {
-    if (!this.events[event]) return;
-    this.events[event].forEach(callback => callback(data));
-  }
-};
+> [!TIP]
+> 此項目已於 v2.6.0 完成實作
 
-// 使用範例
-EventBus.emit('student:updated', { id: 1, name: '王小明' });
-EventBus.on('student:updated', (student) => {
-  console.log('學生資料更新:', student);
-});
-```
+**已實作內容**：
+- ✅ 建立 `js/event-bus.js` 事件總線模組
+  - 支援 `on`, `once`, `off`, `emit` 方法
+  - 事件歷史記錄和除錯模式
+  - 預定義事件類型常數 `EventTypes`
+- ✅ 統一的模組間事件通訊機制
 
-**預估工時**：3-4 天  
-**相關檔案**：
-- `js/app-state.js`
-- 所有模組檔案
+**完成日期**：2026-01-13
 
 ---
 
-#### 2. 錯誤處理機制完善
-**現狀問題**：
-- 許多非同步操作缺乏 try-catch
-- 錯誤訊息不夠友善
-- 沒有錯誤回報機制
+#### 2. ✅ 錯誤處理機制完善（已完成）
 
-**建議方案**：
-```javascript
-// 新增檔案：js/error-handler.js
-const ErrorHandler = {
-  // 錯誤類型定義
-  ErrorTypes: {
-    STORAGE: 'storage',
-    NETWORK: 'network',
-    VALIDATION: 'validation',
-    RENDER: 'render'
-  },
-  
-  // 統一錯誤處理
-  handle(error, type, context = '') {
-    console.error(`[${type}] ${context}:`, error);
-    
-    // 顯示友善錯誤訊息
-    const message = this.getDisplayMessage(type, error);
-    showNotification(message, 'error');
-    
-    // 可選：發送錯誤報告
-    this.report(error, type, context);
-  },
-  
-  getDisplayMessage(type, error) {
-    const messages = {
-      storage: '資料儲存失敗，請重試',
-      network: '網路連線異常，請檢查連線',
-      validation: error.message || '輸入資料有誤',
-      render: '畫面載入異常，請重新整理'
-    };
-    return messages[type] || '發生未知錯誤';
-  },
-  
-  report(error, type, context) {
-    // 未來可接 Sentry 或自建錯誤收集系統
-    if (window.errorReportEnabled) {
-      fetch('/api/errors', {
-        method: 'POST',
-        body: JSON.stringify({ error: error.message, type, context })
-      });
-    }
-  }
-};
-```
+> [!TIP]
+> 此項目已於 v2.6.0 完成實作
 
-**預估工時**：2 天  
-**相關檔案**：所有模組
+**已實作內容**：
+- ✅ 建立 `js/error-handler.js` 錯誤處理模組
+  - 統一錯誤類型定義（儲存、網路、驗證、渲染等）
+  - 友善的中文錯誤訊息顯示
+  - 全域錯誤捕獲（unhandledrejection、window.error）
+  - 錯誤歷史記錄與匯出功能
+  - 包裝函數（`wrap`、`wrapAsync`、`safeExecute`）
+  - 資料驗證輔助（`validate`、`assert`）
+
+**完成日期**：2026-01-13
 
 ---
 
@@ -1696,26 +1632,32 @@ function captureError(error, context = {}) {
 
 ## 🎯 建議執行順序
 
-### 第一階段（1-2 週）
-1. ✅ JavaScript 模組化重構
-2. ✅ 錯誤處理機制
-3. ✅ Console Log 清理
-4. ✅ CSS 架構優化
+### ✅ 第一階段（1-2 週）- 已完成
+1. ✅ JavaScript 模組化重構 - `js/event-bus.js` 已建立
+2. ✅ 錯誤處理機制 - `js/error-handler.js` 已建立
+3. ⬜ Console Log 清理 - 待處理
+4. ⬜ CSS 架構優化 - 待處理
 
-### 第二階段（3-4 週）
-1. ✅ 考試監考優化（音效、衝突檢測、缺考記錄）
-2. ✅ 載入狀態統一化
-3. ✅ IndexedDB 遷移
+### 🔄 第二階段（3-4 週）- 進行中
+1. 🔄 考試監考優化
+   - ⬜ 音效提醒系統
+   - ⬜ 科目時間衝突檢測
+   - ⬜ 缺考學生名單記錄
+   - ✅ RWD 佈局優化 - 已完成
+   - ✅ 圓形時鐘切換 - 已完成
+   - ✅ 深色模式時鐘顏色 - 已完成
+2. ⬜ 載入狀態統一化
+3. ⬜ IndexedDB 遷移
 
-### 第三階段（5-8 週）
-1. ✅ Firebase 離線支援
-2. ✅ 課表管理模組
-3. ✅ 班級公告系統
+### ⬜ 第三階段（5-8 週）
+1. ⬜ Firebase 離線支援
+2. ⬜ 課表管理模組
+3. ⬜ 班級公告系統
 
-### 第四階段（9-12 週）
-1. ✅ 學生成績追蹤
-2. ✅ 無障礙改善
-3. ✅ CI/CD 建立
+### ⬜ 第四階段（9-12 週）
+1. ⬜ 學生成績追蹤
+2. ⬜ 無障礙改善
+3. ⬜ CI/CD 建立
 
 ### 長期目標（3-6 個月）
 1. TypeScript 遷移
@@ -1724,4 +1666,718 @@ function captureError(error, context = {}) {
 
 ---
 
+## 📊 完成進度統計
+
+| 階段 | 完成項目 | 總項目 | 進度 |
+|------|----------|--------|------|
+| 第一階段 | 2 | 4 | 50% |
+| 第二階段 | 3 | 6 | 50% |
+| 第三階段 | 0 | 3 | 0% |
+| 第四階段 | 0 | 3 | 0% |
+| **總計** | **5** | **16** | **31%** |
+
+---
+
 > 📝 **備註**：本文件為開發參考，實際執行時間可能因專案狀況調整。建議每完成一個階段後更新此文件，記錄實際進度與遇到的問題。
+
+> 📅 **最後更新**：2026-01-13 17:30 by Antigravity AI
+
+---
+
+## 🆕 2026 新增開發建議
+
+> [!IMPORTANT]
+> 以下為 2026-01-13 新增的開發建議，基於目前專案狀態與功能需求整理
+
+---
+
+### 🔧 P0：PWA 與離線功能強化
+
+#### 29. Service Worker 快取策略優化
+**現狀**：
+- 基礎 PWA 已實作（manifest.json、icons）
+- Service Worker 可能有快取路徑問題
+
+**建議方案**：
+```javascript
+// sw.js 優化版
+const CACHE_NAME = 'class-manager-v2.6.1';
+const ASSETS_TO_CACHE = [
+  './',
+  './index.html',
+  './classnew.html',
+  './css/main.css',
+  './css/rwd-breakpoints.css',
+  './js/app-state.js',
+  './js/event-bus.js',
+  './js/error-handler.js',
+  // ... 其他資源
+];
+
+// 網路優先策略（適合動態內容）
+async function networkFirst(request) {
+  try {
+    const networkResponse = await fetch(request);
+    const cache = await caches.open(CACHE_NAME);
+    cache.put(request, networkResponse.clone());
+    return networkResponse;
+  } catch (error) {
+    const cachedResponse = await caches.match(request);
+    return cachedResponse || new Response('Offline', { status: 503 });
+  }
+}
+
+// 快取優先策略（適合靜態資源）
+async function cacheFirst(request) {
+  const cachedResponse = await caches.match(request);
+  if (cachedResponse) return cachedResponse;
+  
+  const networkResponse = await fetch(request);
+  const cache = await caches.open(CACHE_NAME);
+  cache.put(request, networkResponse.clone());
+  return networkResponse;
+}
+```
+
+**預估工時**：1-2 天
+
+---
+
+#### 30. PWA 安裝引導優化
+**需求描述**：
+- 更友善的「加入主畫面」引導
+- iOS/Android 分別處理
+- 安裝後隱藏提示
+
+**建議實作**：
+```javascript
+// js/pwa-install.js
+class PWAInstaller {
+  constructor() {
+    this.deferredPrompt = null;
+    this.isInstalled = this.checkIfInstalled();
+    
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      this.deferredPrompt = e;
+      this.showInstallPrompt();
+    });
+  }
+  
+  checkIfInstalled() {
+    return window.matchMedia('(display-mode: standalone)').matches
+      || window.navigator.standalone === true;
+  }
+  
+  showInstallPrompt() {
+    if (this.isInstalled) return;
+    
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    
+    if (isIOS) {
+      this.showIOSGuide();
+    } else {
+      this.showAndroidPrompt();
+    }
+  }
+  
+  showIOSGuide() {
+    const guide = document.createElement('div');
+    guide.className = 'pwa-ios-guide';
+    guide.innerHTML = `
+      <div class="guide-content">
+        <button class="close-btn" onclick="this.parentElement.parentElement.remove()">×</button>
+        <p>📱 將「班級小管家」加入主畫面：</p>
+        <ol>
+          <li>點擊底部 <span class="share-icon">⬆️</span> 分享按鈕</li>
+          <li>選擇「加入主畫面」</li>
+        </ol>
+      </div>
+    `;
+    document.body.appendChild(guide);
+  }
+  
+  async showAndroidPrompt() {
+    if (!this.deferredPrompt) return;
+    
+    const result = await this.deferredPrompt.prompt();
+    if (result.outcome === 'accepted') {
+      localStorage.setItem('pwaInstalled', 'true');
+    }
+    this.deferredPrompt = null;
+  }
+}
+```
+
+**預估工時**：1 天
+
+---
+
+### 🟡 P1：考試監考模式進階功能
+
+#### 31. 考試音效提醒系統
+**需求描述**：
+- 考試開始/結束音效
+- 最後 5 分鐘警示音
+- 休息結束前 1 分鐘提醒
+- 音量控制
+
+**建議實作**：
+```javascript
+// 在 exam-proctor.js 中新增
+const ExamSounds = {
+  sounds: {
+    start: null,
+    end: null,
+    warning: null,
+    break: null
+  },
+  
+  enabled: localStorage.getItem('examSoundEnabled') !== 'false',
+  volume: parseFloat(localStorage.getItem('examSoundVolume') || '0.5'),
+  
+  // 使用 Web Audio API 產生簡單音效
+  createTone(frequency, duration, type = 'sine') {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    oscillator.frequency.value = frequency;
+    oscillator.type = type;
+    gainNode.gain.value = this.volume;
+    
+    oscillator.start();
+    setTimeout(() => {
+      gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+      setTimeout(() => oscillator.stop(), 500);
+    }, duration);
+  },
+  
+  playStart() {
+    if (!this.enabled) return;
+    this.createTone(880, 500); // A5
+    setTimeout(() => this.createTone(1046, 300), 500); // C6
+  },
+  
+  playEnd() {
+    if (!this.enabled) return;
+    this.createTone(1046, 300);
+    setTimeout(() => this.createTone(880, 300), 300);
+    setTimeout(() => this.createTone(784, 500), 600);
+  },
+  
+  playWarning() {
+    if (!this.enabled) return;
+    this.createTone(587, 200); // D5
+    setTimeout(() => this.createTone(587, 200), 300);
+  }
+};
+```
+
+**預估工時**：1 天
+
+---
+
+#### 32. 科目時間衝突視覺化
+**需求描述**：
+- 時間軸視覺化顯示
+- 衝突區域紅色高亮
+- 點擊衝突快速修正
+
+**建議 UI**：
+```html
+<!-- 時間軸視覺化 -->
+<div class="exam-timeline">
+  <div class="timeline-header">
+    <span>08:00</span>
+    <span>09:00</span>
+    <span>10:00</span>
+    <span>11:00</span>
+    <span>12:00</span>
+  </div>
+  <div class="timeline-body">
+    <div class="subject-bar" 
+         style="left: 12.5%; width: 10%;" 
+         data-subject="國語">
+      國語
+    </div>
+    <div class="subject-bar conflict" 
+         style="left: 21%; width: 10%;" 
+         data-subject="數學">
+      數學 ⚠️
+    </div>
+  </div>
+</div>
+```
+
+**預估工時**：2 天
+
+---
+
+#### 33. 缺考學生快速記錄
+**需求描述**：
+- 從學生清單快速選擇缺考者
+- 支援請假原因分類（病假/事假/公假）
+- 自動計算出席率
+
+**建議資料結構**：
+```javascript
+const examAbsence = {
+  examId: 'exam_20260113',
+  date: '2026-01-13',
+  records: [
+    {
+      subjectId: 'chinese',
+      subjectName: '國語',
+      expected: 28,
+      present: 26,
+      absences: [
+        { studentId: 5, name: '王小明', type: 'sick', note: '發燒請假' },
+        { studentId: 12, name: '李小華', type: 'personal', note: '家中有事' }
+      ]
+    }
+  ]
+};
+
+// 缺考類型
+const AbsenceTypes = {
+  sick: { label: '病假', icon: '🤒', color: '#ef4444' },
+  personal: { label: '事假', icon: '📝', color: '#f59e0b' },
+  official: { label: '公假', icon: '🏫', color: '#3b82f6' },
+  other: { label: '其他', icon: '❓', color: '#6b7280' }
+};
+```
+
+**預估工時**：2 天
+
+---
+
+### 🟡 P1：UI/UX 體驗提升
+
+#### 34. 全域 Toast 通知優化
+**需求描述**：
+- 通知堆疊顯示（最多 3 則）
+- 進度條倒數
+- 可點擊關閉
+- 動作按鈕支援
+
+**建議實作**：
+```javascript
+// js/toast-notification.js
+class ToastNotification {
+  constructor() {
+    this.container = this.createContainer();
+    this.toasts = [];
+    this.maxToasts = 3;
+  }
+  
+  createContainer() {
+    const container = document.createElement('div');
+    container.className = 'toast-container';
+    container.style.cssText = `
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    `;
+    document.body.appendChild(container);
+    return container;
+  }
+  
+  show(message, type = 'info', duration = 3000, action = null) {
+    if (this.toasts.length >= this.maxToasts) {
+      this.dismiss(this.toasts[0]);
+    }
+    
+    const toast = this.createToast(message, type, duration, action);
+    this.container.appendChild(toast);
+    this.toasts.push(toast);
+    
+    // 進度條動畫
+    const progress = toast.querySelector('.toast-progress');
+    progress.style.transition = `width ${duration}ms linear`;
+    requestAnimationFrame(() => {
+      progress.style.width = '0%';
+    });
+    
+    setTimeout(() => this.dismiss(toast), duration);
+    return toast;
+  }
+  
+  createToast(message, type, duration, action) {
+    const icons = {
+      success: '✅',
+      error: '❌',
+      warning: '⚠️',
+      info: 'ℹ️'
+    };
+    
+    const colors = {
+      success: '#10b981',
+      error: '#ef4444',
+      warning: '#f59e0b',
+      info: '#3b82f6'
+    };
+    
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `
+      <div class="toast-content">
+        <span class="toast-icon">${icons[type]}</span>
+        <span class="toast-message">${message}</span>
+        ${action ? `<button class="toast-action">${action.label}</button>` : ''}
+        <button class="toast-close">×</button>
+      </div>
+      <div class="toast-progress" style="background: ${colors[type]}; width: 100%;"></div>
+    `;
+    
+    toast.querySelector('.toast-close').onclick = () => this.dismiss(toast);
+    if (action) {
+      toast.querySelector('.toast-action').onclick = action.callback;
+    }
+    
+    return toast;
+  }
+  
+  dismiss(toast) {
+    toast.style.animation = 'slideOut 0.3s ease forwards';
+    setTimeout(() => {
+      toast.remove();
+      this.toasts = this.toasts.filter(t => t !== toast);
+    }, 300);
+  }
+}
+
+window.Toast = new ToastNotification();
+```
+
+**預估工時**：1 天
+
+---
+
+#### 35. 深色模式轉場動畫
+**需求描述**：
+- 平滑的顏色過渡
+- 避免閃爍
+- 記憶使用者偏好
+
+**建議實作**：
+```css
+/* css/theme-transitions.css */
+:root {
+  --theme-transition-duration: 300ms;
+}
+
+/* 基礎過渡 */
+body,
+.card,
+.modal,
+.sidebar,
+.header,
+.btn {
+  transition: 
+    background-color var(--theme-transition-duration) ease,
+    color var(--theme-transition-duration) ease,
+    border-color var(--theme-transition-duration) ease,
+    box-shadow var(--theme-transition-duration) ease;
+}
+
+/* 切換時暫時禁用過渡（避免大量元素同時過渡造成卡頓） */
+.theme-switching * {
+  transition-duration: 0ms !important;
+}
+
+/* 圓形展開動畫（從切換按鈕位置展開） */
+.theme-transition-overlay {
+  position: fixed;
+  border-radius: 50%;
+  background: var(--bg-primary);
+  transform: scale(0);
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.theme-transition-overlay.active {
+  animation: themeExpand 400ms ease-out forwards;
+}
+
+@keyframes themeExpand {
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+```
+
+**預估工時**：0.5 天
+
+---
+
+### 🟢 P2：功能擴展建議
+
+#### 36. 快速指令面板（Command Palette）
+**需求描述**：
+- 按 Ctrl+K 或 ⌘+K 開啟
+- 模糊搜尋功能
+- 鍵盤導航
+
+**建議實作**：
+```javascript
+// js/command-palette.js
+class CommandPalette {
+  constructor() {
+    this.commands = [
+      { id: 'lottery', name: '抽籤', icon: '🎲', shortcut: 'L', action: () => startLottery(1) },
+      { id: 'timer', name: '計時器', icon: '⏱️', shortcut: 'T', action: () => showTimer() },
+      { id: 'group', name: '隨機分組', icon: '👥', shortcut: 'G', action: () => showGrouping() },
+      { id: 'exam', name: '監考模式', icon: '📝', shortcut: 'E', action: () => enterExamMode() },
+      { id: 'dark', name: '深色模式', icon: '🌙', shortcut: 'D', action: () => toggleDarkMode() },
+      { id: 'export', name: '匯出資料', icon: '📤', action: () => exportData() },
+      { id: 'backup', name: '備份', icon: '💾', action: () => createBackup() },
+      // ... 更多指令
+    ];
+    
+    this.visible = false;
+    this.selectedIndex = 0;
+    this.filteredCommands = this.commands;
+    
+    this.bindEvents();
+  }
+  
+  bindEvents() {
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        this.toggle();
+      }
+      
+      if (this.visible) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          this.navigate(1);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          this.navigate(-1);
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          this.execute();
+        } else if (e.key === 'Escape') {
+          this.hide();
+        }
+      }
+    });
+  }
+  
+  toggle() {
+    this.visible ? this.hide() : this.show();
+  }
+  
+  show() {
+    this.visible = true;
+    this.render();
+    this.modal.querySelector('input').focus();
+  }
+  
+  hide() {
+    this.visible = false;
+    this.modal?.remove();
+  }
+  
+  filter(query) {
+    const lowerQuery = query.toLowerCase();
+    this.filteredCommands = this.commands.filter(cmd => 
+      cmd.name.toLowerCase().includes(lowerQuery) ||
+      cmd.id.includes(lowerQuery)
+    );
+    this.selectedIndex = 0;
+    this.updateList();
+  }
+  
+  navigate(delta) {
+    this.selectedIndex = Math.max(0, 
+      Math.min(this.filteredCommands.length - 1, this.selectedIndex + delta)
+    );
+    this.updateList();
+  }
+  
+  execute() {
+    const command = this.filteredCommands[this.selectedIndex];
+    if (command) {
+      command.action();
+      this.hide();
+    }
+  }
+  
+  render() {
+    // 渲染指令面板 UI
+  }
+}
+
+window.commandPalette = new CommandPalette();
+```
+
+**預估工時**：2 天
+
+---
+
+#### 37. 資料同步狀態指示器
+**需求描述**：
+- 顯示目前同步狀態
+- 離線模式明確提示
+- 待同步項目計數
+
+**建議 UI**：
+```html
+<!-- Header 同步狀態指示器 -->
+<div class="sync-indicator">
+  <span class="sync-icon synced">☁️</span>
+  <span class="sync-text">已同步</span>
+</div>
+
+<div class="sync-indicator offline">
+  <span class="sync-icon">📴</span>
+  <span class="sync-text">離線模式</span>
+  <span class="sync-pending">3 項待同步</span>
+</div>
+
+<div class="sync-indicator syncing">
+  <span class="sync-icon spinning">🔄</span>
+  <span class="sync-text">同步中...</span>
+</div>
+```
+
+**預估工時**：1 天
+
+---
+
+#### 38. 學生快速搜尋
+**需求描述**：
+- 即時搜尋過濾
+- 支援姓名、座號搜尋
+- 高亮匹配文字
+
+**建議實作**：
+```javascript
+// js/student-search.js
+function searchStudents(query) {
+  const lowerQuery = query.toLowerCase().trim();
+  if (!lowerQuery) return students;
+  
+  return students.filter(student => {
+    const nameMatch = student.name.toLowerCase().includes(lowerQuery);
+    const seatMatch = student.seatNumber.toString() === lowerQuery;
+    return nameMatch || seatMatch;
+  }).map(student => ({
+    ...student,
+    highlightedName: highlightMatch(student.name, lowerQuery)
+  }));
+}
+
+function highlightMatch(text, query) {
+  const regex = new RegExp(`(${escapeRegex(query)})`, 'gi');
+  return text.replace(regex, '<mark>$1</mark>');
+}
+
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+```
+
+**預估工時**：0.5 天
+
+---
+
+### 📱 RWD 與觸控優化
+
+#### 39. 觸控手勢增強
+**適用場景**：
+- 側滑切換功能區
+- 長按編輯項目
+- 下拉重新整理
+
+**建議實作**：
+```javascript
+// js/touch-gestures.js
+class TouchGestures {
+  constructor(element) {
+    this.element = element;
+    this.startX = 0;
+    this.startY = 0;
+    this.threshold = 50;
+    
+    this.bindEvents();
+  }
+  
+  bindEvents() {
+    this.element.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: true });
+    this.element.addEventListener('touchend', this.handleTouchEnd.bind(this), { passive: true });
+  }
+  
+  handleTouchStart(e) {
+    this.startX = e.touches[0].clientX;
+    this.startY = e.touches[0].clientY;
+  }
+  
+  handleTouchEnd(e) {
+    const endX = e.changedTouches[0].clientX;
+    const endY = e.changedTouches[0].clientY;
+    const deltaX = endX - this.startX;
+    const deltaY = endY - this.startY;
+    
+    if (Math.abs(deltaX) > this.threshold && Math.abs(deltaX) > Math.abs(deltaY)) {
+      if (deltaX > 0) {
+        this.onSwipeRight?.();
+      } else {
+        this.onSwipeLeft?.();
+      }
+    }
+  }
+}
+```
+
+**預估工時**：1 天
+
+---
+
+## 📋 2026 年開發路線圖
+
+```mermaid
+gantt
+    title 班級小管家開發路線圖 2026
+    dateFormat  YYYY-MM-DD
+    section 第一季度
+    PWA 強化           :done,    p0, 2026-01-01, 2026-01-15
+    考試監考優化        :active,  p1, 2026-01-15, 2026-02-01
+    UI/UX 提升         :         p2, 2026-02-01, 2026-02-15
+    IndexedDB 遷移     :         p3, 2026-02-15, 2026-03-01
+    section 第二季度
+    課表管理           :         p4, 2026-03-01, 2026-03-20
+    班級公告           :         p5, 2026-03-20, 2026-04-10
+    成績追蹤           :         p6, 2026-04-10, 2026-05-01
+    section 第三季度
+    TypeScript 遷移    :         p7, 2026-05-01, 2026-06-15
+    多班級系統         :         p8, 2026-06-15, 2026-08-01
+```
+
+---
+
+## 📌 優先級快速參考
+
+| 優先級 | 新增項目 | 預估工時 | 建議時程 |
+|--------|----------|----------|----------|
+| 🔴 P0 | Service Worker 優化 | 1-2 天 | 本週 |
+| 🔴 P0 | PWA 安裝引導 | 1 天 | 本週 |
+| 🟡 P1 | 考試音效系統 | 1 天 | 下週 |
+| 🟡 P1 | 科目時間衝突視覺化 | 2 天 | 下週 |
+| 🟡 P1 | 缺考學生記錄 | 2 天 | 下週 |
+| 🟡 P1 | Toast 通知優化 | 1 天 | 下週 |
+| 🟢 P2 | Command Palette | 2 天 | 本月 |
+| 🟢 P2 | 同步狀態指示器 | 1 天 | 本月 |
+| 🟢 P2 | 學生快速搜尋 | 0.5 天 | 本月 |
+| 🟢 P2 | 觸控手勢 | 1 天 | 本月 |

@@ -50,11 +50,22 @@
     let currentReminderIndex = 0;
     let reminderRotationInterval = null;
 
-    // 缺考記錄
+    // 缺考記錄（擴展版 - 支援各科目缺考學生記錄）
     let examAttendance = JSON.parse(localStorage.getItem('examAttendance')) || {
         expected: 0,
         present: 0,
         absentNote: ''
+    };
+
+    // 缺考學生詳細記錄
+    let absenceRecords = JSON.parse(localStorage.getItem('examAbsenceRecords')) || [];
+
+    // 缺考原因類型
+    const AbsenceTypes = {
+        sick: { label: '病假', icon: '🤒', color: '#ef4444' },
+        personal: { label: '事假', icon: '📝', color: '#f59e0b' },
+        official: { label: '公假', icon: '🏫', color: '#3b82f6' },
+        other: { label: '其他', icon: '❓', color: '#6b7280' }
     };
 
     // 全螢幕更新計時器
@@ -1363,6 +1374,308 @@
                 font-size: 1.5rem;
             }
         }
+
+        /* ========================================
+           缺考學生管理面板樣式
+           ======================================== */
+        .absence-manager-panel {
+            position: fixed;
+            inset: 0;
+            z-index: 400;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .absence-manager-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+
+        .absence-manager-content {
+            position: relative;
+            width: 90%;
+            max-width: 700px;
+            max-height: 85vh;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .absence-manager-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1.25rem 1.5rem;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+        }
+
+        .absence-manager-header h3 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .absence-subject-selector select {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        .absence-subject-selector select option {
+            color: #333;
+        }
+
+        .absence-manager-close {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            font-size: 1.25rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .absence-manager-close:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .absence-manager-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+        }
+
+        .absence-add-section, .absence-list-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .absence-add-section h4, .absence-list-section h4 {
+            margin: 0 0 1rem;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .absence-add-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+        }
+
+        .absence-input {
+            padding: 0.625rem 1rem;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .absence-input:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .absence-add-btn {
+            grid-column: span 2;
+            padding: 0.75rem 1rem;
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .absence-add-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+        }
+
+        .absence-list {
+            max-height: 250px;
+            overflow-y: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+        }
+
+        .absence-empty {
+            padding: 2rem;
+            text-align: center;
+            color: #9ca3af;
+        }
+
+        .absence-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #f3f4f6;
+            transition: background 0.2s;
+        }
+
+        .absence-item:last-child {
+            border-bottom: none;
+        }
+
+        .absence-item:hover {
+            background: #f9fafb;
+        }
+
+        .absence-type-icon {
+            font-size: 1.25rem;
+        }
+
+        .absence-name {
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .absence-type-label {
+            padding: 0.25rem 0.5rem;
+            background: #f3f4f6;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
+
+        .absence-note {
+            flex: 1;
+            font-size: 0.85rem;
+            color: #9ca3af;
+            font-style: italic;
+        }
+
+        .absence-remove-btn {
+            background: transparent;
+            border: none;
+            color: #9ca3af;
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 0.25rem;
+            border-radius: 4px;
+            transition: color 0.2s, background 0.2s;
+        }
+
+        .absence-remove-btn:hover {
+            color: #ef4444;
+            background: #fef2f2;
+        }
+
+        .absence-stats-section {
+            display: flex;
+            gap: 1rem;
+            padding: 1rem;
+            background: #f8fafc;
+            border-radius: 8px;
+        }
+
+        .absence-stat {
+            flex: 1;
+            text-align: center;
+            padding: 0.75rem;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .stat-label {
+            display: block;
+            font-size: 0.8rem;
+            color: #6b7280;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #3b82f6;
+        }
+
+        .absence-manager-footer {
+            display: flex;
+            gap: 1rem;
+            padding: 1rem 1.5rem;
+            background: #f9fafb;
+            border-top: 1px solid #e5e7eb;
+            justify-content: flex-end;
+        }
+
+        .absence-export-btn, .absence-close-btn {
+            padding: 0.625rem 1.25rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .absence-export-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+        }
+
+        .absence-export-btn:hover {
+            background: #2563eb;
+        }
+
+        .absence-close-btn {
+            background: white;
+            color: #4b5563;
+            border: 1px solid #d1d5db;
+        }
+
+        .absence-close-btn:hover {
+            background: #f3f4f6;
+        }
+
+        /* 衝突指示器動畫 */
+        @keyframes pulse-warning {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.1); }
+        }
+
+        /* RWD for absence manager */
+        @media (max-width: 640px) {
+            .absence-manager-content {
+                width: 95%;
+                max-height: 90vh;
+            }
+
+            .absence-add-form {
+                grid-template-columns: 1fr;
+            }
+
+            .absence-add-btn {
+                grid-column: span 1;
+            }
+
+            .absence-stats-section {
+                flex-direction: column;
+            }
+        }
     `;
 
     // ========================================
@@ -1373,6 +1686,53 @@
         const now = new Date();
         return now.getHours().toString().padStart(2, '0') + ':' +
             now.getMinutes().toString().padStart(2, '0');
+    }
+
+    /**
+     * 顯示通知訊息
+     * @param {string} message - 訊息內容
+     * @param {string} type - 類型 (success, warning, error, info)
+     */
+    function showNotification(message, type = 'info') {
+        // 移除舊通知
+        const oldNotif = document.querySelector('.exam-toast-notification');
+        if (oldNotif) oldNotif.remove();
+
+        const colors = {
+            success: { bg: 'linear-gradient(135deg, #22c55e, #16a34a)', icon: '✅' },
+            warning: { bg: 'linear-gradient(135deg, #f59e0b, #d97706)', icon: '⚠️' },
+            error: { bg: 'linear-gradient(135deg, #ef4444, #dc2626)', icon: '❌' },
+            info: { bg: 'linear-gradient(135deg, #3b82f6, #2563eb)', icon: 'ℹ️' }
+        };
+        const style = colors[type] || colors.info;
+
+        const notif = document.createElement('div');
+        notif.className = 'exam-toast-notification';
+        notif.innerHTML = `<span>${style.icon}</span><span>${message}</span>`;
+        notif.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 1rem 1.5rem;
+            background: ${style.bg};
+            color: white;
+            border-radius: 8px;
+            font-weight: 500;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            animation: slideInRight 0.3s ease;
+        `;
+
+        document.body.appendChild(notif);
+
+        // 3秒後自動移除
+        setTimeout(() => {
+            notif.style.animation = 'slideOutRight 0.3s ease forwards';
+            setTimeout(() => notif.remove(), 300);
+        }, 3000);
     }
 
     function timeToMinutes(timeStr) {
@@ -2126,6 +2486,9 @@
         // 動態新增時鐘切換按鈕（如果不存在）
         injectClockModeButton();
 
+        // 動態新增缺考記錄按鈕（如果不存在）
+        injectAbsenceButton();
+
         // 動態新增類比時鐘 HTML（如果不存在）
         injectAnalogClockHTML();
 
@@ -2188,6 +2551,22 @@
         controls.appendChild(btn);
     }
 
+    // 動態插入缺考記錄按鈕
+    function injectAbsenceButton() {
+        if (document.getElementById('examAbsenceBtn')) return;
+
+        const controls = document.querySelector('.exam-fullscreen-controls');
+        if (!controls) return;
+
+        const btn = document.createElement('button');
+        btn.id = 'examAbsenceBtn';
+        btn.className = 'exam-control-btn';
+        btn.onclick = () => openAbsenceManager();
+        btn.title = '缺考學生記錄';
+        btn.textContent = '📋';
+        controls.appendChild(btn);
+    }
+
     // 動態插入類比時鐘 HTML
     function injectAnalogClockHTML() {
         if (document.getElementById('examAnalogClock')) return;
@@ -2232,6 +2611,534 @@
 
         if (examClockInterval) { clearInterval(examClockInterval); examClockInterval = null; }
         if (reminderRotationInterval) { clearInterval(reminderRotationInterval); reminderRotationInterval = null; }
+    };
+
+    // ========================================
+    // 時間衝突檢測功能
+    // ========================================
+
+    /**
+     * 解析時間字串為分鐘數
+     */
+    function parseTimeToMinutes(timeStr) {
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        return hours * 60 + minutes;
+    }
+
+    /**
+     * 檢測兩個時間段是否衝突
+     */
+    function isTimeConflict(subject1, subject2) {
+        const start1 = parseTimeToMinutes(subject1.startTime);
+        const end1 = parseTimeToMinutes(subject1.endTime);
+        const start2 = parseTimeToMinutes(subject2.startTime);
+        const end2 = parseTimeToMinutes(subject2.endTime);
+
+        // 時間重疊判斷
+        return start1 < end2 && end1 > start2;
+    }
+
+    /**
+     * 檢測科目時間衝突
+     * @param {Object} newSubject - 要檢測的科目
+     * @param {Array} existingSubjects - 現有科目列表
+     * @returns {Array} 衝突的科目列表
+     */
+    function checkTimeConflicts(newSubject, existingSubjects) {
+        const conflicts = [];
+
+        existingSubjects.forEach(subject => {
+            if (subject.id === newSubject.id) return; // 跳過自己
+
+            if (isTimeConflict(newSubject, subject)) {
+                conflicts.push({
+                    id: subject.id,
+                    name: subject.name,
+                    time: `${subject.startTime}-${subject.endTime}`
+                });
+            }
+        });
+
+        return conflicts;
+    }
+
+    /**
+     * 顯示時間衝突警告
+     */
+    function showConflictWarning(conflicts, subjectName) {
+        const conflictNames = conflicts.map(c => `${c.name} (${c.time})`).join('、');
+        const message = `⚠️ 時間衝突警告\n\n「${subjectName}」與以下科目時間重疊：\n${conflictNames}\n\n是否仍要儲存？`;
+        return confirm(message);
+    }
+
+    /**
+     * 取得所有衝突的科目配對
+     */
+    function getAllConflicts() {
+        const allConflicts = [];
+
+        for (let i = 0; i < examSubjects.length; i++) {
+            for (let j = i + 1; j < examSubjects.length; j++) {
+                if (isTimeConflict(examSubjects[i], examSubjects[j])) {
+                    allConflicts.push({
+                        subject1: examSubjects[i],
+                        subject2: examSubjects[j]
+                    });
+                }
+            }
+        }
+
+        return allConflicts;
+    }
+
+    /**
+     * 渲染衝突指示器到科目列表
+     */
+    function addConflictIndicators() {
+        const conflicts = getAllConflicts();
+        const conflictIds = new Set();
+
+        conflicts.forEach(c => {
+            conflictIds.add(c.subject1.id);
+            conflictIds.add(c.subject2.id);
+        });
+
+        document.querySelectorAll('.exam-subject-item').forEach(item => {
+            const id = parseInt(item.dataset.id);
+            const indicator = item.querySelector('.conflict-indicator');
+
+            if (conflictIds.has(id)) {
+                if (!indicator) {
+                    const badge = document.createElement('span');
+                    badge.className = 'conflict-indicator';
+                    badge.innerHTML = '⚠️';
+                    badge.title = '此科目與其他科目時間衝突';
+                    badge.style.cssText = 'margin-left: 0.5rem; cursor: pointer; animation: pulse-warning 1s ease-in-out infinite;';
+                    badge.onclick = (e) => {
+                        e.stopPropagation();
+                        showConflictDetails(id);
+                    };
+                    item.querySelector('.exam-subject-name')?.parentNode.appendChild(badge);
+                }
+            } else if (indicator) {
+                indicator.remove();
+            }
+        });
+    }
+
+    /**
+     * 顯示衝突詳情
+     */
+    function showConflictDetails(subjectId) {
+        const subject = examSubjects.find(s => s.id === subjectId);
+        if (!subject) return;
+
+        const conflicts = checkTimeConflicts(subject, examSubjects);
+        const details = conflicts.map(c => `• ${c.name}: ${c.time}`).join('\n');
+
+        alert(`「${subject.name}」(${subject.startTime}-${subject.endTime}) 與以下科目時間衝突：\n\n${details}`);
+    }
+
+    // ========================================
+    // 缺考學生記錄功能
+    // ========================================
+
+    /**
+     * 取得今日考試記錄 ID
+     */
+    function getTodayExamId() {
+        const today = new Date();
+        return `exam_${today.getFullYear()}${(today.getMonth() + 1).toString().padStart(2, '0')}${today.getDate().toString().padStart(2, '0')}`;
+    }
+
+    /**
+     * 取得或建立今日缺考記錄
+     */
+    function getTodayAbsenceRecord() {
+        const examId = getTodayExamId();
+        let record = absenceRecords.find(r => r.examId === examId);
+
+        if (!record) {
+            record = {
+                examId: examId,
+                date: new Date().toISOString().split('T')[0],
+                subjects: []
+            };
+            absenceRecords.push(record);
+        }
+
+        return record;
+    }
+
+    /**
+     * 取得特定科目的缺考記錄
+     */
+    function getSubjectAbsences(subjectId) {
+        const record = getTodayAbsenceRecord();
+        let subjectRecord = record.subjects.find(s => s.subjectId === subjectId);
+
+        if (!subjectRecord) {
+            const subject = examSubjects.find(s => s.id === subjectId);
+            subjectRecord = {
+                subjectId: subjectId,
+                subjectName: subject?.name || '未知科目',
+                absences: []
+            };
+            record.subjects.push(subjectRecord);
+        }
+
+        return subjectRecord;
+    }
+
+    /**
+     * 新增缺考學生
+     */
+    window.addAbsentStudent = function (subjectId, studentName, absenceType, note) {
+        const subjectRecord = getSubjectAbsences(subjectId);
+
+        // 檢查是否已存在
+        if (subjectRecord.absences.find(a => a.name === studentName)) {
+            showNotification('此學生已在缺考名單中', 'warning');
+            return false;
+        }
+
+        subjectRecord.absences.push({
+            id: Date.now(),
+            name: studentName,
+            type: absenceType || 'other',
+            note: note || '',
+            timestamp: new Date().toISOString()
+        });
+
+        saveAbsenceRecords();
+        syncFullscreenAttendance(subjectId); // 同步全螢幕模式（傳遞科目 ID）
+        showNotification(`已記錄 ${studentName} 缺考`, 'success');
+        return true;
+    };
+
+    /**
+     * 移除缺考學生
+     */
+    window.removeAbsentStudent = function (subjectId, absenceId) {
+        const subjectRecord = getSubjectAbsences(subjectId);
+        const index = subjectRecord.absences.findIndex(a => a.id === absenceId);
+
+        if (index > -1) {
+            const removed = subjectRecord.absences.splice(index, 1)[0];
+            saveAbsenceRecords();
+            syncFullscreenAttendance(subjectId); // 同步全螢幕模式（傳遞科目 ID）
+            showNotification(`已移除 ${removed.name}`, 'info');
+            return true;
+        }
+        return false;
+    };
+
+    /**
+     * 儲存缺考記錄
+     */
+    function saveAbsenceRecords() {
+        localStorage.setItem('examAbsenceRecords', JSON.stringify(absenceRecords));
+    }
+
+    /**
+     * 同步全螢幕模式的出席人數
+     * @param {number} subjectId - 科目 ID（可選，預設為當前科目）
+     */
+    function syncFullscreenAttendance(subjectId) {
+        // 取得指定科目的缺考人數（若未提供則用當前科目）
+        const targetExam = subjectId ?
+            examSubjects.find(s => s.id === subjectId) :
+            (getCurrentExam() || examSubjects[0]);
+        if (!targetExam) return;
+
+        const subjectRecord = getSubjectAbsences(targetExam.id);
+        const absentCount = subjectRecord.absences.length;
+
+        // 更新 examAttendance
+        const totalStudents = getStudentCount();
+        examAttendance.expected = totalStudents;
+        examAttendance.present = totalStudents - absentCount;
+        saveData();
+
+        // 更新全螢幕顯示 (使用 ID 選擇器)
+        const expectedEl = document.getElementById('examExpectedCount');
+        const presentEl = document.getElementById('examPresentCount');
+
+        if (expectedEl) expectedEl.textContent = totalStudents;
+        if (presentEl) presentEl.textContent = totalStudents - absentCount;
+    }
+
+    /**
+     * 取得學生總數
+     */
+    function getStudentCount() {
+        if (typeof AppState !== 'undefined' && AppState.students && AppState.students.length > 0) {
+            return AppState.students.length;
+        } else if (window.students && window.students.length > 0) {
+            return window.students.length;
+        } else {
+            try {
+                const savedStudents = JSON.parse(localStorage.getItem('students') || '[]');
+                return savedStudents.length;
+            } catch (e) {
+                return examAttendance.expected || 0;
+            }
+        }
+    }
+
+    /**
+     * 開啟缺考學生管理面板
+     */
+    window.openAbsenceManager = function (subjectId) {
+        const currentSubject = subjectId ?
+            examSubjects.find(s => s.id === subjectId) :
+            getCurrentExam() || examSubjects[0];
+
+        if (!currentSubject) {
+            showNotification('請先新增考試科目', 'warning');
+            return;
+        }
+
+        const subjectRecord = getSubjectAbsences(currentSubject.id);
+
+        // 從多個來源取得學生名單
+        let students = [];
+        if (typeof AppState !== 'undefined' && AppState.students && AppState.students.length > 0) {
+            students = AppState.students;
+        } else if (window.students && window.students.length > 0) {
+            students = window.students;
+        } else {
+            // 嘗試從 localStorage 讀取
+            try {
+                const savedStudents = JSON.parse(localStorage.getItem('students') || '[]');
+                students = savedStudents;
+            } catch (e) {
+                console.warn('[AbsenceManager] 無法讀取學生名單');
+            }
+        }
+
+        // 排序學生（按座號）
+        students = [...students].sort((a, b) => (a.number || 0) - (b.number || 0));
+
+        // 創建面板
+        let panel = document.getElementById('absenceManagerPanel');
+        if (panel) panel.remove();
+
+        panel = document.createElement('div');
+        panel.id = 'absenceManagerPanel';
+        panel.className = 'absence-manager-panel';
+        panel.innerHTML = `
+            <div class="absence-manager-overlay" onclick="closeAbsenceManager()"></div>
+            <div class="absence-manager-content">
+                <div class="absence-manager-header">
+                    <h3>📋 缺考學生記錄</h3>
+                    <div class="absence-subject-selector">
+                        <select id="absenceSubjectSelect" onchange="switchAbsenceSubject(this.value)">
+                            ${examSubjects.map(s => `
+                                <option value="${s.id}" ${s.id === currentSubject.id ? 'selected' : ''}>
+                                    ${escapeHtml(s.name)} (${s.startTime}-${s.endTime})
+                                </option>
+                            `).join('')}
+                        </select>
+                    </div>
+                    <button class="absence-manager-close" onclick="closeAbsenceManager()">✕</button>
+                </div>
+                
+                <div class="absence-manager-body">
+                    <div class="absence-add-section">
+                        <h4>新增缺考學生</h4>
+                        <div class="absence-add-form">
+                            <select id="absenceStudentSelect" class="absence-input">
+                                <option value="">-- 選擇學生 --</option>
+                                ${students.map(s => `<option value="${escapeHtml(s.name)}">${s.number ? s.number + '. ' : ''}${escapeHtml(s.name)}</option>`).join('')}
+                            </select>
+                            <input type="text" id="absenceStudentName" class="absence-input" placeholder="或直接輸入姓名">
+                            <select id="absenceTypeSelect" class="absence-input">
+                                ${Object.entries(AbsenceTypes).map(([key, val]) =>
+            `<option value="${key}">${val.icon} ${val.label}</option>`
+        ).join('')}
+                            </select>
+                            <input type="text" id="absenceNote" class="absence-input" placeholder="備註（選填）">
+                            <button class="absence-add-btn" onclick="submitAbsentStudent()">➕ 新增</button>
+                        </div>
+                    </div>
+                    
+                    <div class="absence-list-section">
+                        <h4>已記錄缺考學生 (<span id="absenceCount">${subjectRecord.absences.length}</span>人)</h4>
+                        <div class="absence-list" id="absenceList">
+                            ${renderAbsenceList(currentSubject.id)}
+                        </div>
+                    </div>
+                    
+                    <div class="absence-stats-section">
+                        <div class="absence-stat">
+                            <span class="stat-label">應到人數</span>
+                            <span class="stat-value" id="absenceStatsExpected">${students.length || '未設定'}</span>
+                        </div>
+                        <div class="absence-stat">
+                            <span class="stat-label">實到人數</span>
+                            <span class="stat-value" id="absenceStatsPresent">${students.length - subjectRecord.absences.length}</span>
+                        </div>
+                        <div class="absence-stat">
+                            <span class="stat-label">出席率</span>
+                            <span class="stat-value" id="absenceStatsRate">${students.length ?
+                Math.round(((students.length - subjectRecord.absences.length) / students.length) * 100) + '%' :
+                '-'}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="absence-manager-footer">
+                    <button class="absence-export-btn" onclick="exportAbsenceReport()">📤 匯出報告</button>
+                    <button class="absence-close-btn" onclick="closeAbsenceManager()">關閉</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(panel);
+
+        // 綁定下拉選單事件
+        const studentSelect = document.getElementById('absenceStudentSelect');
+        const studentInput = document.getElementById('absenceStudentName');
+        if (studentSelect && studentInput) {
+            studentSelect.onchange = () => {
+                if (studentSelect.value) {
+                    studentInput.value = studentSelect.value;
+                }
+            };
+        }
+    };
+
+    /**
+     * 渲染缺考學生列表
+     */
+    function renderAbsenceList(subjectId) {
+        const subjectRecord = getSubjectAbsences(subjectId);
+
+        if (subjectRecord.absences.length === 0) {
+            return '<div class="absence-empty">目前沒有缺考記錄</div>';
+        }
+
+        return subjectRecord.absences.map(absence => {
+            const typeInfo = AbsenceTypes[absence.type] || AbsenceTypes.other;
+            return `
+                <div class="absence-item" data-id="${absence.id}">
+                    <span class="absence-type-icon" style="color: ${typeInfo.color}">${typeInfo.icon}</span>
+                    <span class="absence-name">${escapeHtml(absence.name)}</span>
+                    <span class="absence-type-label">${typeInfo.label}</span>
+                    ${absence.note ? `<span class="absence-note">${escapeHtml(absence.note)}</span>` : ''}
+                    <button class="absence-remove-btn" onclick="removeAbsentStudent(${subjectId}, ${absence.id}); refreshAbsenceList(${subjectId});">🗑️</button>
+                </div>
+            `;
+        }).join('');
+    }
+
+    /**
+     * 刷新缺考列表
+     */
+    window.refreshAbsenceList = function (subjectId) {
+        const list = document.getElementById('absenceList');
+        const count = document.getElementById('absenceCount');
+        const subjectRecord = getSubjectAbsences(subjectId);
+
+        if (list) list.innerHTML = renderAbsenceList(subjectId);
+        if (count) count.textContent = subjectRecord.absences.length;
+
+        // 更新統計區
+        const totalStudents = getStudentCount();
+        const absentCount = subjectRecord.absences.length;
+        const presentCount = totalStudents - absentCount;
+        const attendanceRate = totalStudents ? Math.round((presentCount / totalStudents) * 100) : 0;
+
+        const expectedEl = document.getElementById('absenceStatsExpected');
+        const presentEl = document.getElementById('absenceStatsPresent');
+        const rateEl = document.getElementById('absenceStatsRate');
+
+        if (expectedEl) expectedEl.textContent = totalStudents || '未設定';
+        if (presentEl) presentEl.textContent = presentCount;
+        if (rateEl) rateEl.textContent = totalStudents ? attendanceRate + '%' : '-';
+    };
+
+    /**
+     * 切換缺考記錄科目
+     */
+    window.switchAbsenceSubject = function (subjectId) {
+        const id = parseInt(subjectId);
+        refreshAbsenceList(id);
+    };
+
+    /**
+     * 提交缺考學生
+     */
+    window.submitAbsentStudent = function () {
+        const subjectSelect = document.getElementById('absenceSubjectSelect');
+        const studentInput = document.getElementById('absenceStudentName');
+        const typeSelect = document.getElementById('absenceTypeSelect');
+        const noteInput = document.getElementById('absenceNote');
+
+        const subjectId = parseInt(subjectSelect?.value);
+        const studentName = studentInput?.value?.trim();
+        const absenceType = typeSelect?.value || 'other';
+        const note = noteInput?.value?.trim();
+
+        if (!studentName) {
+            showNotification('請輸入或選擇學生姓名', 'warning');
+            return;
+        }
+
+        if (addAbsentStudent(subjectId, studentName, absenceType, note)) {
+            // 清空輸入
+            if (studentInput) studentInput.value = '';
+            if (noteInput) noteInput.value = '';
+            const studentSelect = document.getElementById('absenceStudentSelect');
+            if (studentSelect) studentSelect.value = '';
+
+            // 刷新列表
+            refreshAbsenceList(subjectId);
+        }
+    };
+
+    /**
+     * 關閉缺考管理面板
+     */
+    window.closeAbsenceManager = function () {
+        const panel = document.getElementById('absenceManagerPanel');
+        if (panel) panel.remove();
+    };
+
+    /**
+     * 匯出缺考報告
+     */
+    window.exportAbsenceReport = function () {
+        const record = getTodayAbsenceRecord();
+
+        let report = `缺考記錄報告\n`;
+        report += `日期：${record.date}\n`;
+        report += `=`.repeat(40) + '\n\n';
+
+        record.subjects.forEach(s => {
+            report += `【${s.subjectName}】\n`;
+            if (s.absences.length === 0) {
+                report += '  (無缺考)\n';
+            } else {
+                s.absences.forEach(a => {
+                    const typeInfo = AbsenceTypes[a.type] || AbsenceTypes.other;
+                    report += `  • ${a.name} - ${typeInfo.label}${a.note ? ` (${a.note})` : ''}\n`;
+                });
+            }
+            report += '\n';
+        });
+
+        // 下載文件
+        const blob = new Blob([report], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `缺考記錄_${record.date}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        showNotification('報告已匯出', 'success');
     };
 
     // ========================================
