@@ -1213,8 +1213,8 @@
             border-color: #3b82f6;
         }
 
-        /* RWD 調整 - 平板 */
-        @media (max-width: 1024px) {
+        /* RWD 調整 - 平板與中等螢幕 */
+        @media (max-width: 1200px) {
             .exam-fullscreen-modal.active {
                 grid-template-columns: 1fr;
                 grid-template-rows: auto auto auto auto;
@@ -1237,17 +1237,21 @@
             .exam-subjects-area {
                 grid-column: 1;
                 grid-row: 3;
-                padding: 0.75rem 1.5rem;
+                padding: 0.75rem 1rem;
+                max-height: 180px;
+                overflow-y: auto;
             }
 
             .exam-reminder-area {
                 grid-column: 1;
                 grid-row: 4;
-                padding: 0.75rem 1.5rem;
+                padding: 0.75rem 1rem;
+                max-height: 200px;
+                overflow-y: auto;
             }
 
             .exam-time-display {
-                font-size: clamp(3rem, 10vw, 5rem);
+                font-size: clamp(2.5rem, 8vw, 4.5rem);
             }
 
             .exam-subject-item {
