@@ -1,5 +1,35 @@
 # 班級小管家 Changelog
 
+## [v2.6.0] - 2026-01-13
+
+### ✨ 新增功能
+
+#### 🔧 核心模組 - 程式碼品質提升 (P0)
+
+- **事件總線 (EventBus)**
+  - 統一的模組間事件通訊機制
+  - 支援訂閱 (`on`)、一次性訂閱 (`once`)、取消訂閱 (`off`)
+  - 事件發送 (`emit`) 與錯誤處理
+  - 事件歷史記錄與除錯模式
+  - 預定義事件類型常數 (`EventTypes`)
+
+- **錯誤處理模組 (ErrorHandler)**
+  - 統一的錯誤類型定義（儲存、網路、驗證、渲染等）
+  - 友善的中文錯誤訊息顯示
+  - 全域錯誤捕獲（unhandledrejection、window.error）
+  - 錯誤歷史記錄與匯出功能
+  - 包裝函數 (`wrap`、`wrapAsync`、`safeExecute`)
+  - 資料驗證輔助 (`validate`、`assert`)
+
+### 📁 新增檔案
+- `js/event-bus.js` - 事件總線模組
+- `js/error-handler.js` - 錯誤處理模組
+
+### 📁 更新檔案
+- `classnew.html` - 引入核心模組
+
+---
+
 ## [v2.5.1] - 2026-01-13
 
 ### ✨ 新增功能
