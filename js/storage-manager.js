@@ -194,6 +194,14 @@
 
     // === 初始化載入資料到 AppState ===
     function initAppState() {
+        // 確保 settings 物件存在
+        if (!AppState.settings) {
+            AppState.settings = {
+                noRepeatLottery: true,
+                theme: 'light'
+            };
+        }
+
         AppState.students = StorageManager.get('students', []);
         AppState.groups = StorageManager.get('groups', []);
         AppState.homeworkList = StorageManager.get('homeworkList', []);
