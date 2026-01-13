@@ -91,7 +91,9 @@
         .exam-fullscreen-modal.active {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            grid-template-rows: auto 1fr auto;
+            grid-template-rows: auto 1fr minmax(200px, auto);
+            height: 100vh;
+            overflow: hidden;
         }
 
         /* 左上區域 - 時鐘 */
@@ -701,7 +703,9 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 2rem 3rem;
+            padding: 1.5rem 2rem;
+            overflow-y: auto;
+            min-height: 0;
         }
 
         .exam-reminder-card {
