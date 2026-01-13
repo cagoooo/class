@@ -208,31 +208,29 @@ function renderStudentsEnhanced() {
             ` : '';
 
             div.innerHTML = `
-                <div class="flex items-start gap-3">
-                    <button onclick="showAvatarPicker(${student.id})" 
-                        class="text-3xl hover:scale-110 transition-transform cursor-pointer flex-shrink-0"
-                        title="點擊更換頭像">
-                        ${avatar}
-                    </button>
-                    <div class="flex-1 min-w-0">
-                        <div class="flex justify-between items-start">
-                            <div>
-                                <div class="font-semibold text-gray-800 text-sm sm:text-base truncate">${student.name}</div>
-                                <div class="text-xs sm:text-sm text-gray-600 mt-1">
-                                    <span class="inline-block">座號：${student.number}</span>
-                                    <span class="inline-block ml-2 sm:ml-3">分數：<span class="font-semibold ${student.points >= 0 ? 'text-green-600' : 'text-red-600'}">${student.points}</span></span>
-                                </div>
-                                ${tagsHTML}
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 flex-1 min-w-0">
+                        <button onclick="showAvatarPicker(${student.id})" 
+                            class="text-2xl sm:text-3xl hover:scale-110 transition-transform cursor-pointer flex-shrink-0"
+                            title="點擊更換頭像">
+                            ${avatar}
+                        </button>
+                        <div class="flex-1 min-w-0 overflow-hidden">
+                            <div class="font-semibold text-gray-800 text-sm sm:text-base truncate">${student.name}</div>
+                            <div class="text-xs text-gray-500 flex flex-wrap items-center gap-x-2">
+                                <span>No.${student.number}</span>
+                                <span class="font-medium ${student.points >= 0 ? 'text-green-600' : 'text-red-600'}">${student.points >= 0 ? '+' : ''}${student.points}分</span>
                             </div>
-                            <div class="flex items-center gap-1 ml-2">
-                                <button onclick="showTagEditor(${student.id})" 
-                                    class="text-blue-500 hover:text-blue-700 text-lg p-1 active:scale-95" title="編輯標籤">🏷️</button>
-                                <button onclick="showStudentReport(${student.id})" 
-                                    class="text-green-500 hover:text-green-700 text-lg p-1 active:scale-95" title="查看報告">📊</button>
-                                <button onclick="removeStudent(${student.id})" 
-                                    class="text-red-500 hover:text-red-700 text-lg p-1 active:scale-95" title="刪除學生">🗑️</button>
-                            </div>
+                            ${tagsHTML}
                         </div>
+                    </div>
+                    <div class="flex items-center gap-0.5 flex-shrink-0">
+                        <button onclick="showTagEditor(${student.id})" 
+                            class="text-base sm:text-lg p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded active:scale-95" title="編輯標籤">🏷️</button>
+                        <button onclick="showStudentReport(${student.id})" 
+                            class="text-base sm:text-lg p-1 text-green-500 hover:text-green-700 hover:bg-green-50 rounded active:scale-95" title="查看報告">📊</button>
+                        <button onclick="removeStudent(${student.id})" 
+                            class="text-base sm:text-lg p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded active:scale-95" title="刪除學生">🗑️</button>
                     </div>
                 </div>
             `;
