@@ -1180,12 +1180,15 @@
         /* 時間選擇器彈窗 */
         .exam-time-picker {
             position: fixed;
-            z-index: 300;
+            z-index: 10000;
             background: white;
             border-radius: 0.75rem;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(0, 0, 0, 0.05);
             padding: 1rem;
             display: none;
+            max-width: calc(100vw - 20px);
+            max-height: calc(100vh - 20px);
+            overflow: auto;
         }
 
         .exam-time-picker.active {
@@ -2287,12 +2290,54 @@
             <button style="width: 100%; margin-top: 0.75rem; padding: 0.5rem; background: #14b8a6; color: white; border: none; border-radius: 0.375rem; cursor: pointer; font-weight: 500;" onclick="confirmTimePicker(${subjectId}, '${timeType}')">確定</button>
         `;
 
-        const rect = event.target.getBoundingClientRect();
-        picker.style.left = `${Math.min(rect.left, window.innerWidth - 200)}px`;
-        picker.style.top = `${rect.bottom + 5}px`;
-
         document.body.appendChild(picker);
         activeTimePicker = picker;
+
+        // 使用 requestAnimationFrame 確保 DOM 完成渲染後再計算位置
+        requestAnimationFrame(() => {
+            const rect = event.target.getBoundingClientRect();
+            const pickerRect = picker.getBoundingClientRect();
+            const pickerHeight = pickerRect.height;
+            const pickerWidth = pickerRect.width;
+            const margin = 10;
+            const viewportHeight = window.innerHeight;
+            const viewportWidth = window.innerWidth;
+
+            // 計算水平位置
+            let left = rect.left;
+            if (left + pickerWidth > viewportWidth - margin) {
+                left = viewportWidth - pickerWidth - margin;
+            }
+            left = Math.max(margin, left);
+
+            // 計算垂直位置
+            const spaceBelow = viewportHeight - rect.bottom - margin;
+            const spaceAbove = rect.top - margin;
+            let top;
+
+            if (spaceBelow >= pickerHeight) {
+                // 下方空間足夠
+                top = rect.bottom + 5;
+            } else if (spaceAbove >= pickerHeight) {
+                // 上方空間足夠，往上顯示
+                top = rect.top - pickerHeight - 5;
+            } else {
+                // 空間都不夠，將選擇器定位在視窗中央並加入滾動
+                top = Math.max(margin, (viewportHeight - pickerHeight) / 2);
+                picker.style.maxHeight = `${viewportHeight - margin * 2}px`;
+            }
+
+            // 確保不會超出視窗頂部
+            top = Math.max(margin, top);
+            // 確保不會超出視窗底部
+            if (top + pickerHeight > viewportHeight - margin) {
+                top = viewportHeight - pickerHeight - margin;
+                top = Math.max(margin, top);
+            }
+
+            picker.style.left = `${left}px`;
+            picker.style.top = `${top}px`;
+        });
 
         setTimeout(() => {
             document.addEventListener('click', closeTimePickerOnOutsideClick);
