@@ -102,7 +102,7 @@
         .exam-fullscreen-modal.active {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            grid-template-rows: minmax(120px, 25vh) 1fr minmax(350px, 55vh);
+            grid-template-rows: auto 1fr auto;
             height: 100vh;
             overflow: hidden;
         }
@@ -116,9 +116,11 @@
             justify-content: center;
             align-items: center;
             text-align: center;
-            padding: 1rem 2rem;
+            padding: 0.75rem 1.5rem;
             background: #1e2538;
             transition: background 0.3s ease;
+            max-height: 45vh;
+            overflow: hidden;
         }
 
         .light-mode .exam-clock-area {
@@ -159,8 +161,8 @@
         .exam-analog-clock {
             display: none;
             position: relative;
-            width: min(50vh, 45vw, 320px);
-            height: min(50vh, 45vw, 320px);
+            width: min(32vh, 35vw, 260px);
+            height: min(32vh, 35vw, 260px);
             aspect-ratio: 1 / 1;
             border-radius: 50%;
             background: linear-gradient(145deg, #2a3347 0%, #1a1f2e 100%);
@@ -323,9 +325,9 @@
         /* 類比模式下的日期顯示 */
         .exam-analog-date {
             display: none;
-            margin-top: 1.5rem;
+            margin-top: 0.75rem;
             color: rgba(255, 255, 255, 0.8);
-            font-size: clamp(1rem, 1.8vw, 1.4rem);
+            font-size: clamp(0.85rem, 1.5vw, 1.2rem);
             text-align: center;
             font-weight: 500;
         }
@@ -444,10 +446,12 @@
             grid-row: 3;
             display: flex;
             flex-direction: column;
-            padding: 1.5rem 3rem 2rem;
+            padding: 1rem 2rem 1.5rem;
             background: #1e2538;
-            gap: 1.5rem;
+            gap: 1rem;
             transition: background 0.3s ease;
+            overflow-y: auto;
+            max-height: 55vh;
         }
 
         .light-mode .exam-subjects-area {
@@ -456,10 +460,10 @@
 
         .exam-subjects-list {
             flex: 1;
-            overflow: hidden;
+            overflow-y: auto;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: flex-start;
             gap: 0.5rem;
         }
 
