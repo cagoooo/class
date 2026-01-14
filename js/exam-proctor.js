@@ -361,6 +361,15 @@
             min-width: 300px;
             max-width: 100%;
             box-shadow: 0 4px 20px rgba(34, 197, 94, 0.3);
+            line-height: 1.4;
+        }
+
+        .exam-status-remaining {
+            display: block;
+            font-size: clamp(1rem, 2.5vw, 1.8rem);
+            font-weight: 500;
+            opacity: 0.95;
+            margin-top: 0.25rem;
         }
 
         .exam-status-bar.waiting {
@@ -1912,7 +1921,7 @@
         if (statusEl) {
             if (currentExam) {
                 const remaining = getRemainingMinutes(currentExam);
-                statusEl.textContent = `考試進行中 - 剩餘 ${remaining} 分鐘`;
+                statusEl.innerHTML = `考試進行中<br><span class="exam-status-remaining">剩餘時間還有 ${remaining} 分鐘</span>`;
                 statusEl.className = 'exam-status-bar';
 
                 if (progressFill) {
