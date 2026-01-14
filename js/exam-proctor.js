@@ -102,7 +102,7 @@
         .exam-fullscreen-modal.active {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            grid-template-rows: auto 1fr auto;
+            grid-template-rows: minmax(150px, 35vh) minmax(0, 1fr) auto;
             height: 100vh;
             overflow: hidden;
         }
@@ -343,13 +343,14 @@
         /* 右上區域 - 狀態條與進度條 */
         .exam-status-area {
             grid-column: 2;
-            grid-row: 1 / 3;
+            grid-row: 1;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 2rem 3rem;
-            gap: 1.5rem;
+            padding: 1.5rem 2rem;
+            gap: 1rem;
+            overflow: hidden;
         }
 
         .exam-status-bar {
@@ -368,10 +369,19 @@
 
         .exam-status-remaining {
             display: block;
-            font-size: clamp(1rem, 2.5vw, 1.8rem);
-            font-weight: 500;
-            opacity: 0.95;
-            margin-top: 0.25rem;
+            font-size: clamp(1.2rem, 3vw, 2.2rem);
+            font-weight: 600;
+            opacity: 1;
+            margin-top: 0.5rem;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 0.5rem 1.5rem;
+            border-radius: 2rem;
+            animation: pulse-remaining 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-remaining {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.85; transform: scale(1.02); }
         }
 
         .exam-status-bar.waiting {
@@ -726,7 +736,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 1.5rem 2rem;
+            padding: 1rem 1.5rem;
             overflow-y: auto;
             min-height: 0;
         }
