@@ -358,23 +358,23 @@
             color: white;
             padding: 1.5rem 3rem;
             border-radius: 1rem;
-            font-size: clamp(1.5rem, 4vw, 3rem);
+            font-size: clamp(2rem, 5vw, 4rem);
             font-weight: 700;
             text-align: center;
             min-width: 300px;
             max-width: 100%;
             box-shadow: 0 4px 20px rgba(34, 197, 94, 0.3);
-            line-height: 1.4;
+            line-height: 1.3;
         }
 
         .exam-status-remaining {
             display: block;
-            font-size: clamp(1.2rem, 3vw, 2.2rem);
+            font-size: clamp(1.5rem, 4vw, 2.8rem);
             font-weight: 600;
             opacity: 1;
             margin-top: 0.5rem;
-            background: rgba(255, 255, 255, 0.2);
-            padding: 0.5rem 1.5rem;
+            background: rgba(255, 255, 255, 0.25);
+            padding: 0.6rem 2rem;
             border-radius: 2rem;
             animation: pulse-remaining 2s ease-in-out infinite;
         }
