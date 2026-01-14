@@ -208,30 +208,30 @@ function renderStudentsEnhanced() {
             ` : '';
 
             div.innerHTML = `
-                <div class="flex items-center justify-between gap-2">
-                    <div class="flex items-center gap-2 flex-1 min-w-0">
-                        <button onclick="showAvatarPicker(${student.id})" 
-                            class="text-2xl sm:text-3xl hover:scale-110 transition-transform cursor-pointer flex-shrink-0"
-                            title="點擊更換頭像">
-                            ${avatar}
-                        </button>
-                        <div class="flex-1 min-w-0 overflow-hidden">
-                            <div class="font-semibold text-gray-800 text-sm sm:text-base truncate">${student.name}</div>
-                            <div class="text-xs text-gray-500 flex flex-wrap items-center gap-x-2">
-                                <span>No.${student.number}</span>
-                                <span class="font-medium ${student.points >= 0 ? 'text-green-600' : 'text-red-600'}">${student.points >= 0 ? '+' : ''}${student.points}分</span>
-                            </div>
-                            ${tagsHTML}
+                <div class="flex flex-col gap-1">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <button onclick="showAvatarPicker(${student.id})" 
+                                class="text-xl hover:scale-110 transition-transform cursor-pointer flex-shrink-0"
+                                title="點擊更換頭像">
+                                ${avatar}
+                            </button>
+                            <span class="font-semibold text-gray-800 text-sm truncate">${student.name}</span>
+                        </div>
+                        <div class="flex items-center flex-shrink-0">
+                            <button onclick="showTagEditor(${student.id})" 
+                                class="text-sm p-0.5 text-blue-500 hover:text-blue-700" title="編輯標籤">🏷️</button>
+                            <button onclick="showStudentReport(${student.id})" 
+                                class="text-sm p-0.5 text-green-500 hover:text-green-700" title="查看報告">📊</button>
+                            <button onclick="removeStudent(${student.id})" 
+                                class="text-sm p-0.5 text-red-500 hover:text-red-700" title="刪除學生">🗑️</button>
                         </div>
                     </div>
-                    <div class="flex items-center gap-0.5 flex-shrink-0">
-                        <button onclick="showTagEditor(${student.id})" 
-                            class="text-base sm:text-lg p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded active:scale-95" title="編輯標籤">🏷️</button>
-                        <button onclick="showStudentReport(${student.id})" 
-                            class="text-base sm:text-lg p-1 text-green-500 hover:text-green-700 hover:bg-green-50 rounded active:scale-95" title="查看報告">📊</button>
-                        <button onclick="removeStudent(${student.id})" 
-                            class="text-base sm:text-lg p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded active:scale-95" title="刪除學生">🗑️</button>
+                    <div class="text-xs text-gray-500 pl-7">
+                        <span>座號：${student.number}</span>
+                        <span class="ml-2 font-medium ${student.points >= 0 ? 'text-green-600' : 'text-red-600'}">分數：${student.points}</span>
                     </div>
+                    ${tagsHTML}
                 </div>
             `;
 

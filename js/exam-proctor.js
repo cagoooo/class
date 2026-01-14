@@ -102,7 +102,7 @@
         .exam-fullscreen-modal.active {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            grid-template-rows: auto 1fr minmax(200px, auto);
+            grid-template-rows: minmax(120px, 25vh) 1fr minmax(350px, 55vh);
             height: 100vh;
             overflow: hidden;
         }
@@ -116,7 +116,7 @@
             justify-content: center;
             align-items: center;
             text-align: center;
-            padding: 2rem;
+            padding: 1rem 2rem;
             background: #1e2538;
             transition: background 0.3s ease;
         }
@@ -341,7 +341,7 @@
         /* 右上區域 - 狀態條與進度條 */
         .exam-status-area {
             grid-column: 2;
-            grid-row: 1;
+            grid-row: 1 / 3;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -447,10 +447,11 @@
 
         .exam-subjects-list {
             flex: 1;
-            overflow-y: auto;
+            overflow: hidden;
             display: flex;
             flex-direction: column;
-            padding-top: 0.5rem;
+            justify-content: center;
+            gap: 0.5rem;
         }
 
         .exam-subject-item {
@@ -458,16 +459,16 @@
             align-items: center;
             justify-content: center;
             flex-wrap: wrap;
-            padding: 0.75rem 1.5rem;
-            margin-bottom: 0.5rem;
+            padding: 1rem 2rem;
+            margin-bottom: 0.75rem;
             border-radius: 0.75rem;
             background: rgba(255, 255, 255, 0.05);
             color: rgba(255, 255, 255, 0.8);
-            font-size: clamp(0.9rem, 2vw, 1.2rem);
+            font-size: clamp(1.1rem, 2.5vw, 1.6rem);
             transition: all 0.3s ease;
             border: 2px solid transparent;
             cursor: pointer;
-            gap: 1rem;
+            gap: 1.5rem;
         }
 
         .light-mode .exam-subject-item {
@@ -1973,12 +1974,26 @@
                     statusEl.className = 'exam-status-bar finished';
                 }
 
-                if (progressFill) {
-                    progressFill.style.width = '0%';
+                // 休息時間也顯示進度條（到下一場考試的進度）
+                if (progressFill && nextExam) {
+                    // 計算上一場考試結束到下一場考試開始的休息時間進度
+                    const prevExam = examSubjects.filter(s => timeToMinutes(s.endTime) <= currentMinutes).pop();
+                    const breakStart = prevExam ? timeToMinutes(prevExam.endTime) : timeToMinutes(examSubjects[0].startTime) - 10;
+                    const breakEnd = timeToMinutes(nextExam.startTime);
+                    const breakTotal = breakEnd - breakStart;
+                    const breakElapsed = currentMinutes - breakStart;
+                    const breakProgress = breakTotal > 0 ? Math.min(100, (breakElapsed / breakTotal) * 100) : 0;
+
+                    progressFill.style.width = breakProgress + '%';
                     progressFill.classList.remove('warning', 'danger');
+                    progressFill.style.background = 'linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%)';
+                } else if (progressFill) {
+                    progressFill.style.width = '100%';
+                    progressFill.classList.remove('warning', 'danger');
+                    progressFill.style.background = 'linear-gradient(90deg, #22c55e 0%, #4ade80 100%)';
                 }
-                if (progressElapsed) progressElapsed.textContent = '休息中';
-                if (progressRemaining) progressRemaining.textContent = '--';
+                if (progressElapsed) progressElapsed.textContent = nextExam ? '休息中' : '已完成';
+                if (progressRemaining) progressRemaining.textContent = nextExam ? `${Math.floor(timeToMinutes(nextExam.startTime) - currentMinutes)} 分鐘後開始` : '今日結束';
             }
         }
 

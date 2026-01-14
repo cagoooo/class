@@ -2137,7 +2137,9 @@
                 renderGroups();
             }
 
-            const record = { id: Date.now(), studentId: studentId, studentName: student.name, points: points, reason: reason, timestamp: new Date().toLocaleString('zh-TW', { hour12: false }) };
+            const record = { id: Date.now(), studentId: studentId, studentName: student.name, points: points, reason: reason, date: new Date().toLocaleDateString('zh-TW'), timestamp: new Date().toLocaleString('zh-TW', { hour12: false }) };
+            if (!student.records) student.records = [];
+            student.records.push(record);
             pointsHistory.unshift(record);
             localStorage.setItem('students', JSON.stringify(students));
             localStorage.setItem('pointsHistory', JSON.stringify(pointsHistory));
