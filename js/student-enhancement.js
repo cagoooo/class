@@ -179,7 +179,7 @@ function toggleStudentTag(studentId, tagKey) {
 // ==================== 增強版渲染 ====================
 
 /**
- * 增強版學生列表渲染
+ * 增強版學生列表渲染（支援搜尋功能）
  */
 function renderStudentsEnhanced() {
     const container = document.getElementById('studentsList');
@@ -187,15 +187,36 @@ function renderStudentsEnhanced() {
 
     container.innerHTML = '';
 
+    // 排序學生
+    const sortedStudents = [...students].sort((a, b) => (a.number || 999) - (b.number || 999));
+
+    // 套用搜尋過濾
+    const filteredStudents = filterStudents(sortedStudents, currentSearchQuery);
+
+    // 更新搜尋統計
+    updateSearchStats(filteredStudents.length, students.length);
+
     if (students.length === 0) {
         container.innerHTML = `<div class="col-span-full text-center text-gray-500 p-6 bg-gray-50 rounded-lg">目前沒有學生，請從上方新增學生。</div>`;
+    } else if (filteredStudents.length === 0) {
+        container.innerHTML = `
+            <div class="col-span-full text-center p-6 bg-gray-50 rounded-lg">
+                <div class="text-4xl mb-3">🔍</div>
+                <div class="text-gray-500">找不到符合「<span class="font-semibold text-gray-700">${currentSearchQuery}</span>」的學生</div>
+                <div class="text-sm text-gray-400 mt-2">試試其他關鍵字或清除搜尋</div>
+            </div>`;
     } else {
-        students.sort((a, b) => (a.number || 999) - (b.number || 999)).forEach(student => {
+        filteredStudents.forEach(student => {
             const avatar = student.avatar || '😊';
             const tags = student.tags || [];
 
             const div = document.createElement('div');
             div.className = 'bg-gray-50 p-3 sm:p-4 rounded-lg border-l-4 border-blue-500 hover:shadow-md transition-shadow';
+
+            // 如果正在搜尋，添加高亮動畫效果
+            if (currentSearchQuery) {
+                div.classList.add('ring-2', 'ring-blue-200');
+            }
 
             // 標籤 HTML
             const tagsHTML = tags.length > 0 ? `
@@ -207,6 +228,10 @@ function renderStudentsEnhanced() {
                 </div>
             ` : '';
 
+            // 高亮顯示姓名和座號
+            const highlightedName = highlightSearchText(student.name, currentSearchQuery);
+            const highlightedNumber = highlightSearchText(String(student.number), currentSearchQuery);
+
             div.innerHTML = `
                 <div class="flex flex-col gap-1">
                     <div class="flex items-center justify-between">
@@ -216,7 +241,7 @@ function renderStudentsEnhanced() {
                                 title="點擊更換頭像">
                                 ${avatar}
                             </button>
-                            <span class="font-semibold text-gray-800 text-sm truncate">${student.name}</span>
+                            <span class="font-semibold text-gray-800 text-sm truncate">${highlightedName}</span>
                         </div>
                         <div class="flex items-center flex-shrink-0">
                             <button onclick="showTagEditor(${student.id})" 
@@ -228,7 +253,7 @@ function renderStudentsEnhanced() {
                         </div>
                     </div>
                     <div class="text-xs text-gray-500 pl-7">
-                        <span>座號：${student.number}</span>
+                        <span>座號：${highlightedNumber}</span>
                         <span class="ml-2 font-medium ${student.points >= 0 ? 'text-green-600' : 'text-red-600'}">分數：${student.points}</span>
                     </div>
                     ${tagsHTML}
@@ -292,12 +317,132 @@ function enhanceAddStudentForm() {
     }
 }
 
+// ==================== 搜尋功能 ====================
+
+// 搜尋狀態
+let currentSearchQuery = '';
+let searchDebounceTimer = null;
+
+/**
+ * 初始化搜尋功能
+ */
+function initStudentSearch() {
+    const searchInput = document.getElementById('studentSearch');
+    const clearBtn = document.getElementById('clearSearch');
+    const searchStats = document.getElementById('searchStats');
+
+    if (!searchInput) return;
+
+    // 輸入事件 - 使用防抖處理
+    searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.trim();
+
+        // 顯示/隱藏清除按鈕
+        if (clearBtn) {
+            clearBtn.classList.toggle('hidden', query === '');
+        }
+
+        // 防抖處理
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(() => {
+            currentSearchQuery = query;
+            renderStudentsEnhanced();
+        }, 150);
+    });
+
+    // 清除按鈕點擊事件
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            currentSearchQuery = '';
+            clearBtn.classList.add('hidden');
+            if (searchStats) searchStats.textContent = '';
+            renderStudentsEnhanced();
+            searchInput.focus();
+        });
+    }
+
+    // 支援 ESC 鍵清除搜尋
+    searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            searchInput.value = '';
+            currentSearchQuery = '';
+            if (clearBtn) clearBtn.classList.add('hidden');
+            if (searchStats) searchStats.textContent = '';
+            renderStudentsEnhanced();
+        }
+    });
+}
+
+/**
+ * 過濾學生列表
+ * @param {Array} studentList - 學生陣列
+ * @param {string} query - 搜尋關鍵字
+ * @returns {Array} - 過濾後的學生陣列
+ */
+function filterStudents(studentList, query) {
+    if (!query) return studentList;
+
+    const lowerQuery = query.toLowerCase();
+
+    return studentList.filter(student => {
+        // 比對姓名
+        const nameMatch = student.name.toLowerCase().includes(lowerQuery);
+        // 比對座號（轉為字串比對）
+        const numberMatch = String(student.number).includes(query);
+
+        return nameMatch || numberMatch;
+    });
+}
+
+/**
+ * 高亮顯示搜尋關鍵字
+ * @param {string} text - 原始文字
+ * @param {string} query - 搜尋關鍵字
+ * @returns {string} - 帶有高亮標記的 HTML
+ */
+function highlightSearchText(text, query) {
+    if (!query) return text;
+
+    // 轉義正則表達式特殊字元
+    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${escapedQuery})`, 'gi');
+
+    return text.replace(regex, '<mark class="bg-yellow-200 px-0.5 rounded">$1</mark>');
+}
+
+/**
+ * 更新搜尋統計
+ * @param {number} filtered - 過濾後的數量
+ * @param {number} total - 總數量
+ */
+function updateSearchStats(filtered, total) {
+    const searchStats = document.getElementById('searchStats');
+    if (!searchStats) return;
+
+    if (!currentSearchQuery) {
+        searchStats.textContent = '';
+        return;
+    }
+
+    if (filtered === 0) {
+        searchStats.innerHTML = `<span class="text-red-500">❌ 找不到符合「${currentSearchQuery}」的學生</span>`;
+    } else if (filtered === total) {
+        searchStats.innerHTML = `<span class="text-green-600">✅ 顯示全部 ${total} 位學生</span>`;
+    } else {
+        searchStats.innerHTML = `<span class="text-blue-600">🔍 找到 ${filtered} / ${total} 位學生</span>`;
+    }
+}
+
 // ==================== 初始化 ====================
 
 /**
  * 初始化學生增強模組
  */
 function initStudentEnhancement() {
+    // 初始化搜尋功能
+    initStudentSearch();
+
     // 增強新增學生表單
     enhanceAddStudentForm();
 
