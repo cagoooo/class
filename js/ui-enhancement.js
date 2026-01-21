@@ -220,11 +220,77 @@
             gap: 0.5rem;
             margin-bottom: 1rem;
             flex-wrap: wrap;
+            align-items: center;
         }
 
-        .seating-controls input {
-            width: 60px;
+        .seating-controls input[type="number"] {
+            width: 70px;
+            min-width: 70px;
             text-align: center;
+            padding: 0.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            border: 2px solid #e5e7eb;
+            border-radius: 0.5rem;
+            background: white;
+            -moz-appearance: textfield;
+        }
+
+        .seating-controls input[type="number"]::-webkit-outer-spin-button,
+        .seating-controls input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .seating-controls input[type="number"]:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+
+        .dark .seating-controls input[type="number"] {
+            background: var(--bg-tertiary);
+            border-color: var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .seating-controls label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: #f9fafb;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            border: 1px solid #e5e7eb;
+        }
+
+        .dark .seating-controls label {
+            background: var(--bg-secondary);
+            border-color: var(--border-color);
+        }
+
+        .seating-controls label span {
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        /* RWD 響應式 */
+        @media (max-width: 640px) {
+            .seating-controls {
+                justify-content: center;
+            }
+
+            .seating-controls label {
+                flex: 1;
+                min-width: 120px;
+                justify-content: center;
+            }
+
+            .seating-btn {
+                flex: 1;
+                min-width: calc(50% - 0.25rem);
+                text-align: center;
+            }
         }
 
         .seating-btn {
@@ -400,15 +466,15 @@
                 
                 <div class="p-4">
                     <div class="seating-controls">
-                        <label class="flex items-center gap-2">
+                        <label>
                             <span class="text-sm text-gray-600">行數:</span>
                             <input type="number" id="seating-rows" value="${seatingConfig.rows}" min="1" max="10" 
-                                class="px-2 py-1 border rounded-lg" onchange="updateSeatingGrid()">
+                                onchange="updateSeatingGrid()">
                         </label>
-                        <label class="flex items-center gap-2">
+                        <label>
                             <span class="text-sm text-gray-600">列數:</span>
                             <input type="number" id="seating-cols" value="${seatingConfig.cols}" min="1" max="10"
-                                class="px-2 py-1 border rounded-lg" onchange="updateSeatingGrid()">
+                                onchange="updateSeatingGrid()">
                         </label>
                         <button onclick="autoAssignSeats()" class="seating-btn seating-btn-secondary">📋 依座號排</button>
                         <button onclick="randomAssignSeats()" class="seating-btn seating-btn-primary">🎲 隨機排座位</button>
