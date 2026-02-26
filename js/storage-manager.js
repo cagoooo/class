@@ -210,13 +210,30 @@
             };
         }
 
+        // 讀取資料並確保類型正確
         AppState.students = StorageManager.get('students', []);
+        if (!Array.isArray(AppState.students)) AppState.students = [];
+
         AppState.groups = StorageManager.get('groups', []);
+        if (!Array.isArray(AppState.groups)) AppState.groups = [];
+
         AppState.homeworkList = StorageManager.get('homeworkList', []);
+        if (!Array.isArray(AppState.homeworkList)) AppState.homeworkList = [];
+
         AppState.homeworkChecks = StorageManager.get('homeworkChecks', {});
+        if (typeof AppState.homeworkChecks !== 'object' || AppState.homeworkChecks === null) {
+            AppState.homeworkChecks = {};
+        }
+
         AppState.pointsHistory = StorageManager.get('pointsHistory', []);
+        if (!Array.isArray(AppState.pointsHistory)) AppState.pointsHistory = [];
+
         AppState.lotteryHistory = StorageManager.get('lotteryHistory', []);
+        if (!Array.isArray(AppState.lotteryHistory)) AppState.lotteryHistory = [];
+
         AppState.drawnStudentIds = StorageManager.get('drawnStudentIds', []);
+        if (!Array.isArray(AppState.drawnStudentIds)) AppState.drawnStudentIds = [];
+
         AppState.settings.noRepeatLottery = StorageManager.get('noRepeatLottery', true);
         AppState.settings.theme = StorageManager.get('theme', 'light');
 

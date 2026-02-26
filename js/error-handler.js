@@ -277,7 +277,7 @@ const ErrorHandler = (function () {
             // 顯示通知
             if (config.showNotification && options.silent !== true) {
                 const customMessage = options.customMessage ||
-                    (errorType === ErrorTypes.VALIDATION ? errorObj.message : null);
+                    (errorType === ErrorTypes.VALIDATION || errorType === ErrorTypes.UNKNOWN ? errorObj.message : null);
                 showErrorNotification(errorType, customMessage);
             }
 

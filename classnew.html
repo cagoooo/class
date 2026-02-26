@@ -1360,13 +1360,13 @@
 
     <script>
         // 全域變數
-        let students = JSON.parse(localStorage.getItem('students')) || [];
-        let pointsHistory = JSON.parse(localStorage.getItem('pointsHistory')) || [];
-        let lotteryHistory = JSON.parse(localStorage.getItem('lotteryHistory')) || [];
-        let groups = JSON.parse(localStorage.getItem('groups')) || [];
-        let notebookEntries = JSON.parse(localStorage.getItem('notebookEntries')) || [];
-        let homeworkList = JSON.parse(localStorage.getItem('homeworkList')) || [];
-        let homeworkChecks = JSON.parse(localStorage.getItem('homeworkChecks')) || {};
+        var students = JSON.parse(localStorage.getItem('students')) || [];
+        var pointsHistory = JSON.parse(localStorage.getItem('pointsHistory')) || [];
+        var lotteryHistory = JSON.parse(localStorage.getItem('lotteryHistory')) || [];
+        var groups = JSON.parse(localStorage.getItem('groups')) || [];
+        var notebookEntries = JSON.parse(localStorage.getItem('notebookEntries')) || [];
+        var homeworkList = JSON.parse(localStorage.getItem('homeworkList')) || [];
+        var homeworkChecks = JSON.parse(localStorage.getItem('homeworkChecks')) || {};
 
         // --- 計時器變數 ---
         let timerInterval = null;
@@ -1377,8 +1377,8 @@
         // --- 結束計時器變數 ---
 
         // --- 抽籤系統變數 ---
-        let drawnStudentIds = JSON.parse(localStorage.getItem('drawnStudentIds')) || []; // 已抽取過的學生 ID
-        let noRepeatLottery = JSON.parse(localStorage.getItem('noRepeatLottery')) ?? true; // 預設開啟不重複抽取
+        var drawnStudentIds = JSON.parse(localStorage.getItem('drawnStudentIds')) || []; // 已抽取過的學生 ID
+        var noRepeatLottery = JSON.parse(localStorage.getItem('noRepeatLottery')) ?? true; // 預設開啟不重複抽取
         // --- 結束抽籤系統變數 ---
 
         // --- 全螢幕時鐘變數 ---

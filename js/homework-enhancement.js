@@ -15,6 +15,9 @@
         late: { color: 'bg-yellow-100 border-yellow-500', text: 'text-yellow-700', label: '遲交', icon: '⚠️' }
     };
 
+    let currentFilter = 'all';
+    let isFromDashboard = false;
+
     // 等待 DOM 載入完成
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
@@ -832,10 +835,25 @@
     window.openHomeworkFullscreen = function () {
         const homeworkId = document.getElementById('checkHomework').value;
         if (!homeworkId) {
+            const msg = '請先選擇要檢查的作業';
             if (typeof NotificationSystem !== 'undefined') {
-                NotificationSystem.warning('請先選擇要檢查的作業');
+                NotificationSystem.warning(msg);
             } else {
-                alert('請先選擇要檢查的作業');
+                alert(msg);
+            }
+            return;
+        }
+
+        // 檢查是否有學生資料
+        const studentList = (typeof AppState !== 'undefined' && AppState.students) ? AppState.students : (typeof students !== 'undefined' ? students : []);
+        if (!Array.isArray(studentList) || studentList.length === 0) {
+            const msg = '請先在學生管理中新增學生資料，才能使用全螢幕檢查功能';
+            if (typeof NotificationSystem !== 'undefined') {
+                NotificationSystem.warning(msg);
+            } else if (typeof ErrorHandler !== 'undefined' && typeof ErrorHandler.handle === 'function') {
+                ErrorHandler.handle(msg, 'VALIDATION', 'HomeworkFullscreen');
+            } else {
+                alert(msg);
             }
             return;
         }
@@ -843,11 +861,19 @@
         const modal = document.getElementById('homeworkFullscreenModal');
         if (!modal) return;
 
+        // 啟動全螢幕模式
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+
         // 取得作業名稱
-        const homework = (typeof homeworkList !== 'undefined') ?
-            homeworkList.find(h => h.id == homeworkId) : null;
+        const homeworkIdNum = parseInt(homeworkId);
+        const homework = (typeof AppState !== 'undefined' && AppState.homeworks) ?
+            AppState.homeworks.find(h => h.id == homeworkIdNum) :
+            (typeof homeworkList !== 'undefined' ? homeworkList.find(h => h.id == homeworkIdNum) : null);
+
         const title = homework ? homework.name : '作業檢查';
-        document.getElementById('homeworkFullscreenTitle').textContent = title;
+        const titleElement = document.getElementById('homeworkFullscreenTitle');
+        if (titleElement) titleElement.textContent = title;
 
         // 渲染篩選按鈕
         renderFilterButtons();
@@ -857,9 +883,6 @@
 
         // 更新統計
         updateFullscreenStats();
-
-        modal.classList.add('active');
-        document.body.style.overflow = 'hidden';
     };
 
     // === 關閉全螢幕 ===
@@ -870,15 +893,31 @@
         modal.classList.remove('active');
         document.body.style.overflow = '';
 
-        // 同步更新原本的檢查清單
-        if (typeof updateHomeworkCheckList === 'function') {
-            updateHomeworkCheckList();
+        // 如果是從儀表板過來的，關閉全螢幕後重新開啟儀表板
+        if (isFromDashboard) {
+            isFromDashboard = false; // 重置標記
+            setTimeout(() => {
+                if (typeof openHomeworkDashboard === 'function') {
+                    openHomeworkDashboard();
+                }
+            }, 300);
+        } else {
+            // 如果不是儀表板，確保主畫面即時整理
+            syncToMainView();
         }
     };
 
-    // === 渲染篩選按鈕 ===
-    let currentFilter = 'all';
+    // === 同步至主畫面 ===
+    function syncToMainView() {
+        if (typeof window.updateHomeworkCheckList === 'function') {
+            window.updateHomeworkCheckList();
+        }
+        if (typeof window.updateHomeworkStats === 'function') {
+            window.updateHomeworkStats();
+        }
+    }
 
+    // === 渲染篩選按鈕 ===
     function renderFilterButtons() {
         const container = document.getElementById('homeworkFilterBtns');
         if (!container) return;
@@ -909,7 +948,17 @@
     // === 渲染學生網格 ===
     function renderStudentGrid() {
         const container = document.getElementById('homeworkStudentGrid');
-        if (!container || typeof students === 'undefined') return;
+        if (!container) return;
+
+        // 檢查資料
+        if (typeof students === 'undefined' || !Array.isArray(students) || students.length === 0) {
+            container.innerHTML = `<div class="col-span-full text-center text-gray-500 py-12">
+                <div class="text-4xl mb-4">👥</div>
+                <div>目前尚無學生資料</div>
+                <div class="text-sm mt-2">請先至「學生管理」新增學生</div>
+            </div>`;
+            return;
+        }
 
         const homeworkId = document.getElementById('checkHomework').value;
         const checks = (typeof homeworkChecks !== 'undefined' && homeworkChecks[homeworkId])
@@ -962,6 +1011,7 @@
 
         renderStudentGrid();
         updateFullscreenStats();
+        syncToMainView(); // 同步至主畫面
     };
 
     // === 全部設定狀態 ===
@@ -982,6 +1032,7 @@
         localStorage.setItem('homeworkChecks', JSON.stringify(homeworkChecks));
         renderStudentGrid();
         updateFullscreenStats();
+        syncToMainView(); // 同步至主畫面
 
         if (typeof NotificationSystem !== 'undefined') {
             const labels = { completed: '全部完成', unchecked: '已重置' };
@@ -1102,6 +1153,20 @@
 
     // === 開啟儀表板 ===
     window.openHomeworkDashboard = function () {
+        // 檢查是否有學生資料，若無則提示
+        const studentList = (typeof AppState !== 'undefined' && AppState.students) ? AppState.students : (typeof students !== 'undefined' ? students : []);
+        if (!Array.isArray(studentList) || studentList.length === 0) {
+            const msg = '請先在學生管理中新增學生資料，才能使用儀表板功能';
+            if (typeof NotificationSystem !== 'undefined') {
+                NotificationSystem.warning(msg);
+            } else if (typeof ErrorHandler !== 'undefined' && typeof ErrorHandler.handle === 'function') {
+                ErrorHandler.handle(msg, 'VALIDATION', 'HomeworkDashboard');
+            } else {
+                alert(msg);
+            }
+            return;
+        }
+
         const modal = document.getElementById('homeworkDashboardModal');
         if (!modal) return;
 
@@ -1175,9 +1240,9 @@
 
     // === 計算單一作業統計 ===
     function getHomeworkStats(homeworkId, studentList, checks) {
-        const homeworkChecks = checks[homeworkId] || {};
+        const homeworkChecks = (checks && checks[homeworkId]) ? checks[homeworkId] : {};
         const stats = {
-            total: studentList.length,
+            total: (Array.isArray(studentList)) ? studentList.length : 0,
             completed: 0,
             incomplete: 0,
             needs_correction: 0,
@@ -1185,10 +1250,12 @@
             unchecked: 0
         };
 
-        studentList.forEach(student => {
-            const status = homeworkChecks[student.id] || 'unchecked';
-            stats[status]++;
-        });
+        if (Array.isArray(studentList)) {
+            studentList.forEach(student => {
+                const status = homeworkChecks[student.id] || 'unchecked';
+                stats[status]++;
+            });
+        }
 
         stats.rate = stats.total > 0 ? ((stats.completed / stats.total) * 100).toFixed(0) : 0;
         return stats;
@@ -1200,7 +1267,7 @@
         if (!container) return;
 
         const homeworks = (typeof homeworkList !== 'undefined') ? homeworkList : [];
-        const studentList = (typeof students !== 'undefined') ? students : [];
+        const studentList = (typeof students !== 'undefined' && Array.isArray(students)) ? students : [];
         const checks = (typeof homeworkChecks !== 'undefined') ? homeworkChecks : {};
 
         // 更新數量顯示
@@ -1212,12 +1279,15 @@
         let totalNeedsCorrection = 0;
         let totalCompleted = 0;
 
-        homeworks.forEach(homework => {
-            const stats = getHomeworkStats(homework.id, studentList, checks);
-            totalIncomplete += stats.incomplete;
-            totalNeedsCorrection += stats.needs_correction;
-            totalCompleted += stats.completed;
-        });
+        // 如果沒有學生，則不需要跑迴圈計算
+        if (studentList.length > 0) {
+            homeworks.forEach(homework => {
+                const stats = getHomeworkStats(homework.id, studentList, checks);
+                totalIncomplete += stats.incomplete;
+                totalNeedsCorrection += stats.needs_correction;
+                totalCompleted += stats.completed;
+            });
+        }
 
         container.innerHTML = `
             <div class="homework-dashboard-stat-card">
@@ -1328,6 +1398,9 @@
 
     // === 從儀表板開啟特定作業 ===
     window.openHomeworkFromDashboard = function (homeworkId) {
+        // 標記來源自儀表板
+        isFromDashboard = true;
+
         // 關閉儀表板
         closeHomeworkDashboard();
 

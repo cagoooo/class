@@ -187,16 +187,19 @@ function renderStudentsEnhanced() {
 
     container.innerHTML = '';
 
+    // 安全性檢查：確保 students 是陣列
+    const safeStudents = (typeof students !== 'undefined' && Array.isArray(students)) ? students : [];
+
     // 排序學生
-    const sortedStudents = [...students].sort((a, b) => (a.number || 999) - (b.number || 999));
+    const sortedStudents = [...safeStudents].sort((a, b) => (a.number || 999) - (b.number || 999));
 
     // 套用搜尋過濾
-    const filteredStudents = filterStudents(sortedStudents, currentSearchQuery);
+    const filteredStudents = filterStudents(sortedStudents, (typeof currentSearchQuery !== 'undefined' ? currentSearchQuery : ''));
 
     // 更新搜尋統計
-    updateSearchStats(filteredStudents.length, students.length);
+    updateSearchStats(filteredStudents.length, safeStudents.length);
 
-    if (students.length === 0) {
+    if (safeStudents.length === 0) {
         container.innerHTML = `<div class="col-span-full text-center text-gray-500 p-6 bg-gray-50 rounded-lg">目前沒有學生，請從上方新增學生。</div>`;
     } else if (filteredStudents.length === 0) {
         container.innerHTML = `
@@ -265,9 +268,14 @@ function renderStudentsEnhanced() {
     }
 
     // 更新統計
-    document.getElementById('totalStudents').textContent = students.length;
-    const avgScore = students.length > 0 ? (students.reduce((sum, s) => sum + s.points, 0) / students.length).toFixed(1) : 0;
-    document.getElementById('averageScore').textContent = avgScore;
+    const totalEl = document.getElementById('totalStudents');
+    if (totalEl) totalEl.textContent = safeStudents.length;
+
+    const avgScoreEl = document.getElementById('averageScore');
+    if (avgScoreEl) {
+        const avgScore = safeStudents.length > 0 ? (safeStudents.reduce((sum, s) => sum + (s.points || 0), 0) / safeStudents.length).toFixed(1) : 0;
+        avgScoreEl.textContent = avgScore;
+    }
 }
 
 // ==================== 新增學生增強 ====================
@@ -297,11 +305,12 @@ function enhanceAddStudentForm() {
             const pendingAvatar = window._pendingStudentAvatar || '😊';
 
             // 調用原始函數
-            const studentCountBefore = students.length;
+            const studentCountBefore = (typeof students !== 'undefined' && Array.isArray(students)) ? students.length : 0;
             originalAddStudent.apply(this, arguments);
 
             // 如果成功新增了學生，更新頭像
-            if (students.length > studentCountBefore) {
+            const currentStudents = (typeof students !== 'undefined' && Array.isArray(students)) ? students : [];
+            if (currentStudents.length > studentCountBefore) {
                 const newStudent = students[students.length - 1];
                 newStudent.avatar = pendingAvatar;
                 newStudent.tags = [];
@@ -381,6 +390,7 @@ function initStudentSearch() {
  * @returns {Array} - 過濾後的學生陣列
  */
 function filterStudents(studentList, query) {
+    if (!Array.isArray(studentList)) return [];
     if (!query) return studentList;
 
     const lowerQuery = query.toLowerCase();
