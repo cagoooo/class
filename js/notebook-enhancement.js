@@ -432,8 +432,193 @@ function saveFromFullscreen() {
 /**
  * 關閉全螢幕編輯器
  */
+/**
+ * 關閉全螢幕編輯器
+ */
 function closeFullscreenEditor() {
     document.getElementById('fullscreen-editor-modal')?.remove();
+}
+
+// ==================== P1 新增：全螢幕展示模式 ====================
+
+/**
+ * 開啟聯絡簿全螢幕展示模式
+ */
+function openNotebookPresentation() {
+    const existingModal = document.getElementById('notebook-presentation-modal');
+    if (existingModal) existingModal.remove();
+
+    const entries = notebookEntries.length > 0 ? notebookEntries : [{
+        id: 0,
+        date: new Date().toISOString().split('T')[0],
+        type: 'other',
+        content: '今日尚無聯絡事項',
+        priority: 'normal',
+        timestamp: ''
+    }];
+
+    const modal = document.createElement('div');
+    modal.id = 'notebook-presentation-modal';
+    modal.className = 'fixed inset-0 z-[100] flex flex-col bg-slate-900 text-white animate-fade-in font-sans';
+
+    // 渲染日期與時鐘
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`;
+
+    modal.innerHTML = `
+        <div class="flex items-center justify-between p-6 bg-slate-800 border-b border-white/10 shadow-xl">
+            <div class="flex items-center gap-6">
+                <div class="text-4xl font-black bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
+                    📅 ${dateStr} 聯絡簿展示
+                </div>
+                <div id="presentation-clock" class="text-3xl font-mono text-slate-300 bg-slate-900/50 px-4 py-1 rounded-lg border border-white/5">
+                    00:00:00
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <button onclick="togglePresentationTheme()" class="p-3 rounded-full hover:bg-white/10 transition-colors text-2xl" title="切換主題">🌓</button>
+                <button onclick="closeNotebookPresentation()" class="p-3 rounded-full hover:bg-red-500/20 text-red-400 transition-colors text-3xl font-bold">✕</button>
+            </div>
+        </div>
+        
+        <div id="presentation-content" class="flex-1 p-8 overflow-y-auto custom-scrollbar bg-slate-900">
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-8 max-w-[1800px] mx-auto">
+                ${entries.map(entry => {
+        const priority = PRIORITIES[entry.priority] || PRIORITIES['normal'];
+        const typeIcon = NOTEBOOK_TYPE_ICONS[entry.type] || '📌';
+        const typeLabels = { homework: '作業', exam: '考試', activity: '活動', notice: '通知', other: '其他' };
+        const typeName = typeLabels[entry.type] || '其他';
+
+        // 根據優先級決定發光效果與邊框
+        let glowClass = 'shadow-lg';
+        let borderClass = 'border-slate-700';
+        let headerBg = 'bg-slate-800';
+
+        if (entry.priority === 'high') {
+            glowClass = 'shadow-[0_0_30px_rgba(239,68,68,0.25)]';
+            borderClass = 'border-red-500/50';
+            headerBg = 'bg-red-900/30';
+        } else if (entry.priority === 'low') {
+            borderClass = 'border-emerald-500/30';
+        }
+
+        return `
+                        <div class="presentation-card flex flex-col rounded-3xl border-2 ${borderClass} ${glowClass} overflow-hidden bg-slate-800/50 backdrop-blur-sm transition-all hover:scale-[1.01] duration-300">
+                            <div class="flex items-center justify-between px-8 py-5 ${headerBg} border-b ${borderClass}">
+                                <div class="flex items-center gap-4">
+                                    <span class="text-4xl">${priority.icon}</span>
+                                    <span class="text-2xl font-bold tracking-wide">${typeIcon} ${typeName}</span>
+                                </div>
+                                <span class="text-xl text-slate-400 font-medium">${entry.date}</span>
+                            </div>
+                            <div class="p-10 flex-1">
+                                <div class="text-slate-100 text-4xl font-medium leading-[1.6] whitespace-pre-wrap select-text">${entry.content}</div>
+                            </div>
+                        </div>
+                    `;
+    }).join('')}
+            </div>
+        </div>
+
+        <style>
+            #notebook-presentation-modal.light-mode {
+                background: #f8fafc;
+                color: #1e293b;
+            }
+            #notebook-presentation-modal.light-mode #presentation-content {
+                background: #f1f5f9;
+            }
+            #notebook-presentation-modal.light-mode .bg-slate-800 {
+                background: #ffffff;
+                border-bottom: 1px solid #e2e8f0;
+            }
+            #notebook-presentation-modal.light-mode .presentation-card {
+                background: #ffffff;
+                border: 2px solid #e2e8f0;
+                box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+            }
+            #notebook-presentation-modal.light-mode .text-slate-100 {
+                color: #0f172a;
+            }
+            #notebook-presentation-modal.light-mode .text-slate-300 {
+                color: #64748b;
+            }
+            #notebook-presentation-modal.light-mode .text-slate-400 {
+                color: #94a3b8;
+            }
+            #notebook-presentation-modal.light-mode .bg-slate-900\\/50 {
+                background: #f8fafc;
+            }
+            
+            .animate-fade-in {
+                animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; transform: scale(0.98); }
+                to { opacity: 1; transform: scale(1); }
+            }
+            
+            .custom-scrollbar::-webkit-scrollbar {
+                width: 10px;
+            }
+            .custom-scrollbar::-webkit-scrollbar-track {
+                background: transparent;
+            }
+            .custom-scrollbar::-webkit-scrollbar-thumb {
+                background: rgba(255, 255, 255, 0.1);
+                border-radius: 10px;
+            }
+            #notebook-presentation-modal.light-mode .custom-scrollbar::-webkit-scrollbar-thumb {
+                background: rgba(0, 0, 0, 0.1);
+            }
+        </style>
+    `;
+
+    document.body.appendChild(modal);
+    document.body.style.overflow = 'hidden';
+
+    // 啟動時鐘
+    updatePresentationClock();
+    const clockInt = setInterval(updatePresentationClock, 1000);
+    modal.dataset.clockInterval = clockInt;
+
+    // 鍵盤監聽
+    const keyHandler = (e) => {
+        if (e.key === 'Escape') closeNotebookPresentation();
+    };
+    document.addEventListener('keydown', keyHandler);
+    modal._keyHandler = keyHandler;
+}
+
+/**
+ * 更新呈現模式的時鐘
+ */
+function updatePresentationClock() {
+    const clockEl = document.getElementById('presentation-clock');
+    if (!clockEl) return;
+    const now = new Date();
+    clockEl.textContent = now.toLocaleTimeString('zh-TW', { hour12: false });
+}
+
+/**
+ * 切換展示模式主題
+ */
+function togglePresentationTheme() {
+    const modal = document.getElementById('notebook-presentation-modal');
+    if (modal) modal.classList.toggle('light-mode');
+}
+
+/**
+ * 關閉展示模式
+ */
+function closeNotebookPresentation() {
+    const modal = document.getElementById('notebook-presentation-modal');
+    if (!modal) return;
+
+    clearInterval(modal.dataset.clockInterval);
+    document.removeEventListener('keydown', modal._keyHandler);
+    modal.remove();
+    document.body.style.overflow = '';
 }
 
 /**
@@ -458,20 +643,8 @@ function injectNotebookEnhancements() {
         notebookTypeSelect.parentNode.insertBefore(priorityDiv.firstElementChild, notebookTypeSelect.nextSibling);
     }
 
-    // 在聯絡簿記錄標題旁添加篩選器
-    const notebookListHeader = document.querySelector('#notebook-section h3');
-    if (notebookListHeader && notebookListHeader.textContent.includes('聯絡簿記錄') && !document.getElementById('priority-filter')) {
-        const filterHTML = `
-            <div id="priority-filter" class="flex gap-1 ml-2">
-                <button onclick="filterNotebookByPriority('all')" class="px-2 py-1 text-xs bg-gray-200 rounded hover:bg-gray-300">全部</button>
-                <button onclick="filterNotebookByPriority('high')" class="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200">🔴</button>
-                <button onclick="filterNotebookByPriority('normal')" class="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200">🟡</button>
-                <button onclick="filterNotebookByPriority('low')" class="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200">🟢</button>
-            </div>
-        `;
-        notebookListHeader.insertAdjacentHTML('afterend', filterHTML);
-        notebookListHeader.style.display = 'inline-block';
-    }
+    // 聯絡簿篩選器現在已直接寫在 HTML 中，這裡僅保留核心功能啟動紀錄
+    console.log('✅ 聯絡簿增強模組核心功能已啟動');
 
     // P1 新增：添加範本選擇器
     const notebookContent = document.getElementById('notebookContent');
@@ -526,4 +699,7 @@ window.openFullscreenEditor = openFullscreenEditor;
 window.applyFsTemplate = applyFsTemplate;
 window.saveFromFullscreen = saveFromFullscreen;
 window.closeFullscreenEditor = closeFullscreenEditor;
+window.openNotebookPresentation = openNotebookPresentation;
+window.closeNotebookPresentation = closeNotebookPresentation;
+window.togglePresentationTheme = togglePresentationTheme;
 window.NOTEBOOK_TEMPLATES = NOTEBOOK_TEMPLATES;
