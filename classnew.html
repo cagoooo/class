@@ -588,8 +588,8 @@
                     </button>
                 </div>
 
-                <!-- 右側空白（保持三欄平衡） -->
-                <div class="hidden lg:block w-48"></div>
+                <!-- Google 帳號登入按鈕（由 google-auth-ui.js 自動注入） -->
+                <div id="auth-nav-slot" class="hidden lg:flex items-center w-48 justify-end"></div>
             </div>
         </div>
     </nav>
@@ -3569,6 +3569,9 @@
     <button id="pwaManualUpdateBtn" title="清除快取並重新載入最新版本">
         🔄 一鍵更新
     </button>
+
+    <!-- Google 帳號登入 UI 模組（必須在所有 Firebase 模組之後載入） -->
+    <script src="./js/google-auth-ui.js"></script>
 </body>
 
 </html>

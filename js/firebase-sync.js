@@ -11,7 +11,9 @@ const COLLECTIONS = {
     NOTEBOOKS: 'notebooks',
     HOMEWORKS: 'homeworks',
     HOMEWORK_CHECKS: 'homeworkChecks',
-    LOTTERY_HISTORY: 'lotteryHistory'
+    LOTTERY_HISTORY: 'lotteryHistory',
+    ANNOUNCEMENTS: 'classAnnouncements',  // 班級公告
+    SETTINGS: 'settings',            // 使用者設定
 };
 
 // 同步狀態
@@ -143,14 +145,19 @@ async function syncToCloud() {
             LoadingIndicator.show('正在同步至雲端...');
         }
 
-        // 同步各資料集合
+        // 同步各資料集合（含公告）
+        const annData = (() => {
+            try { return JSON.parse(localStorage.getItem('classAnnouncements') || '[]'); } catch { return []; }
+        })();
+
         const results = await Promise.all([
             uploadCollection(COLLECTIONS.STUDENTS, students || []),
             uploadCollection(COLLECTIONS.POINTS_HISTORY, pointsHistory || []),
             uploadCollection(COLLECTIONS.GROUPS, groups || []),
             uploadCollection(COLLECTIONS.NOTEBOOKS, notebookEntries || []),
             uploadCollection(COLLECTIONS.HOMEWORKS, homeworkList || []),
-            uploadCollection(COLLECTIONS.LOTTERY_HISTORY, lotteryHistory || [])
+            uploadCollection(COLLECTIONS.LOTTERY_HISTORY, lotteryHistory || []),
+            uploadCollection(COLLECTIONS.ANNOUNCEMENTS, annData),
         ]);
 
         // 同步作業繳交狀態（特殊結構）
@@ -403,23 +410,102 @@ function updateCloudStatusUI(connected) {
     }
 }
 
+/**
+ * 合併雲端與本地資料
+ * - 學生名單：以 id 去重後取聯集
+ * - 評分記錄：全部合併（id 去重）
+ * - 其他集合：雲端優先（本地若為空則用雲端）
+ */
+async function mergeWithCloud() {
+    if (!window.FirebaseConfig.isConnected()) return false;
+
+    try {
+        if (typeof LoadingIndicator !== 'undefined') LoadingIndicator.show('正在合併資料...');
+
+        const cloudData = await syncFromCloud();
+        if (!cloudData) throw new Error('無法取得雲端資料');
+
+        // 合併學生名單（id 去重，以本地版本優先）
+        const localStudents = students || [];
+        const localIds = new Set(localStudents.map(s => s.id));
+        const mergedStudents = [
+            ...localStudents,
+            ...(cloudData.students || []).filter(s => !localIds.has(s.id))
+        ];
+
+        // 合併評分記錄（id 去重，以本地版本優先）
+        const localHist = pointsHistory || [];
+        const localHistIds = new Set(localHist.map(h => h.id));
+        const mergedHistory = [
+            ...localHist,
+            ...(cloudData.pointsHistory || []).filter(h => !localHistIds.has(h.id))
+        ].sort((a, b) => new Date(b.time || 0) - new Date(a.time || 0));
+
+        // 合併公告
+        const localAnn = (() => {
+            try { return JSON.parse(localStorage.getItem('classAnnouncements') || '[]'); } catch { return []; }
+        })();
+        const localAnnIds = new Set(localAnn.map(a => a.id));
+        const mergedAnn = [
+            ...localAnn,
+            ...(cloudData.announcements || []).filter(a => !localAnnIds.has(a.id))
+        ];
+
+        // 套用合併結果
+        students = mergedStudents;
+        pointsHistory = mergedHistory;
+        // 其餘集合：若本地為空則採雲端
+        if (!groups.length && cloudData.groups.length) groups = cloudData.groups;
+        if (!notebookEntries.length && cloudData.notebookEntries.length) notebookEntries = cloudData.notebookEntries;
+        if (!homeworkList.length && cloudData.homeworkList.length) homeworkList = cloudData.homeworkList;
+        if (!lotteryHistory.length && cloudData.lotteryHistory.length) lotteryHistory = cloudData.lotteryHistory;
+
+        // 更新 localStorage
+        localStorage.setItem('students', JSON.stringify(students));
+        localStorage.setItem('pointsHistory', JSON.stringify(pointsHistory));
+        localStorage.setItem('groups', JSON.stringify(groups));
+        localStorage.setItem('notebookEntries', JSON.stringify(notebookEntries));
+        localStorage.setItem('homeworkList', JSON.stringify(homeworkList));
+        localStorage.setItem('lotteryHistory', JSON.stringify(lotteryHistory));
+        localStorage.setItem('classAnnouncements', JSON.stringify(mergedAnn));
+
+        // 重新上傳合併結果到雲端
+        await syncToCloud();
+
+        // 重繪 UI
+        if (typeof renderStudents === 'function') renderStudents();
+        if (typeof renderNotebook === 'function') renderNotebook();
+        if (typeof renderHomework === 'function') renderHomework();
+        if (typeof renderLotteryHistory === 'function') renderLotteryHistory();
+        if (typeof updatePointsStudentSelect === 'function') updatePointsStudentSelect();
+
+        if (typeof LoadingIndicator !== 'undefined') LoadingIndicator.hide();
+        NotificationSystem && NotificationSystem.success('合併完成！資料已同步 🎉');
+        return true;
+    } catch (error) {
+        console.error('合併失敗:', error);
+        if (typeof LoadingIndicator !== 'undefined') LoadingIndicator.hide();
+        NotificationSystem && NotificationSystem.error('合併失敗: ' + error.message);
+        return false;
+    }
+}
+
 // 導出函數
 window.FirebaseSync = {
     syncToCloud: syncToCloud,
     syncFromCloud: syncFromCloud,
     loadFromCloud: loadFromCloud,
+    mergeWithCloud: mergeWithCloud,
     exportAllData: exportAllData,
     showSyncDialog: showSyncDialog,
     init: initFirebaseAndSync,
     uploadItem: uploadItem,
-    deleteItem: deleteItem
+    deleteItem: deleteItem,
 };
 
 // 頁面載入時自動初始化
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        setTimeout(initFirebaseAndSync, 500);
-    });
+    document.addEventListener('DOMContentLoaded', () => setTimeout(initFirebaseAndSync, 500));
 } else {
     setTimeout(initFirebaseAndSync, 500);
 }
