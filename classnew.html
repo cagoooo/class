@@ -161,12 +161,35 @@
 
         /* 時鐘控制列 */
         #clock-controls {
-            transition: opacity 0.3s ease, transform 0.3s ease;
+            transition: opacity 0.35s ease, transform 0.35s ease;
         }
 
         #clock-modal:not(:hover) #clock-controls:not(:focus-within) {
             opacity: 0;
             transform: translateY(100%);
+        }
+
+        /* 滑鼠提示點（底部中央，控制列隱藏時可見） */
+        #clock-modal::after {
+            content: '';
+            position: fixed;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 4px;
+            border-radius: 2px;
+            background: rgba(0, 0, 0, 0.15);
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+
+        #clock-modal.dark::after {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        #clock-modal:hover::after {
+            opacity: 0;
         }
 
         /* 樣式切換按鈕 */
@@ -190,15 +213,19 @@
 
         /* 數位時鐘 (預設) */
         .clock-style-digital .time-display {
-            font-size: clamp(3rem, 18vw, 20rem);
+            font-size: clamp(4rem, min(22vw, 30vh), 30rem);
             font-weight: 700;
             color: #1f2937;
             white-space: nowrap;
+            line-height: 1;
+            letter-spacing: -0.02em;
         }
 
         .clock-style-digital .date-display {
-            font-size: clamp(1rem, 5vw, 4rem);
+            font-size: clamp(1.25rem, min(5vw, 6vh), 5rem);
             color: #4b5563;
+            margin-top: 0.3em;
+            letter-spacing: 0.05em;
         }
 
         #clock-modal.dark .clock-style-digital .time-display {
@@ -212,51 +239,50 @@
         /* LED 時鐘 */
         .clock-style-led .time-display {
             font-family: 'Chakra Petch', 'Noto Sans TC', sans-serif;
-            font-size: clamp(2.5rem, 16vw, 18rem);
+            font-size: clamp(3rem, min(20vw, 28vh), 28rem);
             font-weight: 700;
             color: #16a34a;
-            text-shadow: 0 0 5px rgba(22, 163, 74, 0.3), 0 0 10px rgba(22, 163, 74, 0.3);
+            text-shadow: 0 0 8px rgba(22, 163, 74, 0.5), 0 0 20px rgba(22, 163, 74, 0.3);
             background: #111827;
-            padding: 0.5rem 1rem;
+            padding: 0.4em 0.8em;
             border-radius: 1rem;
             white-space: nowrap;
+            line-height: 1;
         }
 
         .clock-style-led .date-display {
             font-family: 'Chakra Petch', 'Noto Sans TC', sans-serif;
-            font-size: clamp(1rem, 4vw, 3.5rem);
+            font-size: clamp(1rem, min(4vw, 5vh), 4.5rem);
             color: #ca8a04;
-            text-shadow: 0 0 5px rgba(202, 138, 4, 0.3);
+            text-shadow: 0 0 5px rgba(202, 138, 4, 0.4);
             margin-top: 0.5rem;
         }
 
         #clock-modal.dark .clock-style-led .time-display {
             color: #22c55e;
-            /* green-500 */
-            text-shadow: 0 0 5px #22c55e, 0 0 10px #22c55e;
+            text-shadow: 0 0 8px #22c55e, 0 0 20px #22c55e, 0 0 40px rgba(34, 197, 94, 0.3);
         }
 
         #clock-modal.dark .clock-style-led .date-display {
             color: #eab308;
-            /* yellow-500 */
-            text-shadow: 0 0 5px #eab308;
+            text-shadow: 0 0 8px #eab308;
         }
 
         /* 可愛時鐘 */
         .clock-style-cute .time-display {
             font-family: 'Mochiyochi Pop One', 'Noto Sans TC', sans-serif;
-            font-size: clamp(7rem, 20vw, 16rem);
+            font-size: clamp(6rem, min(24vw, 34vh), 30rem);
             font-weight: 400;
             color: #ec4899;
-            /* pink-500 */
-            text-shadow: 4px 4px 0 #ffffff, 6px 6px 0 rgba(0, 0, 0, 0.1);
+            text-shadow: 4px 4px 0 #ffffff, 6px 6px 0 rgba(0, 0, 0, 0.08);
+            line-height: 1;
         }
 
         .clock-style-cute .date-display {
             font-family: 'Mochiyochi Pop One', 'Noto Sans TC', sans-serif;
-            font-size: clamp(2rem, 5vw, 3.5rem);
+            font-size: clamp(1.5rem, min(5vw, 6.5vh), 5rem);
             color: #8b5cf6;
-            /* violet-500 */
+            margin-top: 0.2em;
         }
 
         #clock-modal.dark .clock-style-cute {
@@ -286,7 +312,7 @@
             position: relative;
             font-family: 'Noto Sans TC', sans-serif;
             font-weight: 700;
-            font-size: clamp(6rem, 20vw, 16rem);
+            font-size: clamp(5rem, min(18vw, 26vh), 24rem);
             line-height: 1.1;
             /* 調整行高以避免裁切 */
             perspective: 1000px;
@@ -409,20 +435,18 @@
 
         /* 翻轉時鐘分隔符 */
         .clock-style-flip .flipper-colon {
-            font-size: clamp(5rem, 18vw, 14rem);
+            font-size: clamp(5rem, min(18vw, 26vh), 22rem);
             line-height: 1.0;
             font-weight: 700;
             color: #4b5563;
-            /* gray-600 */
             padding-bottom: 0.1em;
         }
 
         .clock-style-flip .date-display {
-            font-size: clamp(2rem, 6vw, 4rem);
+            font-size: clamp(1.5rem, min(5vw, 6vh), 5rem);
             color: #4b5563;
-            /* gray-600 */
             font-weight: 500;
-            margin-top: 1rem;
+            margin-top: 0.5rem;
         }
 
         /* 翻轉時鐘深色模式 */
