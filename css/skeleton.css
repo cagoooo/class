@@ -1,0 +1,218 @@
+/**
+ * 班級小管家 - 骨架屏（Skeleton Screen）樣式
+ * skeleton.css - 統一載入佔位動畫
+ */
+
+/* ==================== 核心動畫 ==================== */
+
+@keyframes skeleton-wave {
+    0% {
+        background-position: 200% center;
+    }
+
+    100% {
+        background-position: -200% center;
+    }
+}
+
+/* ==================== 基礎骨架元素 ==================== */
+
+.skeleton {
+    background: linear-gradient(90deg,
+            #e2e8f0 25%,
+            #f1f5f9 50%,
+            #e2e8f0 75%);
+    background-size: 200% 100%;
+    animation: skeleton-wave 1.5s ease-in-out infinite;
+    border-radius: 6px;
+    display: block;
+}
+
+/* 深色模式 */
+.dark .skeleton {
+    background: linear-gradient(90deg,
+            #1e293b 25%,
+            #334155 50%,
+            #1e293b 75%);
+    background-size: 200% 100%;
+    animation: skeleton-wave 1.5s ease-in-out infinite;
+}
+
+/* ==================== 形狀變體 ==================== */
+
+/* 頭像（圓形） */
+.skeleton-avatar {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* 文字行 */
+.skeleton-text {
+    height: 0.875rem;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+}
+
+.skeleton-text:last-child {
+    margin-bottom: 0;
+}
+
+/* 標題行（較粗） */
+.skeleton-title {
+    height: 1.125rem;
+    border-radius: 4px;
+    margin-bottom: 0.625rem;
+}
+
+/* 進度條 */
+.skeleton-bar {
+    height: 6px;
+    border-radius: 9999px;
+    margin-top: 0.75rem;
+}
+
+/* 標籤膠囊 */
+.skeleton-badge {
+    height: 1.5rem;
+    border-radius: 9999px;
+    display: inline-block;
+}
+
+/* 方形獎牌 */
+.skeleton-medal {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* ==================== 學生卡片骨架 ==================== */
+
+.skeleton-student-card {
+    background: #f8fafc;
+    border-radius: 0.5rem;
+    border-left: 4px solid #e2e8f0;
+    padding: 0.75rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.dark .skeleton-student-card {
+    background: #1e293b;
+    border-left-color: #334155;
+}
+
+.skeleton-student-card .skeleton-row {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+}
+
+/* ==================== 排行榜項目骨架 ==================== */
+
+.skeleton-leaderboard-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    margin: 0.5rem;
+    border-radius: 1rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+}
+
+.dark .skeleton-leaderboard-item {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+.skeleton-leaderboard-item .skeleton-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+
+/* ==================== 作業卡片骨架 ==================== */
+
+.skeleton-homework-card {
+    background: white;
+    border-radius: 1rem;
+    padding: 1.25rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border: 2px solid transparent;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+}
+
+.dark .skeleton-homework-card {
+    background: #1e293b;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.skeleton-homework-card .skeleton-tag-row {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* ==================== 容器包裝 ==================== */
+
+/* 骨架屏容器 - 防止佈局抖動 */
+.skeleton-container {
+    animation: skeleton-fade-in 0.2s ease;
+}
+
+@keyframes skeleton-fade-in {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/* ==================== RWD ==================== */
+
+/* 骨架屏學生網格（預設 3 欄） */
+.skeleton-student-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+    .skeleton-student-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 1024px) {
+    .skeleton-student-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* 骨架屏作業卡片網格 */
+.skeleton-homework-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    padding: 1.5rem;
+}
+
+@media (min-width: 641px) {
+    .skeleton-homework-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 1025px) {
+    .skeleton-homework-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}

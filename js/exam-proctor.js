@@ -2027,6 +2027,13 @@
         if (presentEl) presentEl.textContent = examAttendance.present;
 
         renderFullscreenSubjects();
+
+        // === 音效提醒問卵 ===
+        if (typeof ExamSounds !== 'undefined') {
+            const _examForSound = getCurrentExam();
+            const _remForSound = _examForSound ? getRemainingMinutes(_examForSound) : 0;
+            ExamSounds.onExamTick(_examForSound, _remForSound, false);
+        }
     }
 
     // ========================================
@@ -2229,6 +2236,10 @@
             updateAnalogClock();
         }
     };
+
+    // 暴露際需給音效模組使用的 helper
+    window.getCurrentExam = getCurrentExam;
+    window.getRemainingMinutes = getRemainingMinutes;
 
 
     // ========================================

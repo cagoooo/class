@@ -878,11 +878,18 @@
         // 渲染篩選按鈕
         renderFilterButtons();
 
-        // 渲染學生網格
-        renderStudentGrid();
+        // === 骨架屏：先在學生網格插入骨架屏，再渲染真實資料 ===
+        if (typeof SkeletonManager !== 'undefined') {
+            const studentList = (typeof AppState !== 'undefined' && AppState.students) ? AppState.students : (typeof students !== 'undefined' ? students : []);
+            const count = Math.min(Math.max(studentList.length, 4), 12);
+            SkeletonManager.show('homeworkStudentGrid', 'student', count);
+        }
 
-        // 更新統計
-        updateFullscreenStats();
+        // 延遲 150ms 後渲染真實學生網格
+        setTimeout(() => {
+            renderStudentGrid();
+            updateFullscreenStats();
+        }, 150);
     };
 
     // === 關閉全螢幕 ===
@@ -1170,14 +1177,23 @@
         const modal = document.getElementById('homeworkDashboardModal');
         if (!modal) return;
 
-        // 渲染統計
-        renderDashboardStats();
-
-        // 渲染作業卡片
-        renderDashboardCards();
-
+        // === 骨架屏：先讓 Modal 可見，再插入骨架屏 ===
         modal.classList.add('active');
         document.body.style.overflow = 'hidden';
+
+        // 在作業卡片網格容器插入骨架屏（計算合理顯示數量）
+        if (typeof SkeletonManager !== 'undefined') {
+            const hwCount = (typeof homeworkList !== 'undefined' && homeworkList.length > 0)
+                ? Math.min(homeworkList.length, 6)
+                : 4;
+            SkeletonManager.show('homeworkDashboardGrid', 'homework', hwCount);
+        }
+
+        // 延遲 200ms 後渲染真實資料（骨架屏動畫有時間展現）
+        setTimeout(() => {
+            renderDashboardStats();
+            renderDashboardCards();
+        }, 200);
     };
 
     // === 關閉儀表板 ===

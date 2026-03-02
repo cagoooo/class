@@ -438,6 +438,40 @@
     // === 增強版 showLeaderboard 函數 ===
     function showLeaderboardEnhanced() {
         const modal = document.getElementById('leaderboardModal');
+
+        // === 骨架屏：立刻顯示 Modal 並插入骨架 ===
+        modal.className = 'fixed inset-0 bg-black bg-opacity-60 leaderboard-modal-enhanced flex items-center justify-center p-2 sm:p-4 z-50';
+        modal.classList.remove('hidden');
+
+        // 建立暫時的容器放骨架屏
+        modal.innerHTML = `
+            <div onclick="event.stopPropagation()" class="leaderboard-container w-full max-w-md sm:max-w-lg">
+                <div class="leaderboard-header">
+                    <h3><span class="trophy-icon">🏆</span> 即時排行榜</h3>
+                    <button onclick="hideLeaderboard()" class="leaderboard-close-btn">&times;</button>
+                </div>
+                <div id="leaderboardSkeletonArea" class="p-2 sm:p-4 max-h-[60vh] overflow-y-auto"></div>
+                <div class="leaderboard-footer">
+                    <button onclick="hideLeaderboard()" class="leaderboard-close-btn-footer">
+                        ✨ 關閉排行榜
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // 在骨架區插入骨架屏動畫
+        if (typeof SkeletonManager !== 'undefined') {
+            SkeletonManager.show('leaderboardSkeletonArea', 'leaderboard', 5);
+        }
+
+        // 延遲 200ms 後渲染真實資料（讓骨架屏有時間展現）
+        setTimeout(() => _renderLeaderboardContent(modal), 200);
+    }
+
+    /**
+     * 排行榜真實內容渲染（內部函式）
+     */
+    function _renderLeaderboardContent(modal) {
         // 直接從 localStorage 讀取學生資料
         const students = JSON.parse(localStorage.getItem('students')) || [];
 
@@ -493,7 +527,7 @@
             }).join('');
         }
 
-        // 更新 Modal 內容
+        // 更新 Modal 內容（覆蓋骨架屏）
         modal.innerHTML = `
             <div onclick="event.stopPropagation()" class="leaderboard-container w-full max-w-md sm:max-w-lg">
                 <div class="leaderboard-header">
@@ -510,12 +544,6 @@
                 </div>
             </div>
         `;
-
-        // 添加增強樣式 class
-        modal.className = 'fixed inset-0 bg-black bg-opacity-60 leaderboard-modal-enhanced flex items-center justify-center p-2 sm:p-4 z-50';
-
-        // 顯示 Modal
-        modal.classList.remove('hidden');
 
         // 觸發特效
         if (typeof triggerConfetti === 'function') {

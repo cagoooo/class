@@ -1,12 +1,57 @@
 # 班級小管家 - 開發進度記錄
 
-## 📅 最後更新：2026-02-26 17:30
+## 📅 最後更新：2026-03-02 21:46
 
-## 🎯 當前版本：v2.8.2
+## 🎯 當前版本：v2.8.5
+
+## ✅ 最新工作階段 (2026-03-02) 班級公告系統
+
+### 📢 班級公告模組 (`js/announcement.js`)
+- [x] **4 種公告類型**：📢 一般公告 / 🚨 緊急通知 / 🎉 活動通知 / 📚 作業提醒
+- [x] **置頂功能** - 重要公告固定顯示在列表頂部
+- [x] **到期自動隱藏** - 設定到期日，過期公告自動移至「已過期」分頁
+- [x] **全螢幕公佈欄** - 深色沉浸式介面，適合教室投影機展示
+- [x] **緊急通知角標** - 導覽按鈕顯示紅色計數徽章
+- [x] **ESC 關閉** - 全螢幕模式鍵盤快捷鍵
+- [x] **localStorage 持久化** - 所有公告跨次保存
+- [x] **完全自我注入** - CSS + HTML 全由 JS 動態注入，無需修改 classnew.html
+- [x] **showSection 整合** - 正確攔截路由切換，避免 Tailwind hidden class 衝突
 
 ---
 
-## ✅ 今日工作階段 (2026-02-26) 作業檢查實時同步優化
+## ✅ 工作階段 (2026-03-02) 音效提醒系統
+
+### 🔔 音效提醒模組 (`js/exam-sounds.js`)
+- [x] **Web Audio API** 合成音效，完全**不需要外部音效檔案**
+- [x] **5 種合成音效**：開始鈴 / 5分鐘警告 / 1分鐘緊急 / 結束鈴 / 計時器到期
+- [x] **考試監看模組整合** - 在 `updateFullscreenStatus()` 末尾插入音效呼叫
+- [x] **計時器連動** - MutationObserver 監聽 `#timerDisplay`，歸零觸發提示音
+- [x] **靜音切換按鈕** - 全螢幕監考模式自動注入 🔔 / 🔇 按鈕
+- [x] **Toast 通知** - 音效觸發時畫面右上角簡短多予記
+- [x] **`localStorage` 持久化** - 靜音狀態跨次密储存
+
+---
+
+## ✅ 工作階段 (2026-03-02) 骨架屏載入狀態統一化
+
+### 🖥️ 骨架屏（Skeleton Screen）模組 (`css/skeleton.css` & `js/skeleton.js`)
+- [x] **`css/skeleton.css`** - 波紋揃描展神動畫（210° 流光扫描）、深色模式、RWD
+- [x] **`js/skeleton.js`** - `SkeletonManager` 管理器，提供 `show(id, type, count)` / `hide(id)` / `wrap()` API
+- [x] **三種骨架模板**：`student`（場次圈+文字）、`leaderboard`（獎牌+排名條）、`homework`（卡片+進度條）
+- [x] **學生列表整合** - 渲染前先展示 6 個骨架卢，250ms 後切換真實資料
+- [x] **排行榜整合** - Modal 立即可見，200ms 後渲染真實排名
+- [x] **作業儀表板整合** - 卡片網格骨架屏，工作數量動態適配，200ms 後渲染
+- [x] **全螢幕作業檢查整啂** - 學生格位骨架屏，150ms 後渲染
+
+---
+
+## ✅ 工作階段 (2026-02-26) 作業系統 + 聯絡簿展示模式
+
+### 📺 聯絡簿展示模式 (`js/notebook-enhancement.js` & `classnew.html`)
+- [x] **全螢幕展示介面**：大字體、高對比設計，包含即時時鐘與主題切換。
+- [x] **渲染崩潰修復**：修復 `renderNotebook` 遺漏預設類型處理導致的 `TypeError`。
+- [x] **按鈕穩定性優化**：直接嵌入 HTML 以確保功能按鈕 100% 顯示。
+- [x] **跨模組資料同步**：展示模式即時同步聯絡簿最新內容。
 
 ### 🔄 作業檢查實時同步 (`js/homework-enhancement.js` & `classnew.html`)
 - [x] **全域作用域修正**：將核心變數從 `let` 改為 `var`，解決跨腳本數據隔離問題。
@@ -15,292 +60,163 @@
 - [x] **導航邏輯補強**：補回 `closeHomeworkFullscreen` 確保導航回儀表板。
 - [x] **學生資料誤判修正**：優化學生資料存在性檢查，避免錯誤警告。
 
-### 📺 聯絡簿展示模式 (`js/notebook-enhancement.js` & `classnew.html`)
-- [x] **全螢幕展示介面**：大字體、高對比設計，包含實即時時鐘與主題切換。
-- [x] **渲染崩潰修復**：修復 `renderNotebook` 遺漏預設類型處理導致的 `TypeError`。
-- [x] **按鈕穩定性優化**：直接嵌入 HTML 以確保功能按鈕 100% 顯示。
-- [x] **跨模組資料同步**：展示模式即時同步聯絡簿最新內容。
-
 ---
 
-## ✅ 昨日工作階段 (2026-01-14) 監考模式 RWD 優化 + 累積分數修正
+## ✅ 已完成功能（各版本累積）
 
-### 🖥️ 監考模式全螢幕 RWD 優化 (`js/exam-proctor.js`)
-- [x] Grid 佈局比例調整：時鐘區 25vh、科目區 55vh
-- [x] 狀態區垂直置中（grid-row: 1/3）
-- [x] 科目列表移除滾動軸，可完整顯示 3 科目
-- [x] 科目文字放大（`clamp(1.1rem, 2.5vw, 1.6rem)`）
-- [x] 休息時間進度條：顯示到下科目倒數進度（橙色）
-
-### 📊 學生報告修正 (`classnew.html`)
-- [x] 累積加扣分同步：記錄存入 `student.records`
-- [x] 報告顯示正確的累積加分/扣分統計
-
-### 🎨 學生名單 RWD 優化 (`js/student-enhancement.js`)
-- [x] 座號格式：`座號：60601` → `座號：X`
-- [x] 分數顯示：添加正負符號
-- [x] 卡片佈局：垂直堆疊優化
-
-### 🆕 P1 監考模式進階功能
-- [x] **缺考學生記錄系統** (`js/exam-proctor.js`)
-  - 按科目記錄缺考學生
-  - 缺考類型：病假、事假、公假、其他
-  - 備註欄位支援
-  - 自動計算出席率統計
-  - 匯出缺考報告 (.txt)
-  - 資料儲存到 localStorage
-  - 全螢幕模式 📋 按鈕快速開啟
-
-- [x] **科目時間衝突檢測** (`js/exam-proctor.js`)
-  - 自動檢測時間重疊的科目
-  - 衝突科目顯示 ⚠️ 警告標示
-  - 點擊警告可查看衝突詳情
-  - 編輯科目時提示衝突警告
-
-### 🔧 P0 核心模組新增
-- [x] **EventBus 事件總線** (`js/event-bus.js`)
-  - 統一的模組間通訊機制
-  - 功能：on, once, off, emit
-  - 事件歷史記錄和除錯模式
-  
-- [x] **ErrorHandler 錯誤處理** (`js/error-handler.js`)
-  - 統一錯誤處理和友善中文訊息
-  - 全域錯誤捕獲 (unhandledrejection, window.error)
-  - 錯誤包裝函數：wrap, wrapAsync, safeExecute
-
-### 🌐 PWA 支援
+### 🌐 PWA 支援（v2.6.0 後）
 - [x] **manifest.json** - PWA 設定檔
 - [x] **favicon.ico** - 網站圖示
 - [x] **icons/icon-192.png, icon-512.png** - 應用圖示
-- [x] **Meta tags 更新**
-  - 新增 `mobile-web-app-capable`
-  - 更新 `apple-touch-icon` 路徑
-  - 新增 `shortcut icon` 連結
 - [x] **Service Worker** (`sw.js`) - 離線快取支援
 - [x] **PWA 安裝引導** (`js/pwa-install.js`, `css/pwa-install.css`)
+- [x] **Firebase App Check** - reCAPTCHA v3 保護
+- [x] **開發環境 SW 排除** - localhost 自動 unregister，避免 HMR 衝突
 
-### 🐛 錯誤修復
-- [x] **storage-manager.js JSON 解析錯誤**
-  - `AppState.settings` undefined 問題
-  - 非 JSON 格式字串處理
-  
-- [x] **監考模式 RWD 修復**
-  - 斷點調整：1024px → 1200px
-  - 科目區域：新增 `overflow-y: auto`
-  - 提醒區域：新增 `max-height` + 滾動
-  - 科目列表：修復無法滾動到頂端問題
-  - hover 抖動：移除 `transform: scale`
-  - 考試監考區塊寬度對齊功能選單
+### 🔧 P0 核心模組
+- [x] **EventBus 事件總線** (`js/event-bus.js`)
+- [x] **ErrorHandler 錯誤處理** (`js/error-handler.js`)
+- [x] **AppState 狀態管理** (`js/app-state.js`)
+- [x] **StorageManager 儲存管理** (`js/storage-manager.js`)
+- [x] **RWD 響應式斷點** (`css/rwd-breakpoints.css`)
 
-### 🎨 大時鐘 RWD 優化
-- [x] **可愛時鐘**：`clamp(7rem→4rem, 20vw→15vw, 16rem→22rem)`
-- [x] **數位時鐘**：`clamp(8rem→6rem, 25vw→20vw, 20rem→26rem)`
-- [x] **深色模式**：時鐘顏色 `#f3f4f6` → `#ffffff`
+### 📝 考試監考模式（`js/exam-proctor.js`）
+- [x] 全螢幕監考介面（數位/類比時鐘切換）
+- [x] 科目管理（可編輯科目名稱與時間）
+- [x] 科目時間衝突自動偵測 ⚠️
+- [x] 出勤記錄（應到/實到）
+- [x] 提醒系統（輪播 + 拖拽排序）
+- [x] 休息倒數（彈跳 emoji + 分秒倒數）
+- [x] 缺考學生記錄（病假/事假/公假/其他 + 匯出 .txt）
+- [x] 監考模式全螢幕 RWD 優化
+- [x] 狀態區雙行大字體顯示
+- [x] 時間選擇器智能定位
 
-### 📝 最新 Git Commits
-| Commit | 說明 |
-|--------|------|
-| (待提交) | feat: 新增缺考學生記錄和時間衝突檢測功能 |
-| `42916ab` | fix: 修復深色模式數位時鐘顏色 |
-| `e9b7da5` | fix: 修復科目列表無法滾動到頂端和 hover 抖動 |
-| `4706f0d` | fix: 修復監考模式大螢幕佈局 |
-| `c727eaa` | style: 優化監考模式 RWD |
-| `03e3f35` | style: 優化大時鐘 RWD |
-| `5208278` | feat: 新增 PWA 支援 |
+### 📊 作業總覽儀表板（`js/homework-enhancement.js`）
+- [x] 卡片式作業總覽（完成率進度條）
+- [x] 頂部統計欄（總數/未繳/待訂正/完成）
+- [x] 全螢幕實時同步檢查模式
+- [x] 匯出 CSV 報告
 
+### 🎓 學生管理（`js/student-enhancement.js`）
+- [x] 24 個可愛頭像
+- [x] 6 種分組標籤（幹部/小老師/課輔/特殊/班長/副班長）
+- [x] 學生名單即時搜尋（支援姓名/座號）
+- [x] 拖拽重新排序
+- [x] 分數累積報告（正負號顯示）
 
----
+### 🍅 計時功能
+- [x] 番茄鐘（25+5+15，`js/pomodoro.js`）
+- [x] 大時鐘 RWD（可愛 + 數位）
+- [x] 鍵盤快捷鍵（數字1-7 切換，空白鍵暫停等）
 
-## ✅ 已完成功能（之前工作階段）
+### 🎲 抽籤 & 分組
+- [x] 不重複抽取 + 進階動畫
+- [x] 隨機分組洗牌動畫 + 組別配色
+- [x] 隨機排座位（Fisher-Yates 演算法）
 
-### 📊 作業總覽儀表板 (`js/homework-enhancement.js`)
+### 📚 聯絡簿（`js/notebook-enhancement.js`）
+- [x] 5 種範本（今日作業/週末通知/考試提醒/活動通知/家長會）
+- [x] 全螢幕編輯模式（Ctrl+Enter 快速儲存）
+- [x] 展示模式（大字體投影）
+- [x] 優先級標記（高/中/低）
 
-#### 核心功能
-- [x] **卡片式作業總覽**
-  - 一目了然所有作業繳交情況
-  - 每張卡片顯示作業名稱、繳交日期
-  - 狀態標籤：X人未繳（紅）、X人待訂正（橙）、X人遲交（黃）
-  - 完成率進度條
+### 📊 數據報表（`js/data-reports.js`）
+- [x] 學生報告卡（個別完整分數記錄）
+- [x] 匯出 CSV（成績單/分數歷史）
+- [x] 每 5 分鐘自動備份（最多 5 份）
 
-- [x] **頂部統計欄**
-  - 總作業數
-  - 總未繳人次
-  - 總待訂正人次
-  - 總完成人次
+### 🔥 Firebase 雲端
+- [x] 匿名登入
+- [x] Firestore 資料同步（上傳/下載）
+- [x] Firebase App Check（reCAPTCHA v3）
+- [x] App Check 節流問題修復
 
-- [x] **快速操作**
-  - 點擊卡片直接進入全螢幕檢查模式
-  - 新增作業按鈕
-  - 匯出 CSV 報告功能
-
-- [x] **視覺設計**
-  - 淺藍漸層背景
-  - 卡片 hover 動畫效果
-  - 完整深色模式支援
-  - RWD 響應式設計
-
----
-
-### 🕐 考試監考圓形時鐘 (`js/exam-proctor.js`)
-
-#### 核心功能
-- [x] **切換時鐘樣式**
-  - 點擊 🕐 按鈕切換數位/類比時鐘
-  - 圓形時鐘包含時針、分針、秒針
-  - 12 小時制刻度與數字顯示
-  - 秒針紅色，分針藍色，時針白色
-  - 時鐘下方顯示民國日期
-
-- [x] **視覺設計**
-  - 精緻的圓形時鐘外框
-  - 深色/淺色模式完整支援
-  - 平滑的指針動畫效果
-  - RWD 響應式設計
+### 🏆 排行榜
+- [x] 金/銀/銅漸層設計
+- [x] 分數進度條 + 依序動畫
+- [x] 全螢幕時鐘整合
 
 ---
 
-### 📝 考試監考模式 (`js/exam-proctor.js`)
+## 📁 主要檔案結構
 
-#### 核心功能
-- [x] **全螢幕監考介面**
-  - 大型數位時鐘顯示（民國日期+時間）
-  - 考試進度條（已進行/剩餘時間）
-  - 考試狀態自動切換（進行中/休息中/已結束）
-  - 深色/淺色模式切換（左上角月亮按鈕）
-
-- [x] **科目管理**
-  - 預設科目時間：
-    - 國語 08:45-09:25
-    - 數學 09:35-10:15
-    - 社會 10:25-11:05
-  - 點擊科目名稱可編輯（hover 顯示 ✏️ 圖示）
-  - 點擊時間可修改（時間選擇器）
-  - 當前考試科目高亮顯示
-
-- [x] **出勤記錄**
-  - 應到/實到人數統計
-  - 點擊人數可編輯（editExamAttendance 函數）
-  - 缺考/請假備註輸入框
-
-- [x] **提醒系統**
-  - 考試中提醒語輪播（每 10 秒切換）
-  - 休息時間提醒語
-  - 拖拽排序提醒順序
-  - 設定面板管理提醒內容（openExamSettings 函數）
-
-- [x] **休息時間有趣倒數**
-  - 彈跳 emoji 動畫（☕🧘🎯📚💪🌟 每 10 秒切換）
-  - 分:秒數字倒數
-  - 閃爍分隔符動畫
-  - 考試結束顯示 🎉
-
-#### UI/UX 優化
-- [x] **設定提醒面板美化**
-  - 漸層紫色標題欄
-  - 毛玻璃背景效果（backdrop-filter: blur）
-  - 卡片動畫過渡（slideUp 動畫）
-  - hover 互動效果（左側藍色條狀指示）
-  - 長文字自動換行（contenteditable div）
-
-- [x] **全螢幕監考 RWD**
-  - 平板版佈局（@media max-width: 1024px）
-  - 手機版佈局（@media max-width: 640px）
-  - 字體大小自適應（clamp 函數）
-  - 時間區域置中顯示（align-items: center）
-
----
-
-## 📁 相關檔案
-
-### 主要檔案
-| 檔案 | 說明 |
-|------|------|
-| `js/exam-proctor.js` | 考試監考模組（約 1900 行） |
-| `classnew.html` | 主頁面（第 1130-1260 行為監考區塊） |
-| `CHANGELOG.md` | 版本更新記錄 |
-
-### HTML 結構位置
-- 非全螢幕管理區塊：約第 1095-1160 行
-- 全螢幕 Modal：約第 1165-1260 行（id="examFullscreenModal"）
+| 檔案 | 說明 | 大小估計 |
+|------|------|----------|
+| `classnew.html` | 主頁面 | ~5000+ 行 |
+| `js/exam-proctor.js` | 考試監考模組 | ~1900 行 |
+| `js/homework-enhancement.js` | 作業模組 | ~1440 行 |
+| `js/notebook-enhancement.js` | 聯絡簿模組 | ~600 行 |
+| `js/student-enhancement.js` | 學生模組 | ~500 行 |
+| `js/skeleton.js` | 骨架屏管理器 | ~130 行 |
+| `css/skeleton.css` | 骨架屏樣式 | ~170 行 |
+| `sw.js` | Service Worker | ~200 行 |
+| `CHANGELOG.md` | 版本記錄 | v1.0-v2.8.3 |
 
 ---
 
 ## 🔧 技術細節
 
-### CSS 樣式（在 exam-proctor.js 中）
-```javascript
-const examStyles = `...`; // 約 1000 行 CSS
-```
-
-### 主要函數
-| 函數名 | 功能 |
-|--------|------|
-| `enterExamFullscreen()` | 進入全螢幕監考 |
-| `exitExamFullscreen()` | 退出全螢幕 |
-| `updateFullscreenStatus()` | 更新狀態（每秒執行） |
-| `renderSubjectList()` | 渲染非全螢幕科目列表 |
-| `renderFullscreenSubjects()` | 渲染全螢幕科目列表 |
-| `openExamSettings()` | 開啟設定面板 |
-| `editSubjectName(id)` | 編輯科目名稱 |
-| `editExamAttendance(type)` | 編輯出勤人數 |
-| `openTimePicker(id, type, event)` | 時間選擇器（全螢幕） |
-| `openSubjectTimePicker(id, type, event)` | 時間選擇器（非全螢幕） |
-
-### localStorage 資料
+### localStorage 資料鍵值
 | Key | 說明 |
 |-----|------|
 | `examSubjects` | 考試科目列表 |
 | `examReminders` | 提醒語（exam/break 兩類） |
 | `examAttendance` | 出勤記錄 |
 | `examLightMode` | 淺色模式狀態 |
+| `absentStudents` | 缺考學生記錄 |
+| `classStudents` | 學生資料 |
+| `notebookEntries` | 聯絡簿記錄 |
+| `homeworkList` | 作業列表 |
+
+### 最新 Git Commits
+| Commit | 說明 |
+|--------|------|
+| `最新` | ✅ 聯絡簿展示模式 + 作業同步優化 |
+| `42916ab` | fix: 修復深色模式數位時鐘顏色 |
+| `e9b7da5` | fix: 修復科目列表無法滾動到頂端和 hover 抖動 |
+| `4706f0d` | fix: 修復監考模式大螢幕佈局 |
+| `c727eaa` | style: 優化監考模式 RWD |
+| `5208278` | feat: 新增 PWA 支援 |
 
 ---
 
-## 🚀 下次可繼續的優化方向
+## 🚀 下次可繼續的優化方向（優先推薦）
 
-### 高優先級
-1. [ ] 新增更多考試科目預設（英語、自然等）
-2. [ ] 科目時間衝突檢測
-3. [ ] 考試結束音效提醒
+### 🔴 高優先（課堂實用性高）
+1. [ ] **音效提醒系統**：考試開始/結束/倒數 5 分鐘音效
+2. [ ] **課表管理**：週課表視覺化，整合監考時間
+3. [ ] **班級公告系統**：置頂公告、到期自動隱藏
+4. [ ] **成績追蹤**：各科成績記錄 + 趨勢折線圖
 
-### 中優先級
-4. [ ] 缺考學生名單記錄（連接學生資料庫）
-5. [ ] 監考記錄匯出 CSV
-6. [ ] 多場次考試支援（上午/下午）
+### 🟡 中優先（體驗提升）
+5. [ ] **語音指令**：「抽一個人」「計時 5 分鐘」語音控制
+6. [ ] **手勢操作**：滑動切換功能區、長按編輯
+7. [x] **骨架屏** ✅ 已完成 v2.8.3 - Skeleton Screen 統一載入狀態
+8. [ ] **多班級支援**：切換管理多個班級
 
-### 低優先級
-7. [ ] 護眼模式（柔和色調）
-8. [ ] 考試倒數語音播報
-9. [ ] 與其他模組整合（抽籤、計時器）
-
----
-
-## 🐛 已知問題
-
-目前沒有已知問題。
+### 🟢 低優先（技術優化）
+9. [ ] **IndexedDB 遷移**：突破 localStorage 5MB 限制
+10. [ ] **TypeScript 遷移**：型別安全 + IDE 補全
+11. [ ] **CSS 架構整理**：拆分為 base/components/layouts/utilities
+12. [ ] **AI 評語生成**：Gemini API 自動生成學生評語
 
 ---
 
-## 📌 備註
-
-- 本地測試伺服器：`npx http-server -p 8080 -c-1`
-- GitHub 倉庫：https://github.com/cagoooo/class.git
-- 最新 commit：`42916ab` (2026-01-13 17:00)
-
----
-
-## 💡 快速恢復指令
+## 📌 快速指令
 
 ```powershell
-# 進入專案目錄
-cd H:\Class
-
 # 啟動本地伺服器
-npx http-server -p 8080 -c-1
+cd H:\Class
+python -m http.server 8080
+# 開啟 http://localhost:8080/classnew.html
 
 # 查看 git 狀態
-git status
+git status && git log -5 --oneline
 
-# 查看最新 commit
-git log -1
+# Push 到 GitHub
+git add -A && git commit -m "✅說明" && git push
 ```
+
+- **GitHub 倉庫**：https://github.com/cagoooo/class.git
+- **GitHub Pages**：https://cagoooo.github.io/class/classnew.html

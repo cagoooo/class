@@ -185,6 +185,21 @@ function renderStudentsEnhanced() {
     const container = document.getElementById('studentsList');
     if (!container) return;
 
+    // 若骨架屏正顯示中（初次載入），稍作延遲讓動畫有時間展現
+    const hasSkeleton = container.querySelector('.skeleton-container');
+    if (hasSkeleton) {
+        // 骨架屏已由 skeleton.js 插入，等待一小段時間後再渲染真實資料
+        setTimeout(() => _doRenderStudents(container), 250);
+        return;
+    }
+
+    _doRenderStudents(container);
+}
+
+/**
+ * 學生列表實際渲染邏輯（內部函式）
+ */
+function _doRenderStudents(container) {
     container.innerHTML = '';
 
     // 安全性檢查：確保 students 是陣列
