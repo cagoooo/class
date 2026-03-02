@@ -18,6 +18,7 @@
             this.checkIfInstalled();
             this.bindEvents();
             this.registerServiceWorker();
+            this.bindManualUpdateBtn();
 
             // 延遲顯示安裝提示（首次訪問後 30 秒）
             const hasSeenPrompt = localStorage.getItem('pwaPromptSeen');
@@ -360,6 +361,58 @@
             if (this.installButton) {
                 this.installButton.remove();
                 this.installButton = null;
+            }
+        },
+
+        // ==================== 手動一鍵更新 ====================
+        /**
+         * 清除所有 SW 快取並重新整理頁面
+         * 一般使用者點擊「一鍵更新」時呼叫
+         */
+        async manualUpdate() {
+            const btn = document.getElementById('pwaManualUpdateBtn');
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = '🔄 更新中…';
+            }
+
+            try {
+                // 1. 取消所有已註冊的 Service Worker
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(registrations.map(r => r.unregister()));
+                    console.log('[PWA] 已取消所有 Service Worker 註冊');
+                }
+
+                // 2. 清除所有快取
+                if ('caches' in window) {
+                    const cacheNames = await caches.keys();
+                    await Promise.all(cacheNames.map(name => caches.delete(name)));
+                    console.log('[PWA] 已清除所有快取:', cacheNames);
+                }
+
+                // 3. 顯示成功訊息後重新載入
+                if (btn) btn.textContent = '✅ 更新完成，重新載入中…';
+                setTimeout(() => window.location.reload(true), 800);
+
+            } catch (error) {
+                console.error('[PWA] 一鍵更新失敗:', error);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = '❌ 更新失敗，請重試';
+                    setTimeout(() => {
+                        btn.textContent = '🔄 一鍵更新';
+                    }, 3000);
+                }
+            }
+        },
+
+        // 綁定手動更新按鈕
+        bindManualUpdateBtn() {
+            const btn = document.getElementById('pwaManualUpdateBtn');
+            if (btn) {
+                btn.addEventListener('click', () => this.manualUpdate());
+                console.log('[PWA] 一鍵更新按鈕已綁定');
             }
         }
     };

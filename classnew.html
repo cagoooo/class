@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-TW">
 
 <head>
@@ -3496,6 +3496,71 @@
     <script src="js/exam-proctor.js"></script>
     <!-- PWA 支援 -->
     <script src="js/pwa-install.js"></script>
+
+    <!-- ===== 一鍵更新浮動按鈕 ===== -->
+    <style>
+        #pwaManualUpdateBtn {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 18px;
+            background: linear-gradient(135deg, #3b82f6, #6366f1);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: 'Noto Sans TC', sans-serif;
+            cursor: pointer;
+            box-shadow: 0 4px 18px rgba(99, 102, 241, 0.45);
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s;
+            animation: pwaFadeIn 0.6s ease both;
+        }
+
+        #pwaManualUpdateBtn:hover:not(:disabled) {
+            transform: scale(1.06) translateY(-2px);
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.55);
+        }
+
+        #pwaManualUpdateBtn:active:not(:disabled) {
+            transform: scale(0.96);
+        }
+
+        #pwaManualUpdateBtn:disabled {
+            background: linear-gradient(135deg, #94a3b8, #a5b4fc);
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        @keyframes pwaFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 手機版調整位置 */
+        @media (max-width: 640px) {
+            #pwaManualUpdateBtn {
+                bottom: 16px;
+                right: 16px;
+                padding: 10px 14px;
+                font-size: 13px;
+            }
+        }
+    </style>
+    <button id="pwaManualUpdateBtn" title="清除快取並重新載入最新版本">
+        🔄 一鍵更新
+    </button>
 </body>
 
 </html>
