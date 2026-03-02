@@ -233,18 +233,18 @@
 
         /* 數位時鐘 (預設) */
         .clock-style-digital .time-display {
-            font-size: clamp(4rem, min(22vw, 30vh), 30rem);
+            font-size: clamp(5rem, min(26vw, 52vh), 40rem);
             font-weight: 700;
             color: #1f2937;
             white-space: nowrap;
-            line-height: 1;
-            letter-spacing: -0.02em;
+            line-height: 0.95;
+            letter-spacing: -0.03em;
         }
 
         .clock-style-digital .date-display {
-            font-size: clamp(1.25rem, min(5vw, 6vh), 5rem);
+            font-size: clamp(1.5rem, min(5.5vw, 7vh), 6rem);
             color: #4b5563;
-            margin-top: 0.3em;
+            margin-top: 0.2em;
             letter-spacing: 0.05em;
         }
 
@@ -259,12 +259,12 @@
         /* LED 時鐘 */
         .clock-style-led .time-display {
             font-family: 'Chakra Petch', 'Noto Sans TC', sans-serif;
-            font-size: clamp(3rem, min(20vw, 28vh), 28rem);
+            font-size: clamp(4rem, min(24vw, 46vh), 36rem);
             font-weight: 700;
             color: #16a34a;
             text-shadow: 0 0 8px rgba(22, 163, 74, 0.5), 0 0 20px rgba(22, 163, 74, 0.3);
             background: #111827;
-            padding: 0.4em 0.8em;
+            padding: 0.35em 0.7em;
             border-radius: 1rem;
             white-space: nowrap;
             line-height: 1;
@@ -272,7 +272,7 @@
 
         .clock-style-led .date-display {
             font-family: 'Chakra Petch', 'Noto Sans TC', sans-serif;
-            font-size: clamp(1rem, min(4vw, 5vh), 4.5rem);
+            font-size: clamp(1.25rem, min(4.5vw, 6vh), 5.5rem);
             color: #ca8a04;
             text-shadow: 0 0 5px rgba(202, 138, 4, 0.4);
             margin-top: 0.5rem;
@@ -291,18 +291,18 @@
         /* 可愛時鐘 */
         .clock-style-cute .time-display {
             font-family: 'Mochiyochi Pop One', 'Noto Sans TC', sans-serif;
-            font-size: clamp(6rem, min(24vw, 34vh), 30rem);
+            font-size: clamp(7rem, min(26vw, 52vh), 40rem);
             font-weight: 400;
             color: #ec4899;
             text-shadow: 4px 4px 0 #ffffff, 6px 6px 0 rgba(0, 0, 0, 0.08);
-            line-height: 1;
+            line-height: 0.95;
         }
 
         .clock-style-cute .date-display {
             font-family: 'Mochiyochi Pop One', 'Noto Sans TC', sans-serif;
-            font-size: clamp(1.5rem, min(5vw, 6.5vh), 5rem);
+            font-size: clamp(1.75rem, min(5.5vw, 7vh), 6rem);
             color: #8b5cf6;
-            margin-top: 0.2em;
+            margin-top: 0.15em;
         }
 
         #clock-modal.dark .clock-style-cute {
