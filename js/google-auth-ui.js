@@ -299,11 +299,22 @@
         refreshSyncTime();
     }
 
+    // 登入按鈕的原始 HTML（共用常數，避免重複字串）
+    const LOGIN_BTN_HTML = `<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G"><span>Google 登入</span>`;
+
     function showLoggedOut() {
         const loginBtn = document.getElementById('gauth-btn');
         const avatarWrap = document.getElementById('gauth-avatar-wrap');
-        if (loginBtn) loginBtn.style.display = 'flex';
+        const dd = document.getElementById('gauth-dropdown');
+        // 關閉下拉、隱藏頭像區塊
+        if (dd) dd.classList.remove('open');
         if (avatarWrap) avatarWrap.style.display = 'none';
+        // ✅ 還原登入按鈕原始狀態（修正「登入中...」卡住問題）
+        if (loginBtn) {
+            loginBtn.innerHTML = LOGIN_BTN_HTML;
+            loginBtn.disabled = false;
+            loginBtn.style.display = 'flex';
+        }
     }
 
     function refreshSyncTime() {
@@ -398,14 +409,13 @@
 
             const profile = await window.FirebaseConfig.signInWithGoogle();
 
-            if (!profile) {
-                // 使用者取消
-                if (loginBtn) {
-                    loginBtn.innerHTML = `<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G"><span>Google 登入</span>`;
-                    loginBtn.disabled = false;
-                }
-                return;
+            // 無論成功或取消，先還原按鈕（避免「登入中...」卡住）
+            if (loginBtn) {
+                loginBtn.innerHTML = LOGIN_BTN_HTML;
+                loginBtn.disabled = false;
             }
+
+            if (!profile) return; // 使用者取消
 
             showLoggedIn(profile);
 
