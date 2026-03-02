@@ -1,10 +1,33 @@
 # 班級小管家 - 開發進度記錄
 
-## 📅 最後更新：2026-03-02 21:46
+## 📅 最後更新：2026-03-02 22:30
 
-## 🎯 當前版本：v2.8.5
+## 🎯 當前版本：v2.9.0
 
-## ✅ 最新工作階段 (2026-03-02) 班級公告系統
+## ✅ 最新工作階段 (2026-03-02) Google 帳號登入 + 資料雲端同步
+
+### 🔑 Google Auth UI 模組 (`js/google-auth-ui.js`)
+- [x] **Google 登入按鈕** - 導覽欄右上角 Popup 方式登入
+- [x] **已登入頭像 + 下拉選單** - 顯示 Google 大頭貼、名字縮寫、蹔點展開
+- [x] **下拉選單功能** - ☁️ 立即同步 / 📥 從雲端還原 / 🕒 上次同步時間 / 🚩 登出
+- [x] **首次登入引導 Modal** - 偵測本地/雲端資料情況，三選一（䣆雲端/使用本地/合併）
+- [x] **檢明登入恢復** - `onAuthStateChanged` 頁面重及後自動恢復 Google 登入狀態
+- [x] **設定確認對話框** - 登出/还原動作均有自訂確認 Modal，非 alert()
+
+### ☁️ Firebase 資料同步擴充 (`js/firebase-config.js` + `js/firebase-sync.js`)
+- [x] **`signInWithGoogle()`** - GoogleAuthProvider Popup 登入
+- [x] **`signOutGoogle()`** - 登出並清除本地快取
+- [x] **`getCurrentProfile()`** - 取得登入者完整資料（uid / displayName / email / photoURL）
+- [x] **`mergeWithCloud()`** - 學生名單取 union、評分記錄追加去重
+- [x] **公告同步** - `classAnnouncements` 集合已包含在部署範圍
+
+### 🛡️ API Key 安全機制
+- [x] **HTTP Referrer 限制** - Key 只接受 localhost / cagoooo.github.io / class-4719f.web.app 請求
+- [x] **Firebase Google 登入提供者** - 已在 Firebase Console 啟用
+
+---
+
+## ✅ 工作階段 (2026-03-02) 班級公告系統
 
 ### 📢 班級公告模組 (`js/announcement.js`)
 - [x] **4 種公告類型**：📢 一般公告 / 🚨 緊急通知 / 🎉 活動通知 / 📚 作業提醒
