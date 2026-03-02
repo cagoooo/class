@@ -2,6 +2,26 @@
 <html lang="zh-TW">
 
 <head>
+    <!-- 🔧 開發環境：localhost 自動清除 Service Worker 快取，避免 404 攔截問題 -->
+    <script>
+        if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+            // 自動 unregister 所有 SW
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function (regs) {
+                    regs.forEach(function (reg) { reg.unregister(); });
+                    if (regs.length > 0) console.log('[Dev] 已自動清除', regs.length, '個 Service Worker');
+                });
+            }
+            // 清除所有 Cache Storage
+            if ('caches' in window) {
+                caches.keys().then(function (keys) {
+                    keys.forEach(function (k) { caches.delete(k); });
+                    if (keys.length > 0) console.log('[Dev] 已清除快取:', keys);
+                });
+            }
+        }
+    </script>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="manifest" href="manifest.json">
