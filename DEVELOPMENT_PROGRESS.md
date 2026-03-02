@@ -1,10 +1,35 @@
 # 班級小管家 - 開發進度記錄
 
-## 📅 最後更新：2026-03-02 22:30
+## 📅 最後更新：2026-03-03 07:10
 
-## 🎯 當前版本：v2.9.0
+## 🎯 當前版本：v2.9.4
 
-## ✅ 最新工作階段 (2026-03-02) Google 帳號登入 + 資料雲端同步
+## ✅ 最新工作階段 (2026-03-03) 登出UI修正 + 大時鐘優化 + SW自動清除
+
+### 🔧 v2.9.1 登出後按鈕UI未重置修正 (`js/google-auth-ui.js`)
+- [x] **`LOGIN_BTN_HTML` 共用常數** - 統一登入按鈕 innerHTML，避免重複字串
+- [x] **`showLoggedOut()` 完整還原** - 登出時同時重置 innerHTML、disabled、關閉下拉
+- [x] **`login()` 安全還原** - await 後不論成功或取消均立即還原按鈕狀態
+
+### ⏰ v2.9.2 大時鐘全螢幕模式優化 (`classnew.html`)
+- [x] **字體改用 `min(vw, vh)`** - 同時考慮寬高，寬螢幕不溢出、直向螢幕正確縮放
+- [x] **底部提示橫槓 UI** - 控制列隱藏時底部顯示細橫槓，hover 消失
+- [x] **`line-height: 0.95` + `letter-spacing`** - 時鐘更緊湊、更易讀
+
+### 🚀 v2.9.3 localhost 自動清除 SW 快取 (`classnew.html`)
+- [x] **`<head>` 頂部內嵌偵測 script** - 偵測 localhost/127.0.0.1 自動執行
+- [x] **`unregister()` 所有 Service Worker** - 避免舊快取攔截造成 404
+- [x] **`caches.delete()` 所有 Cache Storage** - 正式環境不受影響
+
+### 🔍 v2.9.4 大時鐘字體再次放大 (`classnew.html`)
+- [x] **數位樣式** `clamp(5rem, min(26vw, 52vh), 40rem)` - 由 30vh 提升到 52vh
+- [x] **LED 樣式** `clamp(4rem, min(24vw, 46vh), 36rem)` - 由 28vh 提升到 46vh
+- [x] **可愛樣式** `clamp(7rem, min(26vw, 52vh), 40rem)` - 由 34vh 提升到 52vh
+- [x] **佔螢幕高度提升** - 在 1920×911 由 34% 提升至 **52%**，充分利用留白
+
+---
+
+## ✅ 工作階段 (2026-03-02) Google 帳號登入 + 資料雲端同步
 
 ### 🔑 Google Auth UI 模組 (`js/google-auth-ui.js`)
 - [x] **Google 登入按鈕** - 導覽欄右上角 Popup 方式登入
