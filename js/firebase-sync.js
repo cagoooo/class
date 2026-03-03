@@ -28,6 +28,7 @@ let syncStatus = {
 
 /**
  * 取得用戶的資料集合參考
+ * 多班級支援：預設班級使用原有路徑，其他班級使用 classes/{classId}/ 子路徑
  */
 function getUserCollection(collectionName) {
     const db = window.FirebaseConfig.getDb();
@@ -36,8 +37,16 @@ function getUserCollection(collectionName) {
         console.warn('Firebase 尚未連線');
         return null;
     }
-    return db.collection('users').doc(userId).collection(collectionName);
+    // 讀取目前班級 ID（由 class-profiles.js 寫入）
+    const curClassId = localStorage.getItem('currentClassId') || 'default';
+    if (curClassId === 'default') {
+        // 預設班級：沿用現有路徑（向下相容）
+        return db.collection('users').doc(userId).collection(collectionName);
+    }
+    // 新班級：使用獨立子路徑
+    return db.collection('users').doc(userId).collection('classes').doc(curClassId).collection(collectionName);
 }
+
 
 /**
  * 上傳整個資料集合（Array 形式）

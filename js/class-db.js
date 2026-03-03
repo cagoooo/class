@@ -12,7 +12,9 @@
 const ClassDB = (() => {
     'use strict';
 
-    const DB_NAME = 'ClassManagerDB';
+    // 動態 DB 名稱：預設班級用 'ClassManagerDB'（向下相容），其他班級用獨立名稱
+    const _curClassId = localStorage.getItem('currentClassId') || 'default';
+    const DB_NAME = _curClassId === 'default' ? 'ClassManagerDB' : `ClassManagerDB-${_curClassId}`;
     const DB_VERSION = 1;
 
     // ─── 資料表定義 ───────────────────────────────────────────
