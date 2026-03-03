@@ -4,9 +4,9 @@
  * @description PWA 離線支援與快取策略優化
  */
 
-const CACHE_NAME = 'class-manager-v2.9.6';
-const STATIC_CACHE = 'class-manager-static-v2.9.6';
-const DYNAMIC_CACHE = 'class-manager-dynamic-v2.9.6';
+const CACHE_NAME = 'class-manager-v2.9.7';
+const STATIC_CACHE = 'class-manager-static-v2.9.7';
+const DYNAMIC_CACHE = 'class-manager-dynamic-v2.9.7';
 
 // 靜態資源列表（安裝時預快取）
 const STATIC_ASSETS = [
