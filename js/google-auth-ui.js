@@ -171,12 +171,10 @@
     }
 
     // ────────────────────────────────────────────────────────
-    // HTML 注入（注入到 nav 右側佔位元素）
+    // HTML 注入（注入到 nav 右側佔位元素，桌面+手機版同步）
     // ────────────────────────────────────────────────────────
-    function injectHTML() {
-        const slot = document.getElementById('auth-nav-slot');
-        if (!slot) return;
-        slot.innerHTML = `
+    // 共用的登入按鈕 HTML（桌面版）
+    const DESKTOP_SLOT_HTML = `
             <!-- 未登入 -->
             <button id="gauth-btn" onclick="GoogleAuthUI.login()" title="使用 Google 帳號登入，讓資料同步到雲端">
                 <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G">
@@ -211,14 +209,85 @@
                     </button>
                 </div>
             </div>
-        `;
+    `;
 
-        // 點擊外部關閉下拉
+    // 手機版：只有圖示按鈕（緊湊），下拉選單掛在此處
+    const MOBILE_SLOT_HTML = `
+            <!-- 手機未登入 -->
+            <button id="gauth-btn-mobile" onclick="GoogleAuthUI.login()" title="登入" style="
+                display:flex; align-items:center; gap:4px;
+                padding:6px 10px; background:#fff; border:1.5px solid #dadce0;
+                border-radius:50px; cursor:pointer; font-size:0.78rem; font-weight:600;
+                color:#3c4043; white-space:nowrap; box-shadow:0 1px 3px rgba(0,0,0,.08);
+            ">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G" style="width:16px;height:16px;">
+                <span>登入</span>
+            </button>
+
+            <!-- 手機已登入：只顯示頭像 -->
+            <div id="gauth-avatar-wrap-mobile" style="display:none; position:relative;">
+                <div id="gauth-avatar-initial-mobile"
+                     onclick="GoogleAuthUI.toggleDropdownMobile()"
+                     style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#818cf8);
+                            color:#fff;font-weight:700;font-size:0.85rem;display:flex;align-items:center;
+                            justify-content:center;border:2px solid #6366f1;cursor:pointer;
+                            transition:box-shadow 0.2s;">
+                </div>
+                <img id="gauth-avatar-img-mobile" src="" alt="頭像"
+                     style="display:none;width:32px;height:32px;border-radius:50%;border:2px solid #6366f1;
+                            object-fit:cover;cursor:pointer;"
+                     onclick="GoogleAuthUI.toggleDropdownMobile()">
+                <span id="gauth-sync-spinner-mobile" style="display:none;width:14px;height:14px;
+                    border:2px solid #6366f1;border-top-color:transparent;border-radius:50%;
+                    animation:gauthSpin .8s linear infinite;"></span>
+
+                <!-- 手機版下拉選單 -->
+                <div id="gauth-dropdown-mobile" style="
+                    display:none; position:absolute; top:calc(100% + 8px); right:0;
+                    min-width:210px; background:#fff; border-radius:14px;
+                    box-shadow:0 8px 32px rgba(0,0,0,.18); overflow:hidden;
+                    z-index:9999; animation:gauthFadeIn .18s ease;
+                ">
+                    <div class="gauth-dd-header" id="gauth-dd-header-mobile">
+                        <div class="gauth-dd-name"  id="gauth-dd-name-mobile"></div>
+                        <div class="gauth-dd-email" id="gauth-dd-email-mobile"></div>
+                        <div class="gauth-dd-sync-time">🕒 上次同步：<span id="gauth-dd-sync-mobile"></span></div>
+                    </div>
+                    <button class="gauth-dd-item" onclick="GoogleAuthUI.syncUp()">
+                        ☁️ 立即同步
+                    </button>
+                    <button class="gauth-dd-item" onclick="GoogleAuthUI.syncDown()">
+                        📥 從雲端還原
+                    </button>
+                    <div class="gauth-dd-divider"></div>
+                    <button class="gauth-dd-item danger" onclick="GoogleAuthUI.logout()">
+                        🚪 登出
+                    </button>
+                </div>
+            </div>
+    `;
+
+    function injectHTML() {
+        // 桌面版 slot
+        const slot = document.getElementById('auth-nav-slot');
+        if (slot) slot.innerHTML = DESKTOP_SLOT_HTML;
+
+        // 手機版 slot
+        const mobileSlot = document.getElementById('auth-nav-slot-mobile');
+        if (mobileSlot) mobileSlot.innerHTML = MOBILE_SLOT_HTML;
+
+        // 點擊外部關閉桌面下拉
         document.addEventListener('click', (e) => {
             const wrap = document.getElementById('gauth-avatar-wrap');
             if (wrap && !wrap.contains(e.target)) {
                 const dd = document.getElementById('gauth-dropdown');
                 if (dd) dd.classList.remove('open');
+            }
+            // 關閉手機版下拉
+            const mwrap = document.getElementById('gauth-avatar-wrap-mobile');
+            if (mwrap && !mwrap.contains(e.target)) {
+                const mdd = document.getElementById('gauth-dropdown-mobile');
+                if (mdd) mdd.style.display = 'none';
             }
         });
     }
@@ -262,69 +331,104 @@
     }
 
     // ────────────────────────────────────────────────────────
-    // UI 狀態更新
+    // UI 狀態更新（同步更新桌面版與手機版）
     // ────────────────────────────────────────────────────────
     function showLoggedIn(profile) {
-        const loginBtn = document.getElementById('gauth-btn');
-        const avatarWrap = document.getElementById('gauth-avatar-wrap');
-        if (!loginBtn || !avatarWrap) return;
-
-        loginBtn.style.display = 'none';
-        avatarWrap.style.display = 'flex';
-
-        // Initial / Photo
-        const initial = document.getElementById('gauth-avatar-initial');
-        const photo = document.getElementById('gauth-avatar-img');
         const firstChar = (profile.displayName || '老')[0].toUpperCase();
 
-        if (profile.photoURL) {
-            photo.src = profile.photoURL;
-            photo.style.display = 'block';
-            initial.style.display = 'none';
-        } else {
-            initial.textContent = firstChar;
-            initial.style.display = 'flex';
-            photo.style.display = 'none';
+        // === 桌面版 ===
+        const loginBtn = document.getElementById('gauth-btn');
+        const avatarWrap = document.getElementById('gauth-avatar-wrap');
+        if (loginBtn) loginBtn.style.display = 'none';
+        if (avatarWrap) {
+            avatarWrap.style.display = 'flex';
+            const initial = document.getElementById('gauth-avatar-initial');
+            const photo = document.getElementById('gauth-avatar-img');
+            if (profile.photoURL) {
+                if (photo) { photo.src = profile.photoURL; photo.style.display = 'block'; }
+                if (initial) initial.style.display = 'none';
+            } else {
+                if (initial) { initial.textContent = firstChar; initial.style.display = 'flex'; }
+                if (photo) photo.style.display = 'none';
+            }
+            const nameParts = (profile.displayName || '老師').split(' ');
+            const nameLabel = document.getElementById('gauth-name-label');
+            if (nameLabel) nameLabel.textContent = nameParts[0];
         }
 
-        // Name label
-        const nameParts = (profile.displayName || '老師').split(' ');
-        document.getElementById('gauth-name-label').textContent = nameParts[0];
+        // === 手機版 ===
+        const loginBtnM = document.getElementById('gauth-btn-mobile');
+        const avatarWrapM = document.getElementById('gauth-avatar-wrap-mobile');
+        if (loginBtnM) loginBtnM.style.display = 'none';
+        if (avatarWrapM) {
+            avatarWrapM.style.display = 'flex';
+            const initialM = document.getElementById('gauth-avatar-initial-mobile');
+            const photoM = document.getElementById('gauth-avatar-img-mobile');
+            if (profile.photoURL) {
+                if (photoM) { photoM.src = profile.photoURL; photoM.style.display = 'block'; }
+                if (initialM) initialM.style.display = 'none';
+            } else {
+                if (initialM) { initialM.textContent = firstChar; initialM.style.display = 'flex'; }
+                if (photoM) photoM.style.display = 'none';
+            }
+        }
 
-        // Dropdown header
+        // Dropdown header（桌面 + 手機共用名稱/信箱）
         const ddName = document.getElementById('gauth-dd-name');
         const ddEmail = document.getElementById('gauth-dd-email');
         if (ddName) ddName.textContent = profile.displayName || '老師';
         if (ddEmail) ddEmail.textContent = profile.email || '';
+
+        const ddNameM = document.getElementById('gauth-dd-name-mobile');
+        const ddEmailM = document.getElementById('gauth-dd-email-mobile');
+        if (ddNameM) ddNameM.textContent = profile.displayName || '老師';
+        if (ddEmailM) ddEmailM.textContent = profile.email || '';
+
         refreshSyncTime();
     }
 
     // 登入按鈕的原始 HTML（共用常數，避免重複字串）
     const LOGIN_BTN_HTML = `<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G"><span>Google 登入</span>`;
+    const LOGIN_BTN_MOBILE_HTML = `<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G" style="width:16px;height:16px;"><span>登入</span>`;
 
     function showLoggedOut() {
+        // 桌面版
         const loginBtn = document.getElementById('gauth-btn');
         const avatarWrap = document.getElementById('gauth-avatar-wrap');
         const dd = document.getElementById('gauth-dropdown');
-        // 關閉下拉、隱藏頭像區塊
         if (dd) dd.classList.remove('open');
         if (avatarWrap) avatarWrap.style.display = 'none';
-        // ✅ 還原登入按鈕原始狀態（修正「登入中...」卡住問題）
         if (loginBtn) {
             loginBtn.innerHTML = LOGIN_BTN_HTML;
             loginBtn.disabled = false;
             loginBtn.style.display = 'flex';
+        }
+
+        // 手機版
+        const loginBtnM = document.getElementById('gauth-btn-mobile');
+        const avatarWrapM = document.getElementById('gauth-avatar-wrap-mobile');
+        const ddM = document.getElementById('gauth-dropdown-mobile');
+        if (ddM) ddM.style.display = 'none';
+        if (avatarWrapM) avatarWrapM.style.display = 'none';
+        if (loginBtnM) {
+            loginBtnM.innerHTML = LOGIN_BTN_MOBILE_HTML;
+            loginBtnM.disabled = false;
+            loginBtnM.style.display = 'flex';
         }
     }
 
     function refreshSyncTime() {
         const el = document.getElementById('gauth-dd-sync');
         if (el) el.textContent = lastSyncText();
+        const elM = document.getElementById('gauth-dd-sync-mobile');
+        if (elM) elM.textContent = lastSyncText();
     }
 
     function setSyncing(on) {
         const spinner = document.getElementById('gauth-sync-spinner');
         if (spinner) spinner.style.display = on ? 'block' : 'none';
+        const spinnerM = document.getElementById('gauth-sync-spinner-mobile');
+        if (spinnerM) spinnerM.style.display = on ? 'inline-block' : 'none';
     }
 
     // ────────────────────────────────────────────────────────
@@ -401,10 +505,16 @@
     window.GoogleAuthUI = {
 
         async login() {
+            // 桌面版按鈕顯示「登入中...」
             const loginBtn = document.getElementById('gauth-btn');
+            const loginBtnM = document.getElementById('gauth-btn-mobile');
             if (loginBtn) {
                 loginBtn.innerHTML = '<span style="font-size:.8rem;">登入中...</span>';
                 loginBtn.disabled = true;
+            }
+            if (loginBtnM) {
+                loginBtnM.innerHTML = '<span style="font-size:.75rem;">登入中...</span>';
+                loginBtnM.disabled = true;
             }
 
             const profile = await window.FirebaseConfig.signInWithGoogle();
@@ -413,6 +523,10 @@
             if (loginBtn) {
                 loginBtn.innerHTML = LOGIN_BTN_HTML;
                 loginBtn.disabled = false;
+            }
+            if (loginBtnM) {
+                loginBtnM.innerHTML = LOGIN_BTN_MOBILE_HTML;
+                loginBtnM.disabled = false;
             }
 
             if (!profile) return; // 使用者取消
@@ -431,6 +545,8 @@
         async logout() {
             const dd = document.getElementById('gauth-dropdown');
             if (dd) dd.classList.remove('open');
+            const ddM = document.getElementById('gauth-dropdown-mobile');
+            if (ddM) ddM.style.display = 'none';
 
             const confirmed = await showModal(
                 '登出確認',
@@ -451,6 +567,12 @@
             refreshSyncTime();
             const dd = document.getElementById('gauth-dropdown');
             if (dd) dd.classList.toggle('open');
+        },
+
+        toggleDropdownMobile() {
+            refreshSyncTime();
+            const dd = document.getElementById('gauth-dropdown-mobile');
+            if (dd) dd.style.display = (dd.style.display === 'block') ? 'none' : 'block';
         },
 
         async syncUp() {

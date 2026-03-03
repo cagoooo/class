@@ -597,16 +597,21 @@
     <!-- 頂部導航 -->
     <nav class="bg-white shadow-lg border-b-4 border-blue-500">
         <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-            <!-- 手機版：垂直排列 / 電腦版：三欄置中 -->
-            <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center py-3 lg:py-0 lg:h-16">
-                <!-- 左側 Logo -->
-                <div class="flex flex-col sm:flex-row items-center text-center sm:text-left">
-                    <div class="text-xl sm:text-2xl font-bold text-blue-600">📚 班級小管家</div>
-                    <div class="mt-1 sm:mt-0 sm:ml-4 text-xs sm:text-sm text-gray-600">讓課堂管理變得簡單有趣</div>
+            <!-- RWD 導覽列：手機=Logo+登入同列，時鐘第二列；桌面=三欄 -->
+            <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center py-2 lg:py-0 lg:h-16">
+                <!-- 手機/平板：第一列 = Logo + 登入按鈕 同行 -->
+                <div class="flex flex-row items-center justify-between lg:justify-start">
+                    <!-- 左側 Logo -->
+                    <div class="flex flex-row items-center gap-2 sm:gap-3">
+                        <div class="text-xl sm:text-2xl font-bold text-blue-600">📚 班級小管家</div>
+                        <div class="hidden sm:block text-xs sm:text-sm text-gray-600">讓課堂管理變得簡單有趣</div>
+                    </div>
+                    <!-- 手機/平板版登入按鈕（桌面版隱藏） -->
+                    <div id="auth-nav-slot-mobile" class="flex lg:hidden items-center ml-2"></div>
                 </div>
 
-                <!-- 中間：時鐘按鈕（置中顯示） -->
-                <div class="flex justify-center mt-3 lg:mt-0 lg:absolute lg:left-1/2 lg:transform lg:-translate-x-1/2">
+                <!-- 中間：時鐘按鈕（手機置中、桌面絕對置中） -->
+                <div class="flex justify-center mt-2 lg:mt-0 lg:absolute lg:left-1/2 lg:transform lg:-translate-x-1/2">
                     <button onclick="openBigClock()" title="點擊展開全螢幕時鐘"
                         class="group flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-4 py-2 rounded-xl shadow-md hover:shadow-lg hover:from-blue-600 hover:to-indigo-600 transition-all duration-300 active:scale-95">
                         <!-- 時間顯示 -->
@@ -632,7 +637,7 @@
                     </button>
                 </div>
 
-                <!-- Google 帳號登入按鈕（由 google-auth-ui.js 自動注入） -->
+                <!-- Google 帳號登入按鈕（桌面版，由 google-auth-ui.js 自動注入） -->
                 <div id="auth-nav-slot" class="hidden lg:flex items-center w-48 justify-end"></div>
             </div>
         </div>
