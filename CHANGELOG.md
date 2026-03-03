@@ -1,6 +1,28 @@
 # 班級小管家 Changelog
 
+## [v2.9.8] - 2026-03-03
+
+### 🔧 修復問題
+
+#### ☁️ 同步功能細節修復
+- **考試監考設定差異假警報** - 本地統計用科目數量、雲端用有/無，標準不一致導致每次都顯示差異 → **統一改用陣列長度計算**
+- **分組還原後不顯示** - `loadFromCloud()` 重繪區段漏掉 `renderGroups()` 呼叫，資料有寫入但畫面不更新 → **補上呼叫**
+
+#### 🌙 深淺色切換按鈕佈局優化
+- 原 `position: fixed; top: 1rem; right: 1rem` 直接疊在 Google 帳號頭像上
+- **新增 `theme-toggle-slot` div** 至導覽列（桌面 + 手機版），按鈕移入 nav 中，在頭像左側
+- 後備方案改為 `right: 5rem` 確保不重疊
+
+### 📁 更新檔案
+- `js/firebase-sync.js` - 考試監考統計一致化、渲染修復
+- `js/theme-toggle.js` - 按鈕插入 nav slot 邏輯
+- `classnew.html` - 新增 `theme-toggle-slot`（桌面 + 手機）
+- `sw.js` / `manifest.json` - 版本號升至 v2.9.8
+
+---
+
 ## [v2.9.7] - 2026-03-03
+
 
 ### ✨ 新增功能 & 🔧 修復
 
