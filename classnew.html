@@ -233,14 +233,15 @@
 
         /* 數位時鐘 (預設) */
         .clock-style-digital .time-display {
-            font-size: clamp(3rem, min(13vw, 43vh), 22rem);
+            font-size: clamp(3rem, min(19vw, 55vh), 32rem);
             font-weight: 700;
             color: #1f2937;
             white-space: nowrap;
             line-height: 0.95;
             letter-spacing: -0.02em;
-            max-width: 95vw;
             display: block;
+            width: max-content;
+            max-width: 100%;
         }
 
         .clock-style-digital .date-display {
@@ -261,7 +262,7 @@
         /* LED 時鐘 */
         .clock-style-led .time-display {
             font-family: 'Chakra Petch', 'Noto Sans TC', sans-serif;
-            font-size: clamp(2.5rem, min(11vw, 38vh), 18rem);
+            font-size: clamp(2.5rem, min(16vw, 46vh), 26rem);
             font-weight: 700;
             color: #16a34a;
             text-shadow: 0 0 8px rgba(22, 163, 74, 0.5), 0 0 20px rgba(22, 163, 74, 0.3);
@@ -270,8 +271,7 @@
             border-radius: 1rem;
             white-space: nowrap;
             line-height: 1;
-            max-width: 95vw;
-            display: block;
+            display: inline-block;
         }
 
         .clock-style-led .date-display {
@@ -295,13 +295,14 @@
         /* 可愛時鐘 */
         .clock-style-cute .time-display {
             font-family: 'Mochiyochi Pop One', 'Noto Sans TC', sans-serif;
-            font-size: clamp(3rem, min(13vw, 43vh), 22rem);
+            font-size: clamp(3rem, min(19vw, 55vh), 32rem);
             font-weight: 400;
             color: #ec4899;
             text-shadow: 4px 4px 0 #ffffff, 6px 6px 0 rgba(0, 0, 0, 0.08);
             line-height: 0.95;
-            max-width: 95vw;
             display: block;
+            width: max-content;
+            max-width: 100%;
         }
 
         .clock-style-cute .date-display {
@@ -1340,7 +1341,7 @@
 
         <!-- 時鐘顯示區域 -->
         <div id="big-clock-container"
-            class="w-full h-full flex flex-col items-center justify-center text-center select-none overflow-hidden px-4"
+            class="w-full h-full flex flex-col items-center justify-center text-center select-none overflow-hidden"
             onclick="event.stopPropagation()">
             <!-- 這個 div 會根據時鐘樣式切換 class -->
             <div id="big-clock-display" class="clock-style-digital w-full">
@@ -3352,6 +3353,8 @@
                     `;
                     break;
             }
+            // 動態調整字體大小以填滿螢幕
+            requestAnimationFrame(fitClockToScreen);
         }
 
         function createFlipper(digit) {
@@ -3527,7 +3530,56 @@
             }
         }
 
-        // --- 結束全螢幕時鐘功能 ---
+        // ─────────────────────────────────────────
+        // 動態計算最佳時鐘字體大小（精確填滿可用空間）
+        // ─────────────────────────────────────────
+        function fitClockToScreen() {
+            const timeEl = document.querySelector('#big-clock-display .time-display');
+            if (!timeEl) return;
+
+            const controls = document.getElementById('clock-controls');
+            const controlsH = controls ? controls.getBoundingClientRect().height : 130;
+            const dateEl = document.querySelector('#big-clock-display .date-display');
+            const dateH = (dateEl && dateEl.textContent) ? 
+                          (window.innerHeight * 0.085) : 0; // 日期約佔 8.5vh
+
+            // 可用高度（扣掉控制列和日期）
+            const availH = window.innerHeight - controlsH - dateH - 24; // 24px margin
+            // 可用寬度（95% 視窗寬）
+            const availW = window.innerWidth * 0.94;
+
+            // 取得目前顯示的時間文字，計算字元寬度比例
+            const text = timeEl.textContent || '00:00:00';
+            // 一般等寬字型數字寬高比約 0.58；冒號約 0.3
+            const charCount = text.length;
+            const digits = (text.match(/d/g) || []).length;
+            const colons = (text.match(/:/g) || []).length;
+            // 估算 em 單位下的字串寬度
+            const style = window.getComputedStyle(timeEl);
+            const lsRatio = parseFloat(style.letterSpacing) / parseFloat(style.fontSize) || -0.02;
+            const estimatedWidthInEm = digits * 0.57 + colons * 0.28 + charCount * lsRatio * 0.5;
+
+            // 由寬度限制計算最大字體
+            const maxFontByWidth = estimatedWidthInEm > 0 ? availW / estimatedWidthInEm : availW / 4.5;
+            // 由高度限制計算最大字體（time-display line-height ~0.95）
+            const maxFontByHeight = availH * 0.92;
+
+            // 取最小值（確保兩個方向都不溢出）
+            let optimalSize = Math.min(maxFontByWidth, maxFontByHeight);
+            // 安全限制
+            optimalSize = Math.max(40, Math.min(optimalSize, 600)); // 最小 40px，最大 600px
+
+            timeEl.style.fontSize = optimalSize + 'px';
+        }
+
+        // 視窗大小改變時重新計算
+        window.addEventListener('resize', function() {
+            if (!document.getElementById('clock-modal').classList.contains('hidden')) {
+                fitClockToScreen();
+            }
+        });
+
+                // --- 結束全螢幕時鐘功能 ---
     </script>
     <!-- 增強模組 -->
     <script src="js/skeleton.js"></script>
