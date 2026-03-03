@@ -233,12 +233,14 @@
 
         /* 數位時鐘 (預設) */
         .clock-style-digital .time-display {
-            font-size: clamp(5rem, min(26vw, 52vh), 40rem);
+            font-size: clamp(3rem, min(13vw, 43vh), 22rem);
             font-weight: 700;
             color: #1f2937;
             white-space: nowrap;
             line-height: 0.95;
-            letter-spacing: -0.03em;
+            letter-spacing: -0.02em;
+            max-width: 95vw;
+            display: block;
         }
 
         .clock-style-digital .date-display {
@@ -259,15 +261,17 @@
         /* LED 時鐘 */
         .clock-style-led .time-display {
             font-family: 'Chakra Petch', 'Noto Sans TC', sans-serif;
-            font-size: clamp(4rem, min(24vw, 46vh), 36rem);
+            font-size: clamp(2.5rem, min(11vw, 38vh), 18rem);
             font-weight: 700;
             color: #16a34a;
             text-shadow: 0 0 8px rgba(22, 163, 74, 0.5), 0 0 20px rgba(22, 163, 74, 0.3);
             background: #111827;
-            padding: 0.35em 0.7em;
+            padding: 0.3em 0.6em;
             border-radius: 1rem;
             white-space: nowrap;
             line-height: 1;
+            max-width: 95vw;
+            display: block;
         }
 
         .clock-style-led .date-display {
@@ -291,11 +295,13 @@
         /* 可愛時鐘 */
         .clock-style-cute .time-display {
             font-family: 'Mochiyochi Pop One', 'Noto Sans TC', sans-serif;
-            font-size: clamp(7rem, min(26vw, 52vh), 40rem);
+            font-size: clamp(3rem, min(13vw, 43vh), 22rem);
             font-weight: 400;
             color: #ec4899;
             text-shadow: 4px 4px 0 #ffffff, 6px 6px 0 rgba(0, 0, 0, 0.08);
             line-height: 0.95;
+            max-width: 95vw;
+            display: block;
         }
 
         .clock-style-cute .date-display {
@@ -332,7 +338,7 @@
             position: relative;
             font-family: 'Noto Sans TC', sans-serif;
             font-weight: 700;
-            font-size: clamp(5rem, min(18vw, 26vh), 24rem);
+            font-size: clamp(3rem, min(10vw, 30vh), 16rem);
             line-height: 1.1;
             /* 調整行高以避免裁切 */
             perspective: 1000px;
@@ -455,7 +461,7 @@
 
         /* 翻轉時鐘分隔符 */
         .clock-style-flip .flipper-colon {
-            font-size: clamp(5rem, min(18vw, 26vh), 22rem);
+            font-size: clamp(3rem, min(10vw, 30vh), 15rem);
             line-height: 1.0;
             font-weight: 700;
             color: #4b5563;
@@ -1334,7 +1340,7 @@
 
         <!-- 時鐘顯示區域 -->
         <div id="big-clock-container"
-            class="w-full h-full flex flex-col items-center justify-center text-center select-none"
+            class="w-full h-full flex flex-col items-center justify-center text-center select-none overflow-hidden px-4"
             onclick="event.stopPropagation()">
             <!-- 這個 div 會根據時鐘樣式切換 class -->
             <div id="big-clock-display" class="clock-style-digital w-full">
