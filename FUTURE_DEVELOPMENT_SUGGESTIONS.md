@@ -1,8 +1,9 @@
 # 班級小管家 - 未來開發建議 📋
 
-> 最後更新：2026-03-03 19:43
-> 當前版本：v2.9.9
+> 最後更新：2026-03-03 22:35
+> 當前版本：v3.0.2
 > 本文件提供詳細的未來優化與開發方向建議，供開發參考
+
 
 ---
 
@@ -21,6 +22,8 @@
 11. [新增：護具與安全性](#新增護具與安全性)
 12. [新增：進階視覺與動畫](#新增進階視覺與動畫)
 13. [🆕 第八章：v2.9.9 後最新開發建議 (P 系列)](#第八章v299-後最新開發建議)
+14. [🆕 第九章：v3.x 後最新開發建議（Q 系列）](#第九章v3x-後最新開發建議)
+
 
 ---
 
@@ -3422,10 +3425,11 @@ window.Logger = Logger;
 
 | 優先 | ID | 功能名稱 | 工時 | 效益 | 難度 | 狀態 |
 |------|----|---------|------|------|------|------|
-| 🔴 **P0** | **P11** | **自動定時同步（10 分鐘）** | 0.5 天 | ⭐⭐⭐⭐⭐ | ⭐ | 🔲 |
-| 🔴 **P0** | **P12** | **離線狀態 Banner** | 1 天 | ⭐⭐⭐⭐ | ⭐⭐ | 🔲 |
+| 🔴 **P0** | **P11** | **自動定時同步（10 分鐘）** | 0.5 天 | ⭐⭐⭐⭐⭐ | ⭐ | ✅ **v3.0.0** |
+| 🔴 **P0** | **P12** | **離線狀態 Banner** | 1 天 | ⭐⭐⭐⭐ | ⭐⭐ | ✅ **v3.0.0** |
 | 🔴 **P0** | **P05** | **AI 公告快速生成** | 1 天 | ⭐⭐⭐⭐⭐ | ⭐⭐ | 🔲 |
 | 🔴 **P0** | **P01** | **即時搶答 Buzzer** | 2 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | 🔲 |
+
 | 🟡 P1 | O04 | 加分記錄清理工具 | 1 天 | ⭐⭐⭐⭐ | ⭐ | 🔲 |
 | 🟡 P1 | O02 | 學期資料歸檔機制 | 2 天 | ⭐⭐⭐⭐⭐ | ⭐⭐ | 🔲 |
 | 🟡 P1 | O05 | 學生成績單 CSV/PDF 匯出 | 3 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | 🔲 |
@@ -3443,9 +3447,9 @@ window.Logger = Logger;
 | 🟡 P1 | K01 | 座位表生成器 2.0 | 3 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | 🔲 |
 | 🟡 P1 | K04 | 學生個人頁面 | 3-4 天 | ⭐⭐⭐⭐ | ⭐⭐⭐ | 🔲 |
 | 🟢 P2 | **P09** | **學生雷達圖比較** | 2 天 | ⭐⭐⭐ | ⭐⭐⭐ | 🔲 |
-| 🟢 P2 | **P13** | **多班級 Profile 切換** | 3-5 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | 🔲 |
+| 🟢 P2 | **P13** | **多班級 Profile 切換 + 雲端隔離** | 3-5 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ✅ **v3.0.1/3.0.2** |
 | 🟢 P2 | **P14** | **PWA 推播通知（FCM）** | 3 天 | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | 🔲 |
-| 🟢 P2 | L02 | 課堂評量即時回饋（ARS） | 5-7 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | 🔲 |
+| 🟢 P2 | L02 | 課堂評量即時回饵（ARS） | 5-7 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | 🔲 |
 | 🟢 P2 | L03 | 家長通知（LINE/Email） | 5-7 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | 🔲 |
 | ⚙️ 技術 | **P15** | Console Logger 統一 | 0.5 天 | ⭐⭐⭐ | ⭐ | 🔲 |
 | ⚙️ 技術 | M02 | 同步衝突 Timestamp 策略 | 1-2 天 | ⭐⭐⭐ | ⭐⭐⭐ | 🔲 |
@@ -3453,23 +3457,632 @@ window.Logger = Logger;
 | ✅ 完成 | — | 同步 Modal + 10 類資料 | v2.9.7-9 | ⭐⭐⭐⭐⭐ | — | ✅ |
 | ✅ 完成 | — | PWA + App Check + SW 隔離 | v2.8.x | ⭐⭐⭐⭐ | — | ✅ |
 | ✅ 完成 | — | 骨架屏 + 音效系統 | v2.8.3-4 | ⭐⭐⭐ | — | ✅ |
+| ✅ **v3.0.0** | **P11+P12** | **手勢操作 + 自動同步 + 離線 Banner** | v3.0.0 | ⭐⭐⭐⭐⭐ | — | ✅ |
+| ✅ **v3.0.1+v3.0.2** | **P13** | **多班級系統 + 雲端同步修補** | v3.0.1/3.0.2 | ⭐⭐⭐⭐⭐ | — | ✅ |
+
 
 ---
 
-## 🚀 建議下次最優先實作「五步走」
+## 🚀 建議下次最優先實作「五步走」（更新至 v3.0.2）
 
-> 以「投入時間最少、立竿見影效益最大」為原則排序，全部合計約 **5 天**。
+> 已完成 P11/P12/P13！下一步轉向 **AI 輔助** + **課堂互動** + **數據可視化**三大方向。
 
 | 步驟 | ID | 功能名稱 | 工時 | 核心理由 |
 |------|-----|--------|------|---------|
-| 1️⃣ | **P11** | **自動定時同步** | 0.5 天 | 最輕鬆！解決老師最常遇到的「忘記同步」問題，0 學習成本 |
-| 2️⃣ | **P12** | **離線狀態 Banner** | 1 天 | 和 P11 搭配，讓老師清楚知道資料是否安全，消除焦慮 |
-| 3️⃣ | **P05** | **AI 公告快速生成** | 1 天 | Gemini 後端已備，立刻看到 AI 輔助效益，老師驚喜感最強 |
-| 4️⃣ | **O04** | **加分記錄清理工具** | 1 天 | IDB 剛完成，記錄長期累積需要配套的清理工具才實用 |
-| 5️⃣ | **P10** | **今日快報卡片** | 1.5 天 | 每次開啟系統的第一印象升級，顯著提升每日使用黏著度 |
+| 1️⃣ | **P05** | **AI 公告快速生成** | 1 天 | Gemini 後端已備，立刻看到 AI 輔助效益，老師驚喜感最強 |
+| 2️⃣ | **O04** | **加分記錄清理工具** | 1 天 | IDB 長期累積需要配套的清理工具才實用 |
+| 3️⃣ | **P10** | **今日快報首頁卡片** | 1.5 天 | 每次開啟系統的第一印象升級，顯著提升每日使用黏著度 |
+| 4️⃣ | **P01** | **即時搶答 Buzzer** | 2 天 | 課堂互動香氣最強，學生參與感大幅提升 |
+| 5️⃣ | **P02** | **鼓勵卡里程碑動畫** | 1 天 | 低成本高效益，大幅提升課堂正向氛圍 |
 
-> **💡 五步合計約 5 天工時，卻能帶來：自動化資料保護 + AI 輔助效率 + 每日體驗升級，是目前最高 ROI 的開發組合！**
+> **💡 五步合計約 6.5 天工時，能帶來：AI 引擎已備的公告助手 + 課堂氣氛公降的搶答系統 + 不可或缺的日常資料清理，是目前最高 ROI 的開發組合！**
+
+
+
 
 ---
 
-*📝 此文件最終更新於 2026-03-03 19:43 ｜ 當前版本 v2.9.9 ｜ 第八章 P 系列新增於本次更新*
+*📝 此文件最終更新於 2026-03-03 22:35 ｜ 當前版本 v3.0.2 ｜ 第九章 Q 系列新增於本次更新*
+
+---
+
+# 🆕 第九章：v3.x 後最新開發建議（Q 系列）
+
+> **背景（2026-03-03 更新）**：v3.0.x 已完成三大系統性功能：
+> - **v3.0.0**：手勢滑動操作、10 分鐘自動同步、離線 Banner 提示
+> - **v3.0.1**：多班級系統（獨立 IDB + 獨立 Firebase 路徑 + 切換 UI）
+> - **v3.0.2**：多班級雲端同步修補（classProfiles 同步、homeworkChecks 路徑修正）
+>
+> 接下來進入 **v3.1 → v4.0** 的開發藍圖，重點是讓「班級小管家」從工具升格為**教學夥伴**。
+
+---
+
+## 🎯 Q 系列開發目標概覽
+
+| 方向 | 描述 | 對應編號 |
+|------|------|---------|
+| 📅 學期管理自動化 | 減少學期初/末的重複行政作業 | Q01～Q04 |
+| 🎮 互動沉浸體驗 | 讓課堂更像遊戲，學生更投入 | Q05～Q08 |
+| 🛠️ 教師效能工具 | 降低每日行政負擔 | Q09～Q12 |
+| 🏗️ 架構升級 | 為長期維護與擴展打好基礎 | Q13～Q16 |
+
+---
+
+## 📅 一、學期管理自動化
+
+### Q01：學期資料自動封存（Semester Archive）（預估 2 天）
+
+**需求描述**：學期末一鍵「封存」目前班級的所有資料（學生名單、加扣分、作業記錄），存入 Firebase 的 `archives/{year}-{semester}/` 節點，讓下學期可以「繼承學生名單但清空分數」，完全不需要手動操作。
+
+**操作流程**：
+```
+老師點擊「📦 學期歸檔」→
+彈出確認 Modal（顯示本學期統計）→
+寫入 Firebase archives/ 路徑 →
+清空目前班級分數 / 可選清空作業記錄 →
+顯示「🎉 學期圓滿結束！資料已安全歸檔」
+```
+
+**Firebase 路徑設計**：
+```
+users/{uid}/classes/{classId}/archives/
+  └── 2025-S2/          ← 年份-學期（S1 上學期 / S2 下學期）
+        ├── students     ← 含分數快照
+        ├── pointsHistory
+        ├── homeworkList
+        └── meta { archivedAt, studentCount, totalPoints }
+```
+
+**預估工時**：2 天
+**難度**：⭐⭐⭐
+**優先度**：🔴 P0（學期末最剛需，避免資料混淆）
+
+---
+
+### Q02：歷史學期查閱 Modal（預估 1.5 天）
+
+**需求描述**：在「學生管理」頁加入「📚 歷史學期記錄」按鈕，開啟 Modal 後可下拉選擇學年/學期，以唯讀方式查閱當時的學生名單與分數排行，方便寫推薦信或查詢記錄。
+
+**UI 設計**：
+```
+┌──────────────────────────────────────────────┐
+│  📚 歷史學期查閱                            ✕ │
+│  ─────────────────────────────────────────── │
+│  選擇學期：[ 2025 下學期 ▾ ]                  │
+│  ─────────────────────────────────────────── │
+│  👤 王小明   座號 01   學期積分 +87           │
+│  👤 陳小華   座號 02   學期積分 +65           │
+│  ...（唯讀，不可編輯）                        │
+│  [📊 匯出此學期排行榜 CSV]                   │
+└──────────────────────────────────────────────┘
+```
+
+**預估工時**：1.5 天
+**難度**：⭐⭐
+**優先度**：🟡 P1（低開發成本，但對老師查資料極度有用）
+
+---
+
+### Q03：學生升級繼承校正工具（預估 2 天）
+
+**需求描述**：升學期初，老師可在設定頁執行「升年級校正」：選擇性刪除已畢業學生、批次更新座號、修改班級名稱，並保留所有歸檔記錄。
+
+**功能細節**：
+- 批次座號重新排列（拖拉排序）
+- 已選學生標記為「已畢業」（隱藏但不刪除，可查歷史）
+- 班級名稱一鍵修改（同步更新 classProfiles 和 Firebase meta）
+
+**預估工時**：2 天
+**難度**：⭐⭐⭐
+**優先度**：🟡 P1（每學年固定需求）
+
+---
+
+### Q04：學生成績單 PDF 直接列印（預估 3 天）
+
+**需求描述**：每位學生可生成一份個人學期成績單，包含：整學期加扣分明細、作業繳交率、老師手寫評語。支援直接列印（Print API）或下載 PDF（jsPDF）。
+
+```javascript
+// 使用 jsPDF + html2canvas（無後端需求）
+async function exportStudentReport(studentId) {
+    const student = getStudent(studentId);
+    const history = getHistory(studentId);
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+
+    doc.setFont('NotoSansCJK'); // 需內嵌中文字體
+    doc.setFontSize(20);
+    doc.text(`${student.name} 學期表現報告`, 20, 30);
+    // ... 繪製表格、分數圖表
+    doc.save(`${student.name}_學期報告.pdf`);
+}
+```
+
+> ⚠️ **注意**：中文 PDF 需引入 NotoSans CJK 字型（約 3MB），建議採用 CDN 懶加載，僅在點擊匯出時才下載字體。
+
+**預估工時**：3 天
+**難度**：⭐⭐⭐⭐（中文字型嵌入是主要技術挑戰）
+**優先度**：🟡 P1（學期末必備，建議搭配 Q01 一起做）
+
+---
+
+## 🎮 二、互動沉浸體驗
+
+### Q05：班級成就徽章系統（預估 2 天）
+
+**需求描述**：學生累積特定條件後自動解鎖徽章，徽章顯示在學生卡片上，讓積分系統更有遊戲感。
+
+**徽章設計範例**：
+| 徽章 | 圖示 | 解鎖條件 |
+|------|------|---------|
+| 開門紅 | 🔥 | 本學期首次被加分 |
+| 作業達人 | 📚 | 作業繳交率超過 95% |
+| 積極參與 | 🙋 | 當日被加分 3 次以上 |
+| 百分王 | 💯 | 總積分達 100 分 |
+| 全勤星 | ⭐ | 連續 30 天出席 |
+| 善心天使 | 👼 | 無任何扣分記錄超過 30 天 |
+
+```javascript
+// js/badges.js
+const BADGE_RULES = [
+    { id: 'century', icon: '💯', label: '百分王', check: (s) => s.score >= 100 },
+    { id: 'hw-ace',  icon: '📚', label: '作業達人',
+      check: (s) => getHomeworkRate(s.id) >= 95 },
+    // ...
+];
+
+function checkAndAwardBadges(student) {
+    const existing = new Set(student.badges || []);
+    const newBadges = BADGE_RULES
+        .filter(r => !existing.has(r.id) && r.check(student));
+    if (newBadges.length) {
+        student.badges = [...existing, ...newBadges.map(b => b.id)];
+        saveStudent(student);
+        showBadgeUnlock(student.name, newBadges); // 全螢幕動畫
+    }
+}
+```
+
+**預估工時**：2 天
+**難度**：⭐⭐
+**優先度**：🟡 P1（遊戲化設計，對學生動機影響極大）
+
+---
+
+### Q06：座位表 3.0 — 拖拉排座與分組顯色（預估 3 天）
+
+**需求描述**：視覺化座位表，老師可直接在螢幕上拖拉學生到指定座位。分組後各組自動用不同顏色標示，並可投影給全班看。座位配置存入 IDB，可下學期繼承。
+
+**技術方案**：
+```javascript
+// 使用原生 Drag & Drop API，無需引入外部函式庫
+class SeatingChart {
+    constructor(rows, cols) {
+        this.grid = Array.from({ length: rows }, () => Array(cols).fill(null));
+    }
+
+    render() {
+        const container = document.getElementById('seating-grid');
+        container.style.gridTemplateColumns = `repeat(${this.cols}, 1fr)`;
+        this.grid.flat().forEach((seat, idx) => {
+            const el = this._createSeatEl(seat, idx);
+            el.addEventListener('dragover', e => { e.preventDefault(); });
+            el.addEventListener('drop', e => this._onDrop(e, idx));
+            container.appendChild(el);
+        });
+    }
+
+    _onDrop(e, targetIdx) {
+        const fromIdx = parseInt(e.dataTransfer.getData('seatIdx'));
+        [this.grid[fromIdx], this.grid[targetIdx]] =
+            [this.grid[targetIdx], this.grid[fromIdx]];
+        this.render();
+        this.save(); // 存入 IDB
+    }
+}
+```
+
+**預估工時**：3 天
+**難度**：⭐⭐⭐
+**優先度**：🟡 P1（老師開學前必備工具）
+
+---
+
+### Q07：課堂音效主題包（預估 1 天）
+
+**需求描述**：現有的計時器音效擴充為「音效主題包」，老師可選擇不同主題（自然森林、輕鬆爵士、太空科幻），所有音效（加分、抽籤、計時結束、里程碑）統一換成選定主題。
+
+```javascript
+// js/sound-themes.js
+const THEMES = {
+    default:  { add: 'sounds/default/add.mp3',    end: 'sounds/default/end.mp3' },
+    forest:   { add: 'sounds/forest/bird.mp3',    end: 'sounds/forest/bell.mp3' },
+    jazz:     { add: 'sounds/jazz/hit.mp3',        end: 'sounds/jazz/cymbal.mp3' },
+    space:    { add: 'sounds/space/ping.mp3',      end: 'sounds/space/alarm.mp3' },
+};
+
+const SoundTheme = {
+    _current: 'default',
+    setTheme(name)    { this._current = name; localStorage.setItem('soundTheme', name); },
+    play(type)        {
+        const src = THEMES[this._current]?.[type];
+        if (!src) return;
+        new Audio(src).play().catch(() => {});
+    }
+};
+```
+
+**預估工時**：1 天
+**難度**：⭐
+**優先度**：🟢 P2（輕鬆完成，大幅提升使用趣味性）
+
+---
+
+### Q08：全螢幕隨機抽人 2.0 — 學生照片 + 滾輪動畫（預估 2 天）
+
+**需求描述**：升級抽籤界面為「老虎機滾輪」風格，搭配學生照片（存 IDB）在滾輪中快速滾動，最終停在被抽到的學生。這個動畫本身就是課堂焦點，大幅提升緊張感和趣味性。
+
+**動畫設計**：
+```css
+/* 滾輪動畫效果 */
+.slot-reel {
+    overflow: hidden;
+    height: 200px;
+    position: relative;
+}
+.slot-reel-inner {
+    animation: slot-spin 2s cubic-bezier(0.1, 0, 0.2, 1) forwards;
+}
+@keyframes slot-spin {
+    0%   { transform: translateY(0); }
+    60%  { transform: translateY(-8000px); }
+    80%  { transform: translateY(-7800px); }
+    /* 最終停在目標卡片位置 */
+    100% { transform: translateY(var(--target-offset)); }
+}
+```
+
+**預估工時**：2 天
+**難度**：⭐⭐⭐
+**優先度**：🟡 P1（課堂明星功能，第一次展示必然引爆課堂氣氛）
+
+---
+
+## 🛠️ 三、教師效能工具
+
+### Q09：快速加扣分鍵盤模式（預估 1 天）
+
+**需求描述**：支援純鍵盤操作模式：老師輸入座號 + 按 `+1`/`-1` 快捷鍵，在不點滑鼠的狀態下快速完成加扣分，適合老師一邊巡視一邊記分的使用場景。
+
+```javascript
+// 在加扣分頁面啟動時初始化
+document.addEventListener('keydown', (e) => {
+    if (!quickMode.active) return;
+    const num = parseInt(e.key);
+    if (!isNaN(num)) {
+        quickMode.seatInput += e.key;
+        updateSeatHighlight(quickMode.seatInput);
+    }
+    if (e.key === '+' || e.key === '=') confirmQuickPoints(+1);
+    if (e.key === '-')                   confirmQuickPoints(-1);
+    if (e.key === 'Escape')             quickMode.reset();
+});
+```
+
+**UI**：頁面右下角顯示「⌨️ 鍵盤模式」按鈕，開啟後出現半透明「座號輸入框」浮層。
+
+**預估工時**：1 天
+**難度**：⭐⭐
+**優先度**：🟡 P1（對科任老師極有用，可跨班快速操作）
+
+---
+
+### Q10：智慧通知排程（預估 2 天）
+
+**需求描述**：老師可設定「智慧提醒規則」，系統在符合條件時自動顯示 toast 通知：
+- 🔔 「明天 09:00：國語段考，5 人尚未繳宣頁」
+- 🔔 「王小明已連續 5 天未被加分，記得多關注」
+- 🔔 「小組 B 的積分本週停滯，建議安排活動」
+
+```javascript
+// js/smart-alerts.js
+const AlertRules = [
+    {
+        id: 'hw-due-tomorrow',
+        label: '作業明日到期提醒',
+        check: () => {
+            const tomorrow = addDays(new Date(), 1);
+            return homeworkList.filter(hw => isSameDay(new Date(hw.dueDate), tomorrow));
+        },
+        message: (data) => `明天到期：${data.map(hw => hw.name).join('、')}`
+    },
+    {
+        id: 'inactive-student',
+        label: '學生長時間未被加分',
+        check: () => students.filter(s => daysSinceLastActivity(s.id) >= 5),
+        message: (data) => `${data.length} 位學生已 5 天以上未被加分，記得多互動`
+    },
+];
+
+// 每次開啟頁面時執行
+async function runSmartAlerts() {
+    for (const rule of AlertRules) {
+        const triggered = rule.check();
+        if (triggered?.length > 0) {
+            NotificationSystem.info(rule.message(triggered), 6000);
+        }
+    }
+}
+```
+
+**預估工時**：2 天
+**難度**：⭐⭐⭐
+**優先度**：🟡 P1（主動提醒取代被動查找，大幅降低遺漏風險）
+
+---
+
+### Q11：多班級統計跨班比較（預估 2 天）
+
+**需求描述**：利用 v3.0.1 已完成的多班級系統，新增「跨班比較」頁面，自動從各班的 Firebase 路徑讀取統計數據，以橫條圖比較各班：學生人數、平均積分、作業繳交率、本月加分總量。
+
+**資料讀取策略**：
+```javascript
+// 讀取所有班級的 meta 統計（不讀取完整資料，只讀 summary doc）
+async function fetchAllClassStats() {
+    const profiles = JSON.parse(localStorage.getItem('classProfiles') || '[]');
+    const statsPromises = profiles.map(async (p) => {
+        const ref = p.id === 'default'
+            ? db.collection('users').doc(uid).collection('_meta').doc('stats')
+            : db.collection('users').doc(uid).collection('classes').doc(p.id)
+                .collection('_meta').doc('stats');
+        const snap = await ref.get();
+        return { ...p, stats: snap.exists ? snap.data() : null };
+    });
+    return Promise.all(statsPromises);
+}
+```
+
+> 💡 **最佳化**：各班在每次 `syncToCloud()` 時，同步更新一個輕量的 `_meta/stats` 摘要 doc（學生數、平均分），跨班比較時只讀這份摘要，不需要讀完整 collection。
+
+**預估工時**：2 天
+**難度**：⭐⭐⭐
+**優先度**：🟡 P1（科任老師跨班管理的必備可視化工具）
+
+---
+
+### Q12：離線草稿列隊（Offline Queue）（預估 2 天）
+
+**需求描述**：目前離線時雖然資料存 IDB，但「加分」、「新增學生」等操作在重新連線後不會自動重試上傳。加入 Offline Queue 機制，讓每次操作都記入待同步佇列，重新上線時自動批次上傳。
+
+```javascript
+// js/offline-queue.js
+const OfflineQueue = {
+    _queue: [],
+
+    enqueue(operation) {
+        // operation = { type: 'addPoints', payload: {...}, timestamp: Date.now() }
+        this._queue.push(operation);
+        ClassDB.save('_offlineQueue', this._queue);
+    },
+
+    async flush() {
+        if (!navigator.onLine || this._queue.length === 0) return;
+        console.log(`[OfflineQueue] 開始上傳 ${this._queue.length} 個離線操作`);
+        for (const op of [...this._queue]) {
+            await this._execute(op);
+            this._queue.shift();
+            ClassDB.save('_offlineQueue', this._queue);
+        }
+        NotificationSystem.success(`✅ ${this._queue.length} 項離線操作已同步`);
+    },
+
+    _execute(op) {
+        // 依 op.type 執行對應的 Firebase 寫入
+        switch (op.type) {
+            case 'addPoints': return FirebaseSync.uploadItem('pointsHistory', op.payload.id, op.payload);
+            case 'updateStudent': return FirebaseSync.uploadItem('students', op.payload.id, op.payload);
+        }
+    }
+};
+
+// 在 OfflineDetector._hide()（重新上線）時呼叫：
+// OfflineQueue.flush();
+```
+
+**預估工時**：2 天
+**難度**：⭐⭐⭐
+**優先度**：🟡 P1（讓離線功能真正可靠，特別適合網路不穩的教室環境）
+
+---
+
+## 🏗️ 四、架構升級
+
+### Q13：Firestore Security Rules 完整審查（預估 1 天）
+
+**現狀問題**：v3.0.x 加入了多班級路徑（`classes/{classId}/`），但 Firestore Security Rules 可能沒有跟著更新，導致新路徑的資料沒有寫入/讀取保護。
+
+**建議規則**：
+```javascript
+// firestore.rules
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 主要資料路徑（預設班級）
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    // 多班級子路徑（已由上方 {document=**} 覆蓋，但明確列出更清晰）
+    match /users/{userId}/classes/{classId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    // _meta 路徑（classProfiles 同步節點）
+    match /users/{userId}/_meta/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
+```
+
+**預估工時**：1 天（含測試）
+**難度**：⭐⭐
+**優先度**：🔴 P0（安全性問題，建議立即確認！）
+
+---
+
+### Q14：Service Worker 版本管理自動化（預估 1 天）
+
+**現狀問題**：每次升版都需要手動修改 `sw.js` 的 `CACHE_NAME` 常數，容易忘記。
+
+**解決方案**：在 `package.json` 加入 `prebuild` 腳本，自動從 `manifest.json` 讀取版本號並寫入 `sw.js`：
+
+```javascript
+// scripts/update-sw-version.js（Node.js 腳本）
+const fs = require('fs');
+const manifest = JSON.parse(fs.readFileSync('./manifest.json', 'utf8'));
+const version = manifest.version;
+
+let sw = fs.readFileSync('./sw.js', 'utf8');
+sw = sw.replace(
+    /const CACHE_NAME = 'class-manager-v[\d.]+'/,
+    `const CACHE_NAME = 'class-manager-v${version}'`
+);
+sw = sw.replace(
+    /const STATIC_CACHE = 'class-manager-static-v[\d.]+'/,
+    `const STATIC_CACHE = 'class-manager-static-v${version}'`
+);
+fs.writeFileSync('./sw.js', sw);
+console.log(`✅ SW 已更新至 v${version}`);
+```
+
+```json
+// package.json
+{
+    "scripts": {
+        "prebuild": "node scripts/update-sw-version.js",
+        "build": "..."
+    }
+}
+```
+
+**預估工時**：1 天
+**難度**：⭐
+**優先度**：⚙️ 技術債（下次版本更新時一起做，避免日後忘記改 sw.js）
+
+---
+
+### Q15：Firebase Emulator 本地測試環境（預估 1.5 天）
+
+**需求描述**：目前測試都直接打在正式 Firebase 環境，加入 Firebase Local Emulator Suite，讓開發環境完全隔離，可以安全地測試 Firestore Rules 和 Cloud Functions。
+
+```bash
+# 安裝與啟動
+firebase emulators:start --only firestore,functions,auth
+
+# classnew.html 開發模式下自動連線 Emulator
+if (location.hostname === 'localhost') {
+    firebase.firestore().useEmulator('localhost', 8080);
+    firebase.functions().useEmulator('localhost', 5001);
+    firebase.auth().useEmulator('http://localhost:9099');
+}
+```
+
+**預估工時**：1.5 天
+**難度**：⭐⭐⭐
+**優先度**：🟢 P2（對未來大功能開發很重要，但非立即必須）
+
+---
+
+### Q16：Progressive Web App 推播 2.0 — 智慧分級通知（預估 3 天）
+
+**需求描述**：基於 P14（FCM 基礎）的升級版，加入「通知分級」：老師可選擇哪些事件觸發推播（作業到期、里程碑達成、新功能上線等），並可設定「勿擾時段」（如 23:00-07:00 不推送）。
+
+```javascript
+// Firebase Function：智慧分級推播
+exports.smartNotify = functions.firestore
+    .document('users/{uid}/notifyQueue/{notifId}')
+    .onCreate(async (snap, context) => {
+        const notif = snap.data();
+        const prefs = await getNotifPrefs(context.params.uid);
+
+        if (!prefs.enabled[notif.type]) return; // 老師已關閉此類型
+        if (isQuietHour(notif.scheduledAt, prefs.quietStart, prefs.quietEnd)) {
+            // 延至下次非勿擾時間發送
+            await snap.ref.update({ scheduledAt: nextNonQuietTime(prefs) });
+            return;
+        }
+        await sendFCM(prefs.fcmToken, notif);
+        await snap.ref.delete();
+    });
+```
+
+**預估工時**：3 天
+**難度**：⭐⭐⭐⭐
+**優先度**：🟢 P2（P14 基礎推播完成後才做）
+
+---
+
+## 📊 Q 系列完整優先順序總表
+
+| 優先 | ID | 功能名稱 | 工時 | 效益 | 難度 | 狀態 |
+|------|----|---------|------|------|------|------|
+| 🔴 **P0** | **Q13** | **Firestore Rules 安全審查** | 1 天 | ⭐⭐⭐⭐ | ⭐⭐ | 🔲 |
+| 🔴 **P0** | **Q01** | **學期資料自動封存** | 2 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | 🔲 |
+| 🟡 P1 | **Q05** | 班級成就徽章系統 | 2 天 | ⭐⭐⭐⭐⭐ | ⭐⭐ | 🔲 |
+| 🟡 P1 | **Q08** | 全螢幕抽籤 2.0（滾輪動畫） | 2 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | 🔲 |
+| 🟡 P1 | **Q09** | 快速加扣分鍵盤模式 | 1 天 | ⭐⭐⭐⭐ | ⭐⭐ | 🔲 |
+| 🟡 P1 | **Q02** | 歷史學期查閱 Modal | 1.5 天 | ⭐⭐⭐⭐ | ⭐⭐ | 🔲 |
+| 🟡 P1 | **Q06** | 座位表 3.0 拖拉排座 | 3 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | 🔲 |
+| 🟡 P1 | **Q10** | 智慧通知排程 | 2 天 | ⭐⭐⭐⭐ | ⭐⭐⭐ | 🔲 |
+| 🟡 P1 | **Q11** | 多班級跨班比較 | 2 天 | ⭐⭐⭐⭐ | ⭐⭐⭐ | 🔲 |
+| 🟡 P1 | **Q12** | 離線草稿列隊 | 2 天 | ⭐⭐⭐⭐ | ⭐⭐⭐ | 🔲 |
+| 🟡 P1 | **Q03** | 學生升級繼承校正 | 2 天 | ⭐⭐⭐ | ⭐⭐⭐ | 🔲 |
+| 🟡 P1 | **Q04** | 學生成績單 PDF 列印 | 3 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | 🔲 |
+| 🟢 P2 | **Q07** | 課堂音效主題包 | 1 天 | ⭐⭐⭐ | ⭐ | 🔲 |
+| 🟢 P2 | **Q15** | Firebase Emulator 本地測試環境 | 1.5 天 | ⭐⭐⭐ | ⭐⭐⭐ | 🔲 |
+| 🟢 P2 | **Q16** | PWA 推播 2.0 智慧分級 | 3 天 | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | 🔲 |
+| ⚙️ 技術 | **Q14** | SW 版本管理自動化腳本 | 1 天 | ⭐⭐⭐ | ⭐ | 🔲 |
+
+---
+
+## 🚀 Q 系列建議優先「四步衝刺」
+
+> 考量當前 v3.0.2 的架構基礎，從安全性、可靠性、體驗三個維度挑選最高效益的開組合。
+
+| 步驟 | ID | 功能名稱 | 工時 | 核心理由 |
+|------|-----|--------|------|------------|
+| 1️⃣ | **Q13** | **Firestore Rules 安全審查** | 1 天 | 🔴 安全漏洞不能等！v3.x 加入新路徑後必須立即補防線 |
+| 2️⃣ | **Q01** | **學期資料自動封存** | 2 天 | 學期末最剛需，缺少它老師每學期都要手動清除資料 |
+| 3️⃣ | **Q05** | **班級成就徽章系統** | 2 天 | 遊戲化設計，遠比新功能更能提升學生出席意願和課堂活力 |
+| 4️⃣ | **Q09** | **快速鍵盤加扣分** | 1 天 | 科任老師跨班操作時效率提升 300%，開發成本極低 |
+
+> **💡 四步合計約 6 天工時，帶來：資安修補 + 每學期必用的歸檔工具 + 讓學生更投入的徽章系統 + 老師效率大幅提升的鍵盤操作。這是目前 ROI 最高的 Q 系列組合！**
+
+---
+
+## 🗺️ 班級小管家 長期路線圖（v3.x → v4.0）
+
+```mermaid
+gantt
+    title 班級小管家 開發路線圖
+    dateFormat  YYYY-MM
+    section v3.1 穩健性
+    Firestore Rules 審查     :done-q13, 2026-03, 2026-03
+    學期歸檔系統              :q01, 2026-03, 2026-04
+    離線草稿列隊              :q12, 2026-04, 2026-04
+    section v3.2 AI 助教
+    AI 公告生成（P05）        :p05, 2026-04, 2026-04
+    AI 學期評語（P06）        :p06, 2026-04, 2026-05
+    智慧通知排程（Q10）       :q10, 2026-05, 2026-05
+    section v3.3 課堂互動
+    即時搶答 Buzzer（P01）    :p01, 2026-05, 2026-05
+    成就徽章系統（Q05）       :q05, 2026-05, 2026-06
+    滾輪抽籤 2.0（Q08）       :q08, 2026-06, 2026-06
+    section v4.0 學生端
+    學生唯讀入口（L01）       :l01, 2026-06, 2026-07
+    ARS 即時評量（L02）       :l02, 2026-07, 2026-09
+    家長通知系統（L03）       :l03, 2026-09, 2026-10
+```
+
+---
+
+*📝 此文件最終更新於 2026-03-03 22:35 ｜ 當前版本 v3.0.2 ｜ 第九章 Q 系列（16 項新建議）新增於本次更新*
