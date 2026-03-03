@@ -152,7 +152,8 @@
     display: none;
     position: absolute;
     top: calc(100% + 10px);
-    left: 0;
+    right: 0;
+    left: auto;
     min-width: 210px;
     background: #fff;
     border-radius: 14px;

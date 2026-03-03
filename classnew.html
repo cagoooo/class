@@ -618,7 +618,9 @@
                 </div>
 
                 <!-- 中間：時鐘按鈕（手機置中、桌面絕對置中） -->
-                <div class="flex justify-center mt-2 lg:mt-0 lg:absolute lg:left-1/2 lg:transform lg:-translate-x-1/2">
+                <!-- 桌面版用 absolute 置中，加大 mx-auto + pointer-events-auto 確保可點擊 -->
+                <div
+                    class="flex justify-center mt-2 lg:mt-0 lg:absolute lg:left-1/2 lg:top-1/2 lg:-translate-x-1/2 lg:-translate-y-1/2">
                     <button onclick="openBigClock()" title="點擊展開全螢幕時鐘"
                         class="group flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-4 py-2 rounded-xl shadow-md hover:shadow-lg hover:from-blue-600 hover:to-indigo-600 transition-all duration-300 active:scale-95">
                         <!-- 時間顯示 -->
@@ -644,11 +646,16 @@
                     </button>
                 </div>
 
-                <!-- 班級切換器（桌面版，由 class-profiles.js 自動注入） -->
-                <div id="class-selector-slot" class="hidden lg:flex items-center mr-2"></div>
-                <!-- Google 帳號登入按鈕（桌面版，由 google-auth-ui.js 自動注入） -->
-                <div id="theme-toggle-slot" class="hidden lg:flex items-center mr-2"></div>
-                <div id="auth-nav-slot" class="hidden lg:flex items-center w-48 justify-end"></div>
+                <!-- 桌面版右側區塊：班級切換器 + 深淺色模式 + 登入 -->
+                <div class="hidden lg:flex items-center gap-2 ml-auto">
+                    <!-- 班級切換器（桌面版，由 class-profiles.js 自動注入） -->
+                    <div id="class-selector-slot" class="flex items-center flex-shrink-0"></div>
+                    <!-- 填充區塊：推銀 class-selector 遠離時鐘 -->
+                    <div class="w-4 flex-shrink-0"></div>
+                    <!-- Google 帳號登入按鈕（桌面版，由 google-auth-ui.js 自動注入） -->
+                    <div id="theme-toggle-slot" class="flex items-center"></div>
+                    <div id="auth-nav-slot" class="flex items-center w-48 justify-end"></div>
+                </div>
 
             </div>
         </div>
