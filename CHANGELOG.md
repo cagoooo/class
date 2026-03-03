@@ -1,6 +1,51 @@
 # 班級小管家 Changelog
 
+## [v3.0.3] - 2026-03-04
+
+### 🔐 安全性
+- **Firestore Security Rules 正式部署**（Q13）：新建 `firestore.rules`，覆蓋多班級路徑 `classes/{classId}/**`、全域 meta 路徑 `_meta/**` 及 `archives/**`，確保每位使用者只能讀寫自己的資料
+- 更新 `firebase.json` 加入 `firestore.rules` 設定，支援 `firebase deploy --only firestore:rules`
+
+### 📦 系統工具
+- **Service Worker 版本管理自動化**（Q14）：新增 `scripts/update-sw-version.js`，從 `manifest.json` 自動讀取版本號並一次更新 `sw.js` 的 `CACHE_NAME`、`STATIC_CACHE`、`DYNAMIC_CACHE` 及 `@version` 標籤
+- 新增 `package.json`，含 `npm run update-sw` 和 `preversion` 鉤子，升版後執行 `npm version patch` 即可自動同步 SW 快取版本
+
+### 📅 新功能
+- **學期資料自動封存系統**（Q01）：新增 `js/semester-archive.js`，一鍵封存學期到 Firebase `archives/{year}-{semester}/`，選項包含清空分數/清空作業，完整支援多班級路徑（v3.0.1+）
+- 封存 UI：在「學生管理」頁自動注入「📅 封存本學期資料」按鈕，彈出確認 Modal 顯示本學期統計
+
+### 🐛 修復
+- 修復電腦版導覽列班級選擇器與時鐘按鈕重疊問題：桌面版右側三個 slot 統一包入 `ml-auto wrapper`，時鐘絕對置中與右側元素不再衝突
+- 修復時鐘按鈕位置跑偏：移除錯誤加入的 `lg:top-1/2 lg:-translate-y-1/2`，恢復原本正確的 `lg:transform lg:-translate-x-1/2`
+- 班級選擇器下拉選單改為從右側展開（`right:0`），不超出螢幕右邊界
+
+### 📁 更新/新增檔案
+- `firestore.rules` **[新增]** - Firestore 安全規則
+- `firebase.json` **[修改]** - 加入 `firestore` 設定區塊
+- `scripts/update-sw-version.js` **[新增]** - SW 版本自動化腳本
+- `package.json` **[新增]** - npm 腳本定義
+- `js/semester-archive.js` **[新增]** - 學期封存模組
+- `js/class-profiles.js` **[修改]** - 下拉選單從右側展開
+- `classnew.html` **[修改]** - 導覽列右側 slot 重構、加入 semester-archive.js 引用
+
+---
+
+## [v3.0.1 ~ v3.0.2] - 2026-03-03
+
+### ✨ 新功能
+- **多班級系統（P13）**：科任老師可在同一帳號管理多個班級，資料完全隔離（獨立 IDB + Firebase 子路徑）
+- 班級切換器注入桌面/手機導覽列（`js/class-profiles.js` 新增）
+
+### 🐛 修復（v3.0.2）
+- `syncToCloud()` 的 `homeworkChecks` 改用 `getUserCollection()` 動態多班級路徑（原本硬編碼錯誤）
+- `syncFromCloud()` 同樣修正 `homeworkChecks` 下載路徑
+- `classProfiles`（班級清單）現在每次上傳時同步至 `users/{uid}/_meta/classProfiles`，下載後與本地合併還原
+- `loadFromCloud()` 修正誤用舊變數的 bug（`students` → `cloudData.students`）
+
+---
+
 ## [v3.0.0] - 2026-03-03
+
 
 ### 🆕 新增功能
 
