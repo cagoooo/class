@@ -1,9 +1,8 @@
 # 班級小管家 - 未來開發建議 📋
 
-> 最後更新：2026-03-03 18:36
+> 最後更新：2026-03-03 19:43
 > 當前版本：v2.9.9
 > 本文件提供詳細的未來優化與開發方向建議，供開發參考
-
 
 ---
 
@@ -21,6 +20,7 @@
 10. [新增：AI 輔助工具](#新增ai-輔助工具)
 11. [新增：護具與安全性](#新增護具與安全性)
 12. [新增：進階視覺與動畫](#新增進階視覺與動畫)
+13. [🆕 第八章：v2.9.9 後最新開發建議 (P 系列)](#第八章v299-後最新開發建議)
 
 ---
 
@@ -2745,3 +2745,731 @@ function exportAllAsCSV() {
 > 3. **O05 成績單 CSV 匯出**（3 天）- 學期末最實用，老師最需要
 > 4. **K03 AI 評語生成**（2 天）- Gemini 後端已備，最快產出高價值功能
 
+---
+
+# 🆕 第八章：v2.9.9 後最新開發建議（P 系列）
+
+> **背景**（2026-03-03 更新）：v2.9.9 已完成 IndexedDB 持久化儲存（`class-db.js`），容量從 5MB 提升至 250MB+，自動遷移、雙重備份、降級保護全部就緒。Google 帳號同步也臻至完善（10 類資料 + 彩色差異 Modal）。接下來的重點轉向**課堂互動**、**AI 輔助效率**、**可視化數據**和**系統穩健性**四大方向。
+
+---
+
+## 🎯 P 系列開發目標概覽
+
+| 方向 | 描述 | 對應編號 |
+|------|------|---------|
+| 🎮 課堂互動升級 | 讓課堂更熱鬧、更有參與感 | P01～P04 |
+| 🤖 AI 智慧輔助 | 利用 Gemini 大幅節省教師行政時間 | P05～P07 |
+| 📊 數據視覺化 | 圖表分析讓班級狀況一目了然 | P08～P10 |
+| 🔧 系統穩健性 | 讓應用更可靠、更易維護 | P11～P15 |
+
+---
+
+## 🎮 一、課堂互動升級
+
+### P01：即時搶答 Buzzer 系統（預估 2 天）
+
+**需求描述**：老師出題後，學生用手機掃描 QR Code 進入搶答頁面，最快按下「搶答」的學生姓名立刻顯示於教室大螢幕，並可連動加分。
+
+**技術架構**：
+- 教師端（`classnew.html`）：建立搶答場次 → 顯示 QR Code
+- 學生端（`buzzer.html`，純靜態頁面）：選擇姓名 → 按搶答按鈕
+- 即時通訊：Firebase Realtime Database `onValue()` 監聽
+
+**資料結構**：
+```javascript
+// Firebase Realtime Database
+buzzer/{sessionId}/:
+  active: true
+  question: "台灣最高山是哪座？"
+  startedAt: 1234567890
+  buzzes:
+    uid1: { name: "王小明", timestamp: 1234567895 }
+    uid2: { name: "陳小華", timestamp: 1234567897 }
+```
+
+**教師端整合**：
+```javascript
+// js/buzzer-host.js
+function startBuzzerSession(question) {
+    const sessionId = Date.now().toString();
+    const ref = firebase.database().ref(`buzzer/${sessionId}`);
+    ref.set({ active: true, question, startedAt: Date.now(), buzzes: {} });
+
+    const url = `${location.origin}/class/buzzer.html?s=${sessionId}`;
+    showQRCode(url);
+
+    // 監聽第一名搶答
+    ref.child('buzzes').orderByChild('timestamp').limitToFirst(1)
+        .on('child_added', snap => {
+            const winner = snap.val();
+            showWinner(winner.name); // 全螢幕顯示得獎者
+            playWinnerSound();
+        });
+}
+```
+
+**預估工時**：2 天
+**難度**：⭐⭐⭐
+**優先度**：🔴 P0（課堂互動感超強，學生最期待）
+
+---
+
+### P02：分數「鼓勵卡」里程碑動畫（預估 1 天）
+
+**需求描述**：當學生達到分數里程碑（首次被加分、達 10 的整數倍、達 100 分）時，觸發全螢幕短暫覆蓋的鼓勵卡，配合彩花與音效，讓課堂充滿驚喜感。
+
+**觸發規則**：
+```javascript
+// js/score-celebrations.js
+const MILESTONES = [
+    { check: (s) => s.score > 0 && s.todayFirst,  msg: "🔥 今日開門紅！", type: 'fire' },
+    { check: (s) => s.score % 10 === 0,            msg: "🌟 整數里程碑！", type: 'golden' },
+    { check: (s) => s.score === 50,                msg: "🎖️ 達到 50 分！", type: 'silver' },
+    { check: (s) => s.score === 100,               msg: "💯 完美滿分！",   type: 'perfect' },
+];
+
+function checkAndCelebrate(student, delta) {
+    if (delta <= 0) return;
+    for (const m of MILESTONES) {
+        if (m.check(student)) { showCelebrationCard(student.name, m.msg, m.type); break; }
+    }
+}
+```
+
+```css
+/* css/celebrations.css */
+.celebration-card {
+    position: fixed; inset: 0; z-index: 9999;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    animation: celebIn 0.4s ease;
+}
+.type-golden  { background: radial-gradient(circle, rgba(251,191,36,0.9), rgba(0,0,0,0.85)); }
+.type-perfect { background: radial-gradient(circle, rgba(99,102,241,0.9), rgba(0,0,0,0.85)); }
+.celebration-name { font-size: clamp(3rem, 10vw, 8rem); font-weight: 900; color: #fef08a; }
+.celebration-msg  { font-size: clamp(1.5rem, 5vw, 3rem); color: white; margin-top: 1rem; }
+@keyframes celebIn { from { opacity:0; transform:scale(0.5); } to { opacity:1; transform:scale(1); } }
+```
+
+**預估工時**：1 天
+**難度**：⭐⭐
+**優先度**：🟡 P1（低成本高效益，大幅提升課堂正向氛圍）
+
+---
+
+### P03：課堂問題庫抽題機制（預估 2 天）
+
+**需求描述**：老師預先建立「課堂問題庫」，每次抽人後系統隨機配對一道問題顯示，讓抽籤更有目的性，答對/答錯連動加扣分。
+
+**資料結構（存入 IDB questionBank 表）**：
+```javascript
+// class-db.js 新增 questionBank store
+const questionRecord = {
+    id: Date.now().toString(),
+    subject: '數學',
+    question: '37 + 48 等於多少？',
+    answer: '85',
+    difficulty: 'easy',  // easy / medium / hard
+    tags: ['加法', '整數'],
+    usedCount: 0,
+    lastUsed: null,
+    createdAt: new Date().toISOString()
+};
+```
+
+**UI 整合**：在「抽籤」頁新增「📚 題目庫模式」Toggle → 抽到學生後顯示隨機題目 → 老師按「✅ 答對 +1」或「❌ 換人 0分」。
+
+**預估工時**：2 天
+**難度**：⭐⭐
+**優先度**：🟡 P1
+
+---
+
+### P04：分組獨立倒數計時器（預估 1.5 天）
+
+**需求描述**：分組活動時，可為各組設定不同倒數計時，各組時間獨立計算，時間到時以組別名稱通知。
+
+```javascript
+// js/group-timers.js（基於現有 exam-sounds.js 音效）
+const GroupTimers = {
+    timers: {},
+
+    start(groupId, seconds, label) {
+        this.timers[groupId] = {
+            remaining: seconds, label,
+            interval: setInterval(() => {
+                this.timers[groupId].remaining--;
+                this._render(groupId);
+                if (this.timers[groupId].remaining <= 0) {
+                    this.stop(groupId);
+                    ExamSounds.playEnd();
+                    showToast(`⏰ ${label} 時間到！`, 'info');
+                }
+            }, 1000)
+        };
+    },
+
+    stop(groupId) { clearInterval(this.timers[groupId]?.interval); },
+    _render(groupId) {
+        const el = document.getElementById(`group-timer-${groupId}`);
+        if (el) el.textContent = formatTime(this.timers[groupId].remaining);
+    }
+};
+```
+
+**預估工時**：1.5 天
+**難度**：⭐⭐
+**優先度**：🟡 P1
+
+---
+
+## 🤖 二、AI 智慧輔助
+
+### P05：AI 班級公告快速生成（預估 1 天）⚡ 建議最優先
+
+**需求描述**：老師只需輸入關鍵字（如「明天段考 國語 數學 帶准考證」），AI 自動潤飾成完整格式的班級公告，大幅節省打字時間。
+
+```javascript
+// js/ai-announcement.js（整合現有 Firebase Functions 後端）
+async function generateAnnouncement(keywords) {
+    const today = new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' });
+    const prompt = `
+你是台灣小學班導師的行政助理。
+請根據以下關鍵字，生成一則格式完整的班級公告（繁體中文）。
+公告需包含：【標題】日期（${today}）、重點條列（每點一行，加上 emoji）、溫馨提醒語。
+關鍵字：${keywords}
+請直接輸出公告，不要額外說明。
+    `.trim();
+
+    const res = await fetch(`${FUNCTIONS_BASE}/generateContent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, maxTokens: 300 })
+    });
+    return (await res.json()).text;
+}
+```
+
+**UI 整合**：公告頁新增「✨ AI 幫我寫」按鈕 → 輸入關鍵字 → 生成草稿 → 老師修改確認 → 發布。
+
+**預估工時**：1 天
+**難度**：⭐⭐（Gemini 後端已備，只需前端 UI）
+**優先度**：🔴 P0（最快看到 AI 效益，教師驚喜感最強）
+
+---
+
+### P06：AI 學期總評摘要報告（預估 2 天）
+
+**需求描述**：學期末一鍵生成全班個人化學期評語 + 全班總結摘要，並可匯出 PDF。
+
+**功能範圍**：
+- 個人評語（80-120 字）：正向具體，含優點+建議
+- 全班摘要（200 字）：班级整體表現、亮點、待改善方向
+- 分批處理（每次 10 人，避免 token 超限）
+
+```javascript
+// js/ai-semester-report.js
+async function generateSemesterReport() {
+    const summaries = AppState.students.map(s => ({
+        name: s.name,
+        totalScore: s.score,
+        addCount: countHistory(s.id, '+'),
+        deductCount: countHistory(s.id, '-'),
+        homeworkRate: getHomeworkRate(s.id),
+        tags: (s.tags || []).join('、') || '無'
+    }));
+
+    // 分批呼叫 Firebase Function
+    const chunks = chunkArray(summaries, 10);
+    const allComments = [];
+    for (const chunk of chunks) {
+        const prompt = buildBatchPrompt(chunk);
+        const res = await callGemini(prompt);
+        allComments.push(...parseResults(res));
+    }
+    return allComments;
+}
+```
+
+**預估工時**：2 天
+**難度**：⭐⭐⭐
+**優先度**：🟡 P1（學期末剛需，建議提前實作）
+
+---
+
+### P07：AI 聰明加分理由建議（預估 1.5 天）
+
+**需求描述**：加分時，系統根據學生最近的行為記錄，自動推薦 3 個可能的加分理由快速選項，讓加分記錄更有意義（而不只是「+1」）。
+
+```javascript
+// 本地規則推導（無需 API，即時反應）
+function suggestScoreReasons(student, delta) {
+    const recent = AppState.pointsHistory
+        .filter(h => h.studentId === student.id).slice(-10);
+    const suggestions = [];
+
+    if (delta > 0) {
+        if (!recent.some(h => h.change > 0 && isToday(h.timestamp)))
+            suggestions.push({ reason: '積極舉手回答問題', delta: 1 });
+        if (student.tags?.includes('leader'))
+            suggestions.push({ reason: '班務協助表現優良', delta: 2 });
+        if (recent.filter(h => h.change < 0).length > 2)
+            suggestions.push({ reason: '近期明顯進步，持續加油', delta: 1 });
+        suggestions.push({ reason: '作業準時繳交', delta: 1 });
+        suggestions.push({ reason: '上課認真專注', delta: 1 });
+    } else {
+        suggestions.push({ reason: '遲到', delta: -1 });
+        suggestions.push({ reason: '上課講話', delta: -1 });
+        suggestions.push({ reason: '未交作業', delta: -2 });
+    }
+    return suggestions.slice(0, 3);
+}
+```
+
+**UI 整合**：加分面板下方顯示「💡 建議理由」快速選按鈕，點選即填入理由欄位。
+
+**預估工時**：1.5 天
+**難度**：⭐⭐
+**優先度**：🟡 P1
+
+---
+
+## 📊 三、數據視覺化
+
+### P08：全班積分熱力圖（預估 2 天）
+
+**需求描述**：以月曆熱力圖顯示每天的加分活躍度，類似 GitHub 貢獻圖，讓老師看到課堂哪幾天最活躍。
+
+```javascript
+// js/heatmap.js
+function renderHeatmap(year, month) {
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const heatmapEl = document.getElementById('heatmap-grid');
+
+    // 統計每天加分總量
+    const dailyMap = {};
+    AppState.pointsHistory.forEach(h => {
+        const d = new Date(h.timestamp);
+        if (d.getFullYear() === year && d.getMonth() === month) {
+            const key = d.getDate();
+            dailyMap[key] = (dailyMap[key] || 0) + Math.abs(h.change);
+        }
+    });
+
+    const maxScore = Math.max(...Object.values(dailyMap), 1);
+    heatmapEl.innerHTML = Array.from({ length: daysInMonth }, (_, i) => {
+        const day = i + 1, score = dailyMap[day] || 0;
+        const intensity = Math.min(4, Math.round((score / maxScore) * 4));
+        return `<div class="heat-cell intensity-${intensity}" title="${day}日：${score}分">
+            <span>${day}</span></div>`;
+    }).join('');
+}
+```
+
+```css
+/* css/heatmap.css */
+#heatmap-grid { display: grid; grid-template-columns: repeat(7, 36px); gap: 4px; }
+.heat-cell { width: 36px; height: 36px; border-radius: 6px; display: flex;
+    align-items: center; justify-content: center; font-size: 0.75rem; cursor: pointer; }
+.intensity-0 { background: var(--bg-secondary, #eee); }
+.intensity-1 { background: #bef264; }
+.intensity-2 { background: #86efac; }
+.intensity-3 { background: #4ade80; }
+.intensity-4 { background: #16a34a; color: white; font-weight: bold; }
+[data-theme="dark"] .intensity-0 { background: #1e293b; }
+```
+
+**預估工時**：2 天
+**難度**：⭐⭐
+**優先度**：🟡 P1
+
+---
+
+### P09：學生成長雷達圖比較（預估 2 天）
+
+**需求描述**：選擇 2～4 位學生，以雷達圖比較「積分」「作業完成」「出席率」「問答參與」「班務貢獻」五個維度——讓老師快速洞察每個孩子的強弱項。
+
+```javascript
+// 需引入 Chart.js CDN
+// <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+function renderRadarChart(studentIds) {
+    const labels = ['積分表現', '作業完成', '出席出勤', '問答參與', '班務貢獻'];
+    const colors = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444'];
+
+    const datasets = studentIds.map((id, i) => {
+        const s = AppState.students.find(x => x.id === id);
+        return {
+            label: s.name,
+            data: [
+                Math.min(100, s.score * 2),    // 積分（正規化到 100）
+                getHomeworkRate(id),            // 作業完成 0~100
+                getAttendanceRate(id),          // 出席率 0~100
+                getQnaRate(id),                 // 問答參與 0~100
+                s.tags?.includes('leader') ? 90 : 50 // 班務貢獻
+            ],
+            borderColor: colors[i],
+            backgroundColor: colors[i] + '22',
+            pointBackgroundColor: colors[i],
+        };
+    });
+
+    new Chart(document.getElementById('radarCanvas'), {
+        type: 'radar',
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            scales: { r: { beginAtZero: true, max: 100 } },
+            plugins: { legend: { position: 'bottom' } }
+        }
+    });
+}
+```
+
+**預估工時**：2 天
+**難度**：⭐⭐⭐
+**優先度**：🟢 P2
+
+---
+
+### P10：班級「今日快報」首頁卡片（預估 1.5 天）
+
+**需求描述**：每天開啟系統時，首頁顯示「今日快報」卡片：今日到期作業、今日加分王、上次同步時間、待完成的重要事項。
+
+**UI 設計（卡片形式）**：
+```
+┌──────────────────────────────────────────────────────┐
+│  📅 2026 年 3 月 3 日（週一）                          │
+│  ─────────────────────────────────────────────────── │
+│  📚 今日到期：數學 P.45（3 人尚未繳）                  │
+│  🏆 今日加分王：王小明 +5 分  ✦ 陳小華 +3 分           │
+│  ☁️ 上次同步：09:23（距今 2 小時）                     │
+│  ⚠️ 注意：5 位學生近 7 天未被加過分                    │
+└──────────────────────────────────────────────────────┘
+```
+
+```javascript
+// js/daily-brief.js
+async function buildDailyBrief() {
+    const today = new Date();
+    const dueTodayHW = (AppState.homeworkList || [])
+        .filter(hw => hw.dueDate && isSameDay(new Date(hw.dueDate), today));
+    const pendingCount = dueTodayHW.reduce((acc, hw) =>
+        acc + AppState.students.filter(s => !hw.submitted?.includes(s.id)).length, 0);
+
+    const todayHistory = (AppState.pointsHistory || [])
+        .filter(h => h.change > 0 && isToday(h.timestamp));
+    const topStudents = Object.entries(
+        todayHistory.reduce((acc, h) => {
+            acc[h.studentId] = (acc[h.studentId] || 0) + h.change;
+            return acc;
+        }, {}))
+        .sort(([,a],[,b]) => b - a).slice(0, 3)
+        .map(([id, score]) => ({
+            name: AppState.students.find(s => s.id === id)?.name || '?', score
+        }));
+
+    const lastSync = await ClassDB.getSetting('lastSyncTime');
+    renderBriefCard({ dueTodayHW, pendingCount, topStudents, lastSync });
+}
+```
+
+**預估工時**：1.5 天
+**難度**：⭐⭐
+**優先度**：🟡 P1（每日必看，提升系統黏著度）
+
+---
+
+## 🔧 四、系統穩健性
+
+### P11：自動定時同步（⚡ 最優先！預估 0.5 天）
+
+> ⚠️ **J01 / N04 已反覆提及此功能，截至 v2.9.9 仍尚未實作，強烈建議立即處理！**
+
+**現狀問題**：目前同步完全靠手動觸發，教師上課忙碌容易完全忘記同步。
+
+```javascript
+// js/auto-sync.js（全新獨立模組）
+const AutoSync = {
+    INTERVAL_MS: 10 * 60 * 1000,  // 10 分鐘（可在設定頁調整）
+    _timer: null,
+
+    start() {
+        if (this._timer) return;
+        this._timer = setInterval(() => this._trySync(), this.INTERVAL_MS);
+        // 從背景切回前台時也觸發
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') this._checkAndSync();
+        });
+        Logger.log('✅ 自動同步已啟動（每 10 分鐘）');
+    },
+
+    stop() { clearInterval(this._timer); this._timer = null; },
+
+    async _trySync() {
+        if (!window.GoogleAuthUI?.isLoggedIn?.()) return;
+        if (!navigator.onLine) return;
+        showSyncSpinner(true);
+        try {
+            await window.FirebaseSync.syncToCloud();
+            await ClassDB.setSetting('lastSyncTime', new Date().toISOString());
+        } finally { showSyncSpinner(false); }
+    },
+
+    async _checkAndSync() {
+        const last = await ClassDB.getSetting('lastSyncTime');
+        if (!last || Date.now() - new Date(last).getTime() > this.INTERVAL_MS) {
+            await this._trySync();
+        }
+    }
+};
+
+// 在 google-auth-ui.js showLoggedIn() 後呼叫：
+// AutoSync.start();
+```
+
+**新增同步指示器 CSS**：
+```css
+#syncIndicator.syncing svg { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+```
+
+**預估工時**：0.5 天
+**難度**：⭐
+**優先度**：🔴 P0（**強烈建議下次第一個實作**）
+
+---
+
+### P12：離線狀態提示 Banner（預估 1 天）
+
+> ⚠️ **J02 已描述，截至 v2.9.9 仍尚未實作。**
+
+**現狀問題**：斷網時老師無法得知資料是否安全，IDB 有保存但毫無視覺提示。
+
+```javascript
+// js/offline-detector.js
+const OfflineDetector = {
+    _banner: null,
+
+    init() {
+        window.addEventListener('online',  () => this._hide());
+        window.addEventListener('offline', () => this._show());
+        if (!navigator.onLine) this._show();
+    },
+
+    _show() {
+        if (this._banner) return;
+        this._banner = document.createElement('div');
+        this._banner.style.cssText = `
+            position:fixed;top:0;left:0;right:0;z-index:9998;
+            background:#f59e0b;color:#1e293b;
+            text-align:center;padding:6px 1rem;
+            font-size:0.875rem;font-weight:600;
+        `;
+        this._banner.textContent = '⚠️ 目前離線 — 資料已安全暫存 IndexedDB，恢復網路後將自動同步';
+        document.body.prepend(this._banner);
+    },
+
+    _hide() {
+        this._banner?.remove();
+        this._banner = null;
+        showToast('✅ 網路已恢復，正在同步資料...', 'success');
+        setTimeout(() => AutoSync._trySync?.(), 1000);
+    }
+};
+// DOMContentLoaded 後呼叫 OfflineDetector.init();
+```
+
+**預估工時**：1 天
+**難度**：⭐⭐
+**優先度**：🔴 P0（資安基礎，配合自動同步一起做）
+
+---
+
+### P13：多班級 Profile 切換（預估 3-5 天）
+
+**需求描述**：基於 IDB 多資料庫架構，讓老師可在導覽列切換班級（如「501班」↔「502班」），資料完全隔離，切換瞬間完成。
+
+**架構設計（最小侵入式）**：
+```javascript
+// 修改 class-db.js：database 名稱改為動態
+const ACTIVE_PROFILE_KEY = 'activeProfile';
+function getActiveDbName() {
+    const profile = localStorage.getItem(ACTIVE_PROFILE_KEY) || 'default';
+    return `classnew-db-${profile}`;
+}
+// 只需更改 indexedDB.open() 的第一個參數為 getActiveDbName()
+// 其他所有 ClassDB 操作保持不變！
+
+// 班級管理
+const ClassProfiles = {
+    list: () => JSON.parse(localStorage.getItem('classProfiles') || '[]'),
+    current: () => localStorage.getItem(ACTIVE_PROFILE_KEY) || 'default',
+    add(id, name) {
+        const profiles = this.list();
+        if (!profiles.find(p => p.id === id)) {
+            profiles.push({ id, name, createdAt: new Date().toISOString() });
+            localStorage.setItem('classProfiles', JSON.stringify(profiles));
+        }
+    },
+    async switchTo(id) {
+        // 1. 先同步目前班級到雲端
+        if (navigator.onLine) await FirebaseSync.syncToCloud();
+        // 2. 切換
+        localStorage.setItem(ACTIVE_PROFILE_KEY, id);
+        location.reload();
+    }
+};
+```
+
+**Firestore 路徑更新**：`users/{uid}/classes/{profileId}/students/...`
+
+**預估工時**：3-5 天
+**難度**：⭐⭐⭐⭐
+**優先度**：🟢 P2（架構性功能，早做避免後期大改）
+
+---
+
+### P14：PWA 推播通知整合 FCM（預估 3 天）
+
+**需求描述**：老師安裝 PWA 後，即使沒有開啟瀏覽器，也能接收：今日作業截止提醒（早上 07:30）、考試提前 24 小時通知。
+
+```javascript
+// sw.js 新增 Push 監聽
+self.addEventListener('push', event => {
+    const data = event.data?.json() ?? {};
+    event.waitUntil(
+        self.registration.showNotification(data.title || '班級小管家', {
+            body: data.body,
+            icon: './icons/icon-192.png',
+            badge: './icons/badge-72.png',
+            tag: data.tag || 'class-notif',
+            data: { url: data.url || './classnew.html' }
+        })
+    );
+});
+
+self.addEventListener('notificationclick', event => {
+    event.notification.close();
+    event.waitUntil(clients.openWindow(event.notification.data.url));
+});
+```
+
+```javascript
+// Firebase Cloud Functions 排程（每日 07:30 台北時間）
+exports.dailyHomeworkReminder = functions.pubsub
+    .schedule('30 7 * * *').timeZone('Asia/Taipei')
+    .onRun(async () => {
+        const teachers = await getActiveTeachersWithToken();
+        for (const t of teachers) {
+            const due = await getTodayDueHomework(t.uid);
+            if (due.length > 0) {
+                await messaging.send({
+                    token: t.fcmToken,
+                    notification: { title: '📚 今日作業提醒', body: `有 ${due.length} 項作業今日到期！` },
+                    webpush: { fcmOptions: { link: 'https://cagoooo.github.io/class/classnew.html' } }
+                });
+            }
+        }
+    });
+```
+
+**預估工時**：3 天
+**難度**：⭐⭐⭐⭐
+**優先度**：🟢 P2
+
+---
+
+### P15：Console Logger 統一模組（預估 0.5 天，技術債）
+
+**現狀問題**：`console.log()` 散落於所有 JS 模組，正式環境不應輸出但難以全部移除。
+
+```javascript
+// js/logger.js（整合現有 error-handler.js）
+const Logger = {
+    _dev: ['localhost', '127.0.0.1'].includes(location.hostname),
+    debug(...a) { if (this._dev) console.debug('[DBG]', ...a); },
+    log(...a)   { if (this._dev) console.log('[LOG]', ...a); },
+    info(...a)  { if (this._dev) console.info('[INFO]', ...a); },
+    warn(...a)  { console.warn('[WARN]', ...a); },
+    error(...a) {
+        console.error('[ERROR]', ...a);
+        // 未來接 Sentry 或 Firebase Crashlytics
+    },
+    time(l)    { if (this._dev) console.time(l); },
+    timeEnd(l) { if (this._dev) console.timeEnd(l); },
+};
+window.Logger = Logger;
+```
+
+> 💡 **快速批次替換（PowerShell）**：
+> ```powershell
+> Get-ChildItem H:\Class\js -Filter "*.js" | ForEach-Object {
+>     (Get-Content $_.FullName) -replace 'console\.log\(', 'Logger.log(' |
+>     Set-Content $_.FullName -Encoding UTF8
+> }
+> ```
+> ⚠️ 執行後需人工審查重要的 log 訊息是否改用 `Logger.warn` 或 `Logger.error`。
+
+**預估工時**：0.5 天
+**難度**：⭐
+**優先度**：⚙️ 技術債（下次大重構時一起處理）
+
+---
+
+## 📊 P 系列完整優先順序總表（v2.9.9 最終版）
+
+> 此表格整合所有 P 系列新建議，以及之前尚未實作的高優先舊功能，統一排序。
+
+| 優先 | ID | 功能名稱 | 工時 | 效益 | 難度 | 狀態 |
+|------|----|---------|------|------|------|------|
+| 🔴 **P0** | **P11** | **自動定時同步（10 分鐘）** | 0.5 天 | ⭐⭐⭐⭐⭐ | ⭐ | 🔲 |
+| 🔴 **P0** | **P12** | **離線狀態 Banner** | 1 天 | ⭐⭐⭐⭐ | ⭐⭐ | 🔲 |
+| 🔴 **P0** | **P05** | **AI 公告快速生成** | 1 天 | ⭐⭐⭐⭐⭐ | ⭐⭐ | 🔲 |
+| 🔴 **P0** | **P01** | **即時搶答 Buzzer** | 2 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | 🔲 |
+| 🟡 P1 | O04 | 加分記錄清理工具 | 1 天 | ⭐⭐⭐⭐ | ⭐ | 🔲 |
+| 🟡 P1 | O02 | 學期資料歸檔機制 | 2 天 | ⭐⭐⭐⭐⭐ | ⭐⭐ | 🔲 |
+| 🟡 P1 | O05 | 學生成績單 CSV/PDF 匯出 | 3 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | 🔲 |
+| 🟡 P1 | **P10** | **今日快報首頁卡片** | 1.5 天 | ⭐⭐⭐⭐ | ⭐⭐ | 🔲 |
+| 🟡 P1 | **P02** | **鼓勵卡里程碑動畫** | 1 天 | ⭐⭐⭐ | ⭐⭐ | 🔲 |
+| 🟡 P1 | **P07** | **AI 聰明加分建議** | 1.5 天 | ⭐⭐⭐⭐ | ⭐⭐ | 🔲 |
+| 🟡 P1 | K03 | AI 智慧評語生成 | 2 天 | ⭐⭐⭐⭐⭐ | ⭐⭐ | 🔲 |
+| 🟡 P1 | **P06** | **AI 學期總評摘要** | 2 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | 🔲 |
+| 🟡 P1 | **P03** | **課堂問題庫抽題** | 2 天 | ⭐⭐⭐⭐ | ⭐⭐ | 🔲 |
+| 🟡 P1 | **P04** | **分組獨立倒數計時** | 1.5 天 | ⭐⭐⭐ | ⭐⭐ | 🔲 |
+| 🟡 P1 | **P08** | **積分熱力圖** | 2 天 | ⭐⭐⭐ | ⭐⭐ | 🔲 |
+| 🟡 P1 | V05 | 課表管理模組 | 4-5 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | 🔲 |
+| 🟡 P1 | K05 | 班級週報自動生成 | 2 天 | ⭐⭐⭐⭐⭐ | ⭐⭐ | 🔲 |
+| 🟡 P1 | N02 | 課堂廣播全螢幕模式 | 2 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | 🔲 |
+| 🟡 P1 | K01 | 座位表生成器 2.0 | 3 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | 🔲 |
+| 🟡 P1 | K04 | 學生個人頁面 | 3-4 天 | ⭐⭐⭐⭐ | ⭐⭐⭐ | 🔲 |
+| 🟢 P2 | **P09** | **學生雷達圖比較** | 2 天 | ⭐⭐⭐ | ⭐⭐⭐ | 🔲 |
+| 🟢 P2 | **P13** | **多班級 Profile 切換** | 3-5 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | 🔲 |
+| 🟢 P2 | **P14** | **PWA 推播通知（FCM）** | 3 天 | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | 🔲 |
+| 🟢 P2 | L02 | 課堂評量即時回饋（ARS） | 5-7 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | 🔲 |
+| 🟢 P2 | L03 | 家長通知（LINE/Email） | 5-7 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | 🔲 |
+| ⚙️ 技術 | **P15** | Console Logger 統一 | 0.5 天 | ⭐⭐⭐ | ⭐ | 🔲 |
+| ⚙️ 技術 | M02 | 同步衝突 Timestamp 策略 | 1-2 天 | ⭐⭐⭐ | ⭐⭐⭐ | 🔲 |
+| ✅ 完成 | — | IndexedDB `class-db.js` | v2.9.9 | ⭐⭐⭐⭐⭐ | — | ✅ |
+| ✅ 完成 | — | 同步 Modal + 10 類資料 | v2.9.7-9 | ⭐⭐⭐⭐⭐ | — | ✅ |
+| ✅ 完成 | — | PWA + App Check + SW 隔離 | v2.8.x | ⭐⭐⭐⭐ | — | ✅ |
+| ✅ 完成 | — | 骨架屏 + 音效系統 | v2.8.3-4 | ⭐⭐⭐ | — | ✅ |
+
+---
+
+## 🚀 建議下次最優先實作「五步走」
+
+> 以「投入時間最少、立竿見影效益最大」為原則排序，全部合計約 **5 天**。
+
+| 步驟 | ID | 功能名稱 | 工時 | 核心理由 |
+|------|-----|--------|------|---------|
+| 1️⃣ | **P11** | **自動定時同步** | 0.5 天 | 最輕鬆！解決老師最常遇到的「忘記同步」問題，0 學習成本 |
+| 2️⃣ | **P12** | **離線狀態 Banner** | 1 天 | 和 P11 搭配，讓老師清楚知道資料是否安全，消除焦慮 |
+| 3️⃣ | **P05** | **AI 公告快速生成** | 1 天 | Gemini 後端已備，立刻看到 AI 輔助效益，老師驚喜感最強 |
+| 4️⃣ | **O04** | **加分記錄清理工具** | 1 天 | IDB 剛完成，記錄長期累積需要配套的清理工具才實用 |
+| 5️⃣ | **P10** | **今日快報卡片** | 1.5 天 | 每次開啟系統的第一印象升級，顯著提升每日使用黏著度 |
+
+> **💡 五步合計約 5 天工時，卻能帶來：自動化資料保護 + AI 輔助效率 + 每日體驗升級，是目前最高 ROI 的開發組合！**
+
+---
+
+*📝 此文件最終更新於 2026-03-03 19:43 ｜ 當前版本 v2.9.9 ｜ 第八章 P 系列新增於本次更新*

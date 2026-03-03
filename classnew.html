@@ -3593,13 +3593,13 @@
         }
 
         // 視窗大小改變時重新計算
-        window.addEventListener('resize', function() {
+        window.addEventListener('resize', function () {
             if (!document.getElementById('clock-modal').classList.contains('hidden')) {
                 fitClockToScreen();
             }
         });
 
-                // --- 結束全螢幕時鐘功能 ---
+        // --- 結束全螢幕時鐘功能 ---
     </script>
     <!-- 增強模組 -->
     <script src="js/skeleton.js"></script>
@@ -3698,8 +3698,18 @@
         🔄 一鍵更新
     </button>
 
+    <!-- 離線狀態偵測（P12：斷網時頂部 Banner 提示） -->
+    <script src="./js/offline-detector.js"></script>
+    <!-- 自動定時同步（P11：每 10 分鐘自動上傳至 Firebase） -->
+    <script src="./js/auto-sync.js"></script>
+
+    <!-- 手勢操作支援（觸控滑動切換功能區 | 長按快捷選單） -->
+    <script src="./js/gesture-handler.js"></script>
+
     <!-- Google 帳號登入 UI 模組（必須在所有 Firebase 模組之後載入） -->
     <script src="./js/google-auth-ui.js"></script>
+
+
 </body>
 
 </html>

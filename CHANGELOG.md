@@ -1,6 +1,44 @@
 # 班級小管家 Changelog
 
+## [v3.0.0] - 2026-03-03
+
+### 🆕 新增功能
+
+#### ✋ 手勢操作支援（`js/gesture-handler.js`）
+- **觸控左右滑動**切換功能區（學生管理 ↔ 加扣分 ↔ 分組 ↔ 抽籤 ↔ 計時器…），方便平板/手機操作
+- **長按學生卡片**彈出快捷選單（+1分 / +2分 / -1分 / 查看資料），不需進入加扣分頁面
+- **GestureHandler 通用類別**，可供其他模組重用（`new GestureHandler(el, { onSwipeLeft, onLongPress })`）
+- 智慧識別橫向滾動容器，不干擾考試監考科目列等原生滾動
+- 切換功能區時顯示半透明 Toast 提示（如「→ 隨機分組」）
+
+#### ⏱️ 自動定時同步（`js/auto-sync.js`）P11 功能
+- **每 10 分鐘自動呼叫 `syncToCloud()`**，無需手動操作，資料安全有保障
+- **登入後自動啟動**、登出後自動停止，無副作用
+- 從背景切回前台時，若距上次同步超過間隔 → 立即補同步
+- 同步中顯示右上角 ⟳ 旋轉小圓點，完成後顯示底部 Toast
+- 支援動態調整間隔：`AutoSync.setIntervalMin(5)`（1~120 分鐘）
+- 未登入 / 離線 / 已在同步中 → 自動跳過，不報錯
+
+#### 📵 離線狀態偵測（`js/offline-detector.js`）P12 功能
+- 斷網時頂部滑入**黃色警告 Banner**：「目前離線中 — 資料已安全暫存於本機 IndexedDB」
+- 自動調整 `<nav>` 間距，Banner 不遮住導覽列
+- Banner 提供 ✕ 關閉按鈕（僅關閉提示，離線仍持續偵測）
+- 恢復連線時 Banner 自動滑出 + 觸發一次 AutoSync
+- **深色模式相容**：自動切換為棕色色調
+
+### 📁 更新檔案
+- `js/gesture-handler.js` **[新增]** - 手勢操作支援（觸控滑動 + 長按選單）
+- `js/auto-sync.js` **[新增]** - 自動定時同步（P11，每 10 分鐘）
+- `js/offline-detector.js` **[新增]** - 離線狀態偵測 Banner（P12）
+- `classnew.html` - 加入三個新模組的 script 引用
+- `sw.js` - 版本升至 v3.0.0，STATIC_ASSETS 新增三模組快取
+- `manifest.json` - version 升至 3.0.0
+- `FUTURE_DEVELOPMENT_SUGGESTIONS.md` - 新增第八章 P 系列（P01~P15）全新功能建議
+
+---
+
 ## [v2.9.9] - 2026-03-03
+
 
 ### 🆕 新增功能
 
