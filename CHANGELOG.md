@@ -1,6 +1,29 @@
 # 班級小管家 Changelog
 
+## [v2.9.9] - 2026-03-03
+
+### 🆕 新增功能
+
+#### 💾 IndexedDB 儲存模組（`js/class-db.js`）
+- **全新 `ClassDB` 模組**：取代 localStorage 成為主要儲存層，容量從 ~5MB 提升至 250MB+
+- **9 個資料表**：`students` / `pointsHistory` / `groups` / `notebookEntries` / `homeworkList` / `lotteryHistory` / `classAnnouncements` / `examSubjects` / `savedStudentLists`
+- **Settings KV 表**：統一管理所有設定類資料（時鐘/作業/抽籤/同步時間等）
+- **首次自動遷移**：偵測到舊 localStorage 資料時，自動一次性遷移至 IndexedDB，完成後標記避免重複
+- **透明後備機制**：IndexedDB 不可用時自動降級至 localStorage，完全不影響功能
+- **localStorage 同步備份**：每次 `ClassDB.save()` 也同步寫入 localStorage，雙重保護
+- **儲存用量報告**：localhost 開發模式下在 Console 顯示 IDB 用量（MB / 總配額）
+- **`firebase-sync.js` 整合**：`loadFromCloud()` 改用 `ClassDB.save`，確保同步結果也寫入 IDB
+
+### 📁 更新檔案
+- `js/class-db.js` **[新增]** - IndexedDB 模組（完整 CRUD + 自動遷移）
+- `classnew.html` - 加入 `class-db.js` script 引用（firebase-config 之前載入）
+- `js/firebase-sync.js` - `loadFromCloud()` 改用 ClassDB.save
+- `sw.js` / `manifest.json` - 版本號升至 v2.9.9
+
+---
+
 ## [v2.9.8] - 2026-03-03
+
 
 ### 🔧 修復問題
 

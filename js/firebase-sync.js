@@ -319,46 +319,45 @@ async function loadFromCloud() {
     const cloudData = await syncFromCloud();
     if (!cloudData) return false;
 
-    // 主資料覆蓋
-    students = cloudData.students;
-    pointsHistory = cloudData.pointsHistory;
-    groups = cloudData.groups;
-    notebookEntries = cloudData.notebookEntries;
-    homeworkList = cloudData.homeworkList;
-    lotteryHistory = cloudData.lotteryHistory;
-    homeworkChecks = cloudData.homeworkChecks;
+    // 主資料覆蓋（優先使用 ClassDB，自動備份至 localStorage）
+    const dbSave = (typeof ClassDB !== 'undefined' && ClassDB.isReady)
+        ? (k, v) => ClassDB.save(k, v)
+        : (k, v) => localStorage.setItem(k, JSON.stringify(v));
 
-    localStorage.setItem('students', JSON.stringify(students));
-    localStorage.setItem('pointsHistory', JSON.stringify(pointsHistory));
-    localStorage.setItem('groups', JSON.stringify(groups));
-    localStorage.setItem('notebookEntries', JSON.stringify(notebookEntries));
-    localStorage.setItem('homeworkList', JSON.stringify(homeworkList));
-    localStorage.setItem('lotteryHistory', JSON.stringify(lotteryHistory));
-    localStorage.setItem('homeworkChecks', JSON.stringify(homeworkChecks));
+    await Promise.all([
+        dbSave('students', students),
+        dbSave('pointsHistory', pointsHistory),
+        dbSave('groups', groups),
+        dbSave('notebookEntries', notebookEntries),
+        dbSave('homeworkList', homeworkList),
+        dbSave('lotteryHistory', lotteryHistory),
+        dbSave('homeworkChecks', homeworkChecks),
+    ]);
 
     // 公告
     if (cloudData.announcements && cloudData.announcements.length > 0) {
-        localStorage.setItem('classAnnouncements', JSON.stringify(cloudData.announcements));
+        await dbSave('classAnnouncements', cloudData.announcements);
     }
 
     // 考試監考設定
     if (cloudData.examSubjects && cloudData.examSubjects.length > 0) {
-        localStorage.setItem('examSubjects', JSON.stringify(cloudData.examSubjects));
+        await dbSave('examSubjects', cloudData.examSubjects);
     }
     if (cloudData.examReminders) {
-        localStorage.setItem('examReminders', JSON.stringify(cloudData.examReminders));
+        await dbSave('examReminders', cloudData.examReminders);
     }
     if (cloudData.examAttendance && Object.keys(cloudData.examAttendance).length > 0) {
-        localStorage.setItem('examAttendance', JSON.stringify(cloudData.examAttendance));
+        await dbSave('examAttendance', cloudData.examAttendance);
     }
 
     // App 設定
     if (cloudData.clockSettings) {
-        localStorage.setItem('clockSettings', JSON.stringify(cloudData.clockSettings));
+        await dbSave('clockSettings', cloudData.clockSettings);
     }
     if (cloudData.lotterySettings?.noRepeatLottery !== undefined) {
         localStorage.setItem('noRepeatLottery', cloudData.lotterySettings.noRepeatLottery);
     }
+
 
     // 重繪 UI
     if (typeof renderStudents === 'function') renderStudents();
