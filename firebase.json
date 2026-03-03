@@ -1,0 +1,13 @@
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "auth": {
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "班級小管家",
+        "supportEmail": "cagooo@gmail.com"
+      }
+    }
+  }
+}

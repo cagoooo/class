@@ -2,6 +2,7 @@
 *.json
 !manifest.json
 !package.json
+!firebase.json
 
 # 系統檔案
 .DS_Store
