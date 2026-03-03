@@ -1,7 +1,7 @@
 # 班級小管家 - 未來開發建議 📋
 
-> 最後更新：2026-03-03 16:10
-> 當前版本：v2.9.8
+> 最後更新：2026-03-03 18:36
+> 當前版本：v2.9.9
 > 本文件提供詳細的未來優化與開發方向建議，供開發參考
 
 
@@ -220,93 +220,27 @@ function sendExamWarning(minutesLeft) {
 
 ### 🔴 P0：資料持久化增強
 
-#### 6. 🔲 IndexedDB 遷移
-**現狀問題**：
-- localStorage 有 5MB 限制
-- 大量學生資料（含歷史記錄）可能超出限制
-- 無法儲存二進位資料（如學生照片）
+#### ✅ 6. IndexedDB 遷移（已完成 v2.9.9）
 
-**建議方案**：
-```javascript
-// 新增檔案：js/indexed-db.js
-const DB_NAME = 'ClassManagerDB';
-const DB_VERSION = 1;
+**完成內容**：
+- ✅ 建立 `js/class-db.js`（`ClassDB` 模組），儲存容量從 ~5MB 提升至 **250MB+**
+- ✅ 9 個 Array 資料表 + `settings` KV 表，涵蓋全部業務資料
+- ✅ 首次開啟自動從 localStorage 一次性遷移，完成後標記避免重複
+- ✅ 每次 `ClassDB.save()` 同步備份至 localStorage（雙重保護）
+- ✅ IndexedDB 不可用時透明降級至 localStorage，完全不破壞現有功能
+- ✅ `firebase-sync.js` 的 `loadFromCloud()` 已整合 ClassDB.save
+- ✅ localhost 開發模式下 Console 顯示 IDB 用量報告（MB / 總配額）
 
-class ClassDatabase {
-  constructor() {
-    this.db = null;
-  }
-  
-  async init() {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
-      
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
-        this.db = request.result;
-        resolve(this);
-      };
-      
-      request.onupgradeneeded = (event) => {
-        const db = event.target.result;
-        
-        // 學生資料表
-        if (!db.objectStoreNames.contains('students')) {
-          const store = db.createObjectStore('students', { keyPath: 'id' });
-          store.createIndex('name', 'name', { unique: false });
-          store.createIndex('seatNumber', 'seatNumber', { unique: false });
-        }
-        
-        // 考試記錄表
-        if (!db.objectStoreNames.contains('examRecords')) {
-          const store = db.createObjectStore('examRecords', { keyPath: 'id' });
-          store.createIndex('date', 'date', { unique: false });
-        }
-        
-        // 評分歷史表
-        if (!db.objectStoreNames.contains('scoreHistory')) {
-          const store = db.createObjectStore('scoreHistory', { keyPath: 'id' });
-          store.createIndex('studentId', 'studentId', { unique: false });
-          store.createIndex('timestamp', 'timestamp', { unique: false });
-        }
-      };
-    });
-  }
-  
-  async getAll(storeName) {
-    return new Promise((resolve, reject) => {
-      const transaction = this.db.transaction(storeName, 'readonly');
-      const store = transaction.objectStore(storeName);
-      const request = store.getAll();
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result);
-    });
-  }
-  
-  async put(storeName, data) {
-    return new Promise((resolve, reject) => {
-      const transaction = this.db.transaction(storeName, 'readwrite');
-      const store = transaction.objectStore(storeName);
-      const request = store.put(data);
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result);
-    });
-  }
-}
+**後續可擴充**：
+- 搭配學生照片儲存（二進位 Blob 直接存 IDB）
+- 學期結束歸檔機制（舊資料移至 `/archive/{semester}/`）
+- 真實 IDB 分頁讀取（班級人數 > 50 時效能優化）
+- 整合 `enableIndexedDbPersistence` 升級至 Firebase 9 modular API
 
-// 全域實例
-const classDB = new ClassDatabase();
-```
-
-**遷移策略**：
-1. 建立 IndexedDB 架構
-2. 保留 localStorage 作為備份
-3. 首次載入時自動遷移資料
-4. 逐步移除 localStorage 依賴
-
-**預估工時**：5-7 天
+**預估工時**：✅ 已完成
 
 ---
+
 
 ### 🟡 P1：新功能模組
 
@@ -1538,7 +1472,7 @@ const NotificationManager = {
 | 🟡 P1 | S02 多班級 Profile | 3-5 天 | ⭐⭐⭐⭐ | 高 |
 | 🟢 P2 | A02 語音指令控制 | 3 天 | ⭐⭐⭐ | 高 |
 | 🟢 P2 | S03 衝突解析 | 3 天 | ⭐⭐ | 高 |
-| 🟢 P2 | IndexedDB 遷移 | 5-7 天 | ⭐⭐ | 極高 |
+| ⚙️ 技術 | ~~IndexedDB 遷移~~ | ✅ v2.9.9 完成 | ⭐⭐⭐⭐⭐ | - |
 
 > 💡 **建議下一步順序（更新版）**：S01 完整備份（保護資料）→ V03 分數動畫（提升課堂互動感）→ E01 考試公告板 → T01 課表管理
 
@@ -2562,4 +2496,252 @@ document.addEventListener('visibilitychange', () => {
 | ⚙️ 技術 | M03 | IndexedDB Persistence 升級 | 2 天 | ⭐⭐ | ⭐⭐⭐⭐ |
 | ⚙️ 技術 | M04 | PWA 推播通知（FCM） | 2-3 天 | ⭐⭐⭐⭐ | ⭐⭐⭐ |
 | ⚙️ 技術 | M05 | 學期資料歸檔機制 | 2 天 | ⭐⭐⭐ | ⭐⭐⭐ |
+| ✅ 已完成 | ~~IDB 遷移~~ | `js/class-db.js` | v2.9.9 | ⭐⭐⭐⭐⭐ | - |
+
+---
+
+## 🆕 第七章：v2.9.9 之後新增開發建議
+
+> 基於 IndexedDB 模組完成後，可以延伸的功能方向。
+
+---
+
+### 📷 O01：學生照片儲存到 IndexedDB（預估 1.5 天）
+
+**現況問題**：目前學生大頭貼如果使用 Base64 存在 localStorage，很快就會超出 5MB 限制。
+
+**解法**：透過已有的 `ClassDB`，直接把照片 Blob 存入 IDB：
+
+```javascript
+// 在 class-db.js 新增 photos store（DB_VERSION 升至 2）
+if (!idb.objectStoreNames.contains('photos')) {
+    idb.createObjectStore('photos', { keyPath: 'studentId' });
+}
+
+// 儲存照片（Blob 格式，不需要 Base64 轉換）
+async function saveStudentPhoto(studentId, file) {
+    await ClassDB.put('photos', { studentId, blob: file, updatedAt: Date.now() });
+}
+
+// 讀取照片（轉換為 Object URL 顯示）
+async function loadStudentPhoto(studentId) {
+    const record = await ClassDB.getSetting('photo_' + studentId);
+    if (!record) return null;
+    return URL.createObjectURL(record.blob);
+}
+```
+
+**優點**：
+- 照片可達數 MB 各自不互相影響
+- 不再消耗 localStorage 空間
+- 同步至 Firebase Storage（選配）
+
+**預估工時**：1.5 天  
+**難度**：⭐⭐  
+**優先度**：🟡 P1
+
+---
+
+### 🗂️ O02：學期資料歸檔機制（預估 2 天）
+
+**需求描述**：學期結束後，需要保存一份學期記錄，同時清空 IDB 準備新學期。
+
+**建議架構**：
+
+```javascript
+// class-db.js 新增歸檔功能
+async function archiveSemester(semesterLabel) {
+    // semesterLabel 例如 '2025-2nd'
+    const snapshot = {
+        label: semesterLabel,
+        archivedAt: new Date().toISOString(),
+        students:        await ClassDB.getAll('students'),
+        pointsHistory:   await ClassDB.getAll('pointsHistory'),
+        groups:          await ClassDB.getAll('groups'),
+        homeworkList:    await ClassDB.getAll('homeworkList'),
+        lotteryHistory:  await ClassDB.getAll('lotteryHistory'),
+    };
+    // 存入 settings（序列化儲存整學期快照）
+    await ClassDB.setSetting('archive_' + semesterLabel, snapshot);
+
+    // 清空本學期資料（保留 students + settings）
+    await ClassDB.putAll('pointsHistory', []);
+    await ClassDB.putAll('homeworkList', []);
+    await ClassDB.putAll('lotteryHistory', []);
+    console.log(`✅ 學期 ${semesterLabel} 已歸檔`);
+}
+
+// 查看歸檔列表
+async function listArchives() {
+    // 讀取所有以 archive_ 開頭的 setting key
+}
+```
+
+**UI 整合**：在設定頁加入「📦 學期結束歸檔」按鈕，確認後執行，並可瀏覽歷史學期記錄。
+
+**預估工時**：2 天  
+**難度**：⭐⭐  
+**優先度**：🟡 P1
+
+---
+
+### 💡 O03：ClassDB 儲存用量儀表板（預估 1 天）
+
+**需求描述**：讓老師清楚知道目前各類資料佔用多少空間，及何時需要清理。
+
+**建議 UI**：在「設定」頁加入儲存用量卡片：
+
+```
+┌─────────────────────────────────────┐
+│  💾 儲存用量                         │
+│  IndexedDB：12.5 MB / 250 MB (5%)   │
+│  ├── 學生名單    0.2 MB  ████░      │
+│  ├── 加分記錄    8.3 MB  ████████░  │
+│  ├── 照片        3.7 MB  ███░       │
+│  └── 其他        0.3 MB  ██░        │
+│  [ 🗑️ 清理舊記錄 ]  [ 📦 歸檔學期 ]  │
+└─────────────────────────────────────┘
+```
+
+**建議實作**：
+
+```javascript
+async function getDetailedStorageReport() {
+    const report = await ClassDB.getStorageReport();
+    const storeCounts = {};
+    for (const name of ['students','pointsHistory','groups','homeworkList','lotteryHistory']) {
+        const items = await ClassDB.getAll(name);
+        storeCounts[name] = items.length;
+    }
+    return { ...report, storeCounts };
+}
+```
+
+**預估工時**：1 天  
+**難度**：⭐  
+**優先度**：🟢 P2
+
+---
+
+### 🧹 O04：加分記錄清理工具（預估 1 天）
+
+**需求描述**：長期使用後，`pointsHistory` 可能累積數千筆，需要定期清理。
+
+**建議功能**：
+- 顯示「最舊記錄日期」和「記錄總筆數」
+- 提供「保留最近 30 天」「保留本學期」「全部清除」三個選項
+- 清理前自動歸檔到 settings（以防反悔）
+
+```javascript
+async function cleanOldHistory(keepDays = 30) {
+    const all = await ClassDB.getAll('pointsHistory');
+    const cutoff = Date.now() - keepDays * 86400000;
+    // 先備份
+    await ClassDB.setSetting('history_backup_' + Date.now(), all);
+    // 只保留 cutoff 之後的記錄
+    const kept = all.filter(h => new Date(h.time).getTime() > cutoff);
+    await ClassDB.putAll('pointsHistory', kept);
+    return { removed: all.length - kept.length, kept: kept.length };
+}
+```
+
+**預估工時**：1 天  
+**難度**：⭐  
+**優先度**：🟡 P1
+
+---
+
+### 🖨️ O05：學生成績單 / 報表匯出（預估 3 天）
+
+**需求描述**：學期末需要產出每位學生的個人加減分報告，供紙本存檔或交給家長。
+
+**建議功能**：
+- 個別學生：點開個人記錄 → 「匯出 PDF」（使用 `window.print` 或 `jsPDF`）
+- 全班：一鍵產出「全班加分報告 Excel」（CSV 格式，可在 Excel 開啟）
+
+```javascript
+// 匯出個人報告（print-friendly HTML）
+function printStudentReport(studentId) {
+    const s = students.find(x => x.id === studentId);
+    const history = pointsHistory.filter(h => h.studentId === studentId)
+        .sort((a, b) => new Date(b.time) - new Date(a.time));
+    const html = `
+        <h1>${s.name} 的加扣分記錄</h1>
+        <p>總積分：${s.score} 分</p>
+        <table>
+            <tr><th>日期</th><th>項目</th><th>分數</th></tr>
+            ${history.map(h =>
+                `<tr><td>${new Date(h.time).toLocaleString('zh-TW')}</td>
+                 <td>${h.reason}</td>
+                 <td>${h.points > 0 ? '+' : ''}${h.points}</td></tr>`
+            ).join('')}
+        </table>`;
+    const w = window.open('', '_blank');
+    w.document.write(`<html><head><title>${s.name}報告</title>
+        <style>body{font-family:sans-serif}table{border-collapse:collapse;width:100%}
+        th,td{border:1px solid #ccc;padding:6px 12px}@media print{button{display:none}}</style>
+        </head><body>${html}<br><button onclick="window.print()">🖨️ 列印</button></body></html>`);
+}
+
+// 全班 CSV 匯出
+function exportAllAsCSV() {
+    const rows = [['座號','姓名','總積分','加分筆數','扣分筆數']];
+    students.forEach(s => {
+        const hist = pointsHistory.filter(h => h.studentId === s.id);
+        rows.push([s.seatNumber, s.name, s.score,
+            hist.filter(h => h.points > 0).length,
+            hist.filter(h => h.points < 0).length]);
+    });
+    const csv = rows.map(r => r.join(',')).join('\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+    const a = Object.assign(document.createElement('a'), {
+        href: URL.createObjectURL(blob), download: `全班報告_${new Date().toLocaleDateString('zh-TW')}.csv`
+    });
+    a.click();
+}
+```
+
+**預估工時**：3 天  
+**難度**：⭐⭐⭐  
+**優先度**：🟡 P1
+
+---
+
+## 📊 完整優先順序總表（v2.9.9 最終版）
+
+| 優先 | ID | 功能名稱 | 預估時間 | 效益 | 難度 |
+|------|----|---------|---------|------|------|
+| 🔴 P0 | **N04** | **自動定時同步（10 分鐘）** | 0.5 天 | ⭐⭐⭐⭐⭐ | ⭐ |
+| 🔴 P0 | J02 | 離線狀態提示 Banner | 1 天 | ⭐⭐⭐⭐ | ⭐⭐ |
+| 🟡 P1 | K03 | AI 智慧評語生成 | 2 天 | ⭐⭐⭐⭐⭐ | ⭐⭐ |
+| 🟡 P1 | V03 | 分數浮動動畫 | 1.5 天 | ⭐⭐⭐ | ⭐ |
+| 🟡 P1 | **O05** | **學生成績單 CSV/PDF 匯出** | 3 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
+| 🟡 P1 | **O04** | **加分記錄清理工具** | 1 天 | ⭐⭐⭐⭐ | ⭐ |
+| 🟡 P1 | **O02** | **學期資料歸檔機制** | 2 天 | ⭐⭐⭐⭐⭐ | ⭐⭐ |
+| 🟡 P1 | **O01** | **學生照片存 IDB** | 1.5 天 | ⭐⭐⭐⭐ | ⭐⭐ |
+| 🟡 P1 | V05 | 課表管理模組 | 4-5 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
+| 🟡 P1 | K05 | 班級週報自動生成 | 2 天 | ⭐⭐⭐⭐⭐ | ⭐⭐ |
+| 🟡 P1 | **N01** | **同步選擇性備份** | 1.5 天 | ⭐⭐⭐⭐ | ⭐⭐ |
+| 🟡 P1 | **N02** | **課堂廣播全螢幕模式** | 2 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
+| 🟡 P1 | **N05** | **深色模式完整審查** | 2 天 | ⭐⭐⭐ | ⭐⭐ |
+| 🟡 P1 | K01 | 座位表生成器 2.0 | 3 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
+| 🟡 P1 | K02 | 隨機抽人 2.0 | 2-3 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
+| 🟡 P1 | K04 | 學生個人頁面 | 3-4 天 | ⭐⭐⭐⭐ | ⭐⭐⭐ |
+| 🟢 P2 | **N03** | **學生卡片 + QR Code** | 2 天 | ⭐⭐⭐⭐ | ⭐⭐⭐ |
+| 🟢 P2 | **O03** | **IDB 儲存用量儀表板** | 1 天 | ⭐⭐⭐ | ⭐ |
+| 🟢 P2 | L01 | 學生端唯讀視圖 | 4-5 天 | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
+| 🟢 P2 | L02 | 課堂評量即時回饋（ARS） | 5-7 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+| 🟢 P2 | L03 | 家長通知（LINE/Email） | 5-7 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
+| 🟢 P2 | J03 | 多班級支援 | 3-5 天 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
+| 🟢 P2 | A02 | 語音指令控制 | 3 天 | ⭐⭐⭐ | ⭐⭐⭐⭐ |
+| ⚙️ 技術 | M02 | 同步衝突 Timestamp 策略 | 1-2 天 | ⭐⭐⭐ | ⭐⭐⭐ |
+| ⚙️ 技術 | M04 | PWA 推播通知（FCM） | 2-3 天 | ⭐⭐⭐⭐ | ⭐⭐⭐ |
+| ⚙️ 技術 | M05 | 學期資料歸檔機制（IDB 版）| 2 天 | ⭐⭐⭐ | ⭐⭐⭐ |
+| ✅ 已完成 | IDB 遷移 | `class-db.js` | v2.9.9 | ⭐⭐⭐⭐⭐ | - |
+
+> 💡 **建議下次最優先實作**：
+> 1. **N04 自動定時同步**（0.5 天）- 最輕鬆，效益最高
+> 2. **O04 加分記錄清理工具**（1 天）- 配合 IDB 長期使用的必備工具
+> 3. **O05 成績單 CSV 匯出**（3 天）- 學期末最實用，老師最需要
+> 4. **K03 AI 評語生成**（2 天）- Gemini 後端已備，最快產出高價值功能
 
