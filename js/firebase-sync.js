@@ -227,15 +227,33 @@ async function syncToCloud() {
             uploadSingleDoc(COLLECTIONS.APP_SETTINGS, 'lottery', { noRepeatLottery: noRepeat }),
         ]);
 
-        // 作業繳交狀態（特殊結構）
+        // 作業繳交狀態（特殊結構）— 使用動態路徑（修正多班級漏洞）
         if (homeworkChecks && Object.keys(homeworkChecks).length > 0) {
-            const checksCol = db.collection('users').doc(userId).collection(COLLECTIONS.HOMEWORK_CHECKS);
-            for (const [hwId, checks] of Object.entries(homeworkChecks)) {
-                await checksCol.doc(String(hwId)).set({
-                    checks,
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
+            const checksCol = getUserCollection(COLLECTIONS.HOMEWORK_CHECKS);
+            if (checksCol) {
+                for (const [hwId, checks] of Object.entries(homeworkChecks)) {
+                    await checksCol.doc(String(hwId)).set({
+                        checks,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
             }
+        }
+
+        // 同步班級清單（classProfiles）到雲端 meta 節點，確保多裝置可識別所有班級
+        // 路徑：users/{uid}/_meta/classProfiles（不受多班級路徑影響，固定全域）
+        try {
+            const db = window.FirebaseConfig.getDb();
+            const userId = window.FirebaseConfig.getCurrentUserId();
+            const profiles = JSON.parse(localStorage.getItem('classProfiles') || '[]');
+            if (profiles.length > 0) {
+                await db.collection('users').doc(userId)
+                    .collection('_meta').doc('classProfiles')
+                    .set({ profiles, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                console.log('[MultiClass] classProfiles 已同步至雲端');
+            }
+        } catch (e) {
+            console.warn('[MultiClass] classProfiles 同步失敗（非致命）:', e);
         }
 
         syncStatus.lastSyncTime = new Date();
@@ -290,11 +308,23 @@ async function syncFromCloud() {
             downloadSingleDoc(COLLECTIONS.APP_SETTINGS, 'lottery'),
         ]);
 
-        // 作業繳交狀態
-        const checksSnap = await db.collection('users').doc(userId)
-            .collection(COLLECTIONS.HOMEWORK_CHECKS).get();
+        // 作業繳交狀態 — 使用動態路徑（修正多班級漏洞）
+        const checksCol = getUserCollection(COLLECTIONS.HOMEWORK_CHECKS);
         const cloudChecks = {};
-        checksSnap.forEach(doc => { cloudChecks[doc.id] = doc.data().checks || {}; });
+        if (checksCol) {
+            const checksSnap = await checksCol.get();
+            checksSnap.forEach(doc => { cloudChecks[doc.id] = doc.data().checks || {}; });
+        }
+
+        // 下載班級清單 classProfiles（全域 meta 節點）
+        let cloudProfiles = null;
+        try {
+            const db = window.FirebaseConfig.getDb();
+            const userId = window.FirebaseConfig.getCurrentUserId();
+            const metaDoc = await db.collection('users').doc(userId)
+                .collection('_meta').doc('classProfiles').get();
+            if (metaDoc.exists) cloudProfiles = metaDoc.data().profiles;
+        } catch (e) { /* 無 meta 則略過 */ }
 
         typeof LoadingIndicator !== 'undefined' && LoadingIndicator.hide();
 
@@ -312,7 +342,9 @@ async function syncFromCloud() {
             examAttendance: examAttendDoc?.data ?? {},
             clockSettings: clockDoc ?? null,
             lotterySettings: lotterySettingDoc ?? null,
+            classProfiles: cloudProfiles,  // ← 新增：帶回班級清單
         };
+
     } catch (error) {
         console.error('下載失敗:', error);
         typeof LoadingIndicator !== 'undefined' && LoadingIndicator.hide();
@@ -334,14 +366,30 @@ async function loadFromCloud() {
         : (k, v) => localStorage.setItem(k, JSON.stringify(v));
 
     await Promise.all([
-        dbSave('students', students),
-        dbSave('pointsHistory', pointsHistory),
-        dbSave('groups', groups),
-        dbSave('notebookEntries', notebookEntries),
-        dbSave('homeworkList', homeworkList),
-        dbSave('lotteryHistory', lotteryHistory),
-        dbSave('homeworkChecks', homeworkChecks),
+        dbSave('students', cloudData.students),
+        dbSave('pointsHistory', cloudData.pointsHistory),
+        dbSave('groups', cloudData.groups),
+        dbSave('notebookEntries', cloudData.notebookEntries),
+        dbSave('homeworkList', cloudData.homeworkList),
+        dbSave('lotteryHistory', cloudData.lotteryHistory),
+        dbSave('homeworkChecks', cloudData.homeworkChecks),
     ]);
+
+    // 還原班級清單 classProfiles（若雲端有、本地沒有或版本較舊，則合併）
+    if (cloudData.classProfiles && Array.isArray(cloudData.classProfiles)) {
+        try {
+            const localRaw = localStorage.getItem('classProfiles');
+            const localProfiles = localRaw ? JSON.parse(localRaw) : [];
+            // 合併：以雲端為基礎，本地有但雲端沒有的也保留
+            const cloudIds = new Set(cloudData.classProfiles.map(p => p.id));
+            const localOnlyProfiles = localProfiles.filter(p => !cloudIds.has(p.id));
+            const merged = [...cloudData.classProfiles, ...localOnlyProfiles];
+            localStorage.setItem('classProfiles', JSON.stringify(merged));
+            console.log(`[MultiClass] 已還原 classProfiles（${merged.length} 個班級）`);
+        } catch (e) {
+            console.warn('[MultiClass] classProfiles 還原失敗:', e);
+        }
+    }
 
     // 公告
     if (cloudData.announcements && cloudData.announcements.length > 0) {
