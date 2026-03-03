@@ -362,6 +362,7 @@ async function loadFromCloud() {
 
     // 重繪 UI
     if (typeof renderStudents === 'function') renderStudents();
+    if (typeof renderGroups === 'function') renderGroups();          // ← 補上分組重繪
     if (typeof renderNotebook === 'function') renderNotebook();
     if (typeof renderHomework === 'function') renderHomework();
     if (typeof renderLotteryHistory === 'function') renderLotteryHistory();
