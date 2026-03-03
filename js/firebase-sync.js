@@ -169,7 +169,7 @@ function getLocalStats() {
         homeworkChecks: Object.keys(homeworkChecks || {}).length,
         lotteryHistory: (lotteryHistory || []).length,
         announcements: annData.length,
-        examData: examData ? (examData.length || (typeof examData === 'object' ? 1 : 0)) : 0,
+        examData: Array.isArray(examData) ? examData.length : (examData ? 1 : 0),
         clockSettings: clockSet ? 1 : 0,
     };
 }
@@ -585,7 +585,7 @@ function getCloudStats(cloudData) {
         homeworkChecks: Object.keys(cloudData.homeworkChecks || {}).length,
         lotteryHistory: (cloudData.lotteryHistory || []).length,
         announcements: (cloudData.announcements || []).length,
-        examData: (Array.isArray(examSubjects) && examSubjects.length) ? 1 : 0,
+        examData: Array.isArray(examSubjects) ? examSubjects.length : (examSubjects ? 1 : 0),
         clockSettings: cloudData.clockSettings ? 1 : 0,
     };
 }

@@ -225,11 +225,6 @@
     function addToggleButton() {
         if (document.getElementById('themeToggleBtn')) return;
 
-        // 創建固定定位的按鈕容器，避免干擾導覽列其他元素
-        const wrapper = document.createElement('div');
-        wrapper.id = 'themeToggleWrapper';
-        wrapper.style.cssText = 'position: fixed; top: 1rem; right: 1rem; z-index: 1000;';
-
         const btn = document.createElement('button');
         btn.id = 'themeToggleBtn';
         btn.className = 'theme-toggle-btn';
@@ -241,8 +236,32 @@
             toggleTheme();
         };
 
-        wrapper.appendChild(btn);
-        document.body.appendChild(wrapper);
+        // 優先插入桌面版 slot
+        const desktopSlot = document.getElementById('theme-toggle-slot');
+        if (desktopSlot) {
+            desktopSlot.appendChild(btn);
+
+            // 手機版：複製一份小型按鈕
+            const mobileSlot = document.getElementById('theme-toggle-slot-mobile');
+            if (mobileSlot) {
+                const btnM = btn.cloneNode(true);
+                btnM.id = 'themeToggleBtnMobile';
+                btnM.style.cssText = 'width:34px;height:34px;font-size:1rem;';
+                btnM.onclick = function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleTheme();
+                };
+                mobileSlot.appendChild(btnM);
+            }
+        } else {
+            // 後備：fixed 定位，但往左移避開頭像（頭像約佔 right:0~3rem）
+            const wrapper = document.createElement('div');
+            wrapper.id = 'themeToggleWrapper';
+            wrapper.style.cssText = 'position:fixed;top:0.75rem;right:5rem;z-index:900;';
+            wrapper.appendChild(btn);
+            document.body.appendChild(wrapper);
+        }
     }
 
     // 初始化
