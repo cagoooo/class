@@ -239,9 +239,7 @@
             white-space: nowrap;
             line-height: 0.95;
             letter-spacing: -0.02em;
-            display: block;
-            width: max-content;
-            max-width: 100%;
+            display: inline-block;
         }
 
         .clock-style-digital .date-display {
@@ -300,9 +298,7 @@
             color: #ec4899;
             text-shadow: 4px 4px 0 #ffffff, 6px 6px 0 rgba(0, 0, 0, 0.08);
             line-height: 0.95;
-            display: block;
-            width: max-content;
-            max-width: 100%;
+            display: inline-block;
         }
 
         .clock-style-cute .date-display {
@@ -3530,46 +3526,68 @@
             }
         }
 
-        // ─────────────────────────────────────────
-        // 動態計算最佳時鐘字體大小（精確填滿可用空間）
-        // ─────────────────────────────────────────
+        // ─────────────────────────────────────────────────────────────
+        // fitClockToScreen v2：精確量測法，支援所有 4 種時鐘樣式
+        // ─────────────────────────────────────────────────────────────
         function fitClockToScreen() {
-            const timeEl = document.querySelector('#big-clock-display .time-display');
-            if (!timeEl) return;
-
             const controls = document.getElementById('clock-controls');
             const controlsH = controls ? controls.getBoundingClientRect().height : 130;
-            const dateEl = document.querySelector('#big-clock-display .date-display');
-            const dateH = (dateEl && dateEl.textContent) ? 
-                          (window.innerHeight * 0.085) : 0; // 日期約佔 8.5vh
+            const displayEl = document.getElementById('big-clock-display');
+            if (!displayEl) return;
 
-            // 可用高度（扣掉控制列和日期）
-            const availH = window.innerHeight - controlsH - dateH - 24; // 24px margin
-            // 可用寬度（95% 視窗寬）
-            const availW = window.innerWidth * 0.94;
+            // 日期高度（量測實際值）
+            const dateEl = displayEl.querySelector('.date-display');
+            const dateH = (dateEl && dateEl.textContent.trim())
+                ? (dateEl.getBoundingClientRect().height || window.innerHeight * 0.09)
+                : 0;
 
-            // 取得目前顯示的時間文字，計算字元寬度比例
-            const text = timeEl.textContent || '00:00:00';
-            // 一般等寬字型數字寬高比約 0.58；冒號約 0.3
-            const charCount = text.length;
-            const digits = (text.match(/d/g) || []).length;
-            const colons = (text.match(/:/g) || []).length;
-            // 估算 em 單位下的字串寬度
-            const style = window.getComputedStyle(timeEl);
-            const lsRatio = parseFloat(style.letterSpacing) / parseFloat(style.fontSize) || -0.02;
-            const estimatedWidthInEm = digits * 0.57 + colons * 0.28 + charCount * lsRatio * 0.5;
+            const availH = window.innerHeight - controlsH - dateH - 28; // 28px 上下邊距
+            const availW = window.innerWidth * 0.96;
 
-            // 由寬度限制計算最大字體
-            const maxFontByWidth = estimatedWidthInEm > 0 ? availW / estimatedWidthInEm : availW / 4.5;
-            // 由高度限制計算最大字體（time-display line-height ~0.95）
-            const maxFontByHeight = availH * 0.92;
+            const style = clockSettings.style;
 
-            // 取最小值（確保兩個方向都不溢出）
-            let optimalSize = Math.min(maxFontByWidth, maxFontByHeight);
-            // 安全限制
-            optimalSize = Math.max(40, Math.min(optimalSize, 600)); // 最小 40px，最大 600px
+            if (style === 'flip') {
+                // ── 翻轉時鐘：算 6 個 flipper + 2 個冒號的字體
+                // flipper width = 0.6em，group margin = ~0.3em×2，冒號 0.4em
+                // 全寬 ≈ 6×0.60 + 2×0.30×2 + 2×0.40 = 3.60+1.20+0.80 = 5.60em
+                const fontByW = availW / 5.6;
+                // 高度：flipper-card height = 1.1em（line-height = 1.1）
+                const fontByH = availH / 1.15;
+                let optimal = Math.min(fontByW, fontByH);
+                optimal = Math.max(40, Math.min(optimal, 500));
 
-            timeEl.style.fontSize = optimalSize + 'px';
+                displayEl.querySelectorAll('.flipper').forEach(f => {
+                    f.style.fontSize = optimal + 'px';
+                });
+                displayEl.querySelectorAll('.flipper-colon').forEach(c => {
+                    c.style.fontSize = optimal + 'px';
+                });
+            } else {
+                // ── 文字時鐘（digital / led / cute）：先設 200px，量實際寬，再縮比例
+                const timeEl = displayEl.querySelector('.time-display');
+                if (!timeEl) return;
+
+                // Step 1：設基準字體 200px（不可見，避免閃爍）
+                const prevFs = timeEl.style.fontSize;
+                timeEl.style.fontSize = '200px';
+                timeEl.style.visibility = 'hidden';
+
+                // Step 2：強制 reflow 後量測
+                const actualW = timeEl.scrollWidth;
+                const actualH = timeEl.scrollHeight;
+
+                // Step 3：計算縮放比
+                const scaleByW = actualW > 0 ? availW / actualW : 1;
+                const scaleByH = actualH > 0 ? availH / actualH : 1;
+                const scale = Math.min(scaleByW, scaleByH);
+
+                let optimal = Math.round(200 * scale);
+                optimal = Math.max(40, Math.min(optimal, 500));
+
+                // Step 4：套用最佳字體
+                timeEl.style.fontSize = optimal + 'px';
+                timeEl.style.visibility = '';
+            }
         }
 
         // 視窗大小改變時重新計算
