@@ -618,9 +618,7 @@
                 </div>
 
                 <!-- 中間：時鐘按鈕（手機置中、桌面絕對置中） -->
-                <!-- 桌面版用 absolute 置中，加大 mx-auto + pointer-events-auto 確保可點擊 -->
-                <div
-                    class="flex justify-center mt-2 lg:mt-0 lg:absolute lg:left-1/2 lg:top-1/2 lg:-translate-x-1/2 lg:-translate-y-1/2">
+                <div class="flex justify-center mt-2 lg:mt-0 lg:absolute lg:left-1/2 lg:transform lg:-translate-x-1/2">
                     <button onclick="openBigClock()" title="點擊展開全螢幕時鐘"
                         class="group flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-4 py-2 rounded-xl shadow-md hover:shadow-lg hover:from-blue-600 hover:to-indigo-600 transition-all duration-300 active:scale-95">
                         <!-- 時間顯示 -->
