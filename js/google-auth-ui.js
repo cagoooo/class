@@ -576,38 +576,41 @@
         },
 
         async syncUp() {
+            // 關閉下拉選單
             const dd = document.getElementById('gauth-dropdown');
             if (dd) dd.classList.remove('open');
+            const ddM = document.getElementById('gauth-dropdown-mobile');
+            if (ddM) ddM.style.display = 'none';
+
             if (!window.FirebaseConfig.isConnected()) {
                 NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號');
                 return;
             }
-            setSyncing(true);
-            await window.FirebaseSync.syncToCloud();
-            setSyncing(false);
-            refreshSyncTime();
+            // 呼叫新的詳細差異預覽 Modal
+            const ok = await window.FirebaseSync.showSyncConfirmModal('upload');
+            if (ok) {
+                setSyncing(false);
+                refreshSyncTime();
+            }
         },
 
         async syncDown() {
+            // 關閉下拉選單
             const dd = document.getElementById('gauth-dropdown');
             if (dd) dd.classList.remove('open');
+            const ddM = document.getElementById('gauth-dropdown-mobile');
+            if (ddM) ddM.style.display = 'none';
+
             if (!window.FirebaseConfig.isConnected()) {
                 NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號');
                 return;
             }
-            const confirmed = await showModal(
-                '從雲端還原',
-                '這將用雲端資料覆蓋本地資料，本地未同步的異動將遺失。確定繼續嗎？',
-                [
-                    { label: '📥 確定還原', cls: 'gauth-btn-primary', value: true },
-                    { label: '取消', cls: 'gauth-btn-secondary', value: false },
-                ]
-            );
-            if (!confirmed) return;
-            setSyncing(true);
-            await window.FirebaseSync.loadFromCloud();
-            setSyncing(false);
-            refreshSyncTime();
+            // 呼叫新的詳細差異預覽 Modal（還原方向）
+            const ok = await window.FirebaseSync.showSyncConfirmModal('download');
+            if (ok) {
+                setSyncing(false);
+                refreshSyncTime();
+            }
         },
     };
 
