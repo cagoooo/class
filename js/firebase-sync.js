@@ -801,10 +801,11 @@ async function syncAllClassesToCloud() {
     if (syncStatus.isSyncing) { console.warn('同步進行中...'); return false; }
 
     const profiles = JSON.parse(localStorage.getItem('classProfiles') || '[]');
-    // 加上預設班級
+    // 加上預設班級，並過濾掉 profiles 中 id 已是 'default' 的班級（避免重複同步同一路徑）
+    const nonDefaultProfiles = profiles.filter(p => String(p.id) !== 'default');
     const allClasses = [
-        { id: 'default', name: '預設班級' },
-        ...profiles
+        { id: 'default', name: profiles.find(p => String(p.id) === 'default')?.name || '預設班級' },
+        ...nonDefaultProfiles
     ];
 
     const originalClassId = localStorage.getItem('currentClassId') || 'default';
