@@ -348,16 +348,24 @@
         const mobileTarget = document.getElementById('class-selector-slot-mobile');
         if (mobileTarget) {
             mobileTarget.innerHTML = `
-                <button id="class-selector-btn-mobile" onclick="ClassProfiles.toggleDropdown()"
-                    title="${_esc(_getCurrentName())}"
-                    style="
-                        display:flex;align-items:center;gap:3px;
-                        padding:5px 8px;background:linear-gradient(135deg,#6366f1,#818cf8);
-                        border:none;border-radius:50px;cursor:pointer;font-size:0.75rem;
-                        font-weight:700;color:#fff;box-shadow:0 2px 8px rgba(99,102,241,0.35);
-                    ">
-                    📚
-                </button>
+                <div id="class-selector-wrap-mobile" style="position:relative;display:inline-flex;align-items:center;">
+                    <button id="class-selector-btn-mobile" onclick="ClassProfiles.toggleDropdown()"
+                        title="${_esc(_getCurrentName())}"
+                        style="
+                            display:flex;align-items:center;gap:3px;
+                            padding:5px 8px;background:linear-gradient(135deg,#6366f1,#818cf8);
+                            border:none;border-radius:50px;cursor:pointer;font-size:0.75rem;
+                            font-weight:700;color:#fff;box-shadow:0 2px 8px rgba(99,102,241,0.35);
+                        ">
+                        📚
+                    </button>
+                    <div id="class-selector-dropdown-mobile"
+                        style="display:none;position:absolute;top:calc(100% + 8px);left:0;right:auto;min-width:210px;
+                               background:#fff;border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.18);
+                               overflow:hidden;z-index:9998;animation:csFadeIn .18s ease;">
+                        ${renderDropdown()}
+                    </div>
+                </div>
             `;
         }
 
@@ -395,11 +403,18 @@
             });
         }
 
-        // 點外部關閉下拉
+        // 點外部關閉下拉（桌面版 + 手機版）
         document.addEventListener('click', e => {
+            // 桌面版
             const wrap = document.getElementById('class-selector-wrap');
             if (wrap && !wrap.contains(e.target)) {
                 document.getElementById('class-selector-dropdown')?.classList.remove('open');
+            }
+            // 手機版
+            const wrapMobile = document.getElementById('class-selector-wrap-mobile');
+            if (wrapMobile && !wrapMobile.contains(e.target)) {
+                const ddm = document.getElementById('class-selector-dropdown-mobile');
+                if (ddm) ddm.style.display = 'none';
             }
         });
     }
@@ -464,14 +479,37 @@
         getFirebasePath: () => getFirebasePath(getCurrentId()),
 
         toggleDropdown() {
+            // 偵測目前顯示的是桌面版還是手機版
             const dd = document.getElementById('class-selector-dropdown');
-            if (!dd) return;
-            const isOpen = dd.classList.contains('open');
-            if (!isOpen) {
-                // 更新選單內容
-                dd.innerHTML = renderDropdown();
+            const ddm = document.getElementById('class-selector-dropdown-mobile');
+
+            // 桌面版（元素存在且父容器可見）
+            const desktopWrap = document.getElementById('class-selector-wrap');
+            if (dd && desktopWrap && desktopWrap.offsetParent !== null) {
+                const isOpen = dd.classList.contains('open');
+                if (!isOpen) {
+                    dd.innerHTML = renderDropdown();
+                }
+                dd.classList.toggle('open');
+                // 關閉手機版（若有）
+                if (ddm) ddm.style.display = 'none';
+                return;
             }
-            dd.classList.toggle('open');
+
+            // 手機版
+            if (ddm) {
+                const isOpen = ddm.style.display === 'block';
+                if (!isOpen) {
+                    // 更新選單內容
+                    ddm.innerHTML = renderDropdown();
+                    ddm.style.display = 'block';
+                } else {
+                    ddm.style.display = 'none';
+                }
+                // 關閉桌面版（若有）
+                if (dd) dd.classList.remove('open');
+                return;
+            }
         },
 
         /** 切換班級（核心） */
@@ -479,6 +517,8 @@
             const curId = getCurrentId();
             if (id === curId) {
                 document.getElementById('class-selector-dropdown')?.classList.remove('open');
+                const ddm = document.getElementById('class-selector-dropdown-mobile');
+                if (ddm) ddm.style.display = 'none';
                 return;
             }
 
@@ -551,6 +591,8 @@
 
         async _uiAdd() {
             document.getElementById('class-selector-dropdown')?.classList.remove('open');
+            const ddmA = document.getElementById('class-selector-dropdown-mobile');
+            if (ddmA) ddmA.style.display = 'none';
             const name = await showInputModal(
                 '➕ 新增班級',
                 '輸入新班級名稱（如「502班」、「英文B組」）'
@@ -572,6 +614,8 @@
 
         async _uiRename() {
             document.getElementById('class-selector-dropdown')?.classList.remove('open');
+            const ddmR = document.getElementById('class-selector-dropdown-mobile');
+            if (ddmR) ddmR.style.display = 'none';
             const curProfile = this.currentProfile();
             if (!curProfile) return;
 
@@ -594,6 +638,8 @@
 
         async _uiDelete() {
             document.getElementById('class-selector-dropdown')?.classList.remove('open');
+            const ddmD = document.getElementById('class-selector-dropdown-mobile');
+            if (ddmD) ddmD.style.display = 'none';
             const curProfile = this.currentProfile();
             if (!curProfile || curProfile.id === DEFAULT_ID) return;
 

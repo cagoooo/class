@@ -19,12 +19,13 @@ const COLLECTIONS = {
     APP_SETTINGS: 'appSettings',   // 各類 App 設定（時鐘、抽籤等）
 };
 
-// 同步狀態
-let syncStatus = {
+// 同步狀態（掛到 window，讓 auto-sync.js 能正確讀到 isSyncing）
+window.syncStatus = window.syncStatus || {
     lastSyncTime: null,
     isSyncing: false,
     pendingChanges: []
 };
+const syncStatus = window.syncStatus;
 
 /**
  * 取得用戶的資料集合參考
@@ -354,79 +355,105 @@ async function syncFromCloud() {
 }
 
 // ─────────────────────────────────────────────────────
-// 從雲端還原並覆蓋本地
+// 從雲端還原並覆蓋本地（核心覆蓋邏輯，接受已下載的 cloudData）
 // ─────────────────────────────────────────────────────
+async function loadFromCloudData(cloudData) {
+    if (!cloudData) return false;
+    // 防止並行執行
+    if (syncStatus.isSyncing) {
+        console.warn('[Sync] 同步進行中，跳過 loadFromCloudData');
+        return false;
+    }
+    syncStatus.isSyncing = true;
+    try {
+        // 主資料覆蓋（優先使用 ClassDB，自動備份至 localStorage）
+        const dbSave = (typeof ClassDB !== 'undefined' && ClassDB.isReady)
+            ? (k, v) => ClassDB.save(k, v)
+            : (k, v) => localStorage.setItem(k, JSON.stringify(v));
+
+        await Promise.all([
+            dbSave('students', cloudData.students),
+            dbSave('pointsHistory', cloudData.pointsHistory),
+            dbSave('groups', cloudData.groups),
+            dbSave('notebookEntries', cloudData.notebookEntries),
+            dbSave('homeworkList', cloudData.homeworkList),
+            dbSave('lotteryHistory', cloudData.lotteryHistory),
+            dbSave('homeworkChecks', cloudData.homeworkChecks),
+        ]);
+
+        // ✅ 同步更新記憶體中的全域變數
+        // getLocalStats() 讀取全域變數，若不更新則 getLocalStats() 永遠回傳 0
+        window.students = cloudData.students || [];
+        window.pointsHistory = cloudData.pointsHistory || [];
+        window.groups = cloudData.groups || [];
+        window.notebookEntries = cloudData.notebookEntries || [];
+        window.homeworkList = cloudData.homeworkList || [];
+        window.lotteryHistory = cloudData.lotteryHistory || [];
+        window.homeworkChecks = cloudData.homeworkChecks || {};
+
+        // 還原班級清單 classProfiles
+        if (cloudData.classProfiles && Array.isArray(cloudData.classProfiles)) {
+            try {
+                const localRaw = localStorage.getItem('classProfiles');
+                const localProfiles = localRaw ? JSON.parse(localRaw) : [];
+                const cloudIds = new Set(cloudData.classProfiles.map(p => p.id));
+                const localOnlyProfiles = localProfiles.filter(p => !cloudIds.has(p.id));
+                const merged = [...cloudData.classProfiles, ...localOnlyProfiles];
+                localStorage.setItem('classProfiles', JSON.stringify(merged));
+                console.log(`[MultiClass] 已還原 classProfiles（${merged.length} 個班級）`);
+            } catch (e) {
+                console.warn('[MultiClass] classProfiles 還原失敗:', e);
+            }
+        }
+
+        // 公告
+        if (cloudData.announcements && cloudData.announcements.length > 0) {
+            await dbSave('classAnnouncements', cloudData.announcements);
+        }
+
+        // 考試監考設定
+        if (cloudData.examSubjects && cloudData.examSubjects.length > 0) {
+            await dbSave('examSubjects', cloudData.examSubjects);
+        }
+        if (cloudData.examReminders) {
+            await dbSave('examReminders', cloudData.examReminders);
+        }
+        if (cloudData.examAttendance && Object.keys(cloudData.examAttendance).length > 0) {
+            await dbSave('examAttendance', cloudData.examAttendance);
+        }
+
+        // App 設定
+        if (cloudData.clockSettings) {
+            await dbSave('clockSettings', cloudData.clockSettings);
+        }
+        if (cloudData.lotterySettings?.noRepeatLottery !== undefined) {
+            localStorage.setItem('noRepeatLottery', cloudData.lotterySettings.noRepeatLottery);
+        }
+
+        // ✅ 更新同步時間，防止 AutoSync 還原後立即再觸發
+        syncStatus.lastSyncTime = new Date();
+        localStorage.setItem('lastSyncTime', syncStatus.lastSyncTime.toISOString());
+
+        // 重繪 UI
+        if (typeof renderStudents === 'function') renderStudents();
+        if (typeof renderGroups === 'function') renderGroups();
+        if (typeof renderNotebook === 'function') renderNotebook();
+        if (typeof renderHomework === 'function') renderHomework();
+        if (typeof renderLotteryHistory === 'function') renderLotteryHistory();
+        if (typeof updatePointsStudentSelect === 'function') updatePointsStudentSelect();
+        if (typeof updateHomeworkSelect === 'function') updateHomeworkSelect();
+
+        NotificationSystem && NotificationSystem.success('已從雲端完整還原資料 ✅');
+        return true;
+    } finally {
+        syncStatus.isSyncing = false;
+    }
+}
+
+// 從雲端下載後還原（公開 API，兼容舊版呼叫）
 async function loadFromCloud() {
     const cloudData = await syncFromCloud();
-    if (!cloudData) return false;
-
-    // 主資料覆蓋（優先使用 ClassDB，自動備份至 localStorage）
-    const dbSave = (typeof ClassDB !== 'undefined' && ClassDB.isReady)
-        ? (k, v) => ClassDB.save(k, v)
-        : (k, v) => localStorage.setItem(k, JSON.stringify(v));
-
-    await Promise.all([
-        dbSave('students', cloudData.students),
-        dbSave('pointsHistory', cloudData.pointsHistory),
-        dbSave('groups', cloudData.groups),
-        dbSave('notebookEntries', cloudData.notebookEntries),
-        dbSave('homeworkList', cloudData.homeworkList),
-        dbSave('lotteryHistory', cloudData.lotteryHistory),
-        dbSave('homeworkChecks', cloudData.homeworkChecks),
-    ]);
-
-    // 還原班級清單 classProfiles（若雲端有、本地沒有或版本較舊，則合併）
-    if (cloudData.classProfiles && Array.isArray(cloudData.classProfiles)) {
-        try {
-            const localRaw = localStorage.getItem('classProfiles');
-            const localProfiles = localRaw ? JSON.parse(localRaw) : [];
-            // 合併：以雲端為基礎，本地有但雲端沒有的也保留
-            const cloudIds = new Set(cloudData.classProfiles.map(p => p.id));
-            const localOnlyProfiles = localProfiles.filter(p => !cloudIds.has(p.id));
-            const merged = [...cloudData.classProfiles, ...localOnlyProfiles];
-            localStorage.setItem('classProfiles', JSON.stringify(merged));
-            console.log(`[MultiClass] 已還原 classProfiles（${merged.length} 個班級）`);
-        } catch (e) {
-            console.warn('[MultiClass] classProfiles 還原失敗:', e);
-        }
-    }
-
-    // 公告
-    if (cloudData.announcements && cloudData.announcements.length > 0) {
-        await dbSave('classAnnouncements', cloudData.announcements);
-    }
-
-    // 考試監考設定
-    if (cloudData.examSubjects && cloudData.examSubjects.length > 0) {
-        await dbSave('examSubjects', cloudData.examSubjects);
-    }
-    if (cloudData.examReminders) {
-        await dbSave('examReminders', cloudData.examReminders);
-    }
-    if (cloudData.examAttendance && Object.keys(cloudData.examAttendance).length > 0) {
-        await dbSave('examAttendance', cloudData.examAttendance);
-    }
-
-    // App 設定
-    if (cloudData.clockSettings) {
-        await dbSave('clockSettings', cloudData.clockSettings);
-    }
-    if (cloudData.lotterySettings?.noRepeatLottery !== undefined) {
-        localStorage.setItem('noRepeatLottery', cloudData.lotterySettings.noRepeatLottery);
-    }
-
-
-    // 重繪 UI
-    if (typeof renderStudents === 'function') renderStudents();
-    if (typeof renderGroups === 'function') renderGroups();          // ← 補上分組重繪
-    if (typeof renderNotebook === 'function') renderNotebook();
-    if (typeof renderHomework === 'function') renderHomework();
-    if (typeof renderLotteryHistory === 'function') renderLotteryHistory();
-    if (typeof updatePointsStudentSelect === 'function') updatePointsStudentSelect();
-    if (typeof updateHomeworkSelect === 'function') updateHomeworkSelect();
-
-    NotificationSystem && NotificationSystem.success('已從雲端完整還原資料 ✅');
-    return true;
+    return loadFromCloudData(cloudData);
 }
 
 // ─────────────────────────────────────────────────────
@@ -684,7 +711,8 @@ async function showSyncConfirmModal(direction) {
             if (direction === 'upload') {
                 await syncToCloud();
             } else {
-                await loadFromCloud();
+                // ✅ 直接使用已下載的 cloudData，避免二次讀取 Firebase
+                await loadFromCloudData(cloudData);
             }
             resolve(true);
         });
@@ -756,6 +784,7 @@ window.FirebaseSync = {
     syncToCloud,
     syncFromCloud,
     loadFromCloud,
+    loadFromCloudData,
     mergeWithCloud,
     exportAllData,
     showSyncDialog,

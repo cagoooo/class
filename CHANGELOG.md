@@ -1,5 +1,35 @@
 # 班級小管家 Changelog
 
+## [v3.0.4] - 2026-03-04
+
+### 🐛 修復
+
+#### ☁️ 雲端同步無限循環修復（`js/firebase-sync.js`）
+
+**問題描述**：從雲端還原資料後，AutoSync 立即再次觸發下載，且二次開啟同步預覽 Modal 時本地資料始終顯示為 0，造成差異假報警並形成無限同步循環。
+
+**根本原因（5 個連鎖問題）**：
+
+| # | 問題 | 後果 |
+|---|------|------|
+| 1 | `syncStatus` 用 `let` 宣告，`auto-sync.js` 讀取的 `window.syncStatus` 是不同物件 | `isSyncing` 防護完全失效 |
+| 2 | `loadFromCloud()` 還原後未更新 `lastSyncTime` | AutoSync 認為超過間隔，立即再次觸發上傳 |
+| 3 | `showSyncConfirmModal` 讀取雲端兩次（比對 + 還原各一次） | 浪費 Firebase 讀取次數 |
+| 4 | `loadFromCloud()` 缺乏 `isSyncing` 互斥保護 | 並行呼叫不受限 |
+| 5 | 還原後全域變數（`window.students` 等）未更新 | `getLocalStats()` 讀到舊值（0），預覽 Modal 永遠顯示本地為 0 |
+
+**修復方式**：
+- 將 `syncStatus` 改為 `window.syncStatus`，並以 `const syncStatus = window.syncStatus` 引用
+- 新增 `loadFromCloudData(cloudData)` 函式，內含 `isSyncing` 保護、還原後更新 `lastSyncTime` 與更新全域變數
+- `showSyncConfirmModal` 確認時直接傳入已下載的 `cloudData`，不再二次讀取 Firebase
+- 原 `loadFromCloud()` 改呼叫 `loadFromCloudData()`，保持向下相容
+
+### 📁 更新檔案
+- `js/firebase-sync.js` - 同步防護機制全面修復
+- `sw.js` / `manifest.json` - 版本號升至 v3.0.4
+
+---
+
 ## [v3.0.3] - 2026-03-04
 
 ### 🔐 安全性

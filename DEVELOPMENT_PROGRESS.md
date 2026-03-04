@@ -1,12 +1,21 @@
 # 班級小管家 - 開發進度記錄
 
-## 📅 最後更新：2026-03-03 16:25
+## 📅 最後更新：2026-03-04 08:08
 
-## 🎯 當前版本：v2.9.9
+## 🎯 當前版本：v3.0.4
 
-## ✅ 最新工作階段 (2026-03-03) IndexedDB 儲存模組
+## ✅ 最新工作階段 (2026-03-04) 雲端同步無限循環修復
 
-### v2.9.9 IndexedDB 實作
+### v3.0.4 同步防護機制完善（`js/firebase-sync.js`）
+- [x] **`syncStatus` 掛到 `window`** - 修復 `auto-sync.js` 讀取的防護物件不一致問題
+- [x] **`loadFromCloudData()` 新函式** - 加入 `isSyncing` 互斥鎖、還原後更新 `lastSyncTime`
+- [x] **全域變數同步更新** - 還原後立即更新 `window.students` 等，`getLocalStats()` 不再回傳 0
+- [x] **避免二次讀取 Firebase** - `showSyncConfirmModal` 確認時直接傳入已下載資料
+- [x] **`sw.js` + `manifest.json`** - 版本升至 v3.0.4
+
+---
+
+### v3.0.3 IndexedDB 儲存模組
 - [x] **`js/class-db.js`** - ClassDB 模組（9個 Array 資料表 + settings KV表）
 - [x] **自動遷移邏輯** - 首次載入自動從 localStorage 遷移兩也不重複
 - [x] **localStorage 同步備份** - 安全雙重寫入機制
