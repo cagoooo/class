@@ -813,8 +813,273 @@ function updateCloudStatusUI(connected) {
 }
 
 // ─────────────────────────────────────────────────────
-// 導出
+// 一鍵同步所有班級（科任老師功能）
 // ─────────────────────────────────────────────────────
+
+/**
+ * 根據明確的 classId 取得 Firestore collection ref
+ * 不依賴 localStorage.currentClassId，供全班迴圈使用
+ */
+function getUserCollectionForClass(collectionName, classId) {
+    const db = window.FirebaseConfig.getDb();
+    const userId = window.FirebaseConfig.getCurrentUserId();
+    if (!db || !userId) return null;
+    if (!classId || classId === 'default') {
+        return db.collection('users').doc(userId).collection(collectionName);
+    }
+    return db.collection('users').doc(userId)
+        .collection('classes').doc(String(classId)).collection(collectionName);
+}
+
+/**
+ * 針對指定班級上傳 collection（先刪多餘再寫入）
+ */
+async function uploadCollectionForClass(collectionName, dataArray, classId) {
+    try {
+        const collection = getUserCollectionForClass(collectionName, classId);
+        if (!collection) return false;
+        const db = window.FirebaseConfig.getDb();
+        const localIds = new Set((dataArray || []).map(item => String(item.id)));
+
+        // ① 取得雲端現有 ID，刪除多餘
+        const snapshot = await collection.get();
+        const cloudIds = [];
+        snapshot.forEach(doc => cloudIds.push(doc.id));
+        const toDelete = cloudIds.filter(id => !localIds.has(id));
+        if (toDelete.length > 0) {
+            const delBatch = db.batch();
+            toDelete.forEach(id => delBatch.delete(collection.doc(id)));
+            await delBatch.commit();
+        }
+
+        // ② 批次寫入
+        if (!dataArray || dataArray.length === 0) return true;
+        const BATCH_SIZE = 400;
+        for (let i = 0; i < dataArray.length; i += BATCH_SIZE) {
+            const chunk = dataArray.slice(i, i + BATCH_SIZE);
+            const writeBatch = db.batch();
+            chunk.forEach(item => {
+                writeBatch.set(collection.doc(String(item.id)), {
+                    ...item,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            });
+            await writeBatch.commit();
+        }
+        return true;
+    } catch (err) {
+        console.error(`[AllSync] uploadCollectionForClass ${collectionName} 失敗:`, err);
+        return false;
+    }
+}
+
+/**
+ * 一鍵同步所有班級到雲端
+ * @param {Function} onProgress - 進度回呼 (classIndex, total, className, status)
+ */
+async function syncAllClassesToCloud(onProgress) {
+    if (syncStatus.isSyncing) return { success: 0, failed: 0, results: [] };
+    if (!window.FirebaseConfig.isConnected()) {
+        NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號');
+        return null;
+    }
+    syncStatus.isSyncing = true;
+    const results = [];
+
+    try {
+        const profiles = JSON.parse(localStorage.getItem('classProfiles') || '[]');
+        // 包含預設班（空陣列時也要同步）
+        const allClasses = [
+            { id: 'default', name: '預設班級' },
+            ...profiles.map(p => ({ id: String(p.id), name: p.name || p.id }))
+        ];
+
+        const db = window.FirebaseConfig.getDb();
+        const userId = window.FirebaseConfig.getCurrentUserId();
+
+        for (let i = 0; i < allClasses.length; i++) {
+            const cls = allClasses[i];
+            const classId = cls.id;
+            onProgress && onProgress(i, allClasses.length, cls.name, 'syncing');
+
+            // 讀取各班 localStorage 資料
+            const sKey = classId === 'default' ? 'students' : `students-${classId}`;
+            const gKey = classId === 'default' ? 'groups' : `groups-${classId}`;
+            const pKey = classId === 'default' ? 'pointsHistory' : `pointsHistory-${classId}`;
+
+            const localStudents = JSON.parse(localStorage.getItem(sKey) || '[]');
+            const localGroups = JSON.parse(localStorage.getItem(gKey) || '[]');
+            const localPoints = JSON.parse(localStorage.getItem(pKey) || '[]');
+            const localNotebooks = JSON.parse(localStorage.getItem('notebookEntries') || '[]');
+            const localHomeworks = JSON.parse(localStorage.getItem('homeworkList') || '[]');
+            const localLottery = JSON.parse(localStorage.getItem('lotteryHistory') || '[]');
+            const localAnn = JSON.parse(localStorage.getItem('classAnnouncements') || '[]');
+
+            try {
+                await Promise.all([
+                    uploadCollectionForClass(COLLECTIONS.STUDENTS, localStudents, classId),
+                    uploadCollectionForClass(COLLECTIONS.GROUPS, localGroups, classId),
+                    uploadCollectionForClass(COLLECTIONS.POINTS_HISTORY, localPoints, classId),
+                    uploadCollectionForClass(COLLECTIONS.NOTEBOOKS, localNotebooks, classId),
+                    uploadCollectionForClass(COLLECTIONS.HOMEWORKS, localHomeworks, classId),
+                    uploadCollectionForClass(COLLECTIONS.LOTTERY_HISTORY, localLottery, classId),
+                    uploadCollectionForClass(COLLECTIONS.ANNOUNCEMENTS, localAnn, classId),
+                ]);
+                results.push({ name: cls.name, status: 'ok', count: localStudents.length });
+                onProgress && onProgress(i + 1, allClasses.length, cls.name, 'ok', localStudents.length);
+            } catch (err) {
+                results.push({ name: cls.name, status: 'fail', error: err.message });
+                onProgress && onProgress(i + 1, allClasses.length, cls.name, 'fail');
+            }
+        }
+
+        // 同步班級清單 meta
+        try {
+            const profiles2 = JSON.parse(localStorage.getItem('classProfiles') || '[]');
+            if (profiles2.length > 0) {
+                await db.collection('users').doc(userId)
+                    .collection('_meta').doc('classProfiles')
+                    .set({ profiles: profiles2, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+            }
+        } catch (e) { /* 非致命 */ }
+
+        syncStatus.lastSyncTime = new Date();
+        localStorage.setItem('lastSyncTime', syncStatus.lastSyncTime.toISOString());
+
+    } finally {
+        syncStatus.isSyncing = false;
+    }
+    return results;
+}
+
+/**
+ * 顯示一鍵同步所有班級的進度 Modal
+ */
+async function showAllClassSyncModal() {
+    // 移除既有 Modal
+    const existId = 'all-class-sync-modal';
+    document.getElementById(existId)?.remove();
+
+    const profiles = JSON.parse(localStorage.getItem('classProfiles') || '[]');
+    const allClasses = [
+        { id: 'default', name: '預設班級' },
+        ...profiles.map(p => ({ id: String(p.id), name: p.name || p.id }))
+    ];
+    const total = allClasses.length;
+
+    // 建立 Modal
+    const wrap = document.createElement('div');
+    wrap.id = existId;
+    wrap.style.cssText = `
+        position:fixed; inset:0; z-index:99999;
+        background:rgba(0,0,0,.55); backdrop-filter:blur(4px);
+        display:flex; align-items:center; justify-content:center; padding:16px;
+    `;
+
+    const card = document.createElement('div');
+    card.style.cssText = `
+        background:#fff; border-radius:20px; padding:28px 32px; max-width:480px; width:100%;
+        box-shadow:0 24px 80px rgba(0,0,0,.22); font-family:inherit;
+    `;
+
+    const renderInitial = () => {
+        const rows = allClasses.map((cls, i) =>
+            `<div id="acsm-row-${i}" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0f0;">
+                <span id="acsm-icon-${i}" style="font-size:1.2rem;width:24px;text-align:center;">⬜</span>
+                <span style="flex:1;font-weight:600;color:#374151;">${cls.name}</span>
+                <span id="acsm-info-${i}" style="color:#9ca3af;font-size:.85rem;"></span>
+            </div>`
+        ).join('');
+
+        card.innerHTML = `
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;">
+                <span style="font-size:1.6rem;">🌐</span>
+                <div>
+                    <div style="font-weight:700;font-size:1.1rem;color:#1e293b;">一鍵同步所有班級</div>
+                    <div style="color:#64748b;font-size:.88rem;">本地 → 雲端，共 ${total} 個班級</div>
+                </div>
+            </div>
+            <div style="background:#f0f9ff;border-radius:10px;padding:8px 14px;margin-bottom:16px;">
+                <div style="display:flex;justify-content:space-between;font-size:.85rem;color:#0369a1;margin-bottom:6px;">
+                    <span id="acsm-label">準備同步...</span>
+                    <span id="acsm-counter">0 / ${total}</span>
+                </div>
+                <div style="background:#bae6fd;border-radius:999px;height:8px;">
+                    <div id="acsm-bar" style="background:linear-gradient(90deg,#0ea5e9,#06b6d4);height:8px;border-radius:999px;width:0%;transition:width .4s ease;"></div>
+                </div>
+            </div>
+            <div style="max-height:300px;overflow-y:auto;">${rows}</div>
+            <div style="margin-top:20px;text-align:right;">
+                <button id="acsm-close-btn" onclick="document.getElementById('${existId}').remove()"
+                    style="padding:10px 28px;background:#6b7280;color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:.95rem;">
+                    取消
+                </button>
+            </div>
+        `;
+    };
+    renderInitial();
+    wrap.appendChild(card);
+    document.body.appendChild(wrap);
+
+    // 更新進度的回呼
+    const onProgress = (done, total, name, status, count) => {
+        const bar = document.getElementById('acsm-bar');
+        const label = document.getElementById('acsm-label');
+        const counter = document.getElementById('acsm-counter');
+        const idx = done - (status === 'syncing' ? 0 : 1);
+
+        if (bar) bar.style.width = `${Math.round((done / total) * 100)}%`;
+        if (counter) counter.textContent = `${done} / ${total}`;
+
+        if (status === 'syncing') {
+            if (label) label.textContent = `正在同步：${name}...`;
+            const icon = document.getElementById(`acsm-icon-${idx}`);
+            const info = document.getElementById(`acsm-info-${idx}`);
+            if (icon) icon.textContent = '⏳';
+            if (info) info.textContent = '同步中...';
+        } else if (status === 'ok') {
+            if (label) label.textContent = `已完成：${name}`;
+            const rowIdx = done - 1;
+            const icon = document.getElementById(`acsm-icon-${rowIdx}`);
+            const info = document.getElementById(`acsm-info-${rowIdx}`);
+            if (icon) icon.textContent = '✅';
+            if (info) info.textContent = `${count} 人`;
+        } else if (status === 'fail') {
+            const rowIdx = done - 1;
+            const icon = document.getElementById(`acsm-icon-${rowIdx}`);
+            const info = document.getElementById(`acsm-info-${rowIdx}`);
+            if (icon) icon.textContent = '❌';
+            if (info) { info.textContent = '失敗'; info.style.color = '#ef4444'; }
+        }
+    };
+
+    // 執行
+    const results = await syncAllClassesToCloud(onProgress);
+
+    // 完成
+    const bar = document.getElementById('acsm-bar');
+    const label = document.getElementById('acsm-label');
+    const counter = document.getElementById('acsm-counter');
+    const closeBtn = document.getElementById('acsm-close-btn');
+    if (bar) bar.style.width = '100%';
+    if (counter) counter.textContent = `${total} / ${total}`;
+
+    if (results) {
+        const failed = results.filter(r => r.status === 'fail').length;
+        if (label) {
+            label.textContent = failed === 0
+                ? `✅ 所有 ${total} 個班級同步完成！`
+                : `⚠️ ${total - failed} 班成功，${failed} 班失敗`;
+            label.style.color = failed === 0 ? '#16a34a' : '#d97706';
+        }
+        if (closeBtn) {
+            closeBtn.textContent = '完成';
+            closeBtn.style.background = failed === 0 ? '#16a34a' : '#d97706';
+        }
+        NotificationSystem && NotificationSystem.success(`所有班級同步完成 🌐`);
+    }
+}
+
 window.FirebaseSync = {
     syncToCloud,
     syncFromCloud,
@@ -823,7 +1088,8 @@ window.FirebaseSync = {
     mergeWithCloud,
     exportAllData,
     showSyncDialog,
-    showSyncConfirmModal,   // 新增：供 UI 直接呼叫
+    showSyncConfirmModal,
+    showAllClassSyncModal,   // 新增：一鍵同步所有班級
     init: initFirebaseAndSync,
     uploadItem,
     deleteItem,

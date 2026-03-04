@@ -203,6 +203,9 @@
                     <button class="gauth-dd-item" onclick="GoogleAuthUI.syncDown()">
                         📥 從雲端還原（雲端 → 本地）
                     </button>
+                    <button class="gauth-dd-item" onclick="GoogleAuthUI.syncAll()" style="color:#0369a1;font-weight:700;">
+                        🌐 一鍵同步所有班級
+                    </button>
                     <div class="gauth-dd-divider"></div>
                     <button class="gauth-dd-item danger" onclick="GoogleAuthUI.logout()">
                         🚪 登出
@@ -258,6 +261,9 @@
                     </button>
                     <button class="gauth-dd-item" onclick="GoogleAuthUI.syncDown()">
                         📥 從雲端還原
+                    </button>
+                    <button class="gauth-dd-item" onclick="GoogleAuthUI.syncAll()" style="color:#0369a1;font-weight:700;">
+                        🌐 一鍵同步所有班級
                     </button>
                     <div class="gauth-dd-divider"></div>
                     <button class="gauth-dd-item danger" onclick="GoogleAuthUI.logout()">
@@ -611,6 +617,25 @@
                 setSyncing(false);
                 refreshSyncTime();
             }
+        },
+
+        async syncAll() {
+            // 關閉下拉選單
+            const dd = document.getElementById('gauth-dropdown');
+            if (dd) dd.classList.remove('open');
+            const ddM = document.getElementById('gauth-dropdown-mobile');
+            if (ddM) ddM.style.display = 'none';
+
+            if (!window.FirebaseConfig.isConnected()) {
+                NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號');
+                return;
+            }
+            if (!window.FirebaseSync || typeof window.FirebaseSync.showAllClassSyncModal !== 'function') {
+                NotificationSystem && NotificationSystem.error('同步模組尚未載入，請稍後再試');
+                return;
+            }
+            await window.FirebaseSync.showAllClassSyncModal();
+            refreshSyncTime();
         },
     };
 
