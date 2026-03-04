@@ -3832,6 +3832,21 @@
                                                                 // --- 結束全螢幕時鐘功能 ---
                                                                 </script>
                                                                 <!-- 增強模組 -->
+                                                                <!-- 核心：showSection 函數（必須在所有模組前定義） -->
+                                                                <script>
+                                                                    window.showSection = function showSection(sectionName) {
+                                                                        document.querySelectorAll('.section').forEach(function (el) {
+                                                                            el.classList.add('hidden');
+                                                                        });
+                                                                        var targetId = sectionName.endsWith('-section') ? sectionName : (sectionName + '-section');
+                                                                        var target = document.getElementById(targetId);
+                                                                        if (target) {
+                                                                            target.classList.remove('hidden');
+                                                                        } else {
+                                                                            console.warn('[showSection] 找不到區塊:', targetId);
+                                                                        }
+                                                                    };
+                                                                </script>
                                                                 <script src="js/skeleton.js"></script>
                                                                 <script src="js/event-bus.js"></script>
                                                                 <script src="js/error-handler.js"></script>
