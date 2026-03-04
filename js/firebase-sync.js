@@ -1080,6 +1080,211 @@ async function showAllClassSyncModal() {
     }
 }
 
+
+// ─────────────────────────────────────────────────────
+// 一鍵從雲端還原所有班級到本地（科任老師回家用）
+// ─────────────────────────────────────────────────────
+
+/**
+ * 從雲端下載所有班級資料，寫入各班 localStorage
+ * @param {Function} onProgress - 進度回呼 (done, total, name, status, count)
+ */
+async function syncAllClassesFromCloud(onProgress) {
+    if (syncStatus.isSyncing) return null;
+    if (!window.FirebaseConfig.isConnected()) {
+        NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號');
+        return null;
+    }
+    syncStatus.isSyncing = true;
+    const results = [];
+
+    try {
+        const profiles = JSON.parse(localStorage.getItem('classProfiles') || '[]');
+        const allClasses = [
+            { id: 'default', name: '預設班級' },
+            ...profiles.map(p => ({ id: String(p.id), name: p.name || p.id }))
+        ];
+
+        for (let i = 0; i < allClasses.length; i++) {
+            const cls = allClasses[i];
+            const classId = cls.id;
+            onProgress && onProgress(i, allClasses.length, cls.name, 'syncing');
+
+            const sKey = classId === 'default' ? 'students' : `students-${classId}`;
+            const gKey = classId === 'default' ? 'groups' : `groups-${classId}`;
+            const pKey = classId === 'default' ? 'pointsHistory' : `pointsHistory-${classId}`;
+
+            try {
+                // 從對應班級的 Firebase 路徑下載
+                const [
+                    cloudStudents, cloudGroups, cloudPoints,
+                    cloudNotebooks, cloudHomeworks, cloudLottery, cloudAnn
+                ] = await Promise.all([
+                    (async () => { const col = getUserCollectionForClass(COLLECTIONS.STUDENTS, classId); if (!col) return []; const s = await col.get(); return s.docs.map(d => ({ id: d.id, ...d.data() })); })(),
+                    (async () => { const col = getUserCollectionForClass(COLLECTIONS.GROUPS, classId); if (!col) return []; const s = await col.get(); return s.docs.map(d => ({ id: d.id, ...d.data() })); })(),
+                    (async () => { const col = getUserCollectionForClass(COLLECTIONS.POINTS_HISTORY, classId); if (!col) return []; const s = await col.get(); return s.docs.map(d => ({ id: d.id, ...d.data() })); })(),
+                    (async () => { const col = getUserCollectionForClass(COLLECTIONS.NOTEBOOKS, classId); if (!col) return []; const s = await col.get(); return s.docs.map(d => ({ id: d.id, ...d.data() })); })(),
+                    (async () => { const col = getUserCollectionForClass(COLLECTIONS.HOMEWORKS, classId); if (!col) return []; const s = await col.get(); return s.docs.map(d => ({ id: d.id, ...d.data() })); })(),
+                    (async () => { const col = getUserCollectionForClass(COLLECTIONS.LOTTERY_HISTORY, classId); if (!col) return []; const s = await col.get(); return s.docs.map(d => ({ id: d.id, ...d.data() })); })(),
+                    (async () => { const col = getUserCollectionForClass(COLLECTIONS.ANNOUNCEMENTS, classId); if (!col) return []; const s = await col.get(); return s.docs.map(d => ({ id: d.id, ...d.data() })); })(),
+                ]);
+
+                // 寫入各班 localStorage
+                localStorage.setItem(sKey, JSON.stringify(cloudStudents));
+                localStorage.setItem(gKey, JSON.stringify(cloudGroups));
+                localStorage.setItem(pKey, JSON.stringify(cloudPoints));
+                // 聯絡簿、作業、抽籤、公告共用（寫入目前 key）— 目前為全班共用
+                if (cloudNotebooks.length > 0) localStorage.setItem('notebookEntries', JSON.stringify(cloudNotebooks));
+                if (cloudHomeworks.length > 0) localStorage.setItem('homeworkList', JSON.stringify(cloudHomeworks));
+                if (cloudLottery.length > 0) localStorage.setItem('lotteryHistory', JSON.stringify(cloudLottery));
+                if (cloudAnn.length > 0) localStorage.setItem('classAnnouncements', JSON.stringify(cloudAnn));
+
+                results.push({ name: cls.name, status: 'ok', count: cloudStudents.length });
+                onProgress && onProgress(i + 1, allClasses.length, cls.name, 'ok', cloudStudents.length);
+            } catch (err) {
+                console.error(`[AllSync] 雲端→本地 ${cls.name} 失敗:`, err);
+                results.push({ name: cls.name, status: 'fail', error: err.message });
+                onProgress && onProgress(i + 1, allClasses.length, cls.name, 'fail');
+            }
+        }
+
+        // 若目前班級資料被覆蓋，刷新全域變數
+        try {
+            const curId = localStorage.getItem('currentClassId') || 'default';
+            const curSKey = curId === 'default' ? 'students' : `students-${curId}`;
+            window.students = JSON.parse(localStorage.getItem(curSKey) || '[]');
+            if (typeof renderStudents === 'function') renderStudents();
+        } catch (e) { /* 非致命 */ }
+
+        syncStatus.lastSyncTime = new Date();
+        localStorage.setItem('lastSyncTime', syncStatus.lastSyncTime.toISOString());
+
+    } finally {
+        syncStatus.isSyncing = false;
+    }
+    return results;
+}
+
+/**
+ * 顯示一鍵雲端→本地的進度 Modal
+ */
+async function showAllClassDownloadModal() {
+    const existId = 'all-class-dl-modal';
+    document.getElementById(existId)?.remove();
+
+    const profiles = JSON.parse(localStorage.getItem('classProfiles') || '[]');
+    const allClasses = [
+        { id: 'default', name: '預設班級' },
+        ...profiles.map(p => ({ id: String(p.id), name: p.name || p.id }))
+    ];
+    const total = allClasses.length;
+
+    const wrap = document.createElement('div');
+    wrap.id = existId;
+    wrap.style.cssText = `
+        position:fixed; inset:0; z-index:99999;
+        background:rgba(0,0,0,.55); backdrop-filter:blur(4px);
+        display:flex; align-items:center; justify-content:center; padding:16px;
+    `;
+    const card = document.createElement('div');
+    card.style.cssText = `
+        background:#fff; border-radius:20px; padding:28px 32px; max-width:480px; width:100%;
+        box-shadow:0 24px 80px rgba(0,0,0,.22); font-family:inherit;
+    `;
+
+    const rows = allClasses.map((cls, i) =>
+        `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0f0;">
+            <span id="acdm-icon-${i}" style="font-size:1.2rem;width:24px;text-align:center;">⬜</span>
+            <span style="flex:1;font-weight:600;color:#374151;">${cls.name}</span>
+            <span id="acdm-info-${i}" style="color:#9ca3af;font-size:.85rem;"></span>
+        </div>`
+    ).join('');
+
+    card.innerHTML = `
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;">
+            <span style="font-size:1.6rem;">📥</span>
+            <div>
+                <div style="font-weight:700;font-size:1.1rem;color:#1e293b;">還原所有班級至本地</div>
+                <div style="color:#64748b;font-size:.88rem;">雲端 → 本地，共 ${total} 個班級</div>
+            </div>
+        </div>
+        <div style="background:#fef3c7;border-radius:10px;padding:8px 14px;font-size:.82rem;color:#92400e;margin-bottom:14px;">
+            ⚠️ 各班本地資料將被雲端資料覆蓋，操作前請確認雲端有最新備份
+        </div>
+        <div style="background:#f0f9ff;border-radius:10px;padding:8px 14px;margin-bottom:16px;">
+            <div style="display:flex;justify-content:space-between;font-size:.85rem;color:#0369a1;margin-bottom:6px;">
+                <span id="acdm-label">準備還原...</span>
+                <span id="acdm-counter">0 / ${total}</span>
+            </div>
+            <div style="background:#bae6fd;border-radius:999px;height:8px;">
+                <div id="acdm-bar" style="background:linear-gradient(90deg,#7c3aed,#2563eb);height:8px;border-radius:999px;width:0%;transition:width .4s ease;"></div>
+            </div>
+        </div>
+        <div style="max-height:280px;overflow-y:auto;">${rows}</div>
+        <div style="margin-top:20px;text-align:right;">
+            <button id="acdm-close-btn" onclick="document.getElementById('${existId}').remove()"
+                style="padding:10px 28px;background:#6b7280;color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:.95rem;">
+                取消
+            </button>
+        </div>
+    `;
+    wrap.appendChild(card);
+    document.body.appendChild(wrap);
+
+    const onProgress = (done, total, name, status, count) => {
+        const bar = document.getElementById('acdm-bar');
+        const label = document.getElementById('acdm-label');
+        const counter = document.getElementById('acdm-counter');
+        if (bar) bar.style.width = `${Math.round((done / total) * 100)}%`;
+        if (counter) counter.textContent = `${done} / ${total}`;
+
+        const idx = status === 'syncing' ? done : done - 1;
+        if (status === 'syncing') {
+            if (label) label.textContent = `正在還原：${name}...`;
+            const icon = document.getElementById(`acdm-icon-${idx}`);
+            const info = document.getElementById(`acdm-info-${idx}`);
+            if (icon) icon.textContent = '⏳';
+            if (info) info.textContent = '下載中...';
+        } else if (status === 'ok') {
+            if (label) label.textContent = `已還原：${name}`;
+            const icon = document.getElementById(`acdm-icon-${idx}`);
+            const info = document.getElementById(`acdm-info-${idx}`);
+            if (icon) icon.textContent = '✅';
+            if (info) info.textContent = `${count} 人`;
+        } else if (status === 'fail') {
+            const icon = document.getElementById(`acdm-icon-${idx}`);
+            const info = document.getElementById(`acdm-info-${idx}`);
+            if (icon) icon.textContent = '❌';
+            if (info) { info.textContent = '失敗'; info.style.color = '#ef4444'; }
+        }
+    };
+
+    const results = await syncAllClassesFromCloud(onProgress);
+
+    const bar = document.getElementById('acdm-bar');
+    const label = document.getElementById('acdm-label');
+    const counter = document.getElementById('acdm-counter');
+    const closeBtn = document.getElementById('acdm-close-btn');
+    if (bar) bar.style.width = '100%';
+    if (counter) counter.textContent = `${total} / ${total}`;
+
+    if (results) {
+        const failed = results.filter(r => r.status === 'fail').length;
+        if (label) {
+            label.textContent = failed === 0
+                ? `✅ 所有 ${total} 個班級已還原至本地！`
+                : `⚠️ ${total - failed} 班成功，${failed} 班失敗`;
+            label.style.color = failed === 0 ? '#16a34a' : '#d97706';
+        }
+        if (closeBtn) {
+            closeBtn.textContent = '完成';
+            closeBtn.style.background = failed === 0 ? '#16a34a' : '#d97706';
+        }
+        NotificationSystem && NotificationSystem.success(`所有班級已從雲端還原 📥`);
+    }
+}
+
+
 window.FirebaseSync = {
     syncToCloud,
     syncFromCloud,
@@ -1089,7 +1294,8 @@ window.FirebaseSync = {
     exportAllData,
     showSyncDialog,
     showSyncConfirmModal,
-    showAllClassSyncModal,   // 新增：一鍵同步所有班級
+    showAllClassSyncModal,       // 一鍵同步所有班級（本地→雲端）
+    showAllClassDownloadModal,   // 一鍵還原所有班級（雲端→本地）
     init: initFirebaseAndSync,
     uploadItem,
     deleteItem,
