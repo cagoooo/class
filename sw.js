@@ -1,7 +1,7 @@
-﻿/**
- * ?剔?撠恣摰?Service Worker
- * @version 3.0.4
- * @description PWA ?Ｙ??舀?翰???亙??
+/**
+ * 班級小管家 Service Worker
+ * @version 3.0.5
+ * @description PWA 離線支援與快取策略優化
  */
 
 const CACHE_NAME = 'class-manager-v3.0.5';
@@ -9,7 +9,7 @@ const STATIC_CACHE = 'class-manager-static-v3.0.5';
 const DYNAMIC_CACHE = 'class-manager-dynamic-v3.0.5';
 
 
-// ??鞈??”嚗?鋆??翰??
+// 靜態資源列表（安裝時預快取）
 const STATIC_ASSETS = [
     './',
     './index.html',
@@ -25,13 +25,13 @@ const STATIC_ASSETS = [
     './css/notification.css',
     './css/rwd-breakpoints.css',
     './css/pwa-install.css',
-    // ?詨? JS
+    // 核心 JS
     './js/app-state.js',
     './js/event-bus.js',
     './js/error-handler.js',
     './js/storage-manager.js',
     './js/utils.js',
-    // ?璅∠? JS
+    // 功能模組 JS
     './js/exam-proctor.js',
     './js/homework-enhancement.js',
     './js/lottery-enhancement.js',
@@ -46,13 +46,13 @@ const STATIC_ASSETS = [
     './js/data-reports.js',
     './js/theme-toggle.js',
     './js/pwa-install.js',
-    // v3.0.0 ?啣?璅∠?
+    // v3.0.0 新增模組
     './js/gesture-handler.js',
     './js/auto-sync.js',
     './js/offline-detector.js'
 ];
 
-// ?閬雯頝臬??頝臬?璅∪?
+// 需要網路優先的路徑模式
 const NETWORK_FIRST_PATTERNS = [
     /\/api\//,
     /firebase/,
@@ -60,33 +60,33 @@ const NETWORK_FIRST_PATTERNS = [
     /googleapis/
 ];
 
-// ==================== 摰?鈭辣 ====================
+// ==================== 安裝事件 ====================
 self.addEventListener('install', (event) => {
-    console.log('[SW] 摰?銝?..', CACHE_NAME);
+    console.log('[SW] 安裝中...', CACHE_NAME);
 
     event.waitUntil(
         caches.open(STATIC_CACHE)
             .then((cache) => {
-                console.log('[SW] ?翰????皞?);
-                // ?翰???踹??桀仃???游?典仃??
+                console.log('[SW] 預快取靜態資源');
+                // 逐個快取，避免單個失敗導致全部失敗
                 return Promise.allSettled(
                     STATIC_ASSETS.map(asset =>
                         cache.add(asset).catch(err => {
-                            console.warn(`[SW] 敹怠?憭望?: ${asset}`, err);
+                            console.warn(`[SW] 快取失敗: ${asset}`, err);
                         })
                     )
                 );
             })
             .then(() => {
-                console.log('[SW] 摰?摰?嚗歲??敺?);
+                console.log('[SW] 安裝完成，跳過等待');
                 return self.skipWaiting();
             })
     );
 });
 
-// ==================== ?鈭辣 ====================
+// ==================== 啟用事件 ====================
 self.addEventListener('activate', (event) => {
-    console.log('[SW] ?銝?..', CACHE_NAME);
+    console.log('[SW] 啟用中...', CACHE_NAME);
 
     event.waitUntil(
         caches.keys()
@@ -94,72 +94,72 @@ self.addEventListener('activate', (event) => {
                 return Promise.all(
                     cacheNames
                         .filter((name) => {
-                            // ?芷???砍翰??
+                            // 刪除舊版本快取
                             return name.startsWith('class-manager-') &&
                                 name !== STATIC_CACHE &&
                                 name !== DYNAMIC_CACHE;
                         })
                         .map((name) => {
-                            console.log('[SW] ?芷?翰??', name);
+                            console.log('[SW] 刪除舊快取:', name);
                             return caches.delete(name);
                         })
                 );
             })
             .then(() => {
-                console.log('[SW] ?摰?嚗蝞⊥?????);
+                console.log('[SW] 啟用完成，接管所有頁面');
                 return self.clients.claim();
             })
     );
 });
 
-// ==================== 隢?? ====================
+// ==================== 請求攔截 ====================
 self.addEventListener('fetch', (event) => {
     const { request } = event;
     const url = new URL(request.url);
 
-    // ?芾???http/https 隢?
+    // 只處理 http/https 請求
     if (!request.url.startsWith('http')) return;
 
-    // 頝喲? Chrome ?游??隢?
+    // 跳過 Chrome 擴充功能請求
     if (url.protocol === 'chrome-extension:') return;
 
-    // ?斗?臬?閬雯頝臬??
+    // 判斷是否需要網路優先
     const needsNetworkFirst = NETWORK_FIRST_PATTERNS.some(pattern =>
         pattern.test(request.url)
     );
 
     if (needsNetworkFirst) {
-        // 蝬脰楝?芸?蝑嚗PI?irebase 蝑?
+        // 網路優先策略（API、Firebase 等）
         event.respondWith(networkFirst(request));
     } else if (request.destination === 'document') {
-        // HTML ?辣嚗雯頝臬??敹怠??
+        // HTML 文件：網路優先，快取備援
         event.respondWith(networkFirst(request));
     } else {
-        // ??鞈?嚗翰???
+        // 靜態資源：快取優先
         event.respondWith(cacheFirst(request));
     }
 });
 
-// ==================== 敹怠?蝑 ====================
+// ==================== 快取策略 ====================
 
 /**
- * 敹怠??芸?蝑
- * ?拍?潘?CSS?S??????鞈?
+ * 快取優先策略
+ * 適用於：CSS、JS、圖片等靜態資源
  */
 async function cacheFirst(request) {
     try {
-        // ??閰血翰??
+        // 先嘗試快取
         const cachedResponse = await caches.match(request);
         if (cachedResponse) {
-            // ?刻??舀?啣翰??Stale While Revalidate嚗?
+            // 在背景更新快取（Stale While Revalidate）
             updateCache(request);
             return cachedResponse;
         }
 
-        // 敹怠??芸銝哨?敺雯頝舐??
+        // 快取未命中，從網路獲取
         const networkResponse = await fetch(request);
 
-        // 敹怠???????
+        // 快取成功的回應
         if (networkResponse.ok) {
             const cache = await caches.open(DYNAMIC_CACHE);
             cache.put(request, networkResponse.clone());
@@ -167,33 +167,33 @@ async function cacheFirst(request) {
 
         return networkResponse;
     } catch (error) {
-        console.error('[SW] cacheFirst ?航炊:', error);
+        console.error('[SW] cacheFirst 錯誤:', error);
 
-        // 餈??Ｙ????閮剖???
+        // 返回離線頁面或預設回應
         const cachedResponse = await caches.match(request);
         if (cachedResponse) return cachedResponse;
 
-        // 憒??臬???瘙?餈??身??
+        // 如果是圖片請求，返回預設圖片
         if (request.destination === 'image') {
             return new Response(
-                '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="#999">?</text></svg>',
+                '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="#999">📷</text></svg>',
                 { headers: { 'Content-Type': 'image/svg+xml' } }
             );
         }
 
-        return new Response('?Ｙ?', { status: 503, statusText: 'Offline' });
+        return new Response('離線', { status: 503, statusText: 'Offline' });
     }
 }
 
 /**
- * 蝬脰楝?芸?蝑
- * ?拍?潘?HTML?PI 隢?
+ * 網路優先策略
+ * 適用於：HTML、API 請求
  */
 async function networkFirst(request) {
     try {
         const networkResponse = await fetch(request);
 
-        // 敹怠?????GET 隢?
+        // 快取成功的 GET 請求
         if (networkResponse.ok && request.method === 'GET') {
             const cache = await caches.open(DYNAMIC_CACHE);
             cache.put(request, networkResponse.clone());
@@ -201,20 +201,20 @@ async function networkFirst(request) {
 
         return networkResponse;
     } catch (error) {
-        console.warn('[SW] 蝬脰楝隢?憭望?嚗?閰血翰??', request.url);
+        console.warn('[SW] 網路請求失敗，嘗試快取:', request.url);
 
         const cachedResponse = await caches.match(request);
         if (cachedResponse) {
             return cachedResponse;
         }
 
-        // 憒??舀?隞嗉?瘙?餈??Ｙ??
+        // 如果是文件請求，返回離線頁面
         if (request.destination === 'document') {
             const offlinePage = await caches.match('./classnew.html');
             if (offlinePage) return offlinePage;
         }
 
-        return new Response('?Ｙ? - 隢炎?亦雯頝舫??', {
+        return new Response('離線 - 請檢查網路連線', {
             status: 503,
             statusText: 'Offline',
             headers: { 'Content-Type': 'text/plain; charset=utf-8' }
@@ -223,7 +223,7 @@ async function networkFirst(request) {
 }
 
 /**
- * ??湔敹怠?嚗tale While Revalidate嚗?
+ * 背景更新快取（Stale While Revalidate）
  */
 async function updateCache(request) {
     try {
@@ -233,11 +233,11 @@ async function updateCache(request) {
             cache.put(request, networkResponse);
         }
     } catch (error) {
-        // ??湔憭望?嚗?暺???
+        // 背景更新失敗，靜默處理
     }
 }
 
-// ==================== 閮?? ====================
+// ==================== 訊息處理 ====================
 self.addEventListener('message', (event) => {
     const { type, payload } = event.data || {};
 
@@ -262,18 +262,18 @@ self.addEventListener('message', (event) => {
 
         default:
             if (type) {
-                console.log('[SW] ?芰閮:', type);
+                console.log('[SW] 未知訊息:', type);
             }
     }
 });
 
-// ==================== ?券嚗靘撅?====================
+// ==================== 推送通知（未來擴展）====================
 self.addEventListener('push', (event) => {
     if (!event.data) return;
 
     const data = event.data.json();
     const options = {
-        body: data.body || '?剔?撠恣摰嗆??圈',
+        body: data.body || '班級小管家有新通知',
         icon: './icons/icon-192.png',
         badge: './icons/icon-192.png',
         vibrate: [100, 50, 100],
@@ -281,7 +281,7 @@ self.addEventListener('push', (event) => {
     };
 
     event.waitUntil(
-        self.registration.showNotification(data.title || '?剔?撠恣摰?, options)
+        self.registration.showNotification(data.title || '班級小管家', options)
     );
 });
 
@@ -292,4 +292,4 @@ self.addEventListener('notificationclick', (event) => {
     );
 });
 
-console.log('[SW] Service Worker 撌脰???', CACHE_NAME);
+console.log('[SW] Service Worker 已載入:', CACHE_NAME);
