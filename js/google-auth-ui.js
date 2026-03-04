@@ -512,6 +512,75 @@
     }
 
     // ────────────────────────────────────────────────────────
+    // ────────────────────────────────────────────────────────
+    // 全班同步確認 Modal（私有輔助函式）
+    // ────────────────────────────────────────────────────────
+    function showAllClassConfirmDialog({ icon, title, subtitle, arrowHtml, warningText, dataList, confirmLabel, confirmColor }) {
+        return new Promise(resolve => {
+            const id = 'gauth-allsync-confirm';
+            document.getElementById(id)?.remove();
+
+            const overlay = document.createElement('div');
+            overlay.id = id;
+            overlay.style.cssText = `
+                position:fixed; inset:0; z-index:999999;
+                background:rgba(0,0,0,.6); backdrop-filter:blur(6px);
+                display:flex; align-items:center; justify-content:center; padding:16px;
+            `;
+
+            const dataItems = dataList.map(d =>
+                `<li style="display:flex;align-items:center;gap:6px;padding:4px 0;">
+                    <span style="color:#6b7280;font-size:.9rem;">•</span>
+                    <span style="color:#374151;font-size:.9rem;">${d}</span>
+                </li>`
+            ).join('');
+
+            overlay.innerHTML = `
+                <div style="background:#fff; border-radius:20px; padding:28px 28px 24px; max-width:440px; width:100%;
+                     box-shadow:0 24px 80px rgba(0,0,0,.25);">
+                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;">
+                        <span style="font-size:2rem;">${icon}</span>
+                        <div>
+                            <div style="font-weight:800;font-size:1.15rem;color:#1e293b;">${title}</div>
+                            <div style="font-size:.85rem;color:#64748b;font-weight:600;">${subtitle}</div>
+                        </div>
+                    </div>
+
+                    ${arrowHtml}
+
+                    <div style="background:#fef3c7;border-left:4px solid #f59e0b;border-radius:8px;padding:10px 14px;margin-bottom:14px;">
+                        <div style="font-size:.85rem;color:#92400e;line-height:1.6;">${warningText}</div>
+                    </div>
+
+                    <div style="font-size:.82rem;font-weight:700;color:#6b7280;margin-bottom:4px;">將同步以下資料：</div>
+                    <ul style="margin:0 0 18px 0;padding:0;list-style:none;background:#f8fafc;border-radius:10px;padding:8px 12px;">
+                        ${dataItems}
+                    </ul>
+
+                    <div style="display:flex;gap:10px;justify-content:flex-end;">
+                        <button id="${id}-cancel"
+                            style="padding:10px 20px;background:#f1f5f9;color:#374151;border:none;border-radius:10px;
+                                   cursor:pointer;font-weight:600;font-size:.9rem;">
+                            取消
+                        </button>
+                        <button id="${id}-confirm"
+                            style="padding:10px 24px;background:${confirmColor};color:#fff;border:none;border-radius:10px;
+                                   cursor:pointer;font-weight:700;font-size:.9rem;">
+                            ${confirmLabel}
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(overlay);
+
+            document.getElementById(`${id}-cancel`).onclick = () => { overlay.remove(); resolve(false); };
+            document.getElementById(`${id}-confirm`).onclick = () => { overlay.remove(); resolve(true); };
+            overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.remove(); resolve(false); } });
+        });
+    }
+
+    // ────────────────────────────────────────────────────────
     // 公開 API
     // ────────────────────────────────────────────────────────
     window.GoogleAuthUI = {
@@ -640,6 +709,28 @@
                 NotificationSystem && NotificationSystem.error('同步模組尚未載入，請稍後再試');
                 return;
             }
+
+            // ── 確認 Modal ──
+            const profiles = JSON.parse(localStorage.getItem('classProfiles') || '[]');
+            const classCount = profiles.length + 1; // 含預設班
+            const confirmed = await showAllClassConfirmDialog({
+                direction: 'upload',
+                icon: '🌐',
+                title: '一鍵同步所有班級',
+                subtitle: '本地 → 雲端',
+                arrowHtml: `
+                    <div style="display:flex;align-items:center;gap:12px;justify-content:center;margin:16px 0;">
+                        <div style="background:#dbeafe;border-radius:10px;padding:8px 16px;font-weight:700;color:#1d4ed8;">📱 本地裝置</div>
+                        <div style="font-size:1.4rem;color:#2563eb;">→</div>
+                        <div style="background:#d1fae5;border-radius:10px;padding:8px 16px;font-weight:700;color:#065f46;">☁️ Firebase 雲端</div>
+                    </div>`,
+                warningText: `本操作將把本裝置上 <strong>${classCount} 個班級</strong> 的資料上傳至雲端，<strong>雲端舊資料將被覆蓋</strong>。`,
+                dataList: ['學生名單與分數', '加扣分記錄', '分組資料', '聯絡簿 / 作業 / 公告', '考試監考設定', '時鐘 / 抽籤設定', '作業繳交狀態'],
+                confirmLabel: '確定同步至雲端',
+                confirmColor: '#2563eb',
+            });
+            if (!confirmed) return;
+
             await window.FirebaseSync.showAllClassSyncModal();
             refreshSyncTime();
         },
@@ -659,6 +750,28 @@
                 NotificationSystem && NotificationSystem.error('同步模組尚未載入，請稍後再試');
                 return;
             }
+
+            // ── 確認 Modal ──
+            const profiles = JSON.parse(localStorage.getItem('classProfiles') || '[]');
+            const classCount = profiles.length + 1;
+            const confirmed = await showAllClassConfirmDialog({
+                direction: 'download',
+                icon: '📥',
+                title: '一鍵還原所有班級',
+                subtitle: '雲端 → 本地',
+                arrowHtml: `
+                    <div style="display:flex;align-items:center;gap:12px;justify-content:center;margin:16px 0;">
+                        <div style="background:#d1fae5;border-radius:10px;padding:8px 16px;font-weight:700;color:#065f46;">☁️ Firebase 雲端</div>
+                        <div style="font-size:1.4rem;color:#7c3aed;">→</div>
+                        <div style="background:#ede9fe;border-radius:10px;padding:8px 16px;font-weight:700;color:#5b21b6;">📱 本地裝置</div>
+                    </div>`,
+                warningText: `本操作將把雲端上 <strong>${classCount} 個班級</strong> 的資料下載至本裝置，<strong>本地現有資料將被覆蓋</strong>。`,
+                dataList: ['學生名單與分數', '加扣分記錄', '分組資料', '聯絡簿 / 作業 / 公告', '考試監考設定', '時鐘 / 抽籤設定', '作業繳交狀態'],
+                confirmLabel: '確定還原至本地',
+                confirmColor: '#7c3aed',
+            });
+            if (!confirmed) return;
+
             await window.FirebaseSync.showAllClassDownloadModal();
             refreshSyncTime();
         },
