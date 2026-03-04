@@ -505,7 +505,7 @@ async function mergeWithCloud() {
 
         // 存 localStorage
         localStorage.setItem(window.STUDENTS_KEY || 'students', JSON.stringify(students));
-        localStorage.setItem('pointsHistory', JSON.stringify(pointsHistory));
+        localStorage.setItem(window.POINTS_HISTORY_KEY || 'pointsHistory', JSON.stringify(pointsHistory));
         localStorage.setItem(window.GROUPS_KEY || 'groups', JSON.stringify(groups));
         localStorage.setItem('notebookEntries', JSON.stringify(notebookEntries));
         localStorage.setItem('homeworkList', JSON.stringify(homeworkList));

@@ -1456,11 +1456,12 @@
         var _curClassId = localStorage.getItem('currentClassId') || 'default';
         window.STUDENTS_KEY = (_curClassId === 'default') ? 'students' : ('students-' + _curClassId);
         window.GROUPS_KEY = (_curClassId === 'default') ? 'groups' : ('groups-' + _curClassId);
+        window.POINTS_HISTORY_KEY = (_curClassId === 'default') ? 'pointsHistory' : ('pointsHistory-' + _curClassId);
         // ===== 結束 =====
 
         // 全域變數
         var students = JSON.parse(localStorage.getItem(STUDENTS_KEY)) || [];
-        var pointsHistory = JSON.parse(localStorage.getItem('pointsHistory')) || [];
+        var pointsHistory = JSON.parse(localStorage.getItem(POINTS_HISTORY_KEY)) || [];
         var lotteryHistory = JSON.parse(localStorage.getItem('lotteryHistory')) || [];
         var groups = JSON.parse(localStorage.getItem(GROUPS_KEY)) || [];
         var notebookEntries = JSON.parse(localStorage.getItem('notebookEntries')) || [];
@@ -1788,7 +1789,7 @@
                     }
                     if (data.pointsHistory) {
                         pointsHistory = data.pointsHistory;
-                        localStorage.setItem('pointsHistory', JSON.stringify(pointsHistory));
+                        localStorage.setItem(window.POINTS_HISTORY_KEY || 'pointsHistory', JSON.stringify(pointsHistory));
                     }
                     if (data.groups) {
                         groups = data.groups;
@@ -2241,7 +2242,7 @@
             student.records.push(record);
             pointsHistory.unshift(record);
             localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
-            localStorage.setItem('pointsHistory', JSON.stringify(pointsHistory));
+            localStorage.setItem(window.POINTS_HISTORY_KEY || 'pointsHistory', JSON.stringify(pointsHistory));
             renderStudents();
             renderPointsHistory();
             showPointsAnimation(points, reason);
@@ -3112,7 +3113,7 @@
                 pointsHistory = [];
                 groups = [];
                 localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
-                localStorage.setItem('pointsHistory', JSON.stringify(pointsHistory));
+                localStorage.setItem(window.POINTS_HISTORY_KEY || 'pointsHistory', JSON.stringify(pointsHistory));
                 localStorage.setItem(window.GROUPS_KEY || 'groups', JSON.stringify(groups));
                 renderStudents();
                 updatePointsStudentSelect();
@@ -3131,7 +3132,7 @@
                 homeworkChecks = {};
 
                 localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
-                localStorage.setItem('pointsHistory', JSON.stringify(pointsHistory));
+                localStorage.setItem(window.POINTS_HISTORY_KEY || 'pointsHistory', JSON.stringify(pointsHistory));
                 localStorage.setItem(window.GROUPS_KEY || 'groups', JSON.stringify(groups));
                 localStorage.setItem('homeworkChecks', JSON.stringify(homeworkChecks));
 
@@ -3219,7 +3220,7 @@
 
                 localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
                 localStorage.setItem(window.GROUPS_KEY || 'groups', JSON.stringify(groups));
-                localStorage.setItem('pointsHistory', JSON.stringify(pointsHistory));
+                localStorage.setItem(window.POINTS_HISTORY_KEY || 'pointsHistory', JSON.stringify(pointsHistory));
 
                 renderStudents();
                 renderGroups();

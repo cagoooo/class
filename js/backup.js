@@ -1,6 +1,6 @@
-﻿/**
- * ?剔?撠恣摰?- 鞈??遢璅∠?
- * backup.js - 鞈??遢?敺拍頂蝯?
+/**
+ * 班級小管家 - 資料備份模組
+ * backup.js - 資料備份與恢復系統
  */
 
 class DataBackup {
@@ -25,55 +25,55 @@ class DataBackup {
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = `?剔?撠恣摰嗅?隞稻${this.getDateString()}.json`;
+            link.download = `班級小管家備份_${this.getDateString()}.json`;
             link.click();
 
             URL.revokeObjectURL(url);
-            NotificationSystem.success('鞈?撌脫????);
+            NotificationSystem.success('資料已成功匯出');
         } catch (error) {
-            console.error('?臬憭望?:', error);
-            NotificationSystem.error('鞈??臬憭望?嚗? + error.message);
+            console.error('匯出失敗:', error);
+            NotificationSystem.error('資料匯出失敗：' + error.message);
         }
     }
 
     static async import(file) {
         try {
-            LoadingIndicator.show('甇?霈??隞賣?獢?..');
+            LoadingIndicator.show('正在讀取備份檔案...');
 
             const text = await file.text();
             const data = JSON.parse(text);
 
-            // 撽?鞈??澆?
+            // 驗證資料格式
             if (!this.validateBackupData(data)) {
-                throw new Error('?遢瑼??澆?銝迤蝣?);
+                throw new Error('備份檔案格式不正確');
             }
 
             LoadingIndicator.hide();
 
-            // 蝣箄??臬
+            // 確認匯入
             const confirmed = await ConfirmDialog.show({
-                title: '蝣箄??臬鞈?',
-                message: '?臬鞈?撠??????蝣箏?閬匱蝥?嚗遣霅啣??遢?暹?鞈???,
+                title: '確認匯入資料',
+                message: '匯入資料將覆蓋現有資料，確定要繼續嗎？建議先備份現有資料。',
                 type: 'warning',
-                confirmText: '蝣箏??臬',
-                cancelText: '??'
+                confirmText: '確定匯入',
+                cancelText: '取消'
             });
 
             if (!confirmed) {
-                NotificationSystem.info('撌脣?瘨??);
+                NotificationSystem.info('已取消匯入');
                 return;
             }
 
-            LoadingIndicator.show('甇??臬鞈?...');
+            LoadingIndicator.show('正在匯入資料...');
 
-            // ?臬鞈?
+            // 匯入資料
             if (data.students) {
                 students = data.students;
-                localStorage.setItem(window.STUDENTS_KEY || 'students', JSON.stringify(students));
+                localStorage.setItem('students', JSON.stringify(students));
             }
             if (data.pointsHistory) {
                 pointsHistory = data.pointsHistory;
-                localStorage.setItem('pointsHistory', JSON.stringify(pointsHistory));
+                localStorage.setItem(window.POINTS_HISTORY_KEY || 'pointsHistory', JSON.stringify(pointsHistory));
             }
             if (data.groups) {
                 groups = data.groups;
@@ -97,13 +97,13 @@ class DataBackup {
             }
 
             LoadingIndicator.hide();
-            NotificationSystem.success('鞈??臬??嚗??Ｗ撠??啗???);
+            NotificationSystem.success('資料匯入成功，頁面即將重新載入');
             setTimeout(() => location.reload(), 1500);
 
         } catch (error) {
             LoadingIndicator.hide();
-            console.error('?臬憭望?:', error);
-            NotificationSystem.error('鞈??臬憭望?嚗? + error.message);
+            console.error('匯入失敗:', error);
+            NotificationSystem.error('資料匯入失敗：' + error.message);
         }
     }
 
@@ -123,23 +123,23 @@ class DataBackup {
             const oneDay = 24 * 60 * 60 * 1000;
 
             if (!lastBackup || (now - parseInt(lastBackup)) > oneDay) {
-                console.log('?瑁??芸??遢嚗??乩?甈∴?');
+                console.log('執行自動備份（每日一次）');
                 this.export();
                 localStorage.setItem('lastAutoBackup', now.toString());
             }
         } catch (error) {
-            console.error('?芸??遢憭望?:', error);
+            console.error('自動備份失敗:', error);
         }
     }
 }
 
-// ?遢?臬???賣
+// 備份匯入處理函數
 async function handleBackupImport(event) {
     const file = event.target.files[0];
     if (!file) return;
 
     await DataBackup.import(file);
 
-    // 皜征瑼??豢??剁??迂???豢???瑼?
+    // 清空檔案選擇器，允許重複選擇同一檔案
     event.target.value = '';
 }

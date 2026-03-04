@@ -381,7 +381,7 @@
      * 匯出分數歷史記錄
      */
     window.exportPointsHistory = function () {
-        const history = JSON.parse(localStorage.getItem('pointsHistory')) || [];
+        const history = JSON.parse(localStorage.getItem(window.POINTS_HISTORY_KEY || 'pointsHistory')) || [];
 
         if (history.length === 0) {
             if (typeof NotificationSystem !== 'undefined') {
@@ -536,7 +536,7 @@
         const backupData = {
             timestamp: new Date().toISOString(),
             students: JSON.parse(localStorage.getItem(window.STUDENTS_KEY || 'students') || '[]'),
-            pointsHistory: JSON.parse(localStorage.getItem('pointsHistory') || '[]'),
+            pointsHistory: JSON.parse(localStorage.getItem(window.POINTS_HISTORY_KEY || 'pointsHistory') || '[]'),
             notebookEntries: JSON.parse(localStorage.getItem('notebookEntries') || '[]'),
             groups: JSON.parse(localStorage.getItem('groups') || '[]'),
             seatingConfig: JSON.parse(localStorage.getItem('seatingConfig') || '{}')
@@ -588,7 +588,7 @@
 
         if (confirm(`確定要恢復 ${new Date(backup.timestamp).toLocaleString()} 的備份嗎？\n\n⚠️ 目前資料將被覆蓋！`)) {
             localStorage.setItem(window.STUDENTS_KEY || 'students', JSON.stringify(backup.students));
-            localStorage.setItem('pointsHistory', JSON.stringify(backup.pointsHistory));
+            localStorage.setItem(window.POINTS_HISTORY_KEY || 'pointsHistory', JSON.stringify(backup.pointsHistory));
             localStorage.setItem('notebookEntries', JSON.stringify(backup.notebookEntries));
             localStorage.setItem('groups', JSON.stringify(backup.groups));
             localStorage.setItem('seatingConfig', JSON.stringify(backup.seatingConfig));
