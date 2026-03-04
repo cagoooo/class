@@ -151,7 +151,7 @@ function addNotebookEnhanced() {
     };
 
     notebookEntries.unshift(entry);
-    localStorage.setItem('notebookEntries', JSON.stringify(notebookEntries));
+    localStorage.setItem(window.CLASS_KEYS?.notebookEntries || 'notebookEntries', JSON.stringify(notebookEntries));
 
     document.getElementById('notebookContent').value = '';
     renderNotebookEnhanced();
@@ -419,7 +419,7 @@ function saveFromFullscreen() {
     };
 
     notebookEntries.unshift(entry);
-    localStorage.setItem('notebookEntries', JSON.stringify(notebookEntries));
+    localStorage.setItem(window.CLASS_KEYS?.notebookEntries || 'notebookEntries', JSON.stringify(notebookEntries));
 
     closeFullscreenEditor();
     renderNotebookEnhanced();

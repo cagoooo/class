@@ -588,9 +588,9 @@
 
         if (confirm(`確定要恢復 ${new Date(backup.timestamp).toLocaleString()} 的備份嗎？\n\n⚠️ 目前資料將被覆蓋！`)) {
             localStorage.setItem(window.STUDENTS_KEY || 'students', JSON.stringify(backup.students));
-            localStorage.setItem('pointsHistory', JSON.stringify(backup.pointsHistory));
-            localStorage.setItem('notebookEntries', JSON.stringify(backup.notebookEntries));
-            localStorage.setItem('groups', JSON.stringify(backup.groups));
+            localStorage.setItem(window.CLASS_KEYS?.pointsHistory || 'pointsHistory', JSON.stringify(backup.pointsHistory));
+            localStorage.setItem(window.CLASS_KEYS?.notebookEntries || 'notebookEntries', JSON.stringify(backup.notebookEntries));
+            localStorage.setItem(window.CLASS_KEYS?.groups || 'groups', JSON.stringify(backup.groups));
             localStorage.setItem('seatingConfig', JSON.stringify(backup.seatingConfig));
 
             if (typeof NotificationSystem !== 'undefined') {

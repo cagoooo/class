@@ -505,11 +505,11 @@ async function mergeWithCloud() {
 
         // 存 localStorage
         localStorage.setItem(window.STUDENTS_KEY || 'students', JSON.stringify(students));
-        localStorage.setItem('pointsHistory', JSON.stringify(pointsHistory));
-        localStorage.setItem('groups', JSON.stringify(groups));
-        localStorage.setItem('notebookEntries', JSON.stringify(notebookEntries));
-        localStorage.setItem('homeworkList', JSON.stringify(homeworkList));
-        localStorage.setItem('lotteryHistory', JSON.stringify(lotteryHistory));
+        localStorage.setItem(window.CLASS_KEYS?.pointsHistory || 'pointsHistory', JSON.stringify(pointsHistory));
+        localStorage.setItem(window.CLASS_KEYS?.groups || 'groups', JSON.stringify(groups));
+        localStorage.setItem(window.CLASS_KEYS?.notebookEntries || 'notebookEntries', JSON.stringify(notebookEntries));
+        localStorage.setItem(window.CLASS_KEYS?.homeworkList || 'homeworkList', JSON.stringify(homeworkList));
+        localStorage.setItem(window.CLASS_KEYS?.lotteryHistory || 'lotteryHistory', JSON.stringify(lotteryHistory));
 
         // 上傳合併結果
         await syncToCloud();
