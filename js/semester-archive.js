@@ -1,16 +1,16 @@
-﻿/**
+/**
  * semester-archive.js
- * Q01嚗飛?????摮芋蝯?Semester Archive嚗?
+ * Q01：學期資料自動封存模組（Semester Archive）
  *
- * ?嚗?
- *  - 銝?萄??桀??剔??????摮 Firebase archives/ 頝臬?
- *  - 撠?敺?賂?皜征?嚗??飛???殷?/ 皜征雿平閮?
- *  - ?舀?仿甇瑕摮豢?嚗?靘???Q02 撱嗡撓嚗?
- *  - 摰?游?憭蝝頂蝯梧?v3.0.1+嚗?
+ * 功能：
+ *  - 一鍵將目前班級所有資料封存至 Firebase archives/ 路徑
+ *  - 封存後可選：清空分數（保留學生名單）/ 清空作業記錄
+ *  - 支援查閱歷史學期（僅供參考，Q02 延伸）
+ *  - 完整整合多班級系統（v3.0.1+）
  *
- * 雿輻?孵?嚗?
- *  ??classnew.html ? <script src="./js/semester-archive.js"> 敺?
- *  SemesterArchive.openUI() ?臬?怠?摮?Modal??
+ * 使用方式：
+ *  在 classnew.html 加入 <script src="./js/semester-archive.js"> 後，
+ *  SemesterArchive.openUI() 可呼叫封存 Modal。
  *
  * @version 3.0.2
  */
@@ -18,19 +18,19 @@
 const SemesterArchive = (() => {
     'use strict';
 
-    // ??? 撣豢 ???????????????????????????????????????????????
+    // ─── 常數 ───────────────────────────────────────────────
     const CURRENT_YEAR = new Date().getFullYear();
     const CURRENT_MONTH = new Date().getMonth() + 1;
-    // ?啁摮詨嚗?嚚??銝飛??S2)嚗????僑1?銝飛??S1)
+    // 台灣學制：2～7月為下學期(S2)，8月～隔年1月為上學期(S1)
     const CURRENT_SEMESTER = (CURRENT_MONTH >= 2 && CURRENT_MONTH <= 7) ? 'S2' : 'S1';
     const DEFAULT_ARCHIVE_KEY = `${CURRENT_YEAR}-${CURRENT_SEMESTER}`;
 
-    // ???桀??剔? ID嚗?游??剔?嚗?
+    // 取得目前班級 ID（支援多班級）
     function getCurClassId() {
         return localStorage.getItem('currentClassId') || 'default';
     }
 
-    // ??甇斤蝝? Firebase ?箏??
+    // 取得此班級的 Firebase 基底參照
     function getClassBaseRef() {
         const db = window.FirebaseConfig?.getDb();
         const uid = window.FirebaseConfig?.getCurrentUserId();
@@ -42,21 +42,21 @@ const SemesterArchive = (() => {
         return db.collection('users').doc(uid).collection('classes').doc(classId);
     }
 
-    // ??? ?詨?嚗銵?摮?????????????????????????????????????
+    // ─── 核心：執行封存 ────────────────────────────────────
     /**
-     * @param {string} archiveKey 靘? "2025-S2"
+     * @param {string} archiveKey 例如 "2025-S2"
      * @param {Object} options { clearScores, clearHomework }
      */
     async function archiveSemester(archiveKey, options = {}) {
         const base = getClassBaseRef();
-        if (!base) throw new Error('隢??餃 Google 撣唾?敺??瑁?撠?');
+        if (!base) throw new Error('請先登入 Google 帳號後再執行封存');
 
-        typeof LoadingIndicator !== 'undefined' && LoadingIndicator.show('? 甇?撠?摮豢?鞈?...');
+        typeof LoadingIndicator !== 'undefined' && LoadingIndicator.show('📦 正在封存學期資料...');
 
         try {
             const archiveRef = base.collection('archives').doc(archiveKey);
 
-            // ?? 1. 霈?????????
+            // ── 1. 讀取目前所有資料 ──
             const [studentsSnap, pointsSnap, notebookSnap, hwSnap] = await Promise.all([
                 base.collection('students').get(),
                 base.collection('pointsHistory').get(),
@@ -72,11 +72,11 @@ const SemesterArchive = (() => {
             const totalPoints = students.reduce((acc, s) => acc + (Number(s.score) || 0), 0);
             const avgPoints = students.length ? (totalPoints / students.length).toFixed(1) : 0;
 
-            // ?? 2. 撖怠撠?蝭暺???
+            // ── 2. 寫入封存節點 ──
             const db = window.FirebaseConfig.getDb();
             const batch = db.batch();
 
-            // meta ?辣
+            // meta 文件
             batch.set(archiveRef.collection('meta').doc('info'), {
                 archiveKey,
                 archivedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -87,19 +87,19 @@ const SemesterArchive = (() => {
                 semesterLabel: _buildSemesterLabel(archiveKey),
             });
 
-            // 摮貊?敹怎嚗?嚗?
+            // 學生快照（含分數）
             students.forEach(s => batch.set(archiveRef.collection('students').doc(String(s.id)), s));
 
-            // ?????
-            const MAX_BATCH = 490; // Firestore batch 銝? 500
-            let batchCount = students.length + 1; // 撌脩??雿
+            // 加扣分記錄
+            const MAX_BATCH = 490; // Firestore batch 上限 500
+            let batchCount = students.length + 1; // 已用的操作數
 
             const flush = async () => {
                 await batch.commit();
-                // 瘜冽?嚗atch 雿輻敺撱Ｘ?嚗??db.batch() ?遣
+                // 注意：batch 使用後即廢棄，改用 db.batch() 重建
             };
 
-            // ?撖怠 pointsHistory
+            // 分批寫入 pointsHistory
             let tempBatch = db.batch();
             let tempCount = 0;
             for (const p of pointsHistory) {
@@ -112,7 +112,7 @@ const SemesterArchive = (() => {
                 }
             }
 
-            // ?舐窗蝪踴?璆剛???
+            // 聯絡簿、作業記錄
             for (const n of notebookEntries) {
                 tempBatch.set(archiveRef.collection('notebookEntries').doc(String(n.id)), n);
                 tempCount++;
@@ -133,20 +133,20 @@ const SemesterArchive = (() => {
             }
             if (tempCount > 0) await tempBatch.commit();
 
-            // 擐嚗eta + students嚗?
+            // 首批（meta + students）
             await batch.commit();
 
-            console.log(`[SemesterArchive] ??撠?摰?: ${archiveKey}嚗?{students.length} 雿飛??`);
+            console.log(`[SemesterArchive] ✅ 封存完成: ${archiveKey}（${students.length} 位學生）`);
 
-            // ?? 3. 靘??蝛箸摮豢?鞈? ??
+            // ── 3. 依選項清空本學期資料 ──
             if (options.clearScores) {
                 await _clearScores(base, students);
-                console.log('[SemesterArchive] ?撌脫飛?塚?摮貊??靽?嚗?);
+                console.log('[SemesterArchive] 分數已歸零（學生名單保留）');
             }
             if (options.clearHomework) {
                 await _clearCollection(base, 'homeworks');
                 await _clearCollection(base, 'notebookEntries');
-                console.log('[SemesterArchive] 雿平?蝯∠倏撌脫?蝛?);
+                console.log('[SemesterArchive] 作業與聯絡簿已清空');
             }
 
             return { success: true, archiveKey, studentCount: students.length };
@@ -156,7 +156,7 @@ const SemesterArchive = (() => {
         }
     }
 
-    // 撠??飛???豢飛?塚?銝?文飛??
+    // 將所有學生分數歸零（不刪除學生）
     async function _clearScores(base, students) {
         const db = window.FirebaseConfig.getDb();
         let batch = db.batch();
@@ -173,10 +173,10 @@ const SemesterArchive = (() => {
         }
         if (count > 0) await batch.commit();
 
-        // 皜征?????
+        // 清空加扣分記錄
         await _clearCollection(base, 'pointsHistory');
 
-        // ?郊?砍 localStorage
+        // 同步本地 localStorage
         window.students?.forEach(s => { s.score = 0; });
         localStorage.setItem(window.STUDENTS_KEY || 'students', JSON.stringify(window.students || []));
         localStorage.setItem('pointsHistory', JSON.stringify([]));
@@ -184,7 +184,7 @@ const SemesterArchive = (() => {
         if (typeof renderStudents === 'function') renderStudents();
     }
 
-    // 皜征?游?collection
+    // 清空整個 collection
     async function _clearCollection(base, collectionName) {
         const snap = await base.collection(collectionName).get();
         if (snap.empty) return;
@@ -198,21 +198,21 @@ const SemesterArchive = (() => {
         if (count > 0) await batch.commit();
     }
 
-    // 撱箇?摮豢?璅惜憿舐內??
+    // 建立學期標籤顯示文字
     function _buildSemesterLabel(key) {
         const [year, sem] = key.split('-');
-        const semLabel = sem === 'S1' ? '銝飛?? : '銝飛??;
-        return `${year} 摮詨僑 ${semLabel}`;
+        const semLabel = sem === 'S1' ? '上學期' : '下學期';
+        return `${year} 學年 ${semLabel}`;
     }
 
-    // ??? 霈?風?脣?摮?銵??????????????????????????????????
+    // ─── 讀取歷史封存列表 ─────────────────────────────────
     async function listArchives() {
         const base = getClassBaseRef();
         if (!base) return [];
         try {
             const archivesCol = base.collection('archives');
             const snap = await archivesCol.listDocuments?.() || [];
-            // listDocuments ?冽?鈭?SDK ?銝?剁??寧 getDocs
+            // listDocuments 在某些 SDK 版本不可用，改用 getDocs
             const metaSnaps = await Promise.all(
                 (await archivesCol.get()).docs
                     .map(d => d.ref.collection('meta').doc('info').get())
@@ -222,18 +222,18 @@ const SemesterArchive = (() => {
                 .map(s => s.data())
                 .sort((a, b) => (b.archiveKey > a.archiveKey ? 1 : -1));
         } catch (e) {
-            console.warn('[SemesterArchive] 霈??摮?銵典仃??', e);
+            console.warn('[SemesterArchive] 讀取封存列表失敗:', e);
             return [];
         }
     }
 
-    // ??? UI 璅??瘜典 ??????????????????????????????????????
+    // ─── UI 樣式注入 ──────────────────────────────────────
     function _injectStyles() {
         if (document.getElementById('semester-archive-styles')) return;
         const style = document.createElement('style');
         style.id = 'semester-archive-styles';
         style.textContent = `
-/* ??? 摮豢?撠? Modal 璅?? ??? */
+/* ─── 學期封存 Modal 樣式 ─── */
 #sa-modal-overlay {
     position: fixed; inset: 0; z-index: 9000;
     background: rgba(0,0,0,0.6);
@@ -333,16 +333,16 @@ const SemesterArchive = (() => {
         document.head.appendChild(style);
     }
 
-    // ??? ?? UI ?亙 ?????????????????????????????????????
+    // ─── 開啟 UI 入口 ─────────────────────────────────────
     async function openUI() {
         if (!window.FirebaseConfig?.isConnected()) {
             typeof NotificationSystem !== 'undefined' &&
-                NotificationSystem.warning('隢??餃 Google 撣唾?敺??賭蝙?典飛??摮???);
+                NotificationSystem.warning('請先登入 Google 帳號後才能使用學期封存功能');
             return;
         }
         _injectStyles();
 
-        // ???桀?蝯梯?
+        // 取得目前統計
         const stu = window.students || [];
         const pts = window.pointsHistory || [];
         const totalPts = stu.reduce((a, s) => a + (Number(s.score) || 0), 0);
@@ -352,72 +352,72 @@ const SemesterArchive = (() => {
         overlay.innerHTML = `
 <div id="sa-modal">
   <div id="sa-modal-header">
-    <h2>? 摮豢?鞈?撠?</h2>
-    <button id="sa-modal-close" title="??">??/button>
+    <h2>📦 學期資料封存</h2>
+    <button id="sa-modal-close" title="關閉">✕</button>
   </div>
 
   <div id="sa-modal-body">
     <p style="font-size:0.85rem;color:#6b7280;margin-bottom:1rem;">
-      撠?敺??砍飛??????瘞訾?靽??券蝡荔??舫??望風?脰???
+      封存後，本學期所有資料將永久保存在雲端，可隨時查閱歷史記錄。
     </p>
 
-    <!-- ?砍飛?絞閮?-->
+    <!-- 本學期統計 -->
     <div class="sa-stat-grid">
       <div class="sa-stat-card">
         <div class="sa-stat-value">${stu.length}</div>
-        <div class="sa-stat-label">摮貊?鈭箸</div>
+        <div class="sa-stat-label">學生人數</div>
       </div>
       <div class="sa-stat-card">
         <div class="sa-stat-value">${pts.length}</div>
-        <div class="sa-stat-label">?????/div>
+        <div class="sa-stat-label">加扣分記錄</div>
       </div>
       <div class="sa-stat-card">
         <div class="sa-stat-value">${totalPts}</div>
-        <div class="sa-stat-label">?函蝛?蝮質?</div>
+        <div class="sa-stat-label">全班積分總計</div>
       </div>
     </div>
 
-    <!-- 撠?摮豢?璅惜 -->
+    <!-- 封存學期標籤 -->
     <div class="sa-key-row">
-      <label>?? 撠?璅惜</label>
+      <label>📅 封存標籤</label>
       <input id="sa-archive-key" type="text" value="${DEFAULT_ARCHIVE_KEY}"
-        placeholder="靘? 2025-S2" maxlength="16">
+        placeholder="例如 2025-S2" maxlength="16">
     </div>
 
-    <!-- 撠?敺?雿??-->
+    <!-- 封存後操作選項 -->
     <div class="sa-options">
       <label class="sa-option">
         <input type="checkbox" id="sa-opt-clear-scores" checked>
         <div>
-          <div class="sa-option-title">?? 皜征?嚗??飛????/div>
-          <div class="sa-option-desc">撠?敺??飛???飛?塚??????蝛算??拙???摮豢?雿輻</div>
+          <div class="sa-option-title">🔄 清空分數，保留學生名單</div>
+          <div class="sa-option-desc">封存後所有學生積分歸零，加扣分記錄清空——最適合升下學期使用</div>
         </div>
       </label>
       <label class="sa-option">
         <input type="checkbox" id="sa-opt-clear-homework">
         <div>
-          <div class="sa-option-title">?? ??皜征雿平?蝯∠倏閮?</div>
-          <div class="sa-option-desc">銝雿菜??方?摮豢???璆剖?銵典??舐窗蝪選?霈?摮豢?敺??</div>
+          <div class="sa-option-title">📋 同時清空作業與聯絡簿記錄</div>
+          <div class="sa-option-desc">一併清除舊學期的作業列表和聯絡簿，讓下學期從頭開始</div>
         </div>
       </label>
     </div>
 
-    <!-- 霅血??憛?-->
+    <!-- 警告區塊 -->
     <div class="sa-warning">
-      ?? <span>皜征??<strong>?⊥?敺拙?</strong>嚗?????撌脣?摰?脣??喳?摮?暺?隢敹?/span>
+      ⚠️ <span>清空操作<strong>無法復原</strong>，但所有資料都已先安全儲存至封存節點，請放心。</span>
     </div>
   </div>
 
   <div id="sa-modal-footer">
-    <button id="sa-btn-cancel">??</button>
-    <button id="sa-btn-confirm">? 蝣箄?撠?</button>
+    <button id="sa-btn-cancel">取消</button>
+    <button id="sa-btn-confirm">📦 確認封存</button>
   </div>
 </div>
         `;
 
         document.body.appendChild(overlay);
 
-        // 鈭辣蝬?
+        // 事件綁定
         overlay.querySelector('#sa-modal-close').onclick = () => overlay.remove();
         overlay.querySelector('#sa-btn-cancel').onclick = () => overlay.remove();
         overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
@@ -425,7 +425,7 @@ const SemesterArchive = (() => {
         overlay.querySelector('#sa-btn-confirm').onclick = async () => {
             const key = overlay.querySelector('#sa-archive-key').value.trim();
             if (!/^\d{4}-S[12]$/.test(key)) {
-                alert('撠?璅惜?澆??航炊嚗?雿輻?僑隞?S1???僑隞?S2?撘n靘?嚗?025-S2');
+                alert('封存標籤格式錯誤，請使用「年份-S1」或「年份-S2」格式\n例如：2025-S2');
                 return;
             }
             const clearScores = overlay.querySelector('#sa-opt-clear-scores').checked;
@@ -433,47 +433,47 @@ const SemesterArchive = (() => {
 
             const btn = overlay.querySelector('#sa-btn-confirm');
             btn.disabled = true;
-            btn.textContent = '撠?銝?..';
+            btn.textContent = '封存中...';
 
             try {
                 const result = await archiveSemester(key, { clearScores, clearHomework });
                 overlay.remove();
                 typeof NotificationSystem !== 'undefined' &&
                     NotificationSystem.success(
-                        `?? 摮豢?撠???嚗歇撠? ${result.studentCount} 雿飛??摰鞈??
+                        `🎉 學期封存成功！已封存 ${result.studentCount} 位學生的完整資料。`
                     );
             } catch (err) {
                 btn.disabled = false;
-                btn.textContent = '? 蝣箄?撠?';
-                console.error('[SemesterArchive] 撠?憭望?:', err);
+                btn.textContent = '📦 確認封存';
+                console.error('[SemesterArchive] 封存失敗:', err);
                 typeof NotificationSystem !== 'undefined' &&
-                    NotificationSystem.error('撠?憭望?嚗? + err.message);
+                    NotificationSystem.error('封存失敗：' + err.message);
             }
         };
     }
 
-    // ??? ?具飛?恣????亙?? ???????????????????????
+    // ─── 在「學生管理」頁加入入口按鈕 ───────────────────────
     function _injectEntryButton() {
-        // 蝑?DOM 撠梁?敺釣??
+        // 等 DOM 就緒後注入
         const tryInject = () => {
-            // 撠???桃恣?憛??剁?蝺?具??渲???隞賬??對?
+            // 尋找「名單管理」区塊底部（緊接在「完整資料備份」下方）
             const backupDiv = document.querySelector('.mt-4.pt-4.border-t.border-gray-200');
             if (!backupDiv) return;
 
-            // ?踹???瘜典
+            // 避免重複注入
             if (document.getElementById('sa-entry-btn')) return;
 
             const wrapper = document.createElement('div');
             wrapper.className = 'mt-4 pt-4 border-t border-gray-200';
             wrapper.innerHTML = `
-<h4 class="text-sm font-semibold text-gray-700 mb-2">? 摮豢?鞈?撠?</h4>
+<h4 class="text-sm font-semibold text-gray-700 mb-2">📦 學期資料封存</h4>
 <button id="sa-entry-btn"
     class="w-full bg-violet-500 text-white px-4 py-2 rounded-lg hover:bg-violet-600 transition-colors text-sm active:scale-95"
-    title="撠?蝝?????摮?脩垢嚗?豢?蝛箏??訾誑靘踵摮豢???">
-    ?? 撠??砍飛????
+    title="將目前班級所有資料封存至雲端，可選清空分數以便新學期開始">
+    📅 封存本學期資料
 </button>
 <div class="text-xs text-gray-600 bg-violet-50 p-2 rounded mt-2">
-    ? 摮豢??思蝙?剁?銝?萄?摮??詨翰?改?霈?摮豢?敺??
+    💡 學期末使用：一鍵封存分數快照，讓下學期從零開始
 </div>
             `;
             backupDiv.after(wrapper);
@@ -483,15 +483,15 @@ const SemesterArchive = (() => {
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', tryInject);
         } else {
-            // 撱園蝑隞芋蝯葡????
+            // 延遲等其他模組渲染完成
             setTimeout(tryInject, 800);
         }
     }
 
-    // ??? ???????????????????????????????????????????????
+    // ─── 初始化 ───────────────────────────────────────────
     _injectEntryButton();
 
-    // ??? ?祇? API ?????????????????????????????????????????
+    // ─── 公開 API ─────────────────────────────────────────
     return {
         openUI,
         archiveSemester,
