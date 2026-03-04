@@ -51,21 +51,46 @@ function getUserCollection(collectionName) {
 
 /**
  * 上傳整個資料集合（Array 形式）
+ * ⚡ 完全同步模式：先刪除雲端多餘舊文件，再寫入本地資料
+ * 確保雲端與本地完全一致，不殘留舊班資料
  */
 async function uploadCollection(collectionName, dataArray) {
     try {
         const collection = getUserCollection(collectionName);
         if (!collection) return false;
-        if (!dataArray || dataArray.length === 0) return true;
 
         const db = window.FirebaseConfig.getDb();
-        const batch = db.batch();
-        dataArray.forEach(item => {
-            const docRef = collection.doc(String(item.id));
-            batch.set(docRef, { ...item, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-        });
-        await batch.commit();
-        console.log(`✅ 上傳 ${collectionName}: ${dataArray.length} 筆`);
+        const localIds = new Set((dataArray || []).map(item => String(item.id)));
+
+        // ① 取得雲端現有所有 ID
+        const snapshot = await collection.get();
+        const cloudIds = [];
+        snapshot.forEach(doc => cloudIds.push(doc.id));
+
+        // ② 批次刪除雲端多餘文件（本地沒有的）
+        const toDelete = cloudIds.filter(id => !localIds.has(id));
+        if (toDelete.length > 0) {
+            const delBatch = db.batch();
+            toDelete.forEach(id => delBatch.delete(collection.doc(id)));
+            await delBatch.commit();
+            console.log(`🗑️ 刪除雲端多餘 ${collectionName}: ${toDelete.length} 筆`);
+        }
+
+        // ③ 批次寫入本地資料（空陣列則只做刪除，直接返回）
+        if (!dataArray || dataArray.length === 0) return true;
+
+        // Firestore 每次 batch 限 500 筆，分批處理
+        const BATCH_SIZE = 400;
+        for (let i = 0; i < dataArray.length; i += BATCH_SIZE) {
+            const chunk = dataArray.slice(i, i + BATCH_SIZE);
+            const writeBatch = db.batch();
+            chunk.forEach(item => {
+                const docRef = collection.doc(String(item.id));
+                writeBatch.set(docRef, { ...item, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+            });
+            await writeBatch.commit();
+        }
+        console.log(`✅ 上傳 ${collectionName}: ${dataArray.length} 筆（已清除 ${toDelete.length} 筆舊資料）`);
         return true;
     } catch (error) {
         console.error(`上傳 ${collectionName} 失敗:`, error);
