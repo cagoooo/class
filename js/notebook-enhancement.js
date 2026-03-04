@@ -168,6 +168,11 @@ function renderNotebookEnhanced() {
     const container = document.getElementById('notebookList');
     if (!container) return;
 
+    // 防禦性檢查：確保全域 notebookEntries 已初始化
+    if (typeof notebookEntries === 'undefined') {
+        console.warn('[notebook-enhancement] notebookEntries 尚未初始化，跳過渲染');
+        return;
+    }
     const typeInfo = {
         homework: { name: '作業', color: 'blue' },
         exam: { name: '考試', color: 'red' },

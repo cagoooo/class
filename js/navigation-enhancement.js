@@ -12,13 +12,19 @@
      * 增強版 showSection 函數
      * 添加平滑滾動效果，提升 UX 體驗
      */
-    function enhanceShowSection() {
+    function enhanceShowSection(retryCount) {
+        retryCount = retryCount || 0;
+
         // 保存原始函數
         const originalShowSection = window.showSection;
 
         if (typeof originalShowSection !== 'function') {
-            console.warn('原始 showSection 函數不存在，稍後重試...');
-            setTimeout(enhanceShowSection, 200);
+            if (retryCount >= 30) {
+                // 超過 30 次（約 6 秒）就放棄，避免無窮迴圈
+                console.warn('⚠️ [navigation-enhancement] showSection 函數始終不存在，已停止重試');
+                return;
+            }
+            setTimeout(() => enhanceShowSection(retryCount + 1), 200);
             return;
         }
 
