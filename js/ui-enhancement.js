@@ -713,8 +713,8 @@
         const studentSection = document.getElementById('students-section');
         if (!studentSection || document.getElementById('seating-chart-btn')) return;
 
-        // 找到班級統計區域
-        const statsArea = studentSection.querySelector('.bg-gray-50.p-3');
+        // 使用 id 精確定位班級統計區域，避免誤配學生卡片
+        const statsArea = document.getElementById('class-stats-panel');
         if (statsArea) {
             const btn = document.createElement('button');
             btn.id = 'seating-chart-btn';
