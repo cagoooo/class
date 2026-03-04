@@ -21,6 +21,21 @@
             }
         }
     </script>
+    <!-- 核心函數：showSection（在所有其他 JS 之前定義，確保任何時機都可用） -->
+    <script>
+        window.showSection = function (sectionName) {
+            document.querySelectorAll('.section').forEach(function (el) {
+                el.classList.add('hidden');
+            });
+            var targetId = sectionName.endsWith('-section') ? sectionName : (sectionName + '-section');
+            var target = document.getElementById(targetId);
+            if (target) {
+                target.classList.remove('hidden');
+            } else {
+                console.warn('[showSection] 找不到區塊:', targetId);
+            }
+        };
+    </script>
 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1611,8 +1626,8 @@
                 return { valid: true, value: sanitized };
             } static validateNumber(num, min = 1, max = 999) {
                 const
-                parsed = parseInt(num); if (isNaN(parsed)) { return { valid: false, message: '請輸入有效的數字' }; } if (parsed < min ||
-                    parsed > max) {
+                    parsed = parseInt(num); if (isNaN(parsed)) { return { valid: false, message: '請輸入有效的數字' }; } if (parsed < min ||
+                        parsed > max) {
                     return { valid: false, message: `數字必須介於 ${min} 到 ${max} 之間` };
                 }
 
@@ -2374,12 +2389,12 @@
                 位可抽取的學生`);
                     } const tempAvailable = [...availableStudents]; for (let i = 0; i < selectCount; i++) {
                         const
-                        randomIndex = Math.floor(Math.random() * tempAvailable.length);
+                            randomIndex = Math.floor(Math.random() * tempAvailable.length);
                         result.push(tempAvailable.splice(randomIndex, 1)[0]);
                     }
                 } else if (type === 'group') {
                     const
-                    randomIndex = Math.floor(Math.random() * groups.length); result = [groups[randomIndex]];
+                        randomIndex = Math.floor(Math.random() * groups.length); result = [groups[randomIndex]];
                 } //
                 記錄已抽取的學生（僅限學生抽籤且開啟不重複） if (noRepeatLottery && type !== 'group') {
                     result.forEach(s => {
@@ -2807,7 +2822,7 @@
         // 聯絡簿...
         function useTemplate(content) {
             document.getElementById('notebookContent').value =
-            content;
+                content;
         }
         function addNotebook() {
             const date = document.getElementById('notebookDate').value;
@@ -2826,8 +2841,8 @@
         function removeNotebook(id) {
             if (confirm('確定要刪除這筆聯絡事項嗎？')) {
                 notebookEntries =
-                notebookEntries.filter(e => e.id !== id); localStorage.setItem('notebookEntries',
-                    JSON.stringify(notebookEntries)); renderNotebook();
+                    notebookEntries.filter(e => e.id !== id); localStorage.setItem('notebookEntries',
+                        JSON.stringify(notebookEntries)); renderNotebook();
             }
         }
 
@@ -3581,10 +3596,10 @@
                                                             // let ampm = timeParts[3] ? ` ${timeParts[3]}` : ''; // <--
                                                                 【修改】不再需要 ampm 變數 // 格式化日期 let dateString='' ; if
                     (clockSettings.showDate) {
-                        const dateOptions = {
-                            year: 'numeric', month: 'long', day: 'numeric',
-                            weekday: 'long'
-                        }; // 使用 'zh-TW' 顯示中文日期
+                    const dateOptions = {
+                        year: 'numeric', month: 'long', day: 'numeric',
+                        weekday: 'long'
+                    }; // 使用 'zh-TW' 顯示中文日期
                     dateString = now.toLocaleDateString('zh-TW', dateOptions);
                 } // 根據不同樣式更新 DOM switch (clockSettings.style) {
                                                                 case 'flip' : updateFlipClockDOM(hours, minutes,
