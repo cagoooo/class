@@ -212,12 +212,12 @@ async function syncToCloud() {
 
         // ── 並行上傳全部集合 ──
         await Promise.all([
-            uploadCollection(COLLECTIONS.STUDENTS, students || []),
-            uploadCollection(COLLECTIONS.POINTS_HISTORY, pointsHistory || []),
-            uploadCollection(COLLECTIONS.GROUPS, groups || []),
-            uploadCollection(COLLECTIONS.NOTEBOOKS, notebookEntries || []),
-            uploadCollection(COLLECTIONS.HOMEWORKS, homeworkList || []),
-            uploadCollection(COLLECTIONS.LOTTERY_HISTORY, lotteryHistory || []),
+            uploadCollection(COLLECTIONS.STUDENTS, Array.isArray(students) ? students : []),
+            uploadCollection(COLLECTIONS.POINTS_HISTORY, Array.isArray(pointsHistory) ? pointsHistory : []),
+            uploadCollection(COLLECTIONS.GROUPS, Array.isArray(groups) ? groups : []),
+            uploadCollection(COLLECTIONS.NOTEBOOKS, (typeof notebookEntries !== 'undefined' && Array.isArray(notebookEntries)) ? notebookEntries : []),
+            uploadCollection(COLLECTIONS.HOMEWORKS, Array.isArray(homeworkList) ? homeworkList : []),
+            uploadCollection(COLLECTIONS.LOTTERY_HISTORY, (typeof lotteryHistory !== 'undefined' && Array.isArray(lotteryHistory)) ? lotteryHistory : []),
             uploadCollection(COLLECTIONS.ANNOUNCEMENTS, annData),
             // 考試監考設定（單一 doc）
             uploadSingleDoc(COLLECTIONS.EXAM_DATA, 'subjects', { data: examSubjects }),
@@ -813,7 +813,7 @@ async function syncAllClassesToCloud() {
 
     // 進度通知
     const showProgress = (msg) => {
-        NotificationSystem && NotificationSystem.info(msg, 2000);
+        typeof NotificationSystem !== 'undefined' && NotificationSystem.info(msg, 2000);
     };
 
     const results = [];
@@ -843,11 +843,16 @@ async function syncAllClassesToCloud() {
             // 讀取各班 localStorage 資料
             const annKey = clsId === 'default' ? 'classAnnouncements' : `classAnnouncements-${clsId}`;
             const annData = JSON.parse(localStorage.getItem(annKey) || '[]');
-            const clsPointsHistory = JSON.parse(localStorage.getItem(`pointsHistory`) || '[]');
-            const clsGroups = JSON.parse(localStorage.getItem(`groups`) || '[]');
-            const clsNotebooks = JSON.parse(localStorage.getItem(`notebookEntries`) || '[]');
-            const clsHomeworks = JSON.parse(localStorage.getItem(`homeworkList`) || '[]');
-            const clsLottery = JSON.parse(localStorage.getItem(`lotteryHistory`) || '[]');
+            const phKey = clsId === 'default' ? 'pointsHistory' : `pointsHistory-${clsId}`;
+            const grKey = clsId === 'default' ? 'groups' : `groups-${clsId}`;
+            const nbKey = clsId === 'default' ? 'notebookEntries' : `notebookEntries-${clsId}`;
+            const hwKey = clsId === 'default' ? 'homeworkList' : `homeworkList-${clsId}`;
+            const ltKey = clsId === 'default' ? 'lotteryHistory' : `lotteryHistory-${clsId}`;
+            const clsPointsHistory = JSON.parse(localStorage.getItem(phKey) || '[]');
+            const clsGroups = JSON.parse(localStorage.getItem(grKey) || '[]');
+            const clsNotebooks = JSON.parse(localStorage.getItem(nbKey) || '[]');
+            const clsHomeworks = JSON.parse(localStorage.getItem(hwKey) || '[]');
+            const clsLottery = JSON.parse(localStorage.getItem(ltKey) || '[]');
             const examSubjects = JSON.parse(localStorage.getItem('examSubjects') || 'null');
             const examReminders = JSON.parse(localStorage.getItem('examReminders') || '{}');
             const examAttendance = JSON.parse(localStorage.getItem('examAttendance') || '{}');
