@@ -190,7 +190,7 @@
             group.score = group.members.reduce((total, member) => total + member.points, 0);
         });
 
-        localStorage.setItem('groups', JSON.stringify(groups));
+        localStorage.setItem(window.GROUPS_KEY || 'groups', JSON.stringify(groups));
 
         // 更新進度到 100%
         const progressBar = document.getElementById('groupingProgress');

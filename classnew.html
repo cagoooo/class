@@ -1455,13 +1455,14 @@
         // ===== 多班級資料隔離：根據當前班級 ID 決定 localStorage key =====
         var _curClassId = localStorage.getItem('currentClassId') || 'default';
         window.STUDENTS_KEY = (_curClassId === 'default') ? 'students' : ('students-' + _curClassId);
+        window.GROUPS_KEY = (_curClassId === 'default') ? 'groups' : ('groups-' + _curClassId);
         // ===== 結束 =====
 
         // 全域變數
         var students = JSON.parse(localStorage.getItem(STUDENTS_KEY)) || [];
         var pointsHistory = JSON.parse(localStorage.getItem('pointsHistory')) || [];
         var lotteryHistory = JSON.parse(localStorage.getItem('lotteryHistory')) || [];
-        var groups = JSON.parse(localStorage.getItem('groups')) || [];
+        var groups = JSON.parse(localStorage.getItem(GROUPS_KEY)) || [];
         var notebookEntries = JSON.parse(localStorage.getItem('notebookEntries')) || [];
         var homeworkList = JSON.parse(localStorage.getItem('homeworkList')) || [];
         var homeworkChecks = JSON.parse(localStorage.getItem('homeworkChecks')) || {};
@@ -1791,7 +1792,7 @@
                     }
                     if (data.groups) {
                         groups = data.groups;
-                        localStorage.setItem('groups', JSON.stringify(groups));
+                        localStorage.setItem(window.GROUPS_KEY || 'groups', JSON.stringify(groups));
                     }
                     if (data.notebookEntries) {
                         notebookEntries = data.notebookEntries;
@@ -2231,7 +2232,7 @@
             const group = groups.find(g => g.members.some(m => m.id === studentId));
             if (group) {
                 group.score += points;
-                localStorage.setItem('groups', JSON.stringify(groups));
+                localStorage.setItem(window.GROUPS_KEY || 'groups', JSON.stringify(groups));
                 renderGroups();
             }
 
@@ -3112,7 +3113,7 @@
                 groups = [];
                 localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
                 localStorage.setItem('pointsHistory', JSON.stringify(pointsHistory));
-                localStorage.setItem('groups', JSON.stringify(groups));
+                localStorage.setItem(window.GROUPS_KEY || 'groups', JSON.stringify(groups));
                 renderStudents();
                 updatePointsStudentSelect();
                 renderPointsHistory();
@@ -3131,7 +3132,7 @@
 
                 localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
                 localStorage.setItem('pointsHistory', JSON.stringify(pointsHistory));
-                localStorage.setItem('groups', JSON.stringify(groups));
+                localStorage.setItem(window.GROUPS_KEY || 'groups', JSON.stringify(groups));
                 localStorage.setItem('homeworkChecks', JSON.stringify(homeworkChecks));
 
                 renderStudents();
@@ -3169,7 +3170,7 @@
                 group.score = group.members.reduce((total, member) => total + member.points, 0);
             });
 
-            localStorage.setItem('groups', JSON.stringify(groups));
+            localStorage.setItem(window.GROUPS_KEY || 'groups', JSON.stringify(groups));
             renderGroups();
         }
 
@@ -3189,7 +3190,7 @@
         function adjustGroupScore(groupIndex, amount) {
             if (groups[groupIndex]) {
                 groups[groupIndex].score += amount;
-                localStorage.setItem('groups', JSON.stringify(groups));
+                localStorage.setItem(window.GROUPS_KEY || 'groups', JSON.stringify(groups));
                 renderGroups();
             }
         }
@@ -3217,7 +3218,7 @@
                 pointsHistory = [];
 
                 localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
-                localStorage.setItem('groups', JSON.stringify(groups));
+                localStorage.setItem(window.GROUPS_KEY || 'groups', JSON.stringify(groups));
                 localStorage.setItem('pointsHistory', JSON.stringify(pointsHistory));
 
                 renderStudents();
