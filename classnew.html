@@ -1509,6 +1509,37 @@
     let currentVisibleList = null; // 用於追蹤目前顯示的作業名單
 
     // ============================================
+    // === showSection：切換功能區塊顯示 ===
+    // ============================================
+    /**
+    * 顯示指定的功能區塊，並隱藏其他所有區塊。
+    * @param {string} sectionName - 如 'students'、'points'、'lottery' 等
+    * 實際 DOM id 為 sectionName + '-section'
+    */
+    window.showSection = function showSection(sectionName) {
+    // 隱藏所有 .section 區塊
+    document.querySelectorAll('.section').forEach(el => {
+    el.classList.add('hidden');
+    });
+
+    // 顯示目標區塊（相容兩種 id 格式：有無 -section 後綴）
+    const targetId = sectionName.endsWith('-section') ? sectionName : (sectionName + '-section');
+    const target = document.getElementById(targetId);
+    if (target) {
+    target.classList.remove('hidden');
+    } else {
+    console.warn('[showSection] 找不到區塊:', targetId);
+    }
+
+    // 更新行動裝置底部導覽列 active 狀態（若存在）
+    document.querySelectorAll('[data-section-btn]').forEach(btn => {
+    const s = btn.getAttribute('data-section-btn');
+    btn.classList.toggle('text-blue-500', s === sectionName || s === targetId);
+    });
+    };
+    // ============================================
+
+    // ============================================
     // === 第一階段優化：核心功能系統 ===
     // ============================================
 
