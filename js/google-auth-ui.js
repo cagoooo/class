@@ -200,9 +200,6 @@
                     <button class="gauth-dd-item" onclick="GoogleAuthUI.syncUp()">
                         ☁️ 立即同步（本地 → 雲端）
                     </button>
-                    <button class="gauth-dd-item" onclick="window.FirebaseSync?.syncAllClassesToCloud()" style="color:#7c3aed;font-weight:600">
-                        🚀 全班一鍵上傳
-                    </button>
                     <button class="gauth-dd-item" onclick="GoogleAuthUI.syncDown()">
                         📥 從雲端還原（雲端 → 本地）
                     </button>
@@ -258,9 +255,6 @@
                     </div>
                     <button class="gauth-dd-item" onclick="GoogleAuthUI.syncUp()">
                         ☁️ 立即同步
-                    </button>
-                    <button class="gauth-dd-item" onclick="window.FirebaseSync?.syncAllClassesToCloud()" style="color:#7c3aed;font-weight:600">
-                        🚀 全班上傳
                     </button>
                     <button class="gauth-dd-item" onclick="GoogleAuthUI.syncDown()">
                         📥 從雲端還原

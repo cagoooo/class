@@ -2,30 +2,32 @@
 
 ## [v3.0.5] - 2026-03-04
 
-### 🚀 新功能
-- **多班級資料完整隔離**（`classnew.html` + 7 個 JS 模組）：建立 `window.CLASS_KEYS` 統一管理 8 種 localStorage key，各班資料（加分記錄、分組、聯絡簿、作業、抽籤記錄）完全獨立，切換班級不再互相干擾
-- **🚀 全班一鍵上傳**（`google-auth-ui.js`）：新增「全班一鍵上傳」按鈕（桌面版 + 行動版），一次同步所有班級資料到 Firebase，並顯示完整結果摘要
+### 🆕 新功能
+
+#### 🏫 多班級學生資料隔離（`classnew.html` + 9 個 JS 模組）
+
+**問題描述**：切換班級時，所有班級共用同一個 `localStorage.students` key，導致不同班級的學生資料互相混淆。
+
+**修復方式**：
+- `classnew.html` 初始化 `window.STUDENTS_KEY`：預設班使用 `students`（向下相容），其他班使用 `students-{classId}`（如 `students-1772592454136`）
+- 9 個 JS 模組全部改用 `window.STUDENTS_KEY || 'students'` 讀寫 localStorage
+
+**更新模組**：
+`student-enhancement.js`、`ui-enhancement.js`、`firebase-sync.js`、`backup.js`、`semester-archive.js`、`data-reports.js`、`leaderboard-enhancement.js`、`lottery-enhancement.js`、`exam-proctor.js`、`google-auth-ui.js`
 
 ### 🐛 修復
-- **`showSection` 核心函數補缺**（`classnew.html`）：此函數從未被定義，導致所有功能區塊按鈕（學生管理、加扣分、分組等）點擊完全無效——已直接在主 script 補上完整實作
-- **`syncAllClassesToCloud` 讀取正確班級 key**（`firebase-sync.js`）：全班同步時，各班的 `pointsHistory-{id}`、`groups-{id}` 等 key 改以動態模式讀取，而非固定讀 default key
-- **`NotificationSystem` ReferenceError**（`firebase-sync.js`）：`NotificationSystem &&` 在未宣告環境下仍拋出錯誤，改為 `typeof NotificationSystem !== 'undefined' &&`
-- **`dataArray.forEach is not a function`**（`firebase-sync.js`）：上傳集合前改用 `Array.isArray()` 驗證，`notebookEntries`/`lotteryHistory` 加 `typeof` 保護
-- **`notebookEntries is not defined`**（`notebook-enhancement.js`）：`renderNotebookEnhanced()` 開頭加防禦性 `typeof` 檢查，模組初始化比主程式快時不再崩潰
-- **`navigation-enhancement.js` 無限重試**：`showSection` 函數找不到時，重試次數上限設為 30 次（6 秒），之後停止並印警告
+
+#### 📱 同步確認 Modal 顯示優化（`js/firebase-sync.js`）
+
+- 在 Modal 標題副文字加入目前班級名稱（如「⚡ 僅同步 [602] 班的資料，其他班級不受影響」）
+- 警告文字改為「只同步『602』班的資料至雲端，將完整覆蓋該班雲端資料」
+- 消除因本地/雲端班級資料量差異產生的誤導性「-25 人」警示
 
 ### 📁 更新檔案
-- `classnew.html` - 補上 `showSection` 函數、`window.CLASS_KEYS` 初始化
-- `js/firebase-sync.js` - 全班同步、防禦性檢查、版號升至 v3.0.5
-- `js/notebook-enhancement.js` - 防禦性初始化檢查
-- `js/navigation-enhancement.js` - 重試上限
-- `js/homework-enhancement.js` - CLASS_KEYS 隔離
-- `js/grouping-enhancement.js` - CLASS_KEYS 隔離
-- `js/semester-archive.js` - CLASS_KEYS 隔離
-- `js/backup.js` - CLASS_KEYS 隔離
-- `js/data-reports.js` - CLASS_KEYS 隔離
-- `js/google-auth-ui.js` - 全班一鍵上傳按鈕
-- `sw.js` / `manifest.json` - 版本号升至 v3.0.5
+- `classnew.html` - 初始化 `STUDENTS_KEY` 全域變數
+- `js/firebase-sync.js` - 同步 Modal 顯示班級名稱
+- 9 個 JS 模組 - 改用 `STUDENTS_KEY` 讀寫學生資料
+- `sw.js` / `manifest.json` - 版本號升至 v3.0.5
 
 ---
 

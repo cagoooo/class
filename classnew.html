@@ -21,21 +21,6 @@
             }
         }
     </script>
-    <!-- 核心函數：showSection（在所有其他 JS 之前定義，確保任何時機都可用） -->
-    <script>
-        window.showSection = function (sectionName) {
-            document.querySelectorAll('.section').forEach(function (el) {
-                el.classList.add('hidden');
-            });
-            var targetId = sectionName.endsWith('-section') ? sectionName : (sectionName + '-section');
-            var target = document.getElementById(targetId);
-            if (target) {
-                target.classList.remove('hidden');
-            } else {
-                console.warn('[showSection] 找不到區塊:', targetId);
-            }
-        };
-    </script>
 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1467,30 +1452,19 @@
 
 
     <script>
-        // ===== 多班級資料隔離：根據當前班級 ID 決定所有 localStorage key =====
+        // ===== 多班級資料隔離：根據當前班級 ID 決定 localStorage key =====
         var _curClassId = localStorage.getItem('currentClassId') || 'default';
-        var _sfx = (_curClassId === 'default') ? '' : ('-' + _curClassId);
-        window.CLASS_KEYS = {
-            students: 'students' + _sfx,
-            pointsHistory: 'pointsHistory' + _sfx,
-            groups: 'groups' + _sfx,
-            notebookEntries: 'notebookEntries' + _sfx,
-            homeworkList: 'homeworkList' + _sfx,
-            homeworkChecks: 'homeworkChecks' + _sfx,
-            lotteryHistory: 'lotteryHistory' + _sfx,
-            announcements: 'classAnnouncements' + _sfx,
-        };
-        window.STUDENTS_KEY = window.CLASS_KEYS.students; // 向下相容
+        window.STUDENTS_KEY = (_curClassId === 'default') ? 'students' : ('students-' + _curClassId);
         // ===== 結束 =====
 
         // 全域變數
-        var students = JSON.parse(localStorage.getItem(CLASS_KEYS.students)) || [];
-        var pointsHistory = JSON.parse(localStorage.getItem(CLASS_KEYS.pointsHistory)) || [];
-        var lotteryHistory = JSON.parse(localStorage.getItem(CLASS_KEYS.lotteryHistory)) || [];
-        var groups = JSON.parse(localStorage.getItem(CLASS_KEYS.groups)) || [];
-        var notebookEntries = JSON.parse(localStorage.getItem(CLASS_KEYS.notebookEntries)) || [];
-        var homeworkList = JSON.parse(localStorage.getItem(CLASS_KEYS.homeworkList)) || [];
-        var homeworkChecks = JSON.parse(localStorage.getItem(CLASS_KEYS.homeworkChecks)) || {};
+        var students = JSON.parse(localStorage.getItem(STUDENTS_KEY)) || [];
+        var pointsHistory = JSON.parse(localStorage.getItem('pointsHistory')) || [];
+        var lotteryHistory = JSON.parse(localStorage.getItem('lotteryHistory')) || [];
+        var groups = JSON.parse(localStorage.getItem('groups')) || [];
+        var notebookEntries = JSON.parse(localStorage.getItem('notebookEntries')) || [];
+        var homeworkList = JSON.parse(localStorage.getItem('homeworkList')) || [];
+        var homeworkChecks = JSON.parse(localStorage.getItem('homeworkChecks')) || {};
 
         // --- 計時器變數 ---
         let timerInterval = null;
@@ -1525,37 +1499,6 @@
         let currentVisibleList = null; // 用於追蹤目前顯示的作業名單
 
         // ============================================
-        // === showSection：切換功能區塊顯示 ===
-        // ============================================
-        /**
-        * 顯示指定的功能區塊，並隱藏其他所有區塊。
-        * @param {string} sectionName - 如 'students'、'points'、'lottery' 等
-        * 實際 DOM id 為 sectionName + '-section'
-        */
-        window.showSection = function showSection(sectionName) {
-            // 隱藏所有 .section 區塊
-            document.querySelectorAll('.section').forEach(el => {
-                el.classList.add('hidden');
-            });
-
-            // 顯示目標區塊（相容兩種 id 格式：有無 -section 後綴）
-            const targetId = sectionName.endsWith('-section') ? sectionName : (sectionName + '-section');
-            const target = document.getElementById(targetId);
-            if (target) {
-                target.classList.remove('hidden');
-            } else {
-                console.warn('[showSection] 找不到區塊:', targetId);
-            }
-
-            // 更新行動裝置底部導覽列 active 狀態（若存在）
-            document.querySelectorAll('[data-section-btn]').forEach(btn => {
-                const s = btn.getAttribute('data-section-btn');
-                btn.classList.toggle('text-blue-500', s === sectionName || s === targetId);
-            });
-        };
-        // ============================================
-
-        // ============================================
         // === 第一階段優化：核心功能系統 ===
         // ============================================
 
@@ -1579,9 +1522,9 @@
                 const div = document.createElement('div');
                 div.className = `notification ${type}`;
                 div.innerHTML = `
-    <span class="notification-icon" aria-hidden="true">${this.getIcon(type)}</span>
-    <span class="notification-message">${this.escapeHtml(message)}</span>
-    `;
+                    <span class="notification-icon" aria-hidden="true">${this.getIcon(type)}</span>
+                    <span class="notification-message">${this.escapeHtml(message)}</span>
+                `;
                 return div;
             }
 
@@ -1621,13 +1564,26 @@
                     return { valid: false, message: '姓名不能為空' };
                 }
 
-                if (sanitized.length < 2) { return { valid: false, message: '姓名至少需要 2 個字元' }; } // 檢查是否包含特殊字符（允許中文、英文、數字和空格） if
-                (!/^[\u4e00-\u9fa5a-zA-Z0-9\s]+$/.test(sanitized)) { return { valid: false, message: '姓名只能包含中文、英文、數字和空格' }; }
+                if (sanitized.length < 2) {
+                    return { valid: false, message: '姓名至少需要 2 個字元' };
+                }
+
+                // 檢查是否包含特殊字符（允許中文、英文、數字和空格）
+                if (!/^[\u4e00-\u9fa5a-zA-Z0-9\s]+$/.test(sanitized)) {
+                    return { valid: false, message: '姓名只能包含中文、英文、數字和空格' };
+                }
+
                 return { valid: true, value: sanitized };
-            } static validateNumber(num, min = 1, max = 999) {
-                const
-                    parsed = parseInt(num); if (isNaN(parsed)) { return { valid: false, message: '請輸入有效的數字' }; } if (parsed < min ||
-                        parsed > max) {
+            }
+
+            static validateNumber(num, min = 1, max = 999) {
+                const parsed = parseInt(num);
+
+                if (isNaN(parsed)) {
+                    return { valid: false, message: '請輸入有效的數字' };
+                }
+
+                if (parsed < min || parsed > max) {
                     return { valid: false, message: `數字必須介於 ${min} 到 ${max} 之間` };
                 }
 
@@ -1654,11 +1610,11 @@
                 overlay.id = 'loading-overlay';
                 overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
                 overlay.innerHTML = `
-        <div class="bg-white rounded-lg p-6 flex flex-col items-center">
-            <div class="loader mb-4"></div>
-            <p class="text-gray-700">${Validator.escapeHtml(message)}</p>
-        </div>
-        `;
+                    <div class="bg-white rounded-lg p-6 flex flex-col items-center">
+                        <div class="loader mb-4"></div>
+                        <p class="text-gray-700">${Validator.escapeHtml(message)}</p>
+                    </div>
+                `;
                 document.body.appendChild(overlay);
             }
 
@@ -1723,8 +1679,7 @@
 
             static create({ title, message, confirmText = '確定', cancelText = '取消', type = 'warning' }) {
                 const overlay = document.createElement('div');
-                overlay.className = 'confirm-dialog-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center
-                justify - center z - 50';
+                overlay.className = 'confirm-dialog-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
 
                 const colors = {
                     warning: { title: 'text-yellow-600', btn: 'bg-yellow-500 hover:bg-yellow-600' },
@@ -1735,23 +1690,27 @@
                 const color = colors[type] || colors.warning;
 
                 overlay.innerHTML = `
-        <div class="confirm-dialog bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
-            <div class="p-6">
-                <h3 class="text-xl font-bold ${color.title} mb-4">${Validator.escapeHtml(title)}</h3>
-                <p class="text-gray-700 mb-6">${Validator.escapeHtml(message)}</p>
-                <div class="flex gap-3 justify-end">
-                    <button type="button" data-action="cancel"
-                        class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition active:scale-95">
-                        ${Validator.escapeHtml(cancelText)}
-                    </button>
-                    <button type="button" data-action="confirm"
-                        class="px-4 py-2 ${color.btn} text-white rounded-lg transition active:scale-95">
-                        ${Validator.escapeHtml(confirmText)}
-                    </button>
-                </div>
-            </div>
-        </div>
-        `;
+                    <div class="confirm-dialog bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
+                        <div class="p-6">
+                            <h3 class="text-xl font-bold ${color.title} mb-4">${Validator.escapeHtml(title)}</h3>
+                            <p class="text-gray-700 mb-6">${Validator.escapeHtml(message)}</p>
+                            <div class="flex gap-3 justify-end">
+                                <button 
+                                    type="button"
+                                    data-action="cancel" 
+                                    class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition active:scale-95">
+                                    ${Validator.escapeHtml(cancelText)}
+                                </button>
+                                <button 
+                                    type="button"
+                                    data-action="confirm" 
+                                    class="px-4 py-2 ${color.btn} text-white rounded-lg transition active:scale-95">
+                                    ${Validator.escapeHtml(confirmText)}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
 
                 return overlay;
             }
@@ -1972,10 +1931,7 @@
 
         function updateTime() {
             const now = new Date();
-            const timeString = now.toLocaleString('zh-TW', {
-                year: 'numeric', month: '2-digit', day: '2-digit', hour:
-                    '2-digit', minute: '2-digit', second: '2-digit'
-            });
+            const timeString = now.toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
             document.getElementById('currentTime').textContent = timeString;
         }
 
@@ -2062,20 +2018,13 @@
                 const name = parts[0];
                 let number = parts[1] ? parseInt(parts[1]) : null;
                 if (!name) { errors.push(`第 ${index + 1} 行：姓名不能為空`); return; }
-                if (students.some(s => s.name === name) || newStudents.some(s => s.name === name)) {
-                    errors.push(`第 ${index + 1}
-        行：學生「${name}」已存在`); return;
-                }
-                if (!number) { number = nextNumber++; } else {
-                    if (students.some(s => s.number == number) || newStudents.some(s
-                        => s.number == number)) { errors.push(`第 ${index + 1} 行：座號 ${number} 已被使用`); return; }
-                }
+                if (students.some(s => s.name === name) || newStudents.some(s => s.name === name)) { errors.push(`第 ${index + 1} 行：學生「${name}」已存在`); return; }
+                if (!number) { number = nextNumber++; } else { if (students.some(s => s.number == number) || newStudents.some(s => s.number == number)) { errors.push(`第 ${index + 1} 行：座號 ${number} 已被使用`); return; } }
                 newStudents.push({ id: Date.now() + index, name: name, number: number, points: 0, records: [] });
             });
             if (errors.length > 0) { alert('批次新增時發現以下錯誤：\n\n' + errors.join('\n') + '\n\n請修正後重新嘗試。'); return; }
             if (newStudents.length === 0) { alert('沒有有效的學生資料可新增'); return; }
-            const confirmMessage = `即將新增 ${newStudents.length} 位學生：\n\n${newStudents.map(s => `${s.name}
-        (座號：${s.number})`).join('\n')}\n\n確定要新增嗎？`;
+            const confirmMessage = `即將新增 ${newStudents.length} 位學生：\n\n${newStudents.map(s => `${s.name} (座號：${s.number})`).join('\n')}\n\n確定要新增嗎？`;
             if (confirm(confirmMessage)) {
                 students.push(...newStudents);
                 localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
@@ -2091,13 +2040,8 @@
 
         function showBatchAddAnimation(count) {
             const animation = document.createElement('div');
-            animation.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50
-            animate - bounce -in ';
-            animation.innerHTML = `<div class="bg-white p-6 rounded-xl shadow-2xl border-4 border-green-500">
-            <div class="text-4xl text-center mb-2">🎉</div>
-            <div class="text-2xl font-bold text-center text-green-600">批次新增成功！</div>
-            <div class="text-center text-gray-600">已新增 ${count} 位學生</div>
-        </div>`;
+            animation.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 animate-bounce-in';
+            animation.innerHTML = `<div class="bg-white p-6 rounded-xl shadow-2xl border-4 border-green-500"><div class="text-4xl text-center mb-2">🎉</div><div class="text-2xl font-bold text-center text-green-600">批次新增成功！</div><div class="text-center text-gray-600">已新增 ${count} 位學生</div></div>`;
             document.body.appendChild(animation);
             setTimeout(() => { document.body.removeChild(animation); }, 2500);
         }
@@ -2129,28 +2073,17 @@
             const container = document.getElementById('studentsList');
             container.innerHTML = '';
             if (students.length === 0) {
-                container.innerHTML = `<div class="col-span-full text-center text-gray-500 p-6 bg-gray-50 rounded-lg">
-            目前沒有學生，請從上方新增學生。</div>`;
+                container.innerHTML = `<div class="col-span-full text-center text-gray-500 p-6 bg-gray-50 rounded-lg">目前沒有學生，請從上方新增學生。</div>`;
             } else {
                 students.sort((a, b) => (a.number || 999) - (b.number || 999)).forEach(student => {
                     const div = document.createElement('div');
                     div.className = 'bg-gray-50 p-3 sm:p-4 rounded-lg border-l-4 border-blue-500';
-                    div.innerHTML = `<div class="flex justify-between items-center">
-            <div class="flex-1 min-w-0">
-                <div class="font-semibold text-gray-800 text-sm sm:text-base truncate">${student.name}</div>
-                <div class="text-xs sm:text-sm text-gray-600 mt-1"><span
-                        class="inline-block">座號：${student.number}</span><span class="inline-block ml-2 sm:ml-3">分數：<span
-                            class="font-semibold ${student.points >= 0 ? 'text-green-600' : 'text-red-600'}">${student.points}</span></span>
-                </div>
-            </div><button onclick="removeStudent(${student.id})"
-                class="text-red-500 hover:text-red-700 text-lg sm:text-xl ml-2 p-1 active:scale-95">🗑️</button>
-        </div>`;
+                    div.innerHTML = `<div class="flex justify-between items-center"><div class="flex-1 min-w-0"><div class="font-semibold text-gray-800 text-sm sm:text-base truncate">${student.name}</div><div class="text-xs sm:text-sm text-gray-600 mt-1"><span class="inline-block">座號：${student.number}</span><span class="inline-block ml-2 sm:ml-3">分數：<span class="font-semibold ${student.points >= 0 ? 'text-green-600' : 'text-red-600'}">${student.points}</span></span></div></div><button onclick="removeStudent(${student.id})" class="text-red-500 hover:text-red-700 text-lg sm:text-xl ml-2 p-1 active:scale-95">🗑️</button></div>`;
                     container.appendChild(div);
                 });
             }
             document.getElementById('totalStudents').textContent = students.length;
-            const avgScore = students.length > 0 ? (students.reduce((sum, s) => sum + s.points, 0) /
-                students.length).toFixed(1) : 0;
+            const avgScore = students.length > 0 ? (students.reduce((sum, s) => sum + s.points, 0) / students.length).toFixed(1) : 0;
             document.getElementById('averageScore').textContent = avgScore;
         }
 
@@ -2167,8 +2100,7 @@
             quickPointActions.forEach(action => {
                 const button = document.createElement('button');
                 const colorClass = action.color === 'green' ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600';
-                button.className = `quick-point-btn ${colorClass} text-white p-2 rounded-lg transition-all text-sm
-        active:scale-95`;
+                button.className = `quick-point-btn ${colorClass} text-white p-2 rounded-lg transition-all text-sm active:scale-95`;
                 button.textContent = `${action.reason} ${action.points > 0 ? '+' : ''}${action.points}`;
                 button.onclick = () => selectQuickAction(action);
                 container.appendChild(button);
@@ -2180,10 +2112,11 @@
             const points = [-5, -4, -3, -2, -1, 1, 2, 3, 4, 5];
             points.forEach(point => {
                 const button = document.createElement('button');
-                const isNegative = point < 0; const colorClass = isNegative ? 'border-red-400 text-red-600 hover:bg-red-100'
-                    : 'border-green-400 text-green-600 hover:bg-green-100'; const sign = isNegative ? '' : '+';
-                button.className = `quick-value-btn w-10 h-10 sm:w-11 sm:h-11 rounded-full border-2 bg-white font-bold
-            text-base sm:text-lg transition-all active:scale-95 ${colorClass}`; button.textContent = `${sign}${point}`;
+                const isNegative = point < 0;
+                const colorClass = isNegative ? 'border-red-400 text-red-600 hover:bg-red-100' : 'border-green-400 text-green-600 hover:bg-green-100';
+                const sign = isNegative ? '' : '+';
+                button.className = `quick-value-btn w-10 h-10 sm:w-11 sm:h-11 rounded-full border-2 bg-white font-bold text-base sm:text-lg transition-all active:scale-95 ${colorClass}`;
+                button.textContent = `${sign}${point}`;
                 button.onclick = () => selectQuickPointsValue(point);
                 container.appendChild(button);
             });
@@ -2217,8 +2150,7 @@
         function finishBatchPoints() {
             selectedQuickAction = null;
             selectedQuickPoints = null;
-            document.querySelectorAll('.quick-point-btn, .quick-value-btn').forEach(btn =>
-                btn.classList.remove('active'));
+            document.querySelectorAll('.quick-point-btn, .quick-value-btn').forEach(btn => btn.classList.remove('active'));
         }
         function renderPointsStudentList() {
             const container = document.getElementById('pointsStudentList');
@@ -2229,14 +2161,13 @@
             }
             students.sort((a, b) => (a.number || 999) - (b.number || 999)).forEach(student => {
                 const div = document.createElement('div');
-                div.className = 'flex-grow basis-24 p-2 text-center bg-white rounded-lg shadow cursor-pointer
-                hover: bg - blue - 100 transition - colors';
+                div.className = 'flex-grow basis-24 p-2 text-center bg-white rounded-lg shadow cursor-pointer hover:bg-blue-100 transition-colors';
                 div.dataset.studentId = student.id;
                 div.onclick = () => applyPointsToStudentFromList(student.id);
                 div.innerHTML = `
-            <div class="font-semibold text-gray-800 text-sm truncate">${student.name}</div>
-            <div class="text-xs text-gray-600">座號: ${student.number}</div>
-            `;
+                    <div class="font-semibold text-gray-800 text-sm truncate">${student.name}</div>
+                    <div class="text-xs text-gray-600">座號: ${student.number}</div>
+                `;
                 container.appendChild(div);
             });
         }
@@ -2304,12 +2235,7 @@
                 renderGroups();
             }
 
-            const record = {
-                id: Date.now(), studentId: studentId, studentName: student.name, points: points, reason:
-                    reason, date: new Date().toLocaleDateString('zh-TW'), timestamp: new Date().toLocaleString('zh-TW', {
-                        hour12: false
-                    })
-            };
+            const record = { id: Date.now(), studentId: studentId, studentName: student.name, points: points, reason: reason, date: new Date().toLocaleDateString('zh-TW'), timestamp: new Date().toLocaleString('zh-TW', { hour12: false }) };
             if (!student.records) student.records = [];
             student.records.push(record);
             pointsHistory.unshift(record);
@@ -2321,318 +2247,307 @@
         }
         function showPointsAnimation(points, reason) {
             const animation = document.createElement('div');
-            animation.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50
-            animate - bounce -in ';
-            animation.innerHTML = `<div
-                class="bg-white p-6 rounded-xl shadow-2xl border-4 ${points > 0 ? 'border-green-500' : 'border-red-500'}">
-                <div class="text-4xl text-center mb-2">${points > 0 ? '🎉' : '😔'}</div>
-                <div class="text-2xl font-bold text-center ${points > 0 ? 'text-green-600' : 'text-red-600'}">${points >
-                    0 ? '+' : ''}${points}</div>
-                <div class="text-center text-gray-600">${reason}</div>
-            </div>`;
+            animation.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 animate-bounce-in';
+            animation.innerHTML = `<div class="bg-white p-6 rounded-xl shadow-2xl border-4 ${points > 0 ? 'border-green-500' : 'border-red-500'}"><div class="text-4xl text-center mb-2">${points > 0 ? '🎉' : '😔'}</div><div class="text-2xl font-bold text-center ${points > 0 ? 'text-green-600' : 'text-red-600'}">${points > 0 ? '+' : ''}${points}</div><div class="text-center text-gray-600">${reason}</div></div>`;
             document.body.appendChild(animation);
             setTimeout(() => { document.body.removeChild(animation); }, 2000);
         }
         function renderPointsHistory() {
             const container = document.getElementById('pointsHistory');
             container.innerHTML = '';
-            if (pointsHistory.length === 0) {
-                container.innerHTML = '<div class="text-gray-500 text-center">尚無加扣分記錄
-            </div > '; return; }
-                pointsHistory.slice(0, 10).forEach(record => {
-                    const div = document.createElement('div');
-                    div.className = `flex justify-between items-center p-2 border-l-4 ${record.points > 0 ? 'border-green-500
-            bg - green - 50' : 'border - red - 500 bg - red - 50'} mb-2 rounded`;
-                    div.innerHTML = `<div><span class="font-semibold">${record.studentName}</span><span
-                    class="text-sm text-gray-600 ml-2">${record.reason}</span></div>
-            <div class="text-right">
-                <div class="font-bold ${record.points > 0 ? 'text-green-600' : 'text-red-600'}">${record.points > 0 ?
-                            '+' : ''}${record.points}</div>
-                <div class="text-xs text-gray-500">${record.timestamp}</div>
-            </div>`;
-                    container.appendChild(div);
-                });
-            }
+            if (pointsHistory.length === 0) { container.innerHTML = '<div class="text-gray-500 text-center">尚無加扣分記錄</div>'; return; }
+            pointsHistory.slice(0, 10).forEach(record => {
+                const div = document.createElement('div');
+                div.className = `flex justify-between items-center p-2 border-l-4 ${record.points > 0 ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'} mb-2 rounded`;
+                div.innerHTML = `<div><span class="font-semibold">${record.studentName}</span><span class="text-sm text-gray-600 ml-2">${record.reason}</span></div><div class="text-right"><div class="font-bold ${record.points > 0 ? 'text-green-600' : 'text-red-600'}">${record.points > 0 ? '+' : ''}${record.points}</div><div class="text-xs text-gray-500">${record.timestamp}</div></div>`;
+                container.appendChild(div);
+            });
+        }
 
-            // 抽籤系統
-            function startLottery() {
-                const type = document.getElementById('lotteryType').value;
-                if (students.length === 0) { alert('請先新增學生'); return; }
-                if (type === 'group' && groups.length === 0) { alert('請先在「隨機分組」功能中建立小組！'); return; }
+        // 抽籤系統
+        function startLottery() {
+            const type = document.getElementById('lotteryType').value;
+            if (students.length === 0) { alert('請先新增學生'); return; }
+            if (type === 'group' && groups.length === 0) { alert('請先在「隨機分組」功能中建立小組！'); return; }
 
-                const count = parseInt(document.getElementById('lotteryCount').value) || 2;
-                let result = [];
+            const count = parseInt(document.getElementById('lotteryCount').value) || 2;
+            let result = [];
 
-                // 取得可抽取的學生（排除已抽過的）
-                let availableStudents;
-                if (noRepeatLottery && type !== 'group') {
-                    availableStudents = students.filter(s => !drawnStudentIds.includes(s.id));
+            // 取得可抽取的學生（排除已抽過的）
+            let availableStudents;
+            if (noRepeatLottery && type !== 'group') {
+                availableStudents = students.filter(s => !drawnStudentIds.includes(s.id));
 
-                    // 如果所有人都抽過了，自動重置
-                    if (availableStudents.length === 0) {
-                        drawnStudentIds = [];
-                        localStorage.setItem('drawnStudentIds', JSON.stringify(drawnStudentIds));
-                        availableStudents = [...students];
-                        NotificationSystem.info('所有學生都抽過了，已自動重置！');
-                    }
-                } else {
-                    availableStudents = [...students];
-                }
-
-                if (type === 'single') {
-                    const randomIndex = Math.floor(Math.random() * availableStudents.length);
-                    result = [availableStudents[randomIndex]];
-                } else if (type === 'multiple') {
-                    const selectCount = Math.min(count, availableStudents.length);
-                    if (selectCount < count && noRepeatLottery) {
-                        NotificationSystem.warning(`只剩 ${availableStudents.length}
-                位可抽取的學生`);
-                    } const tempAvailable = [...availableStudents]; for (let i = 0; i < selectCount; i++) {
-                        const
-                            randomIndex = Math.floor(Math.random() * tempAvailable.length);
-                        result.push(tempAvailable.splice(randomIndex, 1)[0]);
-                    }
-                } else if (type === 'group') {
-                    const
-                        randomIndex = Math.floor(Math.random() * groups.length); result = [groups[randomIndex]];
-                } //
-                記錄已抽取的學生（僅限學生抽籤且開啟不重複） if (noRepeatLottery && type !== 'group') {
-                    result.forEach(s => {
-                        if (!drawnStudentIds.includes(s.id)) {
-                            drawnStudentIds.push(s.id);
-                        }
-                    });
+                // 如果所有人都抽過了，自動重置
+                if (availableStudents.length === 0) {
+                    drawnStudentIds = [];
                     localStorage.setItem('drawnStudentIds', JSON.stringify(drawnStudentIds));
-                    updateLotteryStats();
+                    availableStudents = [...students];
+                    NotificationSystem.info('所有學生都抽過了，已自動重置！');
                 }
-
-                runLotteryAnimation(result, type);
-                // 歷史記錄將在動畫結束後才儲存，避免提前洩漏結果
+            } else {
+                availableStudents = [...students];
             }
 
-            // 切換不重複抽取模式
-            function toggleNoRepeat() {
-                noRepeatLottery = document.getElementById('noRepeatToggle').checked;
-                localStorage.setItem('noRepeatLottery', JSON.stringify(noRepeatLottery));
-                updateLotteryStats();
+            if (type === 'single') {
+                const randomIndex = Math.floor(Math.random() * availableStudents.length);
+                result = [availableStudents[randomIndex]];
+            } else if (type === 'multiple') {
+                const selectCount = Math.min(count, availableStudents.length);
+                if (selectCount < count && noRepeatLottery) {
+                    NotificationSystem.warning(`只剩 ${availableStudents.length} 位可抽取的學生`);
+                }
+                const tempAvailable = [...availableStudents];
+                for (let i = 0; i < selectCount; i++) {
+                    const randomIndex = Math.floor(Math.random() * tempAvailable.length);
+                    result.push(tempAvailable.splice(randomIndex, 1)[0]);
+                }
+            } else if (type === 'group') {
+                const randomIndex = Math.floor(Math.random() * groups.length);
+                result = [groups[randomIndex]];
             }
 
-            // 重置已抽取的學生
-            function resetDrawnStudents() {
-                drawnStudentIds = [];
+            // 記錄已抽取的學生（僅限學生抽籤且開啟不重複）
+            if (noRepeatLottery && type !== 'group') {
+                result.forEach(s => {
+                    if (!drawnStudentIds.includes(s.id)) {
+                        drawnStudentIds.push(s.id);
+                    }
+                });
                 localStorage.setItem('drawnStudentIds', JSON.stringify(drawnStudentIds));
                 updateLotteryStats();
-                NotificationSystem.success('已重置抽籤記錄，所有學生都可以被抽取！');
             }
 
-            // 更新抽籤統計顯示
-            function updateLotteryStats() {
-                const remainingEl = document.getElementById('remainingCount');
-                const drawnEl = document.getElementById('drawnCount');
+            runLotteryAnimation(result, type);
+            // 歷史記錄將在動畫結束後才儲存，避免提前洩漏結果
+        }
 
-                if (remainingEl && drawnEl) {
-                    const remaining = noRepeatLottery ? students.filter(s => !drawnStudentIds.includes(s.id)).length :
-                        students.length;
-                    const drawn = noRepeatLottery ? drawnStudentIds.length : 0;
+        // 切換不重複抽取模式
+        function toggleNoRepeat() {
+            noRepeatLottery = document.getElementById('noRepeatToggle').checked;
+            localStorage.setItem('noRepeatLottery', JSON.stringify(noRepeatLottery));
+            updateLotteryStats();
+        }
 
-                    remainingEl.textContent = remaining;
-                    drawnEl.textContent = drawn;
-                }
+        // 重置已抽取的學生
+        function resetDrawnStudents() {
+            drawnStudentIds = [];
+            localStorage.setItem('drawnStudentIds', JSON.stringify(drawnStudentIds));
+            updateLotteryStats();
+            NotificationSystem.success('已重置抽籤記錄，所有學生都可以被抽取！');
+        }
+
+        // 更新抽籤統計顯示
+        function updateLotteryStats() {
+            const remainingEl = document.getElementById('remainingCount');
+            const drawnEl = document.getElementById('drawnCount');
+
+            if (remainingEl && drawnEl) {
+                const remaining = noRepeatLottery ? students.filter(s => !drawnStudentIds.includes(s.id)).length : students.length;
+                const drawn = noRepeatLottery ? drawnStudentIds.length : 0;
+
+                remainingEl.textContent = remaining;
+                drawnEl.textContent = drawn;
             }
+        }
 
-            function runLotteryAnimation(finalResult, type) {
-                const container = document.getElementById('lotteryResult');
-                const btn = document.getElementById('startLotteryBtn');
-                btn.disabled = true;
-                btn.classList.add('bg-gray-400', 'hover:bg-gray-400');
-                container.innerHTML = `<div id="lottery-animation-text" class="text-3xl font-bold text-gray-800"></div>
-                `;
-                const animationText = document.getElementById('lottery-animation-text');
-                if (!animationText) return;
+        function runLotteryAnimation(finalResult, type) {
+            const container = document.getElementById('lotteryResult');
+            const btn = document.getElementById('startLotteryBtn');
+            btn.disabled = true;
+            btn.classList.add('bg-gray-400', 'hover:bg-gray-400');
+            container.innerHTML = `<div id="lottery-animation-text" class="text-3xl font-bold text-gray-800"></div>`;
+            const animationText = document.getElementById('lottery-animation-text');
+            if (!animationText) return;
 
-                let rollCount = 0;
-                const totalRolls = 25;
-                const rollInterval = 100;
+            let rollCount = 0;
+            const totalRolls = 25;
+            const rollInterval = 100;
 
-                const getRollingText = () => {
-                    if (type === 'group') {
-                        const randomGroup = groups[Math.floor(Math.random() * groups.length)];
-                        return randomGroup.name;
-                    } else {
-                        const randomStudents = [...students].sort(() => 0.5 - Math.random());
-                        let randomNames = [];
-                        for (let i = 0; i < finalResult.length; i++) {
-                            randomNames.push(randomStudents[i %
-                                randomStudents.length].name);
-                        } return randomNames.join('、');
-                    }
-                }; const rollTimer = setInterval(() => {
-                    animationText.innerHTML = `<span class="slot-item">${getRollingText()}</span>`;
-                    playLotteryTickSound();
-                    rollCount++;
-                    if (rollCount >= totalRolls) {
-                        clearInterval(rollTimer);
-                        displayLotteryResult(finalResult, type);
-                        playLotteryWinSound();
-                        triggerConfetti();
-                        // 動畫結束後才儲存歷史記錄
-                        saveLotteryHistory(finalResult, type);
-                        btn.disabled = false;
-                        btn.classList.remove('bg-gray-400', 'hover:bg-gray-400');
-                    }
-                }, rollInterval);
-            }
-            function displayLotteryResult(result, type) {
-                const container = document.getElementById('lotteryResult');
+            const getRollingText = () => {
                 if (type === 'group') {
-                    const group = result[0];
-                    container.innerHTML = `<div class="winner">
-                        <div class="text-4xl mb-4">🏆</div>
-                        <div class="text-2xl font-bold text-purple-600 mb-2">獲勝組別</div>
-                        <div class="text-3xl font-bold text-gray-800">${group.name}</div>
-                        <p class="text-sm text-gray-600 mt-2">${group.members.map(m => m.name).join('、')}</p>
-                    </div>`;
+                    const randomGroup = groups[Math.floor(Math.random() * groups.length)];
+                    return randomGroup.name;
                 } else {
-                    container.innerHTML = `<div class="winner">
-                        <div class="text-4xl mb-4">🎉</div>
-                        <div class="text-2xl font-bold text-purple-600 mb-2">抽中的是...</div>
-                        <div class="text-3xl font-bold text-gray-800">${result.map(s => s.name).join('、')}</div>
-                    </div>`;
-                }
-            }
-            function saveLotteryHistory(result, type) {
-                const record = {
-                    id: Date.now(), type: type, result: result, timestamp: new
-                        Date().toLocaleString('zh-TW', { hour12: false })
-                };
-                lotteryHistory.unshift(record);
-                localStorage.setItem('lotteryHistory', JSON.stringify(lotteryHistory));
-                renderLotteryHistory();
-            }
-            function renderLotteryHistory() {
-                const container = document.getElementById('lotteryHistory');
-                container.innerHTML = '';
-                if (lotteryHistory.length === 0) {
-                    container.innerHTML = '<div class="text-gray-500 text-center">
-                        尚無抽籤記錄</div > '; return; }
-                    lotteryHistory.slice(0, 5).forEach(record => {
-                        const div = document.createElement('div');
-                        div.className = 'flex justify-between items-center p-2 bg-purple-50 border-l-4 border-purple-500
-                        mb - 2 rounded';
-                        let resultText = (record.type === 'group') ? record.result[0].name : record.result.map(s =>
-                            s.name).join('、');
-                        div.innerHTML = `<div><span class="font-semibold">${record.type === 'single' ? '單人' : record.type
-                            === 'multiple' ? '多人' : '分組'}抽籤</span><span
-                            class="text-sm text-gray-600 ml-2">${resultText}</span></div>
-                    <div class="text-xs text-gray-500">${record.timestamp}</div>`;
-                        container.appendChild(div);
-                    });
-                }
-
-                // --- 倒數計時器 (已更新為完整計時器) ---
-                function setTimerMode(mode) {
-                    timerMode = mode;
-                    stopTimer(); // 切換模式時停止計時器
-
-                    const modeCountdown = document.getElementById('modeCountdown');
-                    const modeStopwatch = document.getElementById('modeStopwatch');
-                    const countdownSettings = document.getElementById('countdownSettings');
-                    const countdownQuickTimers = document.getElementById('countdownQuickTimers');
-                    const timerProgress = document.getElementById('timerProgress');
-                    const timerBtn = document.getElementById('timerBtn');
-
-                    const activeClass = 'bg-red-500 text-white';
-                    const inactiveClass = 'bg-gray-200 text-gray-700 hover:bg-gray-300';
-
-                    if (mode === 'countdown') {
-                        modeCountdown.className = `flex-1 py-2 rounded-lg transition-colors text-sm font-semibold
-                    ${activeClass}`;
-                        modeStopwatch.className = `flex-1 py-2 rounded-lg transition-colors text-sm font-semibold
-                    ${inactiveClass}`;
-                        countdownSettings.classList.remove('hidden');
-                        countdownQuickTimers.classList.remove('hidden');
-                        timerProgress.classList.remove('hidden');
-
-                        // 重設為預設倒數時間
-                        document.getElementById('timerMinutes').value = 5;
-                        document.getElementById('timerSeconds').value = 0;
-                        totalSeconds = 300;
-                        originalSeconds = 300;
-
-                    } else if (mode === 'stopwatch') {
-                        modeCountdown.className = `flex-1 py-2 rounded-lg transition-colors text-sm font-semibold
-                    ${inactiveClass}`;
-                        modeStopwatch.className = `flex-1 py-2 rounded-lg transition-colors text-sm font-semibold
-                    ${activeClass}`;
-                        countdownSettings.classList.add('hidden');
-                        countdownQuickTimers.classList.add('hidden');
-                        timerProgress.classList.add('hidden');
-
-                        // 重設為0
-                        totalSeconds = 0;
-                        originalSeconds = 0;
+                    const randomStudents = [...students].sort(() => 0.5 - Math.random());
+                    let randomNames = [];
+                    for (let i = 0; i < finalResult.length; i++) {
+                        randomNames.push(randomStudents[i % randomStudents.length].name);
                     }
+                    return randomNames.join('、');
+                }
+            };
 
+            const rollTimer = setInterval(() => {
+                animationText.innerHTML = `<span class="slot-item">${getRollingText()}</span>`;
+                playLotteryTickSound();
+                rollCount++;
+                if (rollCount >= totalRolls) {
+                    clearInterval(rollTimer);
+                    displayLotteryResult(finalResult, type);
+                    playLotteryWinSound();
+                    triggerConfetti();
+                    // 動畫結束後才儲存歷史記錄
+                    saveLotteryHistory(finalResult, type);
+                    btn.disabled = false;
+                    btn.classList.remove('bg-gray-400', 'hover:bg-gray-400');
+                }
+            }, rollInterval);
+        }
+        function displayLotteryResult(result, type) {
+            const container = document.getElementById('lotteryResult');
+            if (type === 'group') {
+                const group = result[0];
+                container.innerHTML = `<div class="winner"><div class="text-4xl mb-4">🏆</div><div class="text-2xl font-bold text-purple-600 mb-2">獲勝組別</div><div class="text-3xl font-bold text-gray-800">${group.name}</div><p class="text-sm text-gray-600 mt-2">${group.members.map(m => m.name).join('、')}</p></div>`;
+            } else {
+                container.innerHTML = `<div class="winner"><div class="text-4xl mb-4">🎉</div><div class="text-2xl font-bold text-purple-600 mb-2">抽中的是...</div><div class="text-3xl font-bold text-gray-800">${result.map(s => s.name).join('、')}</div></div>`;
+            }
+        }
+        function saveLotteryHistory(result, type) {
+            const record = { id: Date.now(), type: type, result: result, timestamp: new Date().toLocaleString('zh-TW', { hour12: false }) };
+            lotteryHistory.unshift(record);
+            localStorage.setItem('lotteryHistory', JSON.stringify(lotteryHistory));
+            renderLotteryHistory();
+        }
+        function renderLotteryHistory() {
+            const container = document.getElementById('lotteryHistory');
+            container.innerHTML = '';
+            if (lotteryHistory.length === 0) { container.innerHTML = '<div class="text-gray-500 text-center">尚無抽籤記錄</div>'; return; }
+            lotteryHistory.slice(0, 5).forEach(record => {
+                const div = document.createElement('div');
+                div.className = 'flex justify-between items-center p-2 bg-purple-50 border-l-4 border-purple-500 mb-2 rounded';
+                let resultText = (record.type === 'group') ? record.result[0].name : record.result.map(s => s.name).join('、');
+                div.innerHTML = `<div><span class="font-semibold">${record.type === 'single' ? '單人' : record.type === 'multiple' ? '多人' : '分組'}抽籤</span><span class="text-sm text-gray-600 ml-2">${resultText}</span></div><div class="text-xs text-gray-500">${record.timestamp}</div>`;
+                container.appendChild(div);
+            });
+        }
+
+        // --- 倒數計時器 (已更新為完整計時器) ---
+        function setTimerMode(mode) {
+            timerMode = mode;
+            stopTimer(); // 切換模式時停止計時器
+
+            const modeCountdown = document.getElementById('modeCountdown');
+            const modeStopwatch = document.getElementById('modeStopwatch');
+            const countdownSettings = document.getElementById('countdownSettings');
+            const countdownQuickTimers = document.getElementById('countdownQuickTimers');
+            const timerProgress = document.getElementById('timerProgress');
+            const timerBtn = document.getElementById('timerBtn');
+
+            const activeClass = 'bg-red-500 text-white';
+            const inactiveClass = 'bg-gray-200 text-gray-700 hover:bg-gray-300';
+
+            if (mode === 'countdown') {
+                modeCountdown.className = `flex-1 py-2 rounded-lg transition-colors text-sm font-semibold ${activeClass}`;
+                modeStopwatch.className = `flex-1 py-2 rounded-lg transition-colors text-sm font-semibold ${inactiveClass}`;
+                countdownSettings.classList.remove('hidden');
+                countdownQuickTimers.classList.remove('hidden');
+                timerProgress.classList.remove('hidden');
+
+                // 重設為預設倒數時間
+                document.getElementById('timerMinutes').value = 5;
+                document.getElementById('timerSeconds').value = 0;
+                totalSeconds = 300;
+                originalSeconds = 300;
+
+            } else if (mode === 'stopwatch') {
+                modeCountdown.className = `flex-1 py-2 rounded-lg transition-colors text-sm font-semibold ${inactiveClass}`;
+                modeStopwatch.className = `flex-1 py-2 rounded-lg transition-colors text-sm font-semibold ${activeClass}`;
+                countdownSettings.classList.add('hidden');
+                countdownQuickTimers.classList.add('hidden');
+                timerProgress.classList.add('hidden');
+
+                // 重設為0
+                totalSeconds = 0;
+                originalSeconds = 0;
+            }
+
+            updateTimerDisplay();
+            timerBtn.textContent = '開始';
+            timerBtn.className = 'w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition-colors text-sm active:scale-95';
+            document.getElementById('timerTitleDisplay').textContent = '準備開始';
+        }
+
+        function setQuickTimer(seconds) {
+            // 確保處於倒數模式
+            if (timerMode !== 'countdown') {
+                setTimerMode('countdown');
+            }
+
+            document.getElementById('timerMinutes').value = Math.floor(seconds / 60);
+            document.getElementById('timerSeconds').value = seconds % 60;
+            totalSeconds = seconds;
+            originalSeconds = seconds;
+
+            stopTimer(); // 停止目前計時
+            updateTimerDisplay(); // 更新顯示
+            document.getElementById('timerBtn').textContent = '開始';
+            document.getElementById('timerTitleDisplay').textContent = '準備開始';
+        }
+
+        function resetTimer() {
+            stopTimer();
+            if (timerMode === 'countdown') {
+                const minutes = parseInt(document.getElementById('timerMinutes').value) || 0;
+                const seconds = parseInt(document.getElementById('timerSeconds').value) || 0;
+                totalSeconds = minutes * 60 + seconds;
+                // 如果時間為0，重設為預設5分鐘
+                if (totalSeconds <= 0) {
+                    totalSeconds = 300;
+                    document.getElementById('timerMinutes').value = 5;
+                    document.getElementById('timerSeconds').value = 0;
+                }
+                originalSeconds = totalSeconds;
+            } else if (timerMode === 'stopwatch') {
+                totalSeconds = 0;
+                originalSeconds = 0;
+            }
+            updateTimerDisplay();
+            document.getElementById('timerBtn').textContent = '開始';
+            document.getElementById('timerTitleDisplay').textContent = '準備開始';
+        }
+
+        function startTimer() {
+            if (timerRunning) {
+                stopTimer();
+                return;
+            }
+
+            timerRunning = true;
+            document.getElementById('timerTitleDisplay').textContent = document.getElementById('timerTitle').value || '計時中';
+            const timerBtn = document.getElementById('timerBtn');
+
+            if (timerMode === 'countdown') {
+                // 只有在計時器未啟動 (或已重設) 時才讀取新時間
+                if (totalSeconds === 0 || totalSeconds === originalSeconds) {
+                    const minutes = parseInt(document.getElementById('timerMinutes').value) || 0;
+                    const seconds = parseInt(document.getElementById('timerSeconds').value) || 0;
+                    totalSeconds = minutes * 60 + seconds;
+                    if (totalSeconds <= 0) {
+                        alert('請設定有效的倒數時間');
+                        timerRunning = false;
+                        return;
+                    }
+                    originalSeconds = totalSeconds;
+                }
+
+                timerBtn.textContent = '停止';
+                timerBtn.className = 'w-full bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600 transition-colors text-sm active:scale-95';
+
+                timerInterval = setInterval(() => {
+                    totalSeconds--;
                     updateTimerDisplay();
-                    timerBtn.textContent = '開始';
-                    timerBtn.className = 'w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600
-                    transition - colors text - sm active: scale - 95';
-                    document.getElementById('timerTitleDisplay').textContent = '準備開始';
-                }
-
-                function setQuickTimer(seconds) {
-                    // 確保處於倒數模式
-                    if (timerMode !== 'countdown') {
-                        setTimerMode('countdown');
+                    if (totalSeconds <= 0) {
+                        timerFinished();
                     }
+                }, 1000);
 
-                    document.getElementById('timerMinutes').value = Math.floor(seconds / 60);
-                    document.getElementById('timerSeconds').value = seconds % 60;
-                    totalSeconds = seconds;
-                    originalSeconds = seconds;
+            } else if (timerMode === 'stopwatch') {
+                timerBtn.textContent = '暫停';
+                timerBtn.className = 'w-full bg-yellow-500 text-white py-2 rounded-lg hover:bg-yellow-600 transition-colors text-sm active:scale-95';
+                originalSeconds = 0; // 碼錶模式不需要進度條
 
-                    stopTimer(); // 停止目前計時
-                    updateTimerDisplay(); // 更新顯示
-                    document.getElementById('timerBtn').textContent = '開始';
-                    document.getElementById('timerTitleDisplay').textContent = '準備開始';
-                }
-
-                function resetTimer() {
-                    stopTimer();
-                    if (timerMode === 'countdown') {
-                        const minutes = parseInt(document.getElementById('timerMinutes').value) || 0;
-                        const seconds = parseInt(document.getElementById('timerSeconds').value) || 0;
-                        totalSeconds = minutes * 60 + seconds;
-                        // 如果時間為0，重設為預設5分鐘
-                        if (totalSeconds <= 0) {
-                            totalSeconds = 300; document.getElementById('timerMinutes').value = 5;
-                            document.getElementById('timerSeconds').value = 0;
-                        } originalSeconds = totalSeconds;
-                    } else if
-                        (timerMode === 'stopwatch') { totalSeconds = 0; originalSeconds = 0; } updateTimerDisplay();
-                    document.getElementById('timerBtn').textContent = '開始';
-                    document.getElementById('timerTitleDisplay').textContent = '準備開始';
-                } function startTimer() {
-                    if
-                        (timerRunning) { stopTimer(); return; } timerRunning = true;
-                    document.getElementById('timerTitleDisplay').textContent = document.getElementById('timerTitle').value
-                        || '計時中'; const timerBtn = document.getElementById('timerBtn'); if (timerMode === 'countdown') {
-                            // 只有在計時器未啟動 (或已重設) 時才讀取新時間 if (totalSeconds===0 || totalSeconds===originalSeconds) { const
-                            minutes = parseInt(document.getElementById('timerMinutes').value) || 0; const
-                                seconds = parseInt(document.getElementById('timerSeconds').value) || 0; totalSeconds = minutes * 60
-                                    + seconds; if (totalSeconds <= 0) { alert('請設定有效的倒數時間'); timerRunning = false; return; }
-                            originalSeconds = totalSeconds;
-                        } timerBtn.textContent = '停止';
-                    timerBtn.className = 'w-full bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600 transition-colors text-sm active:scale-95'
-                        ; timerInterval = setInterval(() => {
-                            totalSeconds--;
-                            updateTimerDisplay();
-                            if (totalSeconds <= 0) { timerFinished(); }
-                        }, 1000);
-                } else if (timerMode === 'stopwatch') {
-                    timerBtn.textContent = '暫停';
-                    timerBtn.className = 'w-full bg-yellow-500 text-white py-2 rounded-lg hover:bg-yellow-600 transition-colors text-sm active:scale-95'
-                        ; originalSeconds = 0; // 碼錶模式不需要進度條 timerInterval=setInterval(()=> {
+                timerInterval = setInterval(() => {
                     totalSeconds++;
                     updateTimerDisplay();
                 }, 1000);
@@ -2647,13 +2562,11 @@
 
             if (timerMode === 'countdown') {
                 timerBtn.textContent = '開始';
-                timerBtn.className = 'w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600
-                transition - colors text - sm active: scale - 95';
+                timerBtn.className = 'w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition-colors text-sm active:scale-95';
                 document.getElementById('timerTitleDisplay').textContent = '已停止';
             } else if (timerMode === 'stopwatch') {
                 timerBtn.textContent = '繼續';
-                timerBtn.className = 'w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600
-                transition - colors text - sm active: scale - 95';
+                timerBtn.className = 'w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition-colors text-sm active:scale-95';
                 document.getElementById('timerTitleDisplay').textContent = '已暫停';
             }
             document.getElementById('timerDisplay').classList.remove('animate-pulse');
@@ -2662,8 +2575,7 @@
         function updateTimerDisplay() {
             const minutes = Math.floor(Math.abs(totalSeconds) / 60);
             const seconds = Math.abs(totalSeconds) % 60;
-            document.getElementById('timerDisplay').textContent = `${minutes.toString().padStart(2,
-                '0')}:${seconds.toString().padStart(2, '0')}`;
+            document.getElementById('timerDisplay').textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
             const progressBar = document.getElementById('timerProgressBar');
 
@@ -2691,14 +2603,8 @@
 
             // 顯示時間到動畫
             const animation = document.createElement('div');
-            animation.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2
-                - translate - y - 1 / 2 z - 50 animate - bounce -in ';
-            animation.innerHTML = `<div
-                                    class="bg-white p-8 rounded-xl shadow-2xl border-4 border-red-500 text-center">
-                                    <div class="text-6xl mb-4">⏰</div>
-                                    <div class="text-3xl font-bold text-red-600 mb-2">時間到！</div>
-                                    <div class="text-lg text-gray-600">計時結束</div>
-                                </div>`;
+            animation.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 animate-bounce-in';
+            animation.innerHTML = `<div class="bg-white p-8 rounded-xl shadow-2xl border-4 border-red-500 text-center"><div class="text-6xl mb-4">⏰</div><div class="text-3xl font-bold text-red-600 mb-2">時間到！</div><div class="text-lg text-gray-600">計時結束</div></div>`;
             document.body.appendChild(animation);
             setTimeout(() => { document.body.removeChild(animation); }, 3000);
 
@@ -2808,43 +2714,32 @@
         function triggerConfetti() {
             for (let i = 0; i < 100; i++) {
                 const confetti = document.createElement('div');
-                confetti.className = 'confetti'; const colors = ['#f44336', '#e91e63', '#9c27b0'
-                    , '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50'
-                    , '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800'];
+                confetti.className = 'confetti';
+                const colors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800'];
                 confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-                confetti.style.left = Math.random() * 100 + 'vw'; confetti.style.top = '-20px';
+                confetti.style.left = Math.random() * 100 + 'vw';
+                confetti.style.top = '-20px';
                 confetti.style.animationDelay = Math.random() * 0.2 + 's';
-                document.body.appendChild(confetti); setTimeout(() => { confetti.remove(); }, 3000);
+                document.body.appendChild(confetti);
+                setTimeout(() => { confetti.remove(); }, 3000);
             }
         }
 
 
         // 聯絡簿...
-        function useTemplate(content) {
-            document.getElementById('notebookContent').value =
-                content;
-        }
+        function useTemplate(content) { document.getElementById('notebookContent').value = content; }
         function addNotebook() {
             const date = document.getElementById('notebookDate').value;
             const type = document.getElementById('notebookType').value;
             const content = document.getElementById('notebookContent').value.trim();
             if (!date || !content) { alert('請填寫日期和內容'); return; }
-            const entry = {
-                id: Date.now(), date: date, type: type, content: content, timestamp:
-                    new Date().toLocaleString('zh-TW', { hour12: false })
-            };
+            const entry = { id: Date.now(), date: date, type: type, content: content, timestamp: new Date().toLocaleString('zh-TW', { hour12: false }) };
             notebookEntries.unshift(entry);
             localStorage.setItem('notebookEntries', JSON.stringify(notebookEntries));
             document.getElementById('notebookContent').value = '';
             renderNotebook();
         }
-        function removeNotebook(id) {
-            if (confirm('確定要刪除這筆聯絡事項嗎？')) {
-                notebookEntries =
-                    notebookEntries.filter(e => e.id !== id); localStorage.setItem('notebookEntries',
-                        JSON.stringify(notebookEntries)); renderNotebook();
-            }
-        }
+        function removeNotebook(id) { if (confirm('確定要刪除這筆聯絡事項嗎？')) { notebookEntries = notebookEntries.filter(e => e.id !== id); localStorage.setItem('notebookEntries', JSON.stringify(notebookEntries)); renderNotebook(); } }
 
         function renderNotebook() {
             const container = document.getElementById('notebookList');
@@ -2856,45 +2751,31 @@
             }
 
             notebookEntries.forEach(entry => {
-                const typeInfo = {
-                    homework: { color: 'border-blue-500 bg-blue-50', name: '作業' },
-                    exam: { color: 'border-red-500 bg-red-50', name: '考試' }, activity: {
-                        color:
-                            'border-green-500 bg-green-50', name: '活動'
-                    }, notice: {
-                        color: 'border-yellow-500
-                                    bg- yellow - 50', name: '通知' }, other: { color: 'border - gray - 500 bg- gray - 50', name:
-                '其他'
-            } };
-        const div = document.createElement('div');
-        const info = typeInfo[entry.type] || typeInfo.other;
-        div.className = `notebook-item p-4 border-l-4 rounded-lg flex items-start
-                                    ${info.color}`;
-        div.draggable = true;
-        div.dataset.id = entry.id;
-        div.innerHTML = `
-                                    <span
-                                        class="drag-handle cursor-move text-gray-500 hover:text-gray-800 mr-3 text-2xl"
-                                        style="padding-top: 0.3rem;">⠿</span>
-                                    <div class="flex-1">
-                                        <div class="flex justify-between items-start">
-                                            <div> <!-- Content container -->
-                                                <div class="flex items-center mb-2">
-                                                    <span
-                                                        class="bg-white px-2 py-1 rounded text-sm font-semibold">${info.name}</span>
-                                                    <span class="ml-2 text-sm text-gray-600">${entry.date}</span>
-                                                </div>
-                                                <div class="text-gray-800 whitespace-pre-wrap">${entry.content}</div>
-                                                <div class="text-xs text-gray-500 mt-2">建立時間：${entry.timestamp}</div>
-                                            </div>
-                                            <button onclick="removeNotebook(${entry.id})"
-                                                class="text-red-500 hover:text-red-700 ml-4">🗑️</button>
-                                        </div>
-                                    </div>`;
-        container.appendChild(div);
-                                    });
-        addNotebookDragListeners();
-                                    }
+                const typeInfo = { homework: { color: 'border-blue-500 bg-blue-50', name: '作業' }, exam: { color: 'border-red-500 bg-red-50', name: '考試' }, activity: { color: 'border-green-500 bg-green-50', name: '活動' }, notice: { color: 'border-yellow-500 bg-yellow-50', name: '通知' }, other: { color: 'border-gray-500 bg-gray-50', name: '其他' } };
+                const div = document.createElement('div');
+                const info = typeInfo[entry.type] || typeInfo.other;
+                div.className = `notebook-item p-4 border-l-4 rounded-lg flex items-start ${info.color}`;
+                div.draggable = true;
+                div.dataset.id = entry.id;
+                div.innerHTML = `
+                    <span class="drag-handle cursor-move text-gray-500 hover:text-gray-800 mr-3 text-2xl" style="padding-top: 0.3rem;">⠿</span>
+                    <div class="flex-1">
+                        <div class="flex justify-between items-start">
+                            <div> <!-- Content container -->
+                                <div class="flex items-center mb-2">
+                                    <span class="bg-white px-2 py-1 rounded text-sm font-semibold">${info.name}</span>
+                                    <span class="ml-2 text-sm text-gray-600">${entry.date}</span>
+                                </div>
+                                <div class="text-gray-800 whitespace-pre-wrap">${entry.content}</div>
+                                <div class="text-xs text-gray-500 mt-2">建立時間：${entry.timestamp}</div>
+                            </div>
+                            <button onclick="removeNotebook(${entry.id})" class="text-red-500 hover:text-red-700 ml-4">🗑️</button>
+                        </div>
+                    </div>`;
+                container.appendChild(div);
+            });
+            addNotebookDragListeners();
+        }
 
         // --- 聯絡簿拖曳功能 ---
         function addNotebookDragListeners() {
@@ -2914,8 +2795,7 @@
             this.classList.remove('dragging');
 
             const container = document.getElementById('notebookList');
-            const orderedIds = [...container.querySelectorAll('.notebook-item')].map(el =>
-                parseInt(el.dataset.id));
+            const orderedIds = [...container.querySelectorAll('.notebook-item')].map(el => parseInt(el.dataset.id));
 
             const entryMap = new Map(notebookEntries.map(entry => [entry.id, entry]));
             const newNotebookEntries = orderedIds.map(id => entryMap.get(id)).filter(Boolean);
@@ -2939,8 +2819,7 @@
         }
 
         function getDragAfterElement(container, y) {
-            const draggableElements =
-                [...container.querySelectorAll('.notebook-item:not(.dragging)')];
+            const draggableElements = [...container.querySelectorAll('.notebook-item:not(.dragging)')];
 
             return draggableElements.reduce((closest, child) => {
                 const box = child.getBoundingClientRect();
@@ -2966,38 +2845,21 @@
             renderHomework();
             updateHomeworkSelect();
         }
-        function removeHomework(id) {
-            if (confirm('確定要刪除這項作業嗎？相關的檢查記錄也會被刪除。')) {
-                homeworkList = homeworkList.filter(h => h.id !== id); delete homeworkChecks[id];
-                localStorage.setItem('homeworkList', JSON.stringify(homeworkList));
-                localStorage.setItem('homeworkChecks', JSON.stringify(homeworkChecks));
-                renderHomework(); updateHomeworkSelect(); updateHomeworkCheckList();
-            }
-        }
+        function removeHomework(id) { if (confirm('確定要刪除這項作業嗎？相關的檢查記錄也會被刪除。')) { homeworkList = homeworkList.filter(h => h.id !== id); delete homeworkChecks[id]; localStorage.setItem('homeworkList', JSON.stringify(homeworkList)); localStorage.setItem('homeworkChecks', JSON.stringify(homeworkChecks)); renderHomework(); updateHomeworkSelect(); updateHomeworkCheckList(); } }
         function renderHomework() {
             const container = document.getElementById('homeworkList');
-            container.innerHTML = homeworkList.length === 0 ? '<div
-                                            class="text-gray-500 text-center" > 尚無作業項目</div > ' : '';
+            container.innerHTML = homeworkList.length === 0 ? '<div class="text-gray-500 text-center">尚無作業項目</div>' : '';
             homeworkList.forEach(homework => {
                 const div = document.createElement('div');
-                div.className = 'flex justify-between items-center p-3 bg-indigo-50 border-l-4
-                border - indigo - 500 rounded';
-                div.innerHTML = `<div>
-                                            <div class="font-semibold text-gray-800">${homework.name}</div>
-                                            <div class="text-sm text-gray-600">繳交日期：${homework.due}</div>
-                                        </div><button onclick="removeHomework(${homework.id})"
-                                            class="text-red-500 hover:text-red-700">🗑️</button>`;
+                div.className = 'flex justify-between items-center p-3 bg-indigo-50 border-l-4 border-indigo-500 rounded';
+                div.innerHTML = `<div><div class="font-semibold text-gray-800">${homework.name}</div><div class="text-sm text-gray-600">繳交日期：${homework.due}</div></div><button onclick="removeHomework(${homework.id})" class="text-red-500 hover:text-red-700">🗑️</button>`;
                 container.appendChild(div);
             });
         }
         function updateHomeworkSelect() {
             const select = document.getElementById('checkHomework');
             select.innerHTML = '<option value="">選擇要檢查的作業</option>';
-            homeworkList.forEach(homework => {
-                const option =
-                    document.createElement('option'); option.value = homework.id; option.textContent
-                        = homework.name; select.appendChild(option);
-            });
+            homeworkList.forEach(homework => { const option = document.createElement('option'); option.value = homework.id; option.textContent = homework.name; select.appendChild(option); });
             select.addEventListener('change', updateHomeworkCheckList);
         }
         function updateHomeworkCheckList() {
@@ -3006,45 +2868,24 @@
             container.innerHTML = '';
             if (!homeworkId) { updateHomeworkStats(); return; }
             if (!homeworkChecks[homeworkId]) homeworkChecks[homeworkId] = {};
-            students.sort((a, b) => (a.number || 999) - (b.number || 999)).forEach(student
-                => {
+            students.sort((a, b) => (a.number || 999) - (b.number || 999)).forEach(student => {
                 const status = homeworkChecks[homeworkId][student.id] || 'unchecked';
                 const div = document.createElement('div');
                 div.className = 'p-2 sm:p-3 bg-gray-50 rounded border';
-                div.innerHTML = `<div
-                                            class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-                                            <span class="font-medium text-sm sm:text-base">${student.number}.
-                                                ${student.name}</span>
-                                            <div class="flex gap-1 sm:gap-2">
-                                                <button
-                                                    onclick="setHomeworkStatus(${homeworkId}, ${student.id}, 'completed')"
-                                                    class="px-2 sm:px-3 py-1 rounded text-xs sm:text-sm flex-1 sm:flex-none active:scale-95 ${status === 'completed' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-700'}">✓
-                                                    完成</button>
-                                                <button
-                                                    onclick="setHomeworkStatus(${homeworkId}, ${student.id}, 'incomplete')"
-                                                    class="px-2 sm:px-3 py-1 rounded text-xs sm:text-sm flex-1 sm:flex-none active:scale-95 ${status === 'incomplete' ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-700'}">✗
-                                                    未交</button>
-                                                <button
-                                                    onclick="setHomeworkStatus(${homeworkId}, ${student.id}, 'needs_correction')"
-                                                    class="px-2 sm:px-3 py-1 rounded text-xs sm:text-sm flex-1 sm:flex-none active:scale-95 ${status === 'needs_correction' ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-700'}">✍️
-                                                    需訂正</button>
-                                                <button
-                                                    onclick="setHomeworkStatus(${homeworkId}, ${student.id}, 'late')"
-                                                    class="px-2 sm:px-3 py-1 rounded text-xs sm:text-sm flex-1 sm:flex-none active:scale-95 ${status === 'late' ? 'bg-yellow-500 text-white' : 'bg-gray-200 text-gray-700'}">⚠
-                                                    遲交</button>
-                                            </div>
-                                        </div>`;
+                div.innerHTML = `<div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                    <span class="font-medium text-sm sm:text-base">${student.number}. ${student.name}</span>
+                    <div class="flex gap-1 sm:gap-2">
+                        <button onclick="setHomeworkStatus(${homeworkId}, ${student.id}, 'completed')" class="px-2 sm:px-3 py-1 rounded text-xs sm:text-sm flex-1 sm:flex-none active:scale-95 ${status === 'completed' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-700'}">✓ 完成</button>
+                        <button onclick="setHomeworkStatus(${homeworkId}, ${student.id}, 'incomplete')" class="px-2 sm:px-3 py-1 rounded text-xs sm:text-sm flex-1 sm:flex-none active:scale-95 ${status === 'incomplete' ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-700'}">✗ 未交</button>
+                        <button onclick="setHomeworkStatus(${homeworkId}, ${student.id}, 'needs_correction')" class="px-2 sm:px-3 py-1 rounded text-xs sm:text-sm flex-1 sm:flex-none active:scale-95 ${status === 'needs_correction' ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-700'}">✍️ 需訂正</button>
+                        <button onclick="setHomeworkStatus(${homeworkId}, ${student.id}, 'late')" class="px-2 sm:px-3 py-1 rounded text-xs sm:text-sm flex-1 sm:flex-none active:scale-95 ${status === 'late' ? 'bg-yellow-500 text-white' : 'bg-gray-200 text-gray-700'}">⚠ 遲交</button>
+                    </div>
+                </div>`;
                 container.appendChild(div);
             });
             updateHomeworkStats();
         }
-        function setHomeworkStatus(homeworkId, studentId, status) {
-            if
-                (!homeworkChecks[homeworkId]) homeworkChecks[homeworkId] = {};
-            homeworkChecks[homeworkId][studentId] = status;
-            localStorage.setItem('homeworkChecks', JSON.stringify(homeworkChecks));
-            updateHomeworkCheckList();
-        }
+        function setHomeworkStatus(homeworkId, studentId, status) { if (!homeworkChecks[homeworkId]) homeworkChecks[homeworkId] = {}; homeworkChecks[homeworkId][studentId] = status; localStorage.setItem('homeworkChecks', JSON.stringify(homeworkChecks)); updateHomeworkCheckList(); }
 
         function updateHomeworkStats() {
             const homeworkId = document.getElementById('checkHomework').value;
@@ -3052,94 +2893,69 @@
             currentVisibleList = null; // 重置顯示列表
 
             if (!homeworkId || students.length === 0) {
-                container.innerHTML = '<div class="text-gray-500 text-sm sm:text-base">請選擇作業項目
-                                        </div > ';
+                container.innerHTML = '<div class="text-gray-500 text-sm sm:text-base">請選擇作業項目</div>';
                 return;
             }
             const checks = homeworkChecks[homeworkId] || {};
             const completed = Object.values(checks).filter(s => s === 'completed').length;
             const incomplete = Object.values(checks).filter(s => s === 'incomplete').length;
             const late = Object.values(checks).filter(s => s === 'late').length;
-            const needs_correction = Object.values(checks).filter(s => s ===
-                'needs_correction').length;
-            const unchecked = students.length - completed - incomplete - late -
-                needs_correction;
-            const completionRate = students.length > 0 ? ((completed / students.length) *
-                100).toFixed(1) : 0;
+            const needs_correction = Object.values(checks).filter(s => s === 'needs_correction').length;
+            const unchecked = students.length - completed - incomplete - late - needs_correction;
+            const completionRate = students.length > 0 ? ((completed / students.length) * 100).toFixed(1) : 0;
 
-            const getStudentNameById = (id) => students.find(s => s.id == id)?.name ||
-                '未知學生';
+            const getStudentNameById = (id) => students.find(s => s.id == id)?.name || '未知學生';
 
-            const incompleteStudents = Object.keys(checks).filter(id => checks[id] ===
-                'incomplete').map(getStudentNameById).join('、') || '無';
-            const needsCorrectionStudents = Object.keys(checks).filter(id => checks[id] ===
-                'needs_correction').map(getStudentNameById).join('、') || '無';
-            const lateStudents = Object.keys(checks).filter(id => checks[id] ===
-                'late').map(getStudentNameById).join('、') || '無';
+            const incompleteStudents = Object.keys(checks).filter(id => checks[id] === 'incomplete').map(getStudentNameById).join('、') || '無';
+            const needsCorrectionStudents = Object.keys(checks).filter(id => checks[id] === 'needs_correction').map(getStudentNameById).join('、') || '無';
+            const lateStudents = Object.keys(checks).filter(id => checks[id] === 'late').map(getStudentNameById).join('、') || '無';
 
             container.innerHTML = `
-                                        <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4">
-                                            <div
-                                                class="text-center p-2 bg-green-50 rounded-lg border-2 border-transparent">
-                                                <div class="text-xl sm:text-2xl font-bold text-green-600">${completed}
-                                                </div>
-                                                <div class="text-xs sm:text-sm text-gray-600">已完成</div>
-                                            </div>
-                                            <div class="stat-block text-center p-2 bg-red-50 rounded-lg border-2 border-transparent cursor-pointer hover:border-red-300 transition"
-                                                data-status="incomplete"
-                                                onclick="toggleHomeworkStudentList('incomplete')">
-                                                <div class="text-xl sm:text-2xl font-bold text-red-600">${incomplete}
-                                                </div>
-                                                <div class="text-xs sm:text-sm text-gray-600">未交</div>
-                                            </div>
-                                            <div class="stat-block text-center p-2 bg-orange-50 rounded-lg border-2 border-transparent cursor-pointer hover:border-orange-300 transition"
-                                                data-status="needs_correction"
-                                                onclick="toggleHomeworkStudentList('needs_correction')">
-                                                <div class="text-xl sm:text-2xl font-bold text-orange-600">
-                                                    ${needs_correction}</div>
-                                                <div class="text-xs sm:text-sm text-gray-600">需訂正</div>
-                                            </div>
-                                            <div class="stat-block text-center p-2 bg-yellow-50 rounded-lg border-2 border-transparent cursor-pointer hover:border-yellow-300 transition"
-                                                data-status="late" onclick="toggleHomeworkStudentList('late')">
-                                                <div class="text-xl sm:text-2xl font-bold text-yellow-600">${late}</div>
-                                                <div class="text-xs sm:text-sm text-gray-600">遲交</div>
-                                            </div>
-                                            <div
-                                                class="text-center p-2 bg-gray-100 rounded-lg border-2 border-transparent">
-                                                <div class="text-xl sm:text-2xl font-bold text-gray-600">${unchecked}
-                                                </div>
-                                                <div class="text-xs sm:text-sm text-gray-600">未檢查</div>
-                                            </div>
-                                        </div>
-                                        <div class="mt-3 sm:mt-4 text-center">
-                                            <div class="text-base sm:text-lg font-semibold">完成率：<span
-                                                    class="text-blue-600">${completionRate}%</span></div>
-                                        </div>
-                                        <div class="mt-4 space-y-2">
-                                            <div id="homework-list-incomplete"
-                                                class="homework-student-list hidden p-3 bg-red-50 rounded-lg border-l-4 border-red-500">
-                                                <h4 class="font-semibold text-red-800 mb-1">🔴 未交名單</h4>
-                                                <p class="text-gray-600 text-sm">${incompleteStudents}</p>
-                                            </div>
-                                            <div id="homework-list-needs_correction"
-                                                class="homework-student-list hidden p-3 bg-orange-50 rounded-lg border-l-4 border-orange-500">
-                                                <h4 class="font-semibold text-orange-800 mb-1">🟠 需訂正名單</h4>
-                                                <p class="text-gray-600 text-sm">${needsCorrectionStudents}</p>
-                                            </div>
-                                            <div id="homework-list-late"
-                                                class="homework-student-list hidden p-3 bg-yellow-50 rounded-lg border-l-4 border-yellow-500">
-                                                <h4 class="font-semibold text-yellow-800 mb-1">🟡 遲交名單</h4>
-                                                <p class="text-gray-600 text-sm">${lateStudents}</p>
-                                            </div>
-                                        </div>
-                                        `;
+                <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4">
+                    <div class="text-center p-2 bg-green-50 rounded-lg border-2 border-transparent">
+                        <div class="text-xl sm:text-2xl font-bold text-green-600">${completed}</div>
+                        <div class="text-xs sm:text-sm text-gray-600">已完成</div>
+                    </div>
+                    <div class="stat-block text-center p-2 bg-red-50 rounded-lg border-2 border-transparent cursor-pointer hover:border-red-300 transition" data-status="incomplete" onclick="toggleHomeworkStudentList('incomplete')">
+                        <div class="text-xl sm:text-2xl font-bold text-red-600">${incomplete}</div>
+                        <div class="text-xs sm:text-sm text-gray-600">未交</div>
+                    </div>
+                    <div class="stat-block text-center p-2 bg-orange-50 rounded-lg border-2 border-transparent cursor-pointer hover:border-orange-300 transition" data-status="needs_correction" onclick="toggleHomeworkStudentList('needs_correction')">
+                        <div class="text-xl sm:text-2xl font-bold text-orange-600">${needs_correction}</div>
+                        <div class="text-xs sm:text-sm text-gray-600">需訂正</div>
+                    </div>
+                    <div class="stat-block text-center p-2 bg-yellow-50 rounded-lg border-2 border-transparent cursor-pointer hover:border-yellow-300 transition" data-status="late" onclick="toggleHomeworkStudentList('late')">
+                        <div class="text-xl sm:text-2xl font-bold text-yellow-600">${late}</div>
+                        <div class="text-xs sm:text-sm text-gray-600">遲交</div>
+                    </div>
+                    <div class="text-center p-2 bg-gray-100 rounded-lg border-2 border-transparent">
+                        <div class="text-xl sm:text-2xl font-bold text-gray-600">${unchecked}</div>
+                        <div class="text-xs sm:text-sm text-gray-600">未檢查</div>
+                    </div>
+                </div>
+                <div class="mt-3 sm:mt-4 text-center">
+                    <div class="text-base sm:text-lg font-semibold">完成率：<span class="text-blue-600">${completionRate}%</span></div>
+                </div>
+                <div class="mt-4 space-y-2">
+                    <div id="homework-list-incomplete" class="homework-student-list hidden p-3 bg-red-50 rounded-lg border-l-4 border-red-500">
+                        <h4 class="font-semibold text-red-800 mb-1">🔴 未交名單</h4>
+                        <p class="text-gray-600 text-sm">${incompleteStudents}</p>
+                    </div>
+                    <div id="homework-list-needs_correction" class="homework-student-list hidden p-3 bg-orange-50 rounded-lg border-l-4 border-orange-500">
+                       <h4 class="font-semibold text-orange-800 mb-1">🟠 需訂正名單</h4>
+                       <p class="text-gray-600 text-sm">${needsCorrectionStudents}</p>
+                    </div>
+                    <div id="homework-list-late" class="homework-student-list hidden p-3 bg-yellow-50 rounded-lg border-l-4 border-yellow-500">
+                        <h4 class="font-semibold text-yellow-800 mb-1">🟡 遲交名單</h4>
+                        <p class="text-gray-600 text-sm">${lateStudents}</p>
+                    </div>
+                </div>
+            `;
         }
 
         function toggleHomeworkStudentList(statusToShow) {
-            document.querySelectorAll('.homework-student-list').forEach(list =>
-                list.classList.add('hidden'));
-            document.querySelectorAll('.stat-block').forEach(block =>
-                block.classList.remove('stat-block-active'));
+            document.querySelectorAll('.homework-student-list').forEach(list => list.classList.add('hidden'));
+            document.querySelectorAll('.stat-block').forEach(block => block.classList.remove('stat-block-active'));
 
             if (currentVisibleList === statusToShow) {
                 currentVisibleList = null;
@@ -3147,8 +2963,7 @@
             }
 
             const listToShow = document.getElementById(`homework-list-${statusToShow}`);
-            const statBlock =
-                document.querySelector(`.stat-block[data-status="${statusToShow}"]`);
+            const statBlock = document.querySelector(`.stat-block[data-status="${statusToShow}"]`);
 
             if (listToShow && statBlock) {
                 listToShow.classList.remove('hidden');
@@ -3182,19 +2997,29 @@
                     const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
                     // 從 A2 (rows[1][0]) 和 B2 (rows[1][1]) 開始讀取
-                    if (rows.length < 2) { alert('Excel 檔案中沒有足夠的資料可以匯入。'); return; } const
-                        newStudents = []; const errors = []; let nextNumber = Math.max(...students.map(s =>
-                            parseInt(s.number) || 0), 0) + 1;
+                    if (rows.length < 2) {
+                        alert('Excel 檔案中沒有足夠的資料可以匯入。');
+                        return;
+                    }
+
+                    const newStudents = [];
+                    const errors = [];
+                    let nextNumber = Math.max(...students.map(s => parseInt(s.number) || 0), 0) + 1;
 
                     // 從第二行開始遍歷 (index 1)
                     for (let i = 1; i < rows.length; i++) {
-                        const row = rows[i]; if (!row ||
-                            row.length === 0) continue; // 跳過空行 const name=row[0] ?
-                        String(row[0]).trim() : ''; let number = row[1] ?
-                            parseInt(String(row[1]).trim()) : null; if (!name) { // 如果 A 欄是空的，就跳過這一行
-                                continue;
-                            } if (students.some(s => s.name === name) || newStudents.some(s
-                                => s.name === name)) {
+                        const row = rows[i];
+                        if (!row || row.length === 0) continue; // 跳過空行
+
+                        const name = row[0] ? String(row[0]).trim() : '';
+                        let number = row[1] ? parseInt(String(row[1]).trim()) : null;
+
+                        if (!name) {
+                            // 如果 A 欄是空的，就跳過這一行
+                            continue;
+                        }
+
+                        if (students.some(s => s.name === name) || newStudents.some(s => s.name === name)) {
                             errors.push(`第 ${i + 1} 行：學生「${name}」已存在`);
                             continue;
                         }
@@ -3202,16 +3027,12 @@
                         if (!number || isNaN(number)) {
                             number = nextNumber++;
                         } else {
-                            if (students.some(s => s.number == number) || newStudents.some(s =>
-                                s.number == number)) {
+                            if (students.some(s => s.number == number) || newStudents.some(s => s.number == number)) {
                                 errors.push(`第 ${i + 1} 行：座號 ${number} 已被使用`);
                                 continue;
                             }
                         }
-                        newStudents.push({
-                            id: Date.now() + i, name: name, number: number,
-                            points: 0, records: []
-                        });
+                        newStudents.push({ id: Date.now() + i, name: name, number: number, points: 0, records: [] });
                     }
 
                     if (errors.length > 0) {
@@ -3224,9 +3045,7 @@
                         return;
                     }
 
-                    const confirmMessage = `預覽即將從 Excel 匯入的 ${newStudents.length}
-                                                位學生：\n\n${newStudents.map(s => `${s.name}
-                                                (座號：${s.number})`).join('\n')}\n\n確定要新增嗎？`;
+                    const confirmMessage = `預覽即將從 Excel 匯入的 ${newStudents.length} 位學生：\n\n${newStudents.map(s => `${s.name} (座號：${s.number})`).join('\n')}\n\n確定要新增嗎？`;
                     if (confirm(confirmMessage)) {
                         students.push(...newStudents);
                         localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
@@ -3255,15 +3074,12 @@
             if (students.length === 0) { alert('沒有學生資料可以匯出。'); return; }
             let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
             csvContent += "座號,姓名,分數\n";
-            [...students].sort((a, b) => (a.number || 0) - (b.number ||
-                0)).forEach(student => {
-                    csvContent += [student.number, `"${student.name}"`,
-                    student.points].join(',') + "\n";
-                });
+            [...students].sort((a, b) => (a.number || 0) - (b.number || 0)).forEach(student => {
+                csvContent += [student.number, `"${student.name}"`, student.points].join(',') + "\n";
+            });
             const link = document.createElement("a");
             link.setAttribute("href", encodeURI(csvContent));
-            link.setAttribute("download", `班級分數_${new
-                Date().toISOString().split('T')[0]}.csv`);
+            link.setAttribute("download", `班級分數_${new Date().toISOString().split('T')[0]}.csv`);
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -3271,40 +3087,31 @@
 
         function saveStudentList() {
             if (students.length === 0) { alert('目前沒有學生名單可以儲存。'); return; }
-            const listName = prompt('請為這個學生名單命名：', `班級名單 ${new
-                Date().toLocaleDateString()}`);
+            const listName = prompt('請為這個學生名單命名：', `班級名單 ${new Date().toLocaleDateString()}`);
             if (!listName || listName.trim() === '') { alert('儲存已取消。'); return; }
-            const savedLists = JSON.parse(localStorage.getItem('savedStudentLists'))
-                || {};
+            const savedLists = JSON.parse(localStorage.getItem('savedStudentLists')) || {};
             savedLists[listName.trim()] = students;
             localStorage.setItem('savedStudentLists', JSON.stringify(savedLists));
             alert(`名單「${listName.trim()}」已成功儲存！`);
         }
 
         function loadStudentList() {
-            const savedLists = JSON.parse(localStorage.getItem('savedStudentLists'))
-                || {};
+            const savedLists = JSON.parse(localStorage.getItem('savedStudentLists')) || {};
             const listNames = Object.keys(savedLists);
             if (listNames.length === 0) { alert('沒有任何已儲存的學生名單。'); return; }
             let message = '請輸入您想載入的名單編號：\n\n';
-            listNames.forEach((name, index) => {
-                message += `${index + 1}.
-                                                ${name}\n`;
-            });
+            listNames.forEach((name, index) => { message += `${index + 1}. ${name}\n`; });
             const choice = prompt(message);
             if (!choice) { alert('載入已取消。'); return; }
             const index = parseInt(choice) - 1;
-            if (isNaN(index) || index < 0 || index >= listNames.length) {
-                alert('無效的選擇。'); return;
-            }
+            if (isNaN(index) || index < 0 || index >= listNames.length) { alert('無效的選擇。'); return; }
             const selectedListName = listNames[index];
             if (confirm(`確定要載入「${selectedListName}」嗎？\n這將會覆蓋目前的學生名單、分數與分組記錄。`)) {
                 students = savedLists[selectedListName];
                 pointsHistory = [];
                 groups = [];
                 localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
-                localStorage.setItem('pointsHistory',
-                    JSON.stringify(pointsHistory));
+                localStorage.setItem('pointsHistory', JSON.stringify(pointsHistory));
                 localStorage.setItem('groups', JSON.stringify(groups));
                 renderStudents();
                 updatePointsStudentSelect();
@@ -3323,11 +3130,9 @@
                 homeworkChecks = {};
 
                 localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
-                localStorage.setItem('pointsHistory',
-                    JSON.stringify(pointsHistory));
+                localStorage.setItem('pointsHistory', JSON.stringify(pointsHistory));
                 localStorage.setItem('groups', JSON.stringify(groups));
-                localStorage.setItem('homeworkChecks',
-                    JSON.stringify(homeworkChecks));
+                localStorage.setItem('homeworkChecks', JSON.stringify(homeworkChecks));
 
                 renderStudents();
                 updatePointsStudentSelect();
@@ -3344,37 +3149,24 @@
         function startGrouping() {
             if (students.length === 0) { alert('請先新增學生！'); return; }
             const method = document.getElementById('groupingMethod').value;
-            const value =
-                parseInt(document.getElementById('groupingValue').value);
-            if (isNaN(value) || value <= 0) { alert('請輸入有效數字！'); return; } let
-                shuffledStudents = [...students].sort(() => Math.random() - 0.5);
+            const value = parseInt(document.getElementById('groupingValue').value);
+            if (isNaN(value) || value <= 0) { alert('請輸入有效數字！'); return; }
+            let shuffledStudents = [...students].sort(() => Math.random() - 0.5);
             groups = [];
             let groupCount;
             if (method === 'byGroupCount') {
                 groupCount = value;
-                if (groupCount > students.length) {
-                    alert('組數不能超過學生總人數！');
-                    return;
-                }
+                if (groupCount > students.length) { alert('組數不能超過學生總人數！'); return; }
             } else {
-                if (value > students.length) {
-                    alert('每組人數不能超過學生總人數！'); return;
-                }
+                if (value > students.length) { alert('每組人數不能超過學生總人數！'); return; }
                 groupCount = Math.ceil(students.length / value);
             }
-            for (let i = 0; i < groupCount; i++) {
-                groups.push({
-                    id:
-                        Date.now() + i, name: `第 ${i + 1} 組`, members: [], score: 0
-                });
-            } shuffledStudents.forEach((student, index) => {
-                groups[index % groupCount].members.push(student);
-            });
+            for (let i = 0; i < groupCount; i++) { groups.push({ id: Date.now() + i, name: `第 ${i + 1} 組`, members: [], score: 0 }); }
+            shuffledStudents.forEach((student, index) => { groups[index % groupCount].members.push(student); });
 
             // Recalculate scores
             groups.forEach(group => {
-                group.score = group.members.reduce((total, member) => total
-                    + member.points, 0);
+                group.score = group.members.reduce((total, member) => total + member.points, 0);
             });
 
             localStorage.setItem('groups', JSON.stringify(groups));
@@ -3384,247 +3176,210 @@
         function renderGroups() {
             const container = document.getElementById('groupingResult');
             container.innerHTML = '';
-            if (groups.length === 0) {
-                container.innerHTML = '<div
-                class="text-gray-500 text-center p-6 bg-gray-50 rounded-lg col-span-full" >
-                    尚無分組結果。</div > '; return; }
-                groups.forEach((group, index) => {
-                    const div = document.createElement('div');
-                    div.className = 'bg-gray-50 p-4 rounded-lg border-l-4
-                    border - cyan - 500 flex flex - col';
-                    const memberNames = group.members.map(m => m.name).join('、')
-                        || '沒有組員';
-                    div.innerHTML = `<div class="flex-grow">
-                                                                <h4 class="font-bold text-lg text-cyan-700">
-                                                                    ${group.name}</h4>
-                                                                <p
-                                                                    class="text-gray-600 text-sm mb-3 h-12 overflow-y-auto">
-                                                                    ${memberNames}</p>
-                                                            </div>
-                                                            <div class="flex items-center justify-between mt-2"><span
-                                                                    class="font-semibold text-xl">分數: <span
-                                                                        class="text-indigo-600">${group.score}</span></span>
-                                                                <div class="flex gap-1"><button
-                                                                        onclick="adjustGroupScore(${index}, 1)"
-                                                                        class="bg-green-500 text-white rounded-full h-8 w-8 text-lg font-bold hover:bg-green-600 active:scale-90 transition-transform">+</button><button
-                                                                        onclick="adjustGroupScore(${index}, -1)"
-                                                                        class="bg-red-500 text-white rounded-full h-8 w-8 text-lg font-bold hover:bg-red-600 active:scale-90 transition-transform">-</button>
-                                                                </div>
-                                                            </div>`;
-                    container.appendChild(div);
-                });
+            if (groups.length === 0) { container.innerHTML = '<div class="text-gray-500 text-center p-6 bg-gray-50 rounded-lg col-span-full">尚無分組結果。</div>'; return; }
+            groups.forEach((group, index) => {
+                const div = document.createElement('div');
+                div.className = 'bg-gray-50 p-4 rounded-lg border-l-4 border-cyan-500 flex flex-col';
+                const memberNames = group.members.map(m => m.name).join('、') || '沒有組員';
+                div.innerHTML = `<div class="flex-grow"><h4 class="font-bold text-lg text-cyan-700">${group.name}</h4><p class="text-gray-600 text-sm mb-3 h-12 overflow-y-auto">${memberNames}</p></div><div class="flex items-center justify-between mt-2"><span class="font-semibold text-xl">分數: <span class="text-indigo-600">${group.score}</span></span><div class="flex gap-1"><button onclick="adjustGroupScore(${index}, 1)" class="bg-green-500 text-white rounded-full h-8 w-8 text-lg font-bold hover:bg-green-600 active:scale-90 transition-transform">+</button><button onclick="adjustGroupScore(${index}, -1)" class="bg-red-500 text-white rounded-full h-8 w-8 text-lg font-bold hover:bg-red-600 active:scale-90 transition-transform">-</button></div></div>`;
+                container.appendChild(div);
+            });
+        }
+
+        function adjustGroupScore(groupIndex, amount) {
+            if (groups[groupIndex]) {
+                groups[groupIndex].score += amount;
+                localStorage.setItem('groups', JSON.stringify(groups));
+                renderGroups();
+            }
+        }
+
+        function exportGroupScores() {
+            if (groups.length === 0) { alert('沒有分組資料可以匯出。'); return; }
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+            csvContent += "組別,組員,分數\n";
+            groups.forEach(group => {
+                const memberNames = group.members.map(m => m.name).join('; ');
+                csvContent += [`"${group.name}"`, `"${memberNames}"`, group.score].join(',') + "\n";
+            });
+            const link = document.createElement("a");
+            link.setAttribute("href", encodeURI(csvContent));
+            link.setAttribute("download", `小組分數_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function resetAllScores() {
+            if (confirm('確定要重置所有學生的分數嗎？此操作無法復原。')) {
+                students.forEach(s => s.points = 0);
+                groups.forEach(g => g.score = 0);
+                pointsHistory = [];
+
+                localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
+                localStorage.setItem('groups', JSON.stringify(groups));
+                localStorage.setItem('pointsHistory', JSON.stringify(pointsHistory));
+
+                renderStudents();
+                renderGroups();
+                renderPointsHistory();
+                alert('所有分數已重置為 0。');
+            }
+        }
+
+        // --- 排行榜功能 ---
+        function showLeaderboard() {
+            const modal = document.getElementById('leaderboardModal');
+            const content = document.getElementById('leaderboardContent');
+
+            const sortedStudents = [...students].sort((a, b) => b.points - a.points);
+
+            if (sortedStudents.length === 0) {
+                content.innerHTML = '<p class="text-center text-gray-500">目前沒有學生可以排名。</p>';
+            } else {
+                const ranksHTML = sortedStudents.map((student, index) => {
+                    let rankDisplay = '';
+                    if (index === 0) rankDisplay = '🥇';
+                    else if (index === 1) rankDisplay = '🥈';
+                    else if (index === 2) rankDisplay = '🥉';
+                    else rankDisplay = `#${index + 1}`;
+
+                    return `
+                        <div class="flex items-center justify-between p-2 rounded-lg ${index < 3 ? 'bg-yellow-50' : ''} mb-2">
+                            <div class="flex items-center">
+                                <span class="font-bold text-lg w-10 text-center">${rankDisplay}</span>
+                                <span class="font-semibold text-gray-700">${student.name}</span>
+                            </div>
+                            <span class="font-bold text-lg ${student.points >= 0 ? 'text-green-600' : 'text-red-600'}">${student.points} 分</span>
+                        </div>
+                    `;
+                }).join('');
+                content.innerHTML = ranksHTML;
             }
 
-            function adjustGroupScore(groupIndex, amount) {
-                if (groups[groupIndex]) {
-                    groups[groupIndex].score += amount;
-                    localStorage.setItem('groups', JSON.stringify(groups));
-                    renderGroups();
-                }
+            modal.classList.remove('hidden');
+            triggerConfetti();
+            playCheerSound();
+        }
+
+        function hideLeaderboard() {
+            document.getElementById('leaderboardModal').classList.add('hidden');
+        }
+
+
+        // --- 全螢幕時鐘功能 ---
+
+        function loadClockSettings() {
+            const savedSettings = JSON.parse(localStorage.getItem('clockSettings'));
+            if (savedSettings) {
+                clockSettings = savedSettings;
             }
 
-            function exportGroupScores() {
-                if (groups.length === 0) { alert('沒有分組資料可以匯出。'); return; }
-                let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
-                csvContent += "組別,組員,分數\n";
-                groups.forEach(group => {
-                    const memberNames = group.members.map(m => m.name).join(';
-                                                            ');
-                                                            csvContent += [`"${group.name}"`, `"${memberNames}"`,
-                        group.score].join(',') + "\n";
-                });
-                const link = document.createElement("a");
-                link.setAttribute("href", encodeURI(csvContent));
-                link.setAttribute("download", `小組分數_${new
-                    Date().toISOString().split('T')[0]}.csv`);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+            // 自動偵測 12/24 小時制 (如果尚未設定)
+            if (clockSettings.is24Hour === null) {
+                // 'zh-TW' 預設是 12 小時制 (下午/上午)，'en-GB' 是 24 小時制
+                // 我們可以用 navigator.language 來猜測
+                const locale = navigator.language || 'zh-TW';
+                const testTime = new Date(2025, 10, 28, 14, 30, 0); // 下午 2:30
+                const localeString = testTime.toLocaleTimeString(locale, { hour: 'numeric' });
+
+                // 如果字串包含 "14" (24小時制) 而不是 "2" 或 "下午"
+                clockSettings.is24Hour = localeString.includes('14') || !localeString.match(/[\u4E0A\u4E0B\u5348|AM|PM]/i);
             }
+            localStorage.setItem('clockSettings', JSON.stringify(clockSettings));
+        }
 
-            function resetAllScores() {
-                if (confirm('確定要重置所有學生的分數嗎？此操作無法復原。')) {
-                    students.forEach(s => s.points = 0);
-                    groups.forEach(g => g.score = 0);
-                    pointsHistory = [];
+        async function openBigClock() {
+            const modal = document.getElementById('clock-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
 
-                    localStorage.setItem(STUDENTS_KEY,
-                        JSON.stringify(students));
-                    localStorage.setItem('groups', JSON.stringify(groups));
-                    localStorage.setItem('pointsHistory',
-                        JSON.stringify(pointsHistory));
+            prevFlipTime = ""; // 重設翻轉時鐘的狀態
+            // await syncTimeWithServer(); // 移除時間同步
+            applyClockSettings(); // 應用載入的設定
+            updateBigClock(); // 立即更新一次
 
-                    renderStudents();
-                    renderGroups();
-                    renderPointsHistory();
-                    alert('所有分數已重置為 0。');
-                }
+            if (bigClockInterval) clearInterval(bigClockInterval);
+            bigClockInterval = setInterval(updateBigClock, 1000); // 每秒更新
+
+            requestWakeLock(); // 保持螢幕開啟
+        }
+
+        function closeBigClock() {
+            const modal = document.getElementById('clock-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+
+            if (bigClockInterval) clearInterval(bigClockInterval);
+            bigClockInterval = null;
+
+            releaseWakeLock(); // 釋放螢幕鎖定
+
+            // 退出全螢幕
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
             }
+        }
 
-            // --- 排行榜功能 ---
-            function showLeaderboard() {
-                const modal = document.getElementById('leaderboardModal');
-                const content =
-                    document.getElementById('leaderboardContent');
+        // 移除了 syncTimeWithServer() 函式
 
-                const sortedStudents = [...students].sort((a, b) => b.points
-                    - a.points);
+        function updateBigClock() {
+            const now = new Date(); // 使用本地時間
+            const displayEl = document.getElementById('big-clock-display');
 
-                if (sortedStudents.length === 0) {
-                    content.innerHTML = '<p class="text-center text-gray-500">
-                    目前沒有學生可以排名。</p > ';
-                } else {
-                    const ranksHTML = sortedStudents.map((student, index) => {
-                        let rankDisplay = '';
-                        if (index === 0) rankDisplay = '🥇';
-                        else if (index === 1) rankDisplay = '🥈';
-                        else if (index === 2) rankDisplay = '🥉';
-                        else rankDisplay = `#${index + 1}`;
+            // 格式化時間選項
+            const timeOptions = {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: !clockSettings.is24Hour
+            };
 
-                        return `
-                                                            <div
-                                                                class="flex items-center justify-between p-2 rounded-lg ${index < 3 ? 'bg-yellow-50' : ''} mb-2">
-                                                                <div class="flex items-center">
-                                                                    <span
-                                                                        class="font-bold text-lg w-10 text-center">${rankDisplay}</span>
-                                                                    <span
-                                                                        class="font-semibold text-gray-700">${student.name}</span>
-                                                                </div>
-                                                                <span
-                                                                    class="font-bold text-lg ${student.points >= 0 ? 'text-green-600' : 'text-red-600'}">${student.points}
-                                                                    分</span>
-                                                            </div>
-                                                            `;
-                    }).join('');
-                    content.innerHTML = ranksHTML;
-                }
+            const timeString = now.toLocaleTimeString('en-US', timeOptions);
+            let timeParts = timeString.split(/:| /); // 分割 'HH:MM:SS AM/PM'
 
-                modal.classList.remove('hidden');
-                triggerConfetti();
-                playCheerSound();
-            }
+            let hours = timeParts[0];
+            let minutes = timeParts[1];
+            let seconds = timeParts[2];
+            // let ampm = timeParts[3] ? ` ${timeParts[3]}` : ''; // <-- 【修改】不再需要 ampm 變數
 
-            function hideLeaderboard() {
-                document.getElementById('leaderboardModal').classList.add('hidden');
-            }
-
-
-            // --- 全螢幕時鐘功能 ---
-
-            function loadClockSettings() {
-                const savedSettings =
-                    JSON.parse(localStorage.getItem('clockSettings'));
-                if (savedSettings) {
-                    clockSettings = savedSettings;
-                }
-
-                // 自動偵測 12/24 小時制 (如果尚未設定)
-                if (clockSettings.is24Hour === null) {
-                    // 'zh-TW' 預設是 12 小時制 (下午/上午)，'en-GB' 是 24 小時制
-                    // 我們可以用 navigator.language 來猜測
-                    const locale = navigator.language || 'zh-TW';
-                    const testTime = new Date(2025, 10, 28, 14, 30, 0); // 下午
-                    2: 30
-                    const localeString = testTime.toLocaleTimeString(locale, {
-                        hour: 'numeric'
-                    });
-
-                    // 如果字串包含 "14" (24小時制) 而不是 "2" 或 "下午"
-                    clockSettings.is24Hour = localeString.includes('14') ||
-                        !localeString.match(/[\u4E0A\u4E0B\u5348|AM|PM]/i);
-                }
-                localStorage.setItem('clockSettings',
-                    JSON.stringify(clockSettings));
-            }
-
-            async function openBigClock() {
-                const modal = document.getElementById('clock-modal');
-                modal.classList.remove('hidden');
-                modal.classList.add('flex');
-
-                prevFlipTime = ""; // 重設翻轉時鐘的狀態
-                // await syncTimeWithServer(); // 移除時間同步
-                applyClockSettings(); // 應用載入的設定
-                updateBigClock(); // 立即更新一次
-
-                if (bigClockInterval) clearInterval(bigClockInterval);
-                bigClockInterval = setInterval(updateBigClock, 1000); //
-                每秒更新
-
-                requestWakeLock(); // 保持螢幕開啟
-            }
-
-            function closeBigClock() {
-                const modal = document.getElementById('clock-modal');
-                modal.classList.add('hidden');
-                modal.classList.remove('flex');
-
-                if (bigClockInterval) clearInterval(bigClockInterval);
-                bigClockInterval = null;
-
-                releaseWakeLock(); // 釋放螢幕鎖定
-
-                // 退出全螢幕
-                if (document.fullscreenElement) {
-                    document.exitFullscreen();
-                }
-            }
-
-            // 移除了 syncTimeWithServer() 函式
-
-            function updateBigClock() {
-                const now = new Date(); // 使用本地時間
-                const displayEl =
-                    document.getElementById('big-clock-display');
-
-                // 格式化時間選項
-                const timeOptions = {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                    hour12: !clockSettings.is24Hour
+            // 格式化日期
+            let dateString = '';
+            if (clockSettings.showDate) {
+                const dateOptions = {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    weekday: 'long'
                 };
+                // 使用 'zh-TW' 顯示中文日期
+                dateString = now.toLocaleDateString('zh-TW', dateOptions);
+            }
 
-                const timeString = now.toLocaleTimeString('en-US',
-                    timeOptions);
-                let timeParts = timeString.split(/:| /); // 分割 'HH:MM:SS
-                AM / PM'
-
-                let hours = timeParts[0];
-                let minutes = timeParts[1];
-                let seconds = timeParts[2];
-                                                            // let ampm = timeParts[3] ? ` ${timeParts[3]}` : ''; // <--
-                                                                【修改】不再需要 ampm 變數 // 格式化日期 let dateString='' ; if
-                    (clockSettings.showDate) {
-                    const dateOptions = {
-                        year: 'numeric', month: 'long', day: 'numeric',
-                        weekday: 'long'
-                    }; // 使用 'zh-TW' 顯示中文日期
-                    dateString = now.toLocaleDateString('zh-TW', dateOptions);
-                } // 根據不同樣式更新 DOM switch (clockSettings.style) {
-                                                                case 'flip' : updateFlipClockDOM(hours, minutes,
-                    seconds, dateString); break; case 'led' :
-                displayEl.innerHTML = ` <div
-                                                                class="time-display">${hours}:${minutes}:${seconds}
-                                                                </div>
-                                                                <div class="date-display">${dateString}</div>
-                                                                `;
-                break;
-                                                                case 'cute':
-                displayEl.innerHTML = `
-                                                                <div class="time-display">${hours}:${minutes}:${seconds}
-                                                                </div>
-                                                                <div class="date-display">${dateString}</div>
-                                                                `;
-                break;
-                                                                case 'digital':
-                                                                default:
-                displayEl.innerHTML = `
-                                                                <div class="time-display">${hours}:${minutes}:${seconds}
-                                                                </div>
-                                                                <div class="date-display">${dateString}</div>
-                                                                `;
-                break;
+            // 根據不同樣式更新 DOM
+            switch (clockSettings.style) {
+                case 'flip':
+                    updateFlipClockDOM(hours, minutes, seconds, dateString);
+                    break;
+                case 'led':
+                    displayEl.innerHTML = `
+                        <div class="time-display">${hours}:${minutes}:${seconds}</div>
+                        <div class="date-display">${dateString}</div>
+                    `;
+                    break;
+                case 'cute':
+                    displayEl.innerHTML = `
+                        <div class="time-display">${hours}:${minutes}:${seconds}</div>
+                        <div class="date-display">${dateString}</div>
+                    `;
+                    break;
+                case 'digital':
+                default:
+                    displayEl.innerHTML = `
+                        <div class="time-display">${hours}:${minutes}:${seconds}</div>
+                        <div class="date-display">${dateString}</div>
+                    `;
+                    break;
             }
             // 動態調整字體大小以填滿螢幕
             requestAnimationFrame(fitClockToScreen);
@@ -3632,49 +3387,43 @@
 
         function createFlipper(digit) {
             return `
-                                                                <div class="flipper" data-digit="${digit}">
-                                                                    <div class="flipper-static-bottom"
-                                                                        data-digit="${digit}"></div>
-                                                                    <div class="flipper-card">
-                                                                        <div class="flipper-face flipper-face-front"
-                                                                            data-digit="${digit}"></div>
-                                                                        <div class="flipper-face flipper-face-back"
-                                                                            data-digit="${digit}"></div>
-                                                                    </div>
-                                                                    <!-- 這個卡片用於在翻轉時顯示新數字的下半部 -->
-                                                                    <div class="flipper-face flipper-face-bottom"
-                                                                        data-digit-new="${digit}"></div>
-                                                                </div>
-                                                                `;
+                <div class="flipper" data-digit="${digit}">
+                    <div class="flipper-static-bottom" data-digit="${digit}"></div>
+                    <div class="flipper-card">
+                        <div class="flipper-face flipper-face-front" data-digit="${digit}"></div>
+                        <div class="flipper-face flipper-face-back" data-digit="${digit}"></div>
+                    </div>
+                    <!-- 這個卡片用於在翻轉時顯示新數字的下半部 -->
+                    <div class="flipper-face flipper-face-bottom" data-digit-new="${digit}"></div>
+                </div>
+            `;
         }
 
-        function updateFlipClockDOM(hours, minutes, seconds,
-            dateString) {
-            const displayEl =
-                document.getElementById('big-clock-display');
+        function updateFlipClockDOM(hours, minutes, seconds, dateString) {
+            const displayEl = document.getElementById('big-clock-display');
             const newFlipTime = hours + minutes + seconds;
 
             // 首次渲染
             if (prevFlipTime === "") {
                 displayEl.innerHTML = `
-                                                                <div class="flex items-center justify-center">
-                                                                    <div class="flipper-group" id="flip-h">
-                                                                        ${createFlipper(hours[0])}
-                                                                        ${createFlipper(hours[1])}
-                                                                    </div>
-                                                                    <div class="flipper-colon">:</div>
-                                                                    <div class="flipper-group" id="flip-m">
-                                                                        ${createFlipper(minutes[0])}
-                                                                        ${createFlipper(minutes[1])}
-                                                                    </div>
-                                                                    <div class="flipper-colon">:</div>
-                                                                    <div class="flipper-group" id="flip-s">
-                                                                        ${createFlipper(seconds[0])}
-                                                                        ${createFlipper(seconds[1])}
-                                                                    </div>
-                                                                </div>
-                                                                <div class="date-display">${dateString}</div>
-                                                                `;
+                    <div class="flex items-center justify-center">
+                        <div class="flipper-group" id="flip-h">
+                            ${createFlipper(hours[0])}
+                            ${createFlipper(hours[1])}
+                        </div>
+                        <div class="flipper-colon">:</div>
+                        <div class="flipper-group" id="flip-m">
+                            ${createFlipper(minutes[0])}
+                            ${createFlipper(minutes[1])}
+                        </div>
+                        <div class="flipper-colon">:</div>
+                        <div class="flipper-group" id="flip-s">
+                            ${createFlipper(seconds[0])}
+                            ${createFlipper(seconds[1])}
+                        </div>
+                    </div>
+                    <div class="date-display">${dateString}</div>
+                `;
                 prevFlipTime = newFlipTime;
                 return;
             }
@@ -3688,20 +3437,14 @@
             }
 
             // 逐一檢查數字是否有變化
-            checkFlipDigit(displayEl.querySelectorAll('#flip-h
-                .flipper')[0], prevFlipTime[0], newFlipTime[0]);
-                                                                checkFlipDigit(displayEl.querySelectorAll('#flip-h
-                    .flipper')[1], prevFlipTime[1], newFlipTime[1]);
-                                                                checkFlipDigit(displayEl.querySelectorAll('#flip-m
-                        .flipper')[0], prevFlipTime[2], newFlipTime[2]);
-                                                                checkFlipDigit(displayEl.querySelectorAll('#flip-m
-                            .flipper')[1], prevFlipTime[3], newFlipTime[3]);
-                                                                checkFlipDigit(displayEl.querySelectorAll('#flip-s
-                                .flipper')[0], prevFlipTime[4], newFlipTime[4]);
-                                                                checkFlipDigit(displayEl.querySelectorAll('#flip-s
-                                    .flipper')[1], prevFlipTime[5], newFlipTime[5]);
+            checkFlipDigit(displayEl.querySelectorAll('#flip-h .flipper')[0], prevFlipTime[0], newFlipTime[0]);
+            checkFlipDigit(displayEl.querySelectorAll('#flip-h .flipper')[1], prevFlipTime[1], newFlipTime[1]);
+            checkFlipDigit(displayEl.querySelectorAll('#flip-m .flipper')[0], prevFlipTime[2], newFlipTime[2]);
+            checkFlipDigit(displayEl.querySelectorAll('#flip-m .flipper')[1], prevFlipTime[3], newFlipTime[3]);
+            checkFlipDigit(displayEl.querySelectorAll('#flip-s .flipper')[0], prevFlipTime[4], newFlipTime[4]);
+            checkFlipDigit(displayEl.querySelectorAll('#flip-s .flipper')[1], prevFlipTime[5], newFlipTime[5]);
 
-                                                                prevFlipTime = newFlipTime;
+            prevFlipTime = newFlipTime;
         }
 
         function checkFlipDigit(flipperEl, prevDigit, newDigit) {
@@ -3710,30 +3453,24 @@
             }
 
             // 1. 設定新數字
-            flipperEl.querySelector('.flipper-face-back').dataset.digit
-                = newDigit;
-            flipperEl.querySelector('.flipper-face-bottom').dataset.digitNew
-                = newDigit;
+            flipperEl.querySelector('.flipper-face-back').dataset.digit = newDigit;
+            flipperEl.querySelector('.flipper-face-bottom').dataset.digitNew = newDigit;
 
             // 2. 觸發翻轉
             flipperEl.classList.add('flip');
 
             // 3. 監聽動畫結束
-            flipperEl.addEventListener('transitionend', function
-                onFlipEnd(e) {
+            flipperEl.addEventListener('transitionend', function onFlipEnd(e) {
                 if (e.propertyName !== 'transform') return;
 
-                flipperEl.removeEventListener('transitionend',
-                    onFlipEnd);
+                flipperEl.removeEventListener('transitionend', onFlipEnd);
 
                 // 4. 重設狀態
                 flipperEl.classList.remove('flip');
 
                 // 5. 將新數字更新到所有卡片上，為下一次翻轉做準備
-                flipperEl.querySelector('.flipper-static-bottom').dataset.digit
-                    = newDigit;
-                flipperEl.querySelector('.flipper-face-front').dataset.digit
-                    = newDigit;
+                flipperEl.querySelector('.flipper-static-bottom').dataset.digit = newDigit;
+                flipperEl.querySelector('.flipper-face-front').dataset.digit = newDigit;
             });
         }
 
@@ -3749,8 +3486,7 @@
                 clockSettings.isDarkMode = !clockSettings.isDarkMode;
             }
 
-            localStorage.setItem('clockSettings',
-                JSON.stringify(clockSettings));
+            localStorage.setItem('clockSettings', JSON.stringify(clockSettings));
             applyClockSettings();
             prevFlipTime = ""; // 強制重繪時鐘
             updateBigClock(); // 立即更新
@@ -3758,44 +3494,34 @@
 
         function applyClockSettings() {
             const modal = document.getElementById('clock-modal');
-            const displayEl =
-                document.getElementById('big-clock-display');
+            const displayEl = document.getElementById('big-clock-display');
 
             // 1. 深色模式
-            modal.classList.toggle('dark',
-                clockSettings.isDarkMode);
-            document.getElementById('clock-toggle-dark').classList.toggle('active',
-                clockSettings.isDarkMode);
+            modal.classList.toggle('dark', clockSettings.isDarkMode);
+            document.getElementById('clock-toggle-dark').classList.toggle('active', clockSettings.isDarkMode);
 
             // 2. 樣式
-            displayEl.className =
-                `clock-style-${clockSettings.style} w-full`;
-            document.querySelectorAll('.clock-style-btn').forEach(btn
-                => {
-                btn.classList.toggle('active', btn.id ===
-                    `clock-style-btn-${clockSettings.style}`);
+            displayEl.className = `clock-style-${clockSettings.style} w-full`;
+            document.querySelectorAll('.clock-style-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.id === `clock-style-btn-${clockSettings.style}`);
             });
 
             // 3. 顯示日期
-            document.getElementById('clock-toggle-date').classList.toggle('active',
-                clockSettings.showDate);
+            document.getElementById('clock-toggle-date').classList.toggle('active', clockSettings.showDate);
             if (!clockSettings.showDate) {
                 const dateEl = displayEl.querySelector('.date-display');
                 if (dateEl) dateEl.innerHTML = '';
             }
 
             // 4. 12/24 小時制
-            document.getElementById('clock-toggle-24h').classList.toggle('active',
-                clockSettings.is24Hour);
-            document.getElementById('clock-toggle-24h-label').textContent
-                = clockSettings.is24Hour ? '24 小時制' : '12 小時制';
+            document.getElementById('clock-toggle-24h').classList.toggle('active', clockSettings.is24Hour);
+            document.getElementById('clock-toggle-24h-label').textContent = clockSettings.is24Hour ? '24 小時制' : '12 小時制';
         }
 
         async function requestWakeLock() {
             if ('wakeLock' in navigator) {
                 try {
-                    clockWakeLock = await
-                        navigator.wakeLock.request('screen');
+                    clockWakeLock = await navigator.wakeLock.request('screen');
                     clockWakeLock.addEventListener('release', () => {
                         console.log('Screen Wake Lock was released');
                     });
@@ -3824,8 +3550,7 @@
         }
 
         function updateFullScreenButton() {
-            const btn =
-                document.getElementById('clock-toggle-fullscreen');
+            const btn = document.getElementById('clock-toggle-fullscreen');
             if (document.fullscreenElement) {
                 btn.textContent = '退出全螢幕';
             } else {
@@ -3833,39 +3558,30 @@
             }
         }
 
-                                                                //
-                                                                ─────────────────────────────────────────────────────────────
-                                                                // fitClockToScreen v2：精確量測法，支援所有 4 種時鐘樣式
-                                                                //
-                                                                ─────────────────────────────────────────────────────────────
+        // ─────────────────────────────────────────────────────────────
+        // fitClockToScreen v2：精確量測法，支援所有 4 種時鐘樣式
+        // ─────────────────────────────────────────────────────────────
         function fitClockToScreen() {
-            const controls =
-                document.getElementById('clock-controls');
-            const controlsH = controls ?
-                controls.getBoundingClientRect().height : 130;
-            const displayEl =
-                document.getElementById('big-clock-display');
+            const controls = document.getElementById('clock-controls');
+            const controlsH = controls ? controls.getBoundingClientRect().height : 130;
+            const displayEl = document.getElementById('big-clock-display');
             if (!displayEl) return;
 
             // 日期高度（量測實際值）
             const dateEl = displayEl.querySelector('.date-display');
             const dateH = (dateEl && dateEl.textContent.trim())
-                ? (dateEl.getBoundingClientRect().height ||
-                    window.innerHeight * 0.09)
+                ? (dateEl.getBoundingClientRect().height || window.innerHeight * 0.09)
                 : 0;
 
-            const availH = window.innerHeight - controlsH - dateH -
-                28; // 28px 上下邊距
+            const availH = window.innerHeight - controlsH - dateH - 28; // 28px 上下邊距
             const availW = window.innerWidth * 0.96;
 
             const style = clockSettings.style;
 
             if (style === 'flip') {
                 // ── 翻轉時鐘：算 6 個 flipper + 2 個冒號的字體
-                // flipper width = 0.6em，group margin = ~0.3em×2，冒號
-                0.4em
-                // 全寬 ≈ 6×0.60 + 2×0.30×2 + 2×0.40 = 3.60+1.20+0.80 =
-                5.60em
+                // flipper width = 0.6em，group margin = ~0.3em×2，冒號 0.4em
+                // 全寬 ≈ 6×0.60 + 2×0.30×2 + 2×0.40 = 3.60+1.20+0.80 = 5.60em
                 const fontByW = availW / 5.6;
                 // 高度：flipper-card height = 1.1em（line-height = 1.1）
                 const fontByH = availH / 1.15;
@@ -3875,8 +3591,7 @@
                 displayEl.querySelectorAll('.flipper').forEach(f => {
                     f.style.fontSize = optimal + 'px';
                 });
-                displayEl.querySelectorAll('.flipper-colon').forEach(c
-                    => {
+                displayEl.querySelectorAll('.flipper-colon').forEach(c => {
                     c.style.fontSize = optimal + 'px';
                 });
             } else {
@@ -3909,15 +3624,13 @@
 
         // 視窗大小改變時重新計算
         window.addEventListener('resize', function () {
-            if
-                (!document.getElementById('clock-modal').classList.contains('hidden')) {
+            if (!document.getElementById('clock-modal').classList.contains('hidden')) {
                 fitClockToScreen();
             }
         });
 
         // --- 結束全螢幕時鐘功能 ---
     </script>
-    <!-- 增強模組 -->
     <!-- 增強模組 -->
     <script src="js/skeleton.js"></script>
     <script src="js/event-bus.js"></script>

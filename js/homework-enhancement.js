@@ -1014,7 +1014,7 @@
         const nextStatus = statusOrder[(currentIndex + 1) % statusOrder.length];
 
         homeworkChecks[homeworkId][studentId] = nextStatus;
-        localStorage.setItem(window.CLASS_KEYS?.homeworkChecks || 'homeworkChecks', JSON.stringify(homeworkChecks));
+        localStorage.setItem('homeworkChecks', JSON.stringify(homeworkChecks));
 
         renderStudentGrid();
         updateFullscreenStats();
@@ -1036,7 +1036,7 @@
             }
         });
 
-        localStorage.setItem(window.CLASS_KEYS?.homeworkChecks || 'homeworkChecks', JSON.stringify(homeworkChecks));
+        localStorage.setItem('homeworkChecks', JSON.stringify(homeworkChecks));
         renderStudentGrid();
         updateFullscreenStats();
         syncToMainView(); // 同步至主畫面

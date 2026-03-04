@@ -1,21 +1,19 @@
 # 班級小管家 - 開發進度記錄
 
-## 📅 最後更新：2026-03-04 13:04
+## 📅 最後更新：2026-03-04 14:55
 
 ## 🎯 當前版本：v3.0.5
 
-## ✅ 最新工作階段 (2026-03-04) 多班級資料隔離 & 核心 Bug 修復
+## ✅ 最新工作階段 (2026-03-04) 多班級學生資料隔離
 
-### v3.0.5 多班級隔離與系統穩定性
-- [x] **`window.CLASS_KEYS`** - 建立全域 localStorage key 管理，8 種資料類型全隔離
-- [x] **7 個 JS 模組更新** - notebook/homework/grouping/semester-archive/backup/data-reports/firebase-sync 均使用 CLASS_KEYS
-- [x] **全班一鍵上傳按鈕** - google-auth-ui.js 新增功能，輸出完整同步摘要
-- [x] **`showSection` 核心函數補缺** - classnew.html 補上此函數，修復所有功能區塊按鈕
-- [x] **`syncAllClassesToCloud` key 修復** - 各班動態讀取正確的 localStorage key
-- [x] **`NotificationSystem` ReferenceError 修復** - 改為 typeof 安全檢查
-- [x] **陣列防禦性檢查** - Array.isArray() 保護所有 uploadCollection 呼叫
-- [x] **`notebookEntries` 未定義修復** - 防禦性 typeof 檢查
-- [x] **navigation-enhancement 無限重試修復** - 加入 30 次上限
+### v3.0.5 多班級資料隔離完整實作
+- [x] **`classnew.html` 初始化 `STUDENTS_KEY`** - 班級 ID 對應唯一 localStorage key（如 `students-1772592454136`），預設班維持 `students` 向下相容
+- [x] **9 個 JS 模組更新** - `student-enhancement`, `ui-enhancement`, `firebase-sync`, `backup`, `semester-archive`, `data-reports`, `leaderboard-enhancement`, `lottery-enhancement`, `exam-proctor` 全部改用 `STUDENTS_KEY`
+- [x] **語法安全替換** - 採用逐行精確替換，避免 PowerShell 批次替換破壞 emoji 字串
+- [x] **同步確認 Modal 優化** - 顯示目前班級名稱（如「602」），提示「只同步當前班資料，其他班不受影響」
+- [x] **`sw.js` + `manifest.json`** - 版本升至 v3.0.5
+
+---
 
 ---
 

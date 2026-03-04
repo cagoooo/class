@@ -179,7 +179,7 @@ const SemesterArchive = (() => {
         // 同步本地 localStorage
         window.students?.forEach(s => { s.score = 0; });
         localStorage.setItem(window.STUDENTS_KEY || 'students', JSON.stringify(window.students || []));
-        localStorage.setItem(window.CLASS_KEYS?.pointsHistory || 'pointsHistory', JSON.stringify([]));
+        localStorage.setItem('pointsHistory', JSON.stringify([]));
         if (typeof window.pointsHistory !== 'undefined') window.pointsHistory = [];
         if (typeof renderStudents === 'function') renderStudents();
     }

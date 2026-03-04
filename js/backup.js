@@ -54,57 +54,56 @@ class DataBackup {
             const confirmed = await ConfirmDialog.show({
                 title: '蝣箄??臬鞈?',
                 message: '?臬鞈?撠??????蝣箏?閬匱蝥?嚗遣霅啣??遢?暹?鞈???,
-                message: '?臬鞈?撠??????蝣箏?閬匱蝥?嚗︁遣霅啣??遢?暹?鞈???,
                 type: 'warning',
                 confirmText: '蝣箏??臬',
                 cancelText: '??'
             });
 
             if (!confirmed) {
-                NotificationSystem.info('已取消還原');
+                NotificationSystem.info('撌脣?瘨??);
                 return;
             }
 
-            LoadingIndicator.show('還原備份中...');
+            LoadingIndicator.show('甇??臬鞈?...');
 
-            // 還原備份資料
+            // ?臬鞈?
             if (data.students) {
                 students = data.students;
                 localStorage.setItem(window.STUDENTS_KEY || 'students', JSON.stringify(students));
             }
             if (data.pointsHistory) {
                 pointsHistory = data.pointsHistory;
-                localStorage.setItem(window.CLASS_KEYS?.pointsHistory || 'pointsHistory', JSON.stringify(pointsHistory));
+                localStorage.setItem('pointsHistory', JSON.stringify(pointsHistory));
             }
             if (data.groups) {
                 groups = data.groups;
-                localStorage.setItem(window.CLASS_KEYS?.groups || 'groups', JSON.stringify(groups));
+                localStorage.setItem('groups', JSON.stringify(groups));
             }
             if (data.notebookEntries) {
                 notebookEntries = data.notebookEntries;
-                localStorage.setItem(window.CLASS_KEYS?.notebookEntries || 'notebookEntries', JSON.stringify(notebookEntries));
+                localStorage.setItem('notebookEntries', JSON.stringify(notebookEntries));
             }
             if (data.homeworkList) {
                 homeworkList = data.homeworkList;
-                localStorage.setItem(window.CLASS_KEYS?.homeworkList || 'homeworkList', JSON.stringify(homeworkList));
+                localStorage.setItem('homeworkList', JSON.stringify(homeworkList));
             }
             if (data.homeworkChecks) {
                 homeworkChecks = data.homeworkChecks;
-                localStorage.setItem(window.CLASS_KEYS?.homeworkChecks || 'homeworkChecks', JSON.stringify(homeworkChecks));
+                localStorage.setItem('homeworkChecks', JSON.stringify(homeworkChecks));
             }
             if (data.lotteryHistory) {
                 lotteryHistory = data.lotteryHistory;
-                localStorage.setItem(window.CLASS_KEYS?.lotteryHistory || 'lotteryHistory', JSON.stringify(lotteryHistory));
+                localStorage.setItem('lotteryHistory', JSON.stringify(lotteryHistory));
             }
 
             LoadingIndicator.hide();
-            NotificationSystem.success('備份已還原，頁面即將重新載入');
+            NotificationSystem.success('鞈??臬??嚗??Ｗ撠??啗???);
             setTimeout(() => location.reload(), 1500);
 
         } catch (error) {
             LoadingIndicator.hide();
-            console.error('還原錯誤:', error);
-            NotificationSystem.error('備份還原失敗：' + error.message);
+            console.error('?臬憭望?:', error);
+            NotificationSystem.error('鞈??臬憭望?嚗? + error.message);
         }
     }
 
