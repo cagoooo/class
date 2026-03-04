@@ -1,22 +1,22 @@
-﻿/**
- * ?賜惜蝟餌絞憓撥璅∠?
- * ??銝?銴???賬脤??????閬箏?撘?
+/**
+ * 抽籤系統增強模組
+ * 提供不重複抽取功能、進階動畫效果、視覺增強
  */
 
 (function () {
     'use strict';
 
-    // ??蔭
+    // 動畫配置
     const LOTTERY_CONFIG = {
-        totalRolls: 30,           // 皛曉?甈⊥
-        initialSpeed: 50,         // ???漲 (ms)
-        finalSpeed: 200,          // ?蝯漲 (ms)
-        suspenseDelay: 500,       // 蝯??剜????怠? (ms)
-        resultScale: 1.2,         // 蝯??曉之?
-        glowColors: ['#8B5CF6', '#EC4899', '#F59E0B', '#10B981'] // ??憿
+        totalRolls: 30,           // 滾動次數
+        initialSpeed: 50,         // 初始速度 (ms)
+        finalSpeed: 200,          // 最終速度 (ms)
+        suspenseDelay: 500,       // 結果揭曉前的暫停 (ms)
+        resultScale: 1.2,         // 結果放大倍數
+        glowColors: ['#8B5CF6', '#EC4899', '#F59E0B', '#10B981'] // 光暈顏色
     };
 
-    // 蝑? DOM 頛摰?
+    // 等待 DOM 載入完成
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initLotteryEnhancement);
     } else {
@@ -24,31 +24,31 @@
     }
 
     function initLotteryEnhancement() {
-        // ?郊 checkbox ???
+        // 同步 checkbox 狀態
         const noRepeatToggle = document.getElementById('noRepeatToggle');
         if (noRepeatToggle) {
             const savedNoRepeat = JSON.parse(localStorage.getItem('noRepeatLottery'));
             noRepeatToggle.checked = savedNoRepeat !== false;
         }
 
-        // ?湔蝯梯??豢?
+        // 更新統計數據
         if (typeof updateLotteryStats === 'function') {
             updateLotteryStats();
         }
 
-        // 皜??⊥?閮?
+        // 清理無效記錄
         cleanupDrawnStudents();
 
-        // 瘜典憓撥璅??
+        // 注入增強樣式
         injectLotteryStyles();
 
-        // 閬??????怠撘?
+        // 覆蓋原有的動畫函式
         overrideLotteryFunctions();
 
-        console.log('? ?賜惜憓撥璅∠?撌脰???(?脤????');
+        console.log('🎲 抽籤增強模組已載入 (進階動畫版)');
     }
 
-    // 瘜典憓撥 CSS 璅??
+    // 注入增強 CSS 樣式
     function injectLotteryStyles() {
         const styleId = 'lottery-enhancement-styles';
         if (document.getElementById(styleId)) return;
@@ -56,13 +56,13 @@
         const styles = document.createElement('style');
         styles.id = styleId;
         styles.textContent = `
-            /* ?賜惜摰孵? */
+            /* 抽籤容器動畫 */
             #lotteryResult {
                 position: relative;
                 overflow: hidden;
             }
 
-            /* 皛曉???璅?? */
+            /* 滾動名字樣式 */
             .lottery-rolling-name {
                 font-size: 2.5rem;
                 font-weight: 800;
@@ -78,7 +78,7 @@
                 50% { transform: scale(1.05); opacity: 0.8; }
             }
 
-            /* 蝯??剜?? */
+            /* 結果揭曉動畫 */
             .lottery-winner-reveal {
                 animation: winner-reveal 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55);
             }
@@ -97,7 +97,7 @@
                 }
             }
 
-            /* ???澆??? */
+            /* 名字發光效果 */
             .lottery-winner-name {
                 font-size: 3rem;
                 font-weight: 800;
@@ -114,7 +114,7 @@
                 100% { filter: brightness(1.2) drop-shadow(0 0 20px rgba(236, 72, 153, 0.7)); }
             }
 
-            /* ??? */
+            /* 問號動畫 */
             .lottery-question-marks {
                 font-size: 4rem;
                 animation: bounce-questions 0.5s ease-in-out infinite;
@@ -125,7 +125,7 @@
                 50% { transform: translateY(-10px); }
             }
 
-            /* ?脣漲?內??*/
+            /* 進度指示器 */
             .lottery-progress-bar {
                 height: 4px;
                 background: linear-gradient(90deg, #6366F1, #8B5CF6, #EC4899);
@@ -133,7 +133,7 @@
                 transition: width 0.1s linear;
             }
 
-            /* ?詨艙?? - ? */
+            /* 懸念效果 - 倒數 */
             .lottery-suspense {
                 animation: suspense-shake 0.1s ease-in-out infinite;
             }
@@ -144,7 +144,7 @@
                 75% { transform: translateX(2px); }
             }
 
-            /* ??? */
+            /* 光暈背景 */
             .lottery-glow-bg {
                 position: absolute;
                 inset: 0;
@@ -160,7 +160,7 @@
                 50% { opacity: 1; transform: scale(1.1); }
             }
 
-            /* ??鋆ˇ */
+            /* 星星裝飾 */
             .lottery-stars {
                 position: absolute;
                 width: 100%;
@@ -180,9 +180,9 @@
                 50% { opacity: 1; transform: scale(1.2); }
             }
 
-            /* === RWD ?踵?撘見撘?=== */
+            /* === RWD 響應式樣式 === */
             
-            /* 撟單隞乩? (768px) */
+            /* 平板以下 (768px) */
             @media (max-width: 768px) {
                 .lottery-rolling-name {
                     font-size: 1.8rem;
@@ -204,7 +204,7 @@
                 }
             }
             
-            /* ?? (480px) */
+            /* 手機 (480px) */
             @media (max-width: 480px) {
                 .lottery-rolling-name {
                     font-size: 1.5rem;
@@ -235,38 +235,38 @@
         document.head.appendChild(styles);
     }
 
-    // 閬????賢?
+    // 覆蓋原有函式
     function overrideLotteryFunctions() {
-        // 靽????賢?
+        // 保存原始函式
         const originalRunLotteryAnimation = window.runLotteryAnimation;
         const originalDisplayLotteryResult = window.displayLotteryResult;
 
-        // 閬? runLotteryAnimation
+        // 覆蓋 runLotteryAnimation
         window.runLotteryAnimation = function (finalResult, type) {
             runEnhancedLotteryAnimation(finalResult, type);
         };
 
-        // 閬? displayLotteryResult
+        // 覆蓋 displayLotteryResult
         window.displayLotteryResult = function (result, type) {
             displayEnhancedLotteryResult(result, type);
         };
     }
 
-    // 憓撥?蝐文???
+    // 增強版抽籤動畫
     function runEnhancedLotteryAnimation(finalResult, type) {
         const container = document.getElementById('lotteryResult');
         const btn = document.getElementById('startLotteryBtn');
 
         btn.disabled = true;
         btn.classList.add('bg-gray-400', 'hover:bg-gray-400');
-        btn.innerHTML = '?? ?賜惜銝?..';
+        btn.innerHTML = '🔄 抽籤中...';
 
-        // 撱箇??摰孵
+        // 建立動畫容器
         container.innerHTML = `
             <div class="lottery-glow-bg"></div>
             <div class="lottery-stars" id="lotteryStars"></div>
             <div class="relative z-10 py-4">
-                <div class="lottery-question-marks mb-2">??/div>
+                <div class="lottery-question-marks mb-2">❓</div>
                 <div id="lottery-rolling-text" class="lottery-rolling-name"></div>
                 <div class="mt-4 px-8">
                     <div class="h-1 bg-gray-200 rounded-full overflow-hidden">
@@ -276,7 +276,7 @@
             </div>
         `;
 
-        // 瘛餃?鋆ˇ??
+        // 添加裝飾星星
         addDecorativeStars();
 
         const rollingText = document.getElementById('lottery-rolling-text');
@@ -287,16 +287,16 @@
         let rollCount = 0;
         const totalRolls = LOTTERY_CONFIG.totalRolls;
 
-        // 閮?霈???
+        // 計算變速動畫
         const getInterval = (count) => {
             const progress = count / totalRolls;
-            // 雿輻蝺拙??賣嚗?憪翰嚗??
+            // 使用緩動函數：開始快，結束慢
             const easeOut = 1 - Math.pow(1 - progress, 3);
             return LOTTERY_CONFIG.initialSpeed +
                 (LOTTERY_CONFIG.finalSpeed - LOTTERY_CONFIG.initialSpeed) * easeOut;
         };
 
-        // ?冽????Ｙ???
+        // 隨機名字產生器
         const getRollingText = () => {
             if (type === 'group') {
                 const randomGroup = groups[Math.floor(Math.random() * groups.length)];
@@ -307,19 +307,19 @@
                 for (let i = 0; i < finalResult.length; i++) {
                     randomNames.push(randomStudents[i % randomStudents.length].name);
                 }
-                return randomNames.join('??);
+                return randomNames.join('、');
             }
         };
 
-        // ?艘?
+        // 遞迴動畫
         const animateRoll = () => {
             rollingText.textContent = getRollingText();
 
-            // ?湔?脣漲璇?
+            // 更新進度條
             const progress = (rollCount / totalRolls) * 100;
             progressBar.style.width = `${progress}%`;
 
-            // ?剜?單?
+            // 播放音效
             if (typeof playLotteryTickSound === 'function') {
                 playLotteryTickSound();
             }
@@ -329,45 +329,45 @@
             if (rollCount < totalRolls) {
                 setTimeout(animateRoll, getInterval(rollCount));
             } else {
-                // ?敺敹菜???
+                // 最後懸念效果
                 rollingText.classList.add('lottery-suspense');
                 progressBar.style.width = '100%';
 
                 setTimeout(() => {
                     rollingText.classList.remove('lottery-suspense');
 
-                    // 憿舐內蝯?
+                    // 顯示結果
                     displayEnhancedLotteryResult(finalResult, type);
 
-                    // ?剜??單?
+                    // 播放勝利音效
                     if (typeof playLotteryWinSound === 'function') {
                         playLotteryWinSound();
                     }
 
-                    // 閫貊敶抵
+                    // 觸發彩花
                     if (typeof triggerConfetti === 'function') {
                         triggerConfetti();
                     }
 
-                    // ?脣?甇瑕閮?
+                    // 儲存歷史記錄
                     if (typeof saveLotteryHistory === 'function') {
                         saveLotteryHistory(finalResult, type);
                     }
 
-                    // ?Ｗ儔??
+                    // 恢復按鈕
                     btn.disabled = false;
                     btn.classList.remove('bg-gray-400', 'hover:bg-gray-400');
-                    btn.innerHTML = '? ???賜惜';
+                    btn.innerHTML = '🎲 開始抽籤';
 
                 }, LOTTERY_CONFIG.suspenseDelay);
             }
         };
 
-        // ???
+        // 開始動畫
         animateRoll();
     }
 
-    // 憓撥???＊蝷?
+    // 增強版結果顯示
     function displayEnhancedLotteryResult(result, type) {
         const container = document.getElementById('lotteryResult');
 
@@ -375,14 +375,14 @@
 
         if (type === 'group') {
             const group = result[0];
-            emoji = '??';
-            title = '?脣?蝯';
+            emoji = '🏆';
+            title = '獲勝組別';
             names = group.name;
-            subtitle = group.members.map(m => m.name).join('??);
+            subtitle = group.members.map(m => m.name).join('、');
         } else {
-            emoji = result.length > 1 ? '??' : '??';
-            title = result.length > 1 ? '?賭葉?...' : '?賭葉?...';
-            names = result.map(s => s.name).join('??);
+            emoji = result.length > 1 ? '🎊' : '🎉';
+            title = result.length > 1 ? '抽中的是...' : '抽中的是...';
+            names = result.map(s => s.name).join('、');
         }
 
         container.innerHTML = `
@@ -396,16 +396,16 @@
             </div>
         `;
 
-        // 瘛餃?鋆ˇ??
+        // 添加裝飾星星
         addDecorativeStars();
     }
 
-    // 瘛餃?鋆ˇ??
+    // 添加裝飾星星
     function addDecorativeStars() {
         const container = document.getElementById('lotteryStars');
         if (!container) return;
 
-        const stars = ['??, '潃?, '??', '?'];
+        const stars = ['✨', '⭐', '🌟', '💫'];
         const positions = [
             { top: '10%', left: '15%' },
             { top: '20%', right: '10%' },
@@ -429,7 +429,7 @@
         });
     }
 
-    // 皜?撌脣?文飛???賢?閮?
+    // 清理已刪除學生的抽取記錄
     function cleanupDrawnStudents() {
         try {
             const drawnIds = JSON.parse(localStorage.getItem('drawnStudentIds')) || [];
@@ -445,7 +445,7 @@
                 }
             }
         } catch (e) {
-            console.error('皜??賜惜閮???隤?', e);
+            console.error('清理抽籤記錄時發生錯誤:', e);
         }
     }
 })();

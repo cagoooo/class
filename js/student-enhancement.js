@@ -1,38 +1,38 @@
-﻿/**
- * 摮貊?蝞∠?憓撥璅∠?
+/**
+ * 學生管理增強模組
  * Student Enhancement Module
  * 
- * ?啣??踝?
- * 1. 摮貊??剖?蝟餌絞嚗?閮剛”?泵???
- * 2. ??璅惜蝟餌絞
+ * 新功能：
+ * 1. 學生頭像系統（預設表情符號頭像）
+ * 2. 分組標籤系統
  */
 
-// ==================== ?蔭 ====================
+// ==================== 配置 ====================
 
-// ?身?剖??賊?
+// 預設頭像選項
 const DEFAULT_AVATARS = [
-    '?', '?', '??', '?', '??', '??', '??', '??',
-    '?', '?', '?', '?', '??', '?', '?', '??',
-    '潃?, '??', '?', '??', '?', '??', '?', '??
+    '👦', '👧', '🧒', '👶', '🙂', '😊', '😎', '🤓',
+    '🐱', '🐶', '🐰', '🐼', '🦊', '🐸', '🐵', '🦁',
+    '⭐', '🌟', '💫', '🌈', '🎨', '📚', '🎵', '⚽'
 ];
 
-// ?身璅惜?蔭
+// 預設標籤配置
 const STUDENT_TAGS = {
-    'leader': { name: '撟寥', icon: '??', color: 'yellow', bgClass: 'bg-yellow-100', textClass: 'text-yellow-800' },
-    'helper': { name: '撠葦', icon: '??', color: 'blue', bgClass: 'bg-blue-100', textClass: 'text-blue-800' },
-    'tutor': { name: '隤脰?', icon: '??', color: 'green', bgClass: 'bg-green-100', textClass: 'text-green-800' },
-    'special': { name: '?寞??瘙?, icon: '??', color: 'pink', bgClass: 'bg-pink-100', textClass: 'text-pink-800' },
-    'monitor': { name: '?剝', icon: '??儭?, color: 'purple', bgClass: 'bg-purple-100', textClass: 'text-purple-800' },
-    'vice': { name: '?舐??, icon: '??', color: 'indigo', bgClass: 'bg-indigo-100', textClass: 'text-indigo-800' }
+    'leader': { name: '幹部', icon: '👑', color: 'yellow', bgClass: 'bg-yellow-100', textClass: 'text-yellow-800' },
+    'helper': { name: '小老師', icon: '📖', color: 'blue', bgClass: 'bg-blue-100', textClass: 'text-blue-800' },
+    'tutor': { name: '課輔', icon: '✏️', color: 'green', bgClass: 'bg-green-100', textClass: 'text-green-800' },
+    'special': { name: '特殊需求', icon: '💝', color: 'pink', bgClass: 'bg-pink-100', textClass: 'text-pink-800' },
+    'monitor': { name: '班長', icon: '🎖️', color: 'purple', bgClass: 'bg-purple-100', textClass: 'text-purple-800' },
+    'vice': { name: '副班長', icon: '🏅', color: 'indigo', bgClass: 'bg-indigo-100', textClass: 'text-indigo-800' }
 };
 
-// ==================== ?剖?蝟餌絞 ====================
+// ==================== 頭像系統 ====================
 
 /**
- * 憿舐內?剖??豢???Modal
+ * 顯示頭像選擇器 Modal
  */
 function showAvatarPicker(studentId = null) {
-    // 蝘駁?? Modal
+    // 移除舊的 Modal
     const existingModal = document.getElementById('avatar-picker-modal');
     if (existingModal) existingModal.remove();
 
@@ -41,11 +41,11 @@ function showAvatarPicker(studentId = null) {
     modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
     modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
 
-    const currentAvatar = studentId ? (students.find(s => s.id === studentId)?.avatar || '??') : '??';
+    const currentAvatar = studentId ? (students.find(s => s.id === studentId)?.avatar || '😊') : '😊';
 
     modal.innerHTML = `
         <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 animate-bounce-in">
-            <h3 class="text-xl font-bold text-gray-800 mb-4 text-center">? ?豢??剖?</h3>
+            <h3 class="text-xl font-bold text-gray-800 mb-4 text-center">🎨 選擇頭像</h3>
             <div class="grid grid-cols-6 gap-3 mb-6" id="avatar-grid">
                 ${DEFAULT_AVATARS.map(avatar => `
                     <button class="avatar-option w-12 h-12 text-2xl rounded-xl hover:bg-blue-100 transition-all
@@ -58,7 +58,7 @@ function showAvatarPicker(studentId = null) {
             <div class="flex gap-3">
                 <button onclick="document.getElementById('avatar-picker-modal').remove()"
                     class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
-                    ??
+                    取消
                 </button>
             </div>
         </div>
@@ -68,22 +68,22 @@ function showAvatarPicker(studentId = null) {
 }
 
 /**
- * ?豢??剖?
+ * 選擇頭像
  */
 function selectAvatar(avatar, studentId) {
     if (studentId) {
-        // ?湔?暹?摮貊????
+        // 更新現有學生的頭像
         const student = students.find(s => s.id === studentId);
         if (student) {
             student.avatar = avatar;
             localStorage.setItem(window.STUDENTS_KEY || 'students', JSON.stringify(students));
             renderStudentsEnhanced();
             if (typeof NotificationSystem !== 'undefined') {
-                NotificationSystem.success(`撌脫?啜?{student.name}???剖?`);
+                NotificationSystem.success(`已更新「${student.name}」的頭像`);
             }
         }
     } else {
-        // 閮剖??啣?摮貊?????剖?
+        // 設定新增學生時的預選頭像
         window._pendingStudentAvatar = avatar;
         const avatarBtn = document.getElementById('new-student-avatar-btn');
         if (avatarBtn) avatarBtn.textContent = avatar;
@@ -92,16 +92,16 @@ function selectAvatar(avatar, studentId) {
     document.getElementById('avatar-picker-modal')?.remove();
 }
 
-// ==================== 璅惜蝟餌絞 ====================
+// ==================== 標籤系統 ====================
 
 /**
- * 憿舐內璅惜蝺刻摩??Modal
+ * 顯示標籤編輯器 Modal
  */
 function showTagEditor(studentId) {
     const student = students.find(s => s.id === studentId);
     if (!student) return;
 
-    // ????蝐日??
+    // 初始化標籤陣列
     if (!student.tags) student.tags = [];
 
     const existingModal = document.getElementById('tag-editor-modal');
@@ -114,7 +114,7 @@ function showTagEditor(studentId) {
 
     modal.innerHTML = `
         <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 animate-bounce-in">
-            <h3 class="text-xl font-bold text-gray-800 mb-2 text-center">?儭?蝺刻摩璅惜</h3>
+            <h3 class="text-xl font-bold text-gray-800 mb-2 text-center">🏷️ 編輯標籤</h3>
             <p class="text-gray-600 text-center mb-4">${student.name}</p>
             <div class="space-y-2 mb-6" id="tag-options">
                 ${Object.entries(STUDENT_TAGS).map(([key, tag]) => `
@@ -131,7 +131,7 @@ function showTagEditor(studentId) {
             </div>
             <button onclick="document.getElementById('tag-editor-modal').remove()"
                 class="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
-                摰?
+                完成
             </button>
         </div>
     `;
@@ -140,7 +140,7 @@ function showTagEditor(studentId) {
 }
 
 /**
- * ??摮貊?璅惜
+ * 切換學生標籤
  */
 function toggleStudentTag(studentId, tagKey) {
     const student = students.find(s => s.id === studentId);
@@ -157,7 +157,7 @@ function toggleStudentTag(studentId, tagKey) {
 
     localStorage.setItem(window.STUDENTS_KEY || 'students', JSON.stringify(students));
 
-    // ?湔 Modal 銝剔?璅??
+    // 更新 Modal 中的樣式
     const modal = document.getElementById('tag-editor-modal');
     if (modal) {
         const tag = STUDENT_TAGS[tagKey];
@@ -176,19 +176,19 @@ function toggleStudentTag(studentId, tagKey) {
     renderStudentsEnhanced();
 }
 
-// ==================== 憓撥?葡??====================
+// ==================== 增強版渲染 ====================
 
 /**
- * 憓撥?飛??銵冽葡???舀???嚗?
+ * 增強版學生列表渲染（支援搜尋功能）
  */
 function renderStudentsEnhanced() {
     const container = document.getElementById('studentsList');
     if (!container) return;
 
-    // ?仿爸?嗅?甇?＊蝷箔葉嚗?甈∟??伐?嚗?雿辣?脰????????
+    // 若骨架屏正顯示中（初次載入），稍作延遲讓動畫有時間展現
     const hasSkeleton = container.querySelector('.skeleton-container');
     if (hasSkeleton) {
-        // 撉冽撅歇??skeleton.js ?嚗?敺?撠挾??敺?皜脫??祕鞈?
+        // 骨架屏已由 skeleton.js 插入，等待一小段時間後再渲染真實資料
         setTimeout(() => _doRenderStudents(container), 250);
         return;
     }
@@ -197,46 +197,46 @@ function renderStudentsEnhanced() {
 }
 
 /**
- * 摮貊??”撖阡?皜脫??摩嚗?典撘?
+ * 學生列表實際渲染邏輯（內部函式）
  */
 function _doRenderStudents(container) {
     container.innerHTML = '';
 
-    // 摰?扳炎?伐?蝣箔? students ?舫??
+    // 安全性檢查：確保 students 是陣列
     const safeStudents = (typeof students !== 'undefined' && Array.isArray(students)) ? students : [];
 
-    // ??摮貊?
+    // 排序學生
     const sortedStudents = [...safeStudents].sort((a, b) => (a.number || 999) - (b.number || 999));
 
-    // 憟???蕪
+    // 套用搜尋過濾
     const filteredStudents = filterStudents(sortedStudents, (typeof currentSearchQuery !== 'undefined' ? currentSearchQuery : ''));
 
-    // ?湔??蝯梯?
+    // 更新搜尋統計
     updateSearchStats(filteredStudents.length, safeStudents.length);
 
     if (safeStudents.length === 0) {
-        container.innerHTML = `<div class="col-span-full text-center text-gray-500 p-6 bg-gray-50 rounded-lg">?桀?瘝?摮貊?嚗?敺??寞憓飛??/div>`;
+        container.innerHTML = `<div class="col-span-full text-center text-gray-500 p-6 bg-gray-50 rounded-lg">目前沒有學生，請從上方新增學生。</div>`;
     } else if (filteredStudents.length === 0) {
         container.innerHTML = `
             <div class="col-span-full text-center p-6 bg-gray-50 rounded-lg">
-                <div class="text-4xl mb-3">??</div>
-                <div class="text-gray-500">?曆??啁泵??span class="font-semibold text-gray-700">${currentSearchQuery}</span>??摮貊?</div>
-                <div class="text-sm text-gray-400 mt-2">閰西岫?嗡??摮?皜??</div>
+                <div class="text-4xl mb-3">🔍</div>
+                <div class="text-gray-500">找不到符合「<span class="font-semibold text-gray-700">${currentSearchQuery}</span>」的學生</div>
+                <div class="text-sm text-gray-400 mt-2">試試其他關鍵字或清除搜尋</div>
             </div>`;
     } else {
         filteredStudents.forEach(student => {
-            const avatar = student.avatar || '??';
+            const avatar = student.avatar || '😊';
             const tags = student.tags || [];
 
             const div = document.createElement('div');
             div.className = 'bg-gray-50 p-3 sm:p-4 rounded-lg border-l-4 border-blue-500 hover:shadow-md transition-shadow';
 
-            // 憒?甇???嚗溶??鈭桀??急???
+            // 如果正在搜尋，添加高亮動畫效果
             if (currentSearchQuery) {
                 div.classList.add('ring-2', 'ring-blue-200');
             }
 
-            // 璅惜 HTML
+            // 標籤 HTML
             const tagsHTML = tags.length > 0 ? `
                 <div class="flex flex-wrap gap-1 mt-2">
                     ${tags.map(tagKey => {
@@ -246,7 +246,7 @@ function _doRenderStudents(container) {
                 </div>
             ` : '';
 
-            // 擃漁憿舐內憪??漣??
+            // 高亮顯示姓名和座號
             const highlightedName = highlightSearchText(student.name, currentSearchQuery);
             const highlightedNumber = highlightSearchText(String(student.number), currentSearchQuery);
 
@@ -256,23 +256,23 @@ function _doRenderStudents(container) {
                         <div class="flex items-center gap-2 min-w-0 flex-1">
                             <button onclick="showAvatarPicker(${student.id})" 
                                 class="text-xl hover:scale-110 transition-transform cursor-pointer flex-shrink-0"
-                                title="暺??湔??剖?">
+                                title="點擊更換頭像">
                                 ${avatar}
                             </button>
                             <span class="font-semibold text-gray-800 text-sm truncate">${highlightedName}</span>
                         </div>
                         <div class="flex items-center flex-shrink-0">
                             <button onclick="showTagEditor(${student.id})" 
-                                class="text-sm p-0.5 text-blue-500 hover:text-blue-700" title="蝺刻摩璅惜">?儭?/button>
+                                class="text-sm p-0.5 text-blue-500 hover:text-blue-700" title="編輯標籤">🏷️</button>
                             <button onclick="showStudentReport(${student.id})" 
-                                class="text-sm p-0.5 text-green-500 hover:text-green-700" title="?亦??勗?">??</button>
+                                class="text-sm p-0.5 text-green-500 hover:text-green-700" title="查看報告">📊</button>
                             <button onclick="removeStudent(${student.id})" 
-                                class="text-sm p-0.5 text-red-500 hover:text-red-700" title="?芷摮貊?">??儭?/button>
+                                class="text-sm p-0.5 text-red-500 hover:text-red-700" title="刪除學生">🗑️</button>
                         </div>
                     </div>
                     <div class="text-xs text-gray-500 pl-7">
-                        <span>摨扯?嚗?{highlightedNumber}</span>
-                        <span class="ml-2 font-medium ${student.points >= 0 ? 'text-green-600' : 'text-red-600'}">?嚗?{student.points}</span>
+                        <span>座號：${highlightedNumber}</span>
+                        <span class="ml-2 font-medium ${student.points >= 0 ? 'text-green-600' : 'text-red-600'}">分數：${student.points}</span>
                     </div>
                     ${tagsHTML}
                 </div>
@@ -282,7 +282,7 @@ function _doRenderStudents(container) {
         });
     }
 
-    // ?湔蝯梯?
+    // 更新統計
     const totalEl = document.getElementById('totalStudents');
     if (totalEl) totalEl.textContent = safeStudents.length;
 
@@ -293,37 +293,37 @@ function _doRenderStudents(container) {
     }
 }
 
-// ==================== ?啣?摮貊?憓撥 ====================
+// ==================== 新增學生增強 ====================
 
 /**
- * 憓撥?啣?摮貊?銵典
+ * 增強新增學生表單
  */
 function enhanceAddStudentForm() {
     const studentNameInput = document.getElementById('studentName');
     if (!studentNameInput || document.getElementById('new-student-avatar-btn')) return;
 
-    // ?典??撓?交??溶??????
+    // 在姓名輸入框前添加頭像選擇按鈕
     const avatarBtn = document.createElement('button');
     avatarBtn.type = 'button';
     avatarBtn.id = 'new-student-avatar-btn';
     avatarBtn.className = 'text-3xl hover:scale-110 transition-transform cursor-pointer bg-gray-100 rounded-lg p-2 mr-2';
-    avatarBtn.textContent = '??';
-    avatarBtn.title = '?豢??剖?';
+    avatarBtn.textContent = '😊';
+    avatarBtn.title = '選擇頭像';
     avatarBtn.onclick = () => showAvatarPicker(null);
 
     studentNameInput.parentNode.insertBefore(avatarBtn, studentNameInput);
 
-    // ???啣?摮貊?鈭辣
+    // 監聽新增學生事件
     const originalAddStudent = window.addStudent;
     if (originalAddStudent) {
         window.addStudent = function () {
-            const pendingAvatar = window._pendingStudentAvatar || '??';
+            const pendingAvatar = window._pendingStudentAvatar || '😊';
 
-            // 隤輻???賣
+            // 調用原始函數
             const studentCountBefore = (typeof students !== 'undefined' && Array.isArray(students)) ? students.length : 0;
             originalAddStudent.apply(this, arguments);
 
-            // 憒????啣?鈭飛???湔?剖?
+            // 如果成功新增了學生，更新頭像
             const currentStudents = (typeof students !== 'undefined' && Array.isArray(students)) ? students : [];
             if (currentStudents.length > studentCountBefore) {
                 const newStudent = students[students.length - 1];
@@ -333,22 +333,22 @@ function enhanceAddStudentForm() {
                 renderStudentsEnhanced();
             }
 
-            // ?蔭
-            window._pendingStudentAvatar = '??';
+            // 重置
+            window._pendingStudentAvatar = '😊';
             const avatarBtn = document.getElementById('new-student-avatar-btn');
-            if (avatarBtn) avatarBtn.textContent = '??';
+            if (avatarBtn) avatarBtn.textContent = '😊';
         };
     }
 }
 
-// ==================== ??? ====================
+// ==================== 搜尋功能 ====================
 
-// ?????
+// 搜尋狀態
 let currentSearchQuery = '';
 let searchDebounceTimer = null;
 
 /**
- * ????撠???
+ * 初始化搜尋功能
  */
 function initStudentSearch() {
     const searchInput = document.getElementById('studentSearch');
@@ -357,16 +357,16 @@ function initStudentSearch() {
 
     if (!searchInput) return;
 
-    // 頛詨鈭辣 - 雿輻?脫???
+    // 輸入事件 - 使用防抖處理
     searchInput.addEventListener('input', (e) => {
         const query = e.target.value.trim();
 
-        // 憿舐內/?梯?皜??
+        // 顯示/隱藏清除按鈕
         if (clearBtn) {
             clearBtn.classList.toggle('hidden', query === '');
         }
 
-        // ?脫???
+        // 防抖處理
         clearTimeout(searchDebounceTimer);
         searchDebounceTimer = setTimeout(() => {
             currentSearchQuery = query;
@@ -374,7 +374,7 @@ function initStudentSearch() {
         }, 150);
     });
 
-    // 皜??暺?鈭辣
+    // 清除按鈕點擊事件
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {
             searchInput.value = '';
@@ -386,7 +386,7 @@ function initStudentSearch() {
         });
     }
 
-    // ?舀 ESC ?菜??斗?撠?
+    // 支援 ESC 鍵清除搜尋
     searchInput.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             searchInput.value = '';
@@ -399,10 +399,10 @@ function initStudentSearch() {
 }
 
 /**
- * ?蕪摮貊??”
- * @param {Array} studentList - 摮貊????
- * @param {string} query - ???摮?
- * @returns {Array} - ?蕪敺?摮貊????
+ * 過濾學生列表
+ * @param {Array} studentList - 學生陣列
+ * @param {string} query - 搜尋關鍵字
+ * @returns {Array} - 過濾後的學生陣列
  */
 function filterStudents(studentList, query) {
     if (!Array.isArray(studentList)) return [];
@@ -411,9 +411,9 @@ function filterStudents(studentList, query) {
     const lowerQuery = query.toLowerCase();
 
     return studentList.filter(student => {
-        // 瘥?憪?
+        // 比對姓名
         const nameMatch = student.name.toLowerCase().includes(lowerQuery);
-        // 瘥?摨扯?嚗??箏?銝脫?撠?
+        // 比對座號（轉為字串比對）
         const numberMatch = String(student.number).includes(query);
 
         return nameMatch || numberMatch;
@@ -421,15 +421,15 @@ function filterStudents(studentList, query) {
 }
 
 /**
- * 擃漁憿舐內???摮?
- * @param {string} text - ????
- * @param {string} query - ???摮?
- * @returns {string} - 撣嗆?擃漁璅???HTML
+ * 高亮顯示搜尋關鍵字
+ * @param {string} text - 原始文字
+ * @param {string} query - 搜尋關鍵字
+ * @returns {string} - 帶有高亮標記的 HTML
  */
 function highlightSearchText(text, query) {
     if (!query) return text;
 
-    // 頧儔甇??銵券?撘畾???
+    // 轉義正則表達式特殊字元
     const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const regex = new RegExp(`(${escapedQuery})`, 'gi');
 
@@ -437,9 +437,9 @@ function highlightSearchText(text, query) {
 }
 
 /**
- * ?湔??蝯梯?
- * @param {number} filtered - ?蕪敺??賊?
- * @param {number} total - 蝮賣??
+ * 更新搜尋統計
+ * @param {number} filtered - 過濾後的數量
+ * @param {number} total - 總數量
  */
 function updateSearchStats(filtered, total) {
     const searchStats = document.getElementById('searchStats');
@@ -451,39 +451,39 @@ function updateSearchStats(filtered, total) {
     }
 
     if (filtered === 0) {
-        searchStats.innerHTML = `<span class="text-red-500">???曆??啁泵??{currentSearchQuery}??摮貊?</span>`;
+        searchStats.innerHTML = `<span class="text-red-500">❌ 找不到符合「${currentSearchQuery}」的學生</span>`;
     } else if (filtered === total) {
-        searchStats.innerHTML = `<span class="text-green-600">??憿舐內?券 ${total} 雿飛??/span>`;
+        searchStats.innerHTML = `<span class="text-green-600">✅ 顯示全部 ${total} 位學生</span>`;
     } else {
-        searchStats.innerHTML = `<span class="text-blue-600">?? ?曉 ${filtered} / ${total} 雿飛??/span>`;
+        searchStats.innerHTML = `<span class="text-blue-600">🔍 找到 ${filtered} / ${total} 位學生</span>`;
     }
 }
 
-// ==================== ????====================
+// ==================== 初始化 ====================
 
 /**
- * ???飛??撘瑟芋蝯?
+ * 初始化學生增強模組
  */
 function initStudentEnhancement() {
-    // ????撠???
+    // 初始化搜尋功能
     initStudentSearch();
 
-    // 憓撥?啣?摮貊?銵典
+    // 增強新增學生表單
     enhanceAddStudentForm();
 
-    // 閬????renderStudents ?賣
+    // 覆蓋原本的 renderStudents 函數
     if (typeof window.renderStudents === 'function') {
         window._originalRenderStudents = window.renderStudents;
         window.renderStudents = renderStudentsEnhanced;
     }
 
-    // ??皜脫?
+    // 初始渲染
     renderStudentsEnhanced();
 
-    console.log('??摮貊?憓撥璅∠?撌脰???);
+    console.log('✅ 學生增強模組已載入');
 }
 
-// ??DOM 頛摰?敺??憪?
+// 在 DOM 載入完成後自動初始化
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         setTimeout(initStudentEnhancement, 200);
