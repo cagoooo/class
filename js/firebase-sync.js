@@ -545,10 +545,20 @@ async function mergeWithCloud() {
 function buildSyncPreviewHTML(direction, local, cloud) {
     const isUpload = direction === 'upload';
     const icon = isUpload ? '📤' : '📥';
-    const title = isUpload ? '立即同步（本地 → 雲端）' : '從雲端還原（雲端 → 本地）';
+    // 取得目前班級名稱
+    const currentClassName = (() => {
+        try {
+            const profiles = JSON.parse(localStorage.getItem('classProfiles') || '[]');
+            const currentId = localStorage.getItem('currentClassId') || 'default';
+            if (currentId === 'default') return '預設班級';
+            const found = profiles.find(p => String(p.id) === String(currentId));
+            return found ? found.name : currentId;
+        } catch { return '目前班級'; }
+    })();
+    const title = isUpload ? `立即同步（本地 → 雲端）` : `從雲端還原（雲端 → 本地）`;
     const warn = isUpload
-        ? '⚠️ 雲端資料將被本地資料<b>完整覆蓋</b>，此操作無法復原。'
-        : '⚠️ 本地資料將被雲端資料<b>完整覆蓋</b>，未同步的本地變更將遺失。';
+        ? `⚠️ <b>只同步「${currentClassName}」班的資料</b>至雲端，將完整覆蓋該班雲端資料，此操作無法復原。`
+        : `⚠️ <b>只還原「${currentClassName}」班的資料</b>至本地，本地未同步變更將遺失。`;
     const btnText = isUpload ? '✅ 確認上傳' : '✅ 確認還原';
     const btnClass = isUpload ? 'gauth-btn-primary' : 'gauth-btn-danger';
 
@@ -610,7 +620,7 @@ function buildSyncPreviewHTML(direction, local, cloud) {
         <!-- Header -->
         <div style="background:linear-gradient(135deg,#3b82f6,#6366f1);padding:18px 24px;color:#fff">
           <div style="font-size:1.4rem;font-weight:700">${icon} ${title}</div>
-          <div style="font-size:.85rem;opacity:.85;margin-top:4px">確認後將執行以下資料操作</div>
+          <div style="font-size:.85rem;opacity:.85;margin-top:4px">⚡ 僅同步 <b style="background:rgba(255,255,255,.2);padding:1px 8px;border-radius:12px">${currentClassName}</b> 班的資料，其他班級不受影響</div>
         </div>
 
         <!-- Table -->
