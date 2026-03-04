@@ -790,6 +790,153 @@ function updateCloudStatusUI(connected) {
 // ─────────────────────────────────────────────────────
 // 導出
 // ─────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────
+// 一鍵全班同步：依序同步所有班級資料到雲端
+// ─────────────────────────────────────────────────────
+async function syncAllClassesToCloud() {
+    if (!window.FirebaseConfig.isConnected()) {
+        NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號');
+        return false;
+    }
+    if (syncStatus.isSyncing) { console.warn('同步進行中...'); return false; }
+
+    const profiles = JSON.parse(localStorage.getItem('classProfiles') || '[]');
+    // 加上預設班級
+    const allClasses = [
+        { id: 'default', name: '預設班級' },
+        ...profiles
+    ];
+
+    const originalClassId = localStorage.getItem('currentClassId') || 'default';
+    syncStatus.isSyncing = true;
+
+    // 進度通知
+    const showProgress = (msg) => {
+        NotificationSystem && NotificationSystem.info(msg, 2000);
+    };
+
+    const results = [];
+
+    try {
+        for (let i = 0; i < allClasses.length; i++) {
+            const cls = allClasses[i];
+            const clsId = String(cls.id);
+            const clsName = cls.name || clsId;
+
+            // 暫時切換班級 context
+            localStorage.setItem('currentClassId', clsId);
+
+            // 讀取該班的 localStorage key
+            const studentsKey = clsId === 'default' ? 'students' : `students-${clsId}`;
+            const clsStudents = JSON.parse(localStorage.getItem(studentsKey) || '[]');
+
+            // 若該班完全沒有資料，跳過
+            if (clsStudents.length === 0) {
+                console.log(`[SyncAll] 跳過 ${clsName}（無學生資料）`);
+                results.push({ name: clsName, skipped: true });
+                continue;
+            }
+
+            showProgress(`☁️ 同步中 (${i + 1}/${allClasses.length})：${clsName}...`);
+
+            // 讀取各班 localStorage 資料
+            const annKey = clsId === 'default' ? 'classAnnouncements' : `classAnnouncements-${clsId}`;
+            const annData = JSON.parse(localStorage.getItem(annKey) || '[]');
+            const clsPointsHistory = JSON.parse(localStorage.getItem(`pointsHistory`) || '[]');
+            const clsGroups = JSON.parse(localStorage.getItem(`groups`) || '[]');
+            const clsNotebooks = JSON.parse(localStorage.getItem(`notebookEntries`) || '[]');
+            const clsHomeworks = JSON.parse(localStorage.getItem(`homeworkList`) || '[]');
+            const clsLottery = JSON.parse(localStorage.getItem(`lotteryHistory`) || '[]');
+            const examSubjects = JSON.parse(localStorage.getItem('examSubjects') || 'null');
+            const examReminders = JSON.parse(localStorage.getItem('examReminders') || '{}');
+            const examAttendance = JSON.parse(localStorage.getItem('examAttendance') || '{}');
+            const clockSettings = JSON.parse(localStorage.getItem('clockSettings') || '{}');
+            const noRepeat = localStorage.getItem('noRepeatLottery');
+
+            try {
+                await Promise.all([
+                    uploadCollection(COLLECTIONS.STUDENTS, clsStudents),
+                    uploadCollection(COLLECTIONS.POINTS_HISTORY, clsPointsHistory),
+                    uploadCollection(COLLECTIONS.GROUPS, clsGroups),
+                    uploadCollection(COLLECTIONS.NOTEBOOKS, clsNotebooks),
+                    uploadCollection(COLLECTIONS.HOMEWORKS, clsHomeworks),
+                    uploadCollection(COLLECTIONS.LOTTERY_HISTORY, clsLottery),
+                    uploadCollection(COLLECTIONS.ANNOUNCEMENTS, annData),
+                    uploadSingleDoc(COLLECTIONS.EXAM_DATA, 'subjects', { data: examSubjects || [] }),
+                    uploadSingleDoc(COLLECTIONS.EXAM_DATA, 'reminders', { data: examReminders }),
+                    uploadSingleDoc(COLLECTIONS.EXAM_DATA, 'attendance', { data: examAttendance }),
+                    uploadSingleDoc(COLLECTIONS.APP_SETTINGS, 'clock', clockSettings),
+                    uploadSingleDoc(COLLECTIONS.APP_SETTINGS, 'lottery', { noRepeatLottery: noRepeat }),
+                ]);
+                results.push({ name: clsName, students: clsStudents.length, success: true });
+                console.log(`[SyncAll] ✅ ${clsName} 同步完成（${clsStudents.length} 人）`);
+            } catch (e) {
+                results.push({ name: clsName, success: false, error: e.message });
+                console.error(`[SyncAll] ❌ ${clsName} 同步失敗:`, e);
+            }
+        }
+
+        // 同步 classProfiles meta
+        try {
+            const db = window.FirebaseConfig.getDb();
+            const userId = window.FirebaseConfig.getCurrentUserId();
+            if (profiles.length > 0) {
+                await db.collection('users').doc(userId)
+                    .collection('_meta').doc('classProfiles')
+                    .set({ profiles, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+            }
+        } catch (e) { console.warn('[SyncAll] classProfiles 同步失敗:', e); }
+
+        syncStatus.lastSyncTime = new Date();
+        localStorage.setItem('lastSyncTime', syncStatus.lastSyncTime.toISOString());
+        window.GoogleAuthUI?.refreshSyncTime && window.GoogleAuthUI.refreshSyncTime();
+
+        // 顯示結果摘要
+        const successList = results.filter(r => r.success);
+        const skipList = results.filter(r => r.skipped);
+        const failList = results.filter(r => !r.success && !r.skipped);
+        const summaryLines = [
+            `✅ 全班同步完成！`,
+            ...successList.map(r => `• ${r.name}：${r.students} 人`),
+            ...(skipList.length ? [`（已跳過無資料班級：${skipList.map(r => r.name).join('、')}）`] : []),
+            ...(failList.length ? [`⚠️ 失敗：${failList.map(r => r.name).join('、')}`] : []),
+        ];
+        // 顯示結果 Modal
+        _showSyncAllResult(summaryLines, failList.length === 0);
+        return true;
+
+    } finally {
+        // 恢復原始班級
+        localStorage.setItem('currentClassId', originalClassId);
+        syncStatus.isSyncing = false;
+    }
+}
+
+/**
+ * 全班同步結果提示
+ */
+function _showSyncAllResult(lines, success) {
+    const existing = document.getElementById('sync-all-result');
+    if (existing) existing.remove();
+    const el = document.createElement('div');
+    el.id = 'sync-all-result';
+    el.style.cssText = `
+        position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+        background:#fff;border-radius:16px;padding:16px 24px;
+        box-shadow:0 8px 32px rgba(0,0,0,.22);z-index:9999;
+        max-width:340px;width:90%;font-size:.88rem;color:#374151;
+        border-top:4px solid ${success ? '#22c55e' : '#f59e0b'};
+    `;
+    el.innerHTML = lines.map((l, i) => i === 0
+        ? `<div style="font-weight:700;font-size:1rem;margin-bottom:6px">${l}</div>`
+        : `<div>${l}</div>`
+    ).join('') + `<button onclick="document.getElementById('sync-all-result').remove()" style="
+        margin-top:10px;width:100%;padding:6px;border-radius:8px;border:1px solid #e5e7eb;
+        background:#f9fafb;cursor:pointer;font-size:.85rem;">確認</button>`;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 8000);
+}
+
 window.FirebaseSync = {
     syncToCloud,
     syncFromCloud,
@@ -799,6 +946,7 @@ window.FirebaseSync = {
     exportAllData,
     showSyncDialog,
     showSyncConfirmModal,   // 新增：供 UI 直接呼叫
+    syncAllClassesToCloud,  // 新增：一鍵全班同步
     init: initFirebaseAndSync,
     uploadItem,
     deleteItem,
