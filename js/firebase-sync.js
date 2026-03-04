@@ -1,9 +1,9 @@
 /**
- * Firebase 資料同步模組 v2.9.7
+ * Firebase 資料同步模組 v3.0.4
  * - 完整涵蓋所有功能模組的資料同步
  * - 新增同步前詳細差異預覽 Modal
  */
-console.log('✅ firebase-sync.js v2.9.7 載入完成');
+console.log('✅ firebase-sync.js v3.0.4 載入完成');
 
 // 資料集合名稱
 const COLLECTIONS = {
