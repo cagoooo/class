@@ -1452,8 +1452,13 @@
 
 
     <script>
+        // ===== 多班級資料隔離：根據當前班級 ID 決定 localStorage key =====
+        var _curClassId = localStorage.getItem('currentClassId') || 'default';
+        window.STUDENTS_KEY = (_curClassId === 'default') ? 'students' : ('students-' + _curClassId);
+        // ===== 結束 =====
+
         // 全域變數
-        var students = JSON.parse(localStorage.getItem('students')) || [];
+        var students = JSON.parse(localStorage.getItem(STUDENTS_KEY)) || [];
         var pointsHistory = JSON.parse(localStorage.getItem('pointsHistory')) || [];
         var lotteryHistory = JSON.parse(localStorage.getItem('lotteryHistory')) || [];
         var groups = JSON.parse(localStorage.getItem('groups')) || [];
@@ -1778,7 +1783,7 @@
                     // 匯入資料
                     if (data.students) {
                         students = data.students;
-                        localStorage.setItem('students', JSON.stringify(students));
+                        localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
                     }
                     if (data.pointsHistory) {
                         pointsHistory = data.pointsHistory;
@@ -1986,7 +1991,7 @@
             };
 
             students.push(student);
-            localStorage.setItem('students', JSON.stringify(students));
+            localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
 
             // 清空輸入
             document.getElementById('studentName').value = '';
@@ -2022,7 +2027,7 @@
             const confirmMessage = `即將新增 ${newStudents.length} 位學生：\n\n${newStudents.map(s => `${s.name} (座號：${s.number})`).join('\n')}\n\n確定要新增嗎？`;
             if (confirm(confirmMessage)) {
                 students.push(...newStudents);
-                localStorage.setItem('students', JSON.stringify(students));
+                localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
                 document.getElementById('batchStudents').value = '';
                 renderStudents();
                 updatePointsStudentSelect();
@@ -2056,7 +2061,7 @@
 
             if (confirmed) {
                 students = students.filter(s => s.id !== id);
-                localStorage.setItem('students', JSON.stringify(students));
+                localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
                 renderStudents();
                 updatePointsStudentSelect();
                 updateHomeworkCheckList();
@@ -2234,7 +2239,7 @@
             if (!student.records) student.records = [];
             student.records.push(record);
             pointsHistory.unshift(record);
-            localStorage.setItem('students', JSON.stringify(students));
+            localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
             localStorage.setItem('pointsHistory', JSON.stringify(pointsHistory));
             renderStudents();
             renderPointsHistory();
@@ -3043,7 +3048,7 @@
                     const confirmMessage = `預覽即將從 Excel 匯入的 ${newStudents.length} 位學生：\n\n${newStudents.map(s => `${s.name} (座號：${s.number})`).join('\n')}\n\n確定要新增嗎？`;
                     if (confirm(confirmMessage)) {
                         students.push(...newStudents);
-                        localStorage.setItem('students', JSON.stringify(students));
+                        localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
                         fileInput.value = ''; // 清空 file input
                         renderStudents();
                         updatePointsStudentSelect();
@@ -3105,7 +3110,7 @@
                 students = savedLists[selectedListName];
                 pointsHistory = [];
                 groups = [];
-                localStorage.setItem('students', JSON.stringify(students));
+                localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
                 localStorage.setItem('pointsHistory', JSON.stringify(pointsHistory));
                 localStorage.setItem('groups', JSON.stringify(groups));
                 renderStudents();
@@ -3124,7 +3129,7 @@
                 groups = [];
                 homeworkChecks = {};
 
-                localStorage.setItem('students', JSON.stringify(students));
+                localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
                 localStorage.setItem('pointsHistory', JSON.stringify(pointsHistory));
                 localStorage.setItem('groups', JSON.stringify(groups));
                 localStorage.setItem('homeworkChecks', JSON.stringify(homeworkChecks));
@@ -3211,7 +3216,7 @@
                 groups.forEach(g => g.score = 0);
                 pointsHistory = [];
 
-                localStorage.setItem('students', JSON.stringify(students));
+                localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
                 localStorage.setItem('groups', JSON.stringify(groups));
                 localStorage.setItem('pointsHistory', JSON.stringify(pointsHistory));
 

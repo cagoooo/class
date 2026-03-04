@@ -1,14 +1,14 @@
-/**
- * UI 增強模組
- * 包含：深色模式完善、拖拽排序、座位表
+﻿/**
+ * UI 憓撥璅∠?
+ * ?嚗楛?脫芋撘????賣?摨漣雿”
  */
 
 (function () {
     'use strict';
 
-    // ==================== 深色模式增強 CSS ====================
+    // ==================== 瘛梯璅∪?憓撥 CSS ====================
     const darkModeEnhancementStyles = `
-        /* Modal 深色模式 */
+        /* Modal 瘛梯璅∪? */
         .dark .fixed.inset-0 > div:not(.bg-black) {
             background-color: var(--bg-card) !important;
         }
@@ -18,18 +18,18 @@
             border: 1px solid var(--border-color);
         }
 
-        /* 通知系統深色 */
+        /* ?蝟餌絞瘛梯 */
         .dark .notification-container > div {
             background-color: var(--bg-card) !important;
             border: 1px solid var(--border-color);
         }
 
-        /* 確認對話框深色 */
+        /* 蝣箄?撠店獢楛??*/
         .dark .confirm-dialog-overlay .bg-white {
             background-color: var(--bg-card) !important;
         }
 
-        /* 分數標籤深色調整 */
+        /* ?璅惜瘛梯隤踵 */
         .dark .bg-green-100 { background-color: rgba(16, 185, 129, 0.2) !important; }
         .dark .bg-red-100 { background-color: rgba(239, 68, 68, 0.2) !important; }
         .dark .bg-yellow-100 { background-color: rgba(245, 158, 11, 0.2) !important; }
@@ -38,12 +38,12 @@
         .dark .bg-pink-100 { background-color: rgba(236, 72, 153, 0.2) !important; }
         .dark .bg-indigo-100 { background-color: rgba(99, 102, 241, 0.2) !important; }
 
-        /* 表格深色 */
+        /* 銵冽瘛梯 */
         .dark table { background-color: var(--bg-card); }
         .dark th { background-color: var(--bg-tertiary) !important; }
         .dark td { border-color: var(--border-color) !important; }
 
-        /* 快捷鍵 Modal 深色 */
+        /* 敹急??Modal 瘛梯 */
         .dark .shortcuts-content {
             background-color: var(--bg-card) !important;
             color: var(--text-primary);
@@ -59,12 +59,12 @@
             color: var(--text-primary);
         }
 
-        /* 番茄鐘狀態深色 */
+        /* ?芾????楛??*/
         .dark .pomodoro-status {
             background-color: var(--bg-secondary) !important;
         }
 
-        /* 頭像/標籤選擇器深色 */
+        /* ?剖?/璅惜?豢??冽楛??*/
         .dark #avatar-picker-modal .bg-white,
         .dark #tag-editor-modal .bg-white {
             background-color: var(--bg-card) !important;
@@ -79,9 +79,9 @@
         }
     `;
 
-    // ==================== 拖拽排序 ====================
+    // ==================== ??? ====================
     const dragStyles = `
-        /* 拖拽樣式 */
+        /* ?璅?? */
         .draggable {
             cursor: grab;
             transition: transform 0.2s, box-shadow 0.2s;
@@ -121,9 +121,9 @@
         }
     `;
 
-    // ==================== 座位表 ====================
+    // ==================== 摨找?銵?====================
     const seatingStyles = `
-        /* 座位表容器 */
+        /* 摨找?銵典捆??*/
         .seating-chart {
             display: grid;
             gap: 0.5rem;
@@ -137,7 +137,7 @@
             background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
         }
 
-        /* 講台 */
+        /* 雓 */
         .seating-podium {
             grid-column: 1 / -1;
             background: linear-gradient(135deg, #6366f1, #8b5cf6);
@@ -149,7 +149,7 @@
             margin-bottom: 1rem;
         }
 
-        /* 座位 */
+        /* 摨找? */
         .seat {
             aspect-ratio: 1;
             min-width: 60px;
@@ -214,7 +214,7 @@
             white-space: nowrap;
         }
 
-        /* 座位表控制 */
+        /* 摨找?銵冽??*/
         .seating-controls {
             display: flex;
             gap: 0.5rem;
@@ -274,7 +274,7 @@
             white-space: nowrap;
         }
 
-        /* RWD 響應式 */
+        /* RWD ?踵?撘?*/
         @media (max-width: 640px) {
             .seating-controls {
                 justify-content: center;
@@ -326,18 +326,18 @@
         }
     `;
 
-    // ==================== 拖拽排序功能 ====================
+    // ==================== ???? ====================
     let draggedElement = null;
     let draggedIndex = null;
 
     /**
-     * 初始化學生列表拖拽
+     * ???飛??銵冽???
      */
     function initStudentDrag() {
         const studentsList = document.getElementById('studentsList');
         if (!studentsList) return;
 
-        // 使用 MutationObserver 監聽列表變化
+        // 雿輻 MutationObserver ???”霈?
         const observer = new MutationObserver(() => {
             setupDraggableItems(studentsList);
         });
@@ -347,7 +347,7 @@
     }
 
     /**
-     * 設置可拖拽項目
+     * 閮剔蔭?舀??賡???
      */
     function setupDraggableItems(container) {
         const items = container.querySelectorAll(':scope > div:not(.col-span-full)');
@@ -360,14 +360,14 @@
             item.classList.add('draggable');
             item.dataset.index = index;
 
-            // 添加拖拽手柄
+            // 瘛餃????
             const handle = document.createElement('span');
             handle.className = 'drag-handle mr-2 text-gray-400';
-            handle.innerHTML = '⠿';
+            handle.innerHTML = '??;
             handle.style.cssText = 'font-size: 1.25rem; user-select: none;';
             item.insertBefore(handle, item.firstChild);
 
-            // 拖拽事件
+            // ?鈭辣
             item.addEventListener('dragstart', onDragStart);
             item.addEventListener('dragend', onDragEnd);
             item.addEventListener('dragover', onDragOver);
@@ -408,27 +408,27 @@
 
         const targetIndex = parseInt(this.dataset.index);
 
-        // 重新排序學生陣列
+        // ???摮貊????
         if (typeof students !== 'undefined' && Array.isArray(students)) {
             const [removed] = students.splice(draggedIndex, 1);
             students.splice(targetIndex, 0, removed);
 
-            // 更新座號
+            // ?湔摨扯?
             students.forEach((s, i) => s.number = i + 1);
 
-            localStorage.setItem('students', JSON.stringify(students));
+            localStorage.setItem(window.STUDENTS_KEY || 'students', JSON.stringify(students));
 
             if (typeof renderStudents === 'function') {
                 renderStudents();
             }
 
             if (typeof NotificationSystem !== 'undefined') {
-                NotificationSystem.success('已更新學生順序');
+                NotificationSystem.success('撌脫?啣飛??摨?);
             }
         }
     }
 
-    // ==================== 座位表功能 ====================
+    // ==================== 摨找?銵典???====================
     let seatingConfig = {
         rows: 6,
         cols: 6,
@@ -436,13 +436,13 @@
     };
 
     /**
-     * 顯示座位表
+     * 憿舐內摨找?銵?
      */
     window.showSeatingChart = function () {
-        // 移除舊的
+        // 蝘駁??
         document.getElementById('seating-modal')?.remove();
 
-        // 載入配置
+        // 頛?蔭
         const saved = localStorage.getItem('seatingConfig');
         if (saved) {
             try {
@@ -459,33 +459,33 @@
             <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-auto" onclick="event.stopPropagation()">
                 <div class="flex items-center justify-between p-4 border-b bg-gradient-to-r from-blue-500 to-indigo-500 rounded-t-2xl">
                     <h3 class="text-xl font-bold text-white flex items-center gap-2">
-                        🪑 座位表
+                        ?? 摨找?銵?
                     </h3>
-                    <button onclick="document.getElementById('seating-modal').remove()" class="text-white hover:text-gray-200 text-2xl">✕</button>
+                    <button onclick="document.getElementById('seating-modal').remove()" class="text-white hover:text-gray-200 text-2xl">??/button>
                 </div>
                 
                 <div class="p-4">
                     <div class="seating-controls">
                         <label>
-                            <span class="text-sm text-gray-600">行數:</span>
+                            <span class="text-sm text-gray-600">銵:</span>
                             <input type="number" id="seating-rows" value="${seatingConfig.rows}" min="1" max="10" 
                                 onchange="updateSeatingGrid()">
                         </label>
                         <label>
-                            <span class="text-sm text-gray-600">列數:</span>
+                            <span class="text-sm text-gray-600">?:</span>
                             <input type="number" id="seating-cols" value="${seatingConfig.cols}" min="1" max="10"
                                 onchange="updateSeatingGrid()">
                         </label>
-                        <button onclick="autoAssignSeats()" class="seating-btn seating-btn-secondary">📋 依座號排</button>
-                        <button onclick="randomAssignSeats()" class="seating-btn seating-btn-primary">🎲 隨機排座位</button>
-                        <button onclick="clearSeats()" class="seating-btn seating-btn-secondary">🗑️ 清除</button>
-                        <button onclick="saveSeatingChart()" class="seating-btn seating-btn-primary">💾 儲存</button>
+                        <button onclick="autoAssignSeats()" class="seating-btn seating-btn-secondary">?? 靘漣??</button>
+                        <button onclick="randomAssignSeats()" class="seating-btn seating-btn-primary">? ?冽??漣雿?/button>
+                        <button onclick="clearSeats()" class="seating-btn seating-btn-secondary">??儭?皜</button>
+                        <button onclick="saveSeatingChart()" class="seating-btn seating-btn-primary">? ?脣?</button>
                     </div>
                     
                     <div id="seating-grid" class="seating-chart"></div>
                     
                     <div class="mt-4 p-3 bg-gray-50 rounded-lg text-sm text-gray-600">
-                        💡 點擊空座位可選擇學生入座，點擊已入座的座位可移除
+                        ? 暺?蝛箏漣雿?豢?摮貊??亙漣嚗??歇?亙漣?漣雿蝘駁
                     </div>
                 </div>
             </div>
@@ -496,14 +496,14 @@
     };
 
     /**
-     * 渲染座位表格
+     * 皜脫?摨找?銵冽
      */
     window.renderSeatingGrid = function () {
         const grid = document.getElementById('seating-grid');
         if (!grid) return;
 
         grid.style.gridTemplateColumns = `repeat(${seatingConfig.cols}, 1fr)`;
-        grid.innerHTML = `<div class="seating-podium">📚 講台</div>`;
+        grid.innerHTML = `<div class="seating-podium">?? 雓</div>`;
 
         for (let row = 0; row < seatingConfig.rows; row++) {
             for (let col = 0; col < seatingConfig.cols; col++) {
@@ -518,7 +518,7 @@
 
                 if (student) {
                     seat.innerHTML = `
-                        <span class="seat-avatar">${student.avatar || '😊'}</span>
+                        <span class="seat-avatar">${student.avatar || '??'}</span>
                         <span class="seat-name">${student.name}</span>
                         <span class="seat-number">${student.number}</span>
                     `;
@@ -535,41 +535,41 @@
     };
 
     /**
-     * 座位點擊事件
+     * 摨找?暺?鈭辣
      */
     function onSeatClick(key, currentStudent) {
         if (currentStudent) {
-            // 移除學生
+            // 蝘駁摮貊?
             delete seatingConfig.layout[key];
             renderSeatingGrid();
             return;
         }
 
-        // 顯示學生選擇器
+        // 憿舐內摮貊??豢???
         const unassigned = students?.filter(s =>
             !Object.values(seatingConfig.layout).includes(s.id)
         ) || [];
 
         if (unassigned.length === 0) {
             if (typeof NotificationSystem !== 'undefined') {
-                NotificationSystem.warning('所有學生都已入座');
+                NotificationSystem.warning('??飛?撌脣摨?);
             }
             return;
         }
 
-        // 簡易選擇器
+        // 蝪⊥??豢???
         const picker = document.createElement('div');
         picker.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]';
         picker.onclick = (e) => { if (e.target === picker) picker.remove(); };
 
         picker.innerHTML = `
             <div class="bg-white rounded-xl p-4 max-w-md w-full mx-4 max-h-[60vh] overflow-auto">
-                <h4 class="font-bold mb-3">選擇學生入座</h4>
+                <h4 class="font-bold mb-3">?豢?摮貊??亙漣</h4>
                 <div class="grid grid-cols-3 gap-2">
                     ${unassigned.map(s => `
                         <button onclick="assignSeat('${key}', ${s.id}); this.closest('.fixed').remove();"
                             class="p-2 bg-gray-50 rounded-lg hover:bg-blue-100 transition-colors text-center">
-                            <div class="text-2xl">${s.avatar || '😊'}</div>
+                            <div class="text-2xl">${s.avatar || '??'}</div>
                             <div class="text-xs truncate">${s.name}</div>
                         </button>
                     `).join('')}
@@ -581,7 +581,7 @@
     }
 
     /**
-     * 分配座位
+     * ??摨找?
      */
     window.assignSeat = function (key, studentId) {
         seatingConfig.layout[key] = studentId;
@@ -589,7 +589,7 @@
     };
 
     /**
-     * 更新座位格局
+     * ?湔摨找??澆?
      */
     window.updateSeatingGrid = function () {
         seatingConfig.rows = parseInt(document.getElementById('seating-rows')?.value) || 6;
@@ -598,7 +598,7 @@
     };
 
     /**
-     * 自動安排座位
+     * ?芸?摰?摨找?
      */
     window.autoAssignSeats = function () {
         seatingConfig.layout = {};
@@ -614,26 +614,26 @@
 
         renderSeatingGrid();
         if (typeof NotificationSystem !== 'undefined') {
-            NotificationSystem.success('已按座號安排座位');
+            NotificationSystem.success('撌脫?摨扯?摰?摨找?');
         }
     };
 
     /**
-     * 隨機安排座位（洗牌演算法）
+     * ?冽?摰?摨找?嚗???蝞?嚗?
      */
     window.randomAssignSeats = function () {
         seatingConfig.layout = {};
 
-        // 複製學生陣列並洗牌
+        // 銴ˊ摮貊????銝行???
         const shuffledStudents = [...(students || [])];
 
-        // Fisher-Yates 洗牌演算法
+        // Fisher-Yates 瘣?瞍?瘜?
         for (let i = shuffledStudents.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [shuffledStudents[i], shuffledStudents[j]] = [shuffledStudents[j], shuffledStudents[i]];
         }
 
-        // 分配座位
+        // ??摨找?
         let index = 0;
         for (let row = 0; row < seatingConfig.rows && index < shuffledStudents.length; row++) {
             for (let col = 0; col < seatingConfig.cols && index < shuffledStudents.length; col++) {
@@ -642,17 +642,17 @@
             }
         }
 
-        // 播放動畫效果
+        // ?剜???
         playShuffleAnimation();
 
         renderSeatingGrid();
         if (typeof NotificationSystem !== 'undefined') {
-            NotificationSystem.success('🎲 已隨機安排座位！');
+            NotificationSystem.success('? 撌脤璈??漣雿?');
         }
     };
 
     /**
-     * 播放洗牌動畫
+     * ?剜瘣??
      */
     function playShuffleAnimation() {
         const seats = document.querySelectorAll('.seat');
@@ -669,7 +669,7 @@
     }
 
     /**
-     * 清除座位
+     * 皜摨找?
      */
     window.clearSeats = function () {
         seatingConfig.layout = {};
@@ -677,18 +677,18 @@
     };
 
     /**
-     * 儲存座位表
+     * ?脣?摨找?銵?
      */
     window.saveSeatingChart = function () {
         localStorage.setItem('seatingConfig', JSON.stringify(seatingConfig));
         if (typeof NotificationSystem !== 'undefined') {
-            NotificationSystem.success('座位表已儲存');
+            NotificationSystem.success('摨找?銵典歇?脣?');
         }
     };
 
-    // ==================== 初始化 ====================
+    // ==================== ????====================
     function init() {
-        // 注入樣式
+        // 瘜典璅??
         if (!document.getElementById('ui-enhancement-styles')) {
             const style = document.createElement('style');
             style.id = 'ui-enhancement-styles';
@@ -696,30 +696,30 @@
             document.head.appendChild(style);
         }
 
-        // 初始化拖拽
+        // ??????
         setTimeout(initStudentDrag, 500);
 
-        // 添加座位表按鈕到學生管理區
+        // 瘛餃?摨找?銵冽??摮貊?蝞∠??
         setTimeout(addSeatingButton, 600);
 
-        console.log('✅ UI 增強模組已載入（深色模式完善、拖拽排序、座位表）');
+        console.log('??UI 憓撥璅∠?撌脰??伐?瘛梯璅∪?摰????賣?摨漣雿”嚗?);
     }
 
     /**
-     * 添加座位表按鈕
+     * 瘛餃?摨找?銵冽???
      */
     function addSeatingButton() {
-        // 修正：使用 students-section（有 s）
+        // 靽格迤嚗蝙??students-section嚗? s嚗?
         const studentSection = document.getElementById('students-section');
         if (!studentSection || document.getElementById('seating-chart-btn')) return;
 
-        // 使用 id 精確定位班級統計區域，避免誤配學生卡片
+        // 雿輻 id 蝎曄Ⅱ摰??剔?蝯梯?????踹?隤日?摮貊??∠?
         const statsArea = document.getElementById('class-stats-panel');
         if (statsArea) {
             const btn = document.createElement('button');
             btn.id = 'seating-chart-btn';
             btn.className = 'w-full mt-3 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg hover:from-blue-600 hover:to-indigo-600 transition-all flex items-center justify-center gap-2';
-            btn.innerHTML = '🪑 座位表';
+            btn.innerHTML = '?? 摨找?銵?;
             btn.onclick = showSeatingChart;
             statsArea.appendChild(btn);
         }

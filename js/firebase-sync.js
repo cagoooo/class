@@ -1,11 +1,11 @@
-/**
- * Firebase 資料同步模組 v3.0.4
- * - 完整涵蓋所有功能模組的資料同步
- * - 新增同步前詳細差異預覽 Modal
+﻿/**
+ * Firebase 鞈??郊璅∠? v3.0.4
+ * - 摰瘨菔?????賣芋蝯?鞈??郊
+ * - ?啣??郊?底蝝啣榆?圈?閬?Modal
  */
-console.log('✅ firebase-sync.js v3.0.4 載入完成');
+console.log('??firebase-sync.js v3.0.4 頛摰?');
 
-// 資料集合名稱
+// 鞈????迂
 const COLLECTIONS = {
     STUDENTS: 'students',
     POINTS_HISTORY: 'pointsHistory',
@@ -15,11 +15,11 @@ const COLLECTIONS = {
     HOMEWORK_CHECKS: 'homeworkChecks',
     LOTTERY_HISTORY: 'lotteryHistory',
     ANNOUNCEMENTS: 'classAnnouncements',
-    EXAM_DATA: 'examData',         // 考試監考設定
-    APP_SETTINGS: 'appSettings',   // 各類 App 設定（時鐘、抽籤等）
+    EXAM_DATA: 'examData',         // ?岫??身摰?
+    APP_SETTINGS: 'appSettings',   // ?? App 閮剖?嚗??蝐斤?嚗?
 };
 
-// 同步狀態（掛到 window，讓 auto-sync.js 能正確讀到 isSyncing）
+// ?郊???? window嚗? auto-sync.js ?賣迤蝣箄???isSyncing嚗?
 window.syncStatus = window.syncStatus || {
     lastSyncTime: null,
     isSyncing: false,
@@ -28,29 +28,29 @@ window.syncStatus = window.syncStatus || {
 const syncStatus = window.syncStatus;
 
 /**
- * 取得用戶的資料集合參考
- * 多班級支援：預設班級使用原有路徑，其他班級使用 classes/{classId}/ 子路徑
+ * ???冽????????
+ * 憭蝝?湛??身?剔?雿輻??頝臬?嚗隞蝝蝙??classes/{classId}/ 摮楝敺?
  */
 function getUserCollection(collectionName) {
     const db = window.FirebaseConfig.getDb();
     const userId = window.FirebaseConfig.getCurrentUserId();
     if (!db || !userId) {
-        console.warn('Firebase 尚未連線');
+        console.warn('Firebase 撠???');
         return null;
     }
-    // 讀取目前班級 ID（由 class-profiles.js 寫入）
+    // 霈??蝝?ID嚗 class-profiles.js 撖怠嚗?
     const curClassId = localStorage.getItem('currentClassId') || 'default';
     if (curClassId === 'default') {
-        // 預設班級：沿用現有路徑（向下相容）
+        // ?身?剔?嚗窒?函?楝敺????詨捆嚗?
         return db.collection('users').doc(userId).collection(collectionName);
     }
-    // 新班級：使用獨立子路徑
+    // ?啁蝝?雿輻?函?摮楝敺?
     return db.collection('users').doc(userId).collection('classes').doc(curClassId).collection(collectionName);
 }
 
 
 /**
- * 上傳整個資料集合（Array 形式）
+ * 銝?游?????Array 敶Ｗ?嚗?
  */
 async function uploadCollection(collectionName, dataArray) {
     try {
@@ -65,32 +65,32 @@ async function uploadCollection(collectionName, dataArray) {
             batch.set(docRef, { ...item, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
         });
         await batch.commit();
-        console.log(`✅ 上傳 ${collectionName}: ${dataArray.length} 筆`);
+        console.log(`??銝 ${collectionName}: ${dataArray.length} 蝑);
         return true;
     } catch (error) {
-        console.error(`上傳 ${collectionName} 失敗:`, error);
+        console.error(`銝 ${collectionName} 憭望?:`, error);
         return false;
     }
 }
 
 /**
- * 上傳單一 Object 形式的設定文件
+ * 銝?桐? Object 敶Ｗ??身摰?隞?
  */
 async function uploadSingleDoc(collectionName, docId, data) {
     try {
         const collection = getUserCollection(collectionName);
         if (!collection) return false;
         await collection.doc(docId).set({ ...data, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-        console.log(`✅ 上傳 ${collectionName}/${docId}`);
+        console.log(`??銝 ${collectionName}/${docId}`);
         return true;
     } catch (error) {
-        console.error(`上傳 ${collectionName}/${docId} 失敗:`, error);
+        console.error(`銝 ${collectionName}/${docId} 憭望?:`, error);
         return false;
     }
 }
 
 /**
- * 下載資料集合（Array 形式）
+ * 銝?鞈???嚗rray 敶Ｗ?嚗?
  */
 async function downloadCollection(collectionName) {
     try {
@@ -99,16 +99,16 @@ async function downloadCollection(collectionName) {
         const snapshot = await collection.get();
         const data = [];
         snapshot.forEach(doc => data.push({ id: doc.id, ...doc.data() }));
-        console.log(`✅ 下載 ${collectionName}: ${data.length} 筆`);
+        console.log(`??銝? ${collectionName}: ${data.length} 蝑);
         return data;
     } catch (error) {
-        console.error(`下載 ${collectionName} 失敗:`, error);
+        console.error(`銝? ${collectionName} 憭望?:`, error);
         return [];
     }
 }
 
 /**
- * 下載單一 Object 文件
+ * 銝??桐? Object ?辣
  */
 async function downloadSingleDoc(collectionName, docId) {
     try {
@@ -117,13 +117,13 @@ async function downloadSingleDoc(collectionName, docId) {
         const doc = await collection.doc(docId).get();
         return doc.exists ? doc.data() : null;
     } catch (error) {
-        console.error(`下載 ${collectionName}/${docId} 失敗:`, error);
+        console.error(`銝? ${collectionName}/${docId} 憭望?:`, error);
         return null;
     }
 }
 
 /**
- * 上傳單一資料項目
+ * 銝?桐?鞈??
  */
 async function uploadItem(collectionName, itemId, data) {
     try {
@@ -135,13 +135,13 @@ async function uploadItem(collectionName, itemId, data) {
         });
         return true;
     } catch (error) {
-        console.error(`上傳 ${collectionName}/${itemId} 失敗:`, error);
+        console.error(`銝 ${collectionName}/${itemId} 憭望?:`, error);
         return false;
     }
 }
 
 /**
- * 刪除資料項目
+ * ?芷鞈??
  */
 async function deleteItem(collectionName, itemId) {
     try {
@@ -150,22 +150,22 @@ async function deleteItem(collectionName, itemId) {
         await collection.doc(String(itemId)).delete();
         return true;
     } catch (error) {
-        console.error(`刪除 ${collectionName}/${itemId} 失敗:`, error);
+        console.error(`?芷 ${collectionName}/${itemId} 憭望?:`, error);
         return false;
     }
 }
 
-// ─────────────────────────────────────────────────────
-// 工具：安全讀取 localStorage
-// ─────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????
+// 撌亙嚗??刻???localStorage
+// ?????????????????????????????????????????????????????
 function safeLS(key, fallback) {
     try { return JSON.parse(localStorage.getItem(key) || 'null') || fallback; }
     catch { return fallback; }
 }
 
-// ─────────────────────────────────────────────────────
-// 工具：取得本地所有資料統計
-// ─────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????
+// 撌亙嚗?敺?唳????絞閮?
+// ?????????????????????????????????????????????????????
 function getLocalStats() {
     const examData = safeLS('examSubjects', null);
     const annData = safeLS('classAnnouncements', []);
@@ -184,33 +184,33 @@ function getLocalStats() {
     };
 }
 
-// ─────────────────────────────────────────────────────
-// 同步所有本地資料到雲端
-// ─────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????
+// ?郊???啗???脩垢
+// ?????????????????????????????????????????????????????
 async function syncToCloud() {
     if (!window.FirebaseConfig.isConnected()) {
-        NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號');
+        NotificationSystem && NotificationSystem.warning('隢??餃 Google 撣唾?');
         return false;
     }
-    if (syncStatus.isSyncing) { console.warn('同步進行中...'); return false; }
+    if (syncStatus.isSyncing) { console.warn('?郊?脰?銝?..'); return false; }
 
     syncStatus.isSyncing = true;
     try {
-        typeof LoadingIndicator !== 'undefined' && LoadingIndicator.show('正在同步至雲端...');
+        typeof LoadingIndicator !== 'undefined' && LoadingIndicator.show('甇??郊?喲蝡?..');
 
         const db = window.FirebaseConfig.getDb();
         const userId = window.FirebaseConfig.getCurrentUserId();
         const annData = safeLS('classAnnouncements', []);
 
-        // 讀取考試監考資料
+        // 霈?岫?????
         const examSubjects = safeLS('examSubjects', []);
         const examReminders = safeLS('examReminders', { exam: [], break: [] });
         const examAttendance = safeLS('examAttendance', {});
-        // 讀取 App 設定
+        // 霈??App 閮剖?
         const clockSettings = safeLS('clockSettings', {});
         const noRepeat = localStorage.getItem('noRepeatLottery');
 
-        // ── 並行上傳全部集合 ──
+        // ?? 銝西?銝?券?? ??
         await Promise.all([
             uploadCollection(COLLECTIONS.STUDENTS, students || []),
             uploadCollection(COLLECTIONS.POINTS_HISTORY, pointsHistory || []),
@@ -219,16 +219,16 @@ async function syncToCloud() {
             uploadCollection(COLLECTIONS.HOMEWORKS, homeworkList || []),
             uploadCollection(COLLECTIONS.LOTTERY_HISTORY, lotteryHistory || []),
             uploadCollection(COLLECTIONS.ANNOUNCEMENTS, annData),
-            // 考試監考設定（單一 doc）
+            // ?岫??身摰??桐? doc嚗?
             uploadSingleDoc(COLLECTIONS.EXAM_DATA, 'subjects', { data: examSubjects }),
             uploadSingleDoc(COLLECTIONS.EXAM_DATA, 'reminders', { data: examReminders }),
             uploadSingleDoc(COLLECTIONS.EXAM_DATA, 'attendance', { data: examAttendance }),
-            // App 設定
+            // App 閮剖?
             uploadSingleDoc(COLLECTIONS.APP_SETTINGS, 'clock', clockSettings),
             uploadSingleDoc(COLLECTIONS.APP_SETTINGS, 'lottery', { noRepeatLottery: noRepeat }),
         ]);
 
-        // 作業繳交狀態（特殊結構）— 使用動態路徑（修正多班級漏洞）
+        // 雿平蝜喃漱????寞?蝯?嚗?雿輻??頝臬?嚗耨甇???剔?瞍?嚗?
         if (homeworkChecks && Object.keys(homeworkChecks).length > 0) {
             const checksCol = getUserCollection(COLLECTIONS.HOMEWORK_CHECKS);
             if (checksCol) {
@@ -241,8 +241,8 @@ async function syncToCloud() {
             }
         }
 
-        // 同步班級清單（classProfiles）到雲端 meta 節點，確保多裝置可識別所有班級
-        // 路徑：users/{uid}/_meta/classProfiles（不受多班級路徑影響，固定全域）
+        // ?郊?剔?皜嚗lassProfiles嚗?脩垢 meta 蝭暺?蝣箔?憭?蝵桀霅??蝝?
+        // 頝臬?嚗sers/{uid}/_meta/classProfiles嚗????剔?頝臬?敶梢嚗摰??
         try {
             const db = window.FirebaseConfig.getDb();
             const userId = window.FirebaseConfig.getCurrentUserId();
@@ -251,10 +251,10 @@ async function syncToCloud() {
                 await db.collection('users').doc(userId)
                     .collection('_meta').doc('classProfiles')
                     .set({ profiles, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-                console.log('[MultiClass] classProfiles 已同步至雲端');
+                console.log('[MultiClass] classProfiles 撌脣?甇亥?脩垢');
             }
         } catch (e) {
-            console.warn('[MultiClass] classProfiles 同步失敗（非致命）:', e);
+            console.warn('[MultiClass] classProfiles ?郊憭望?嚗??游嚗?', e);
         }
 
         syncStatus.lastSyncTime = new Date();
@@ -264,26 +264,26 @@ async function syncToCloud() {
         if (typeof window.GoogleAuthUI !== 'undefined') {
             window.GoogleAuthUI.refreshSyncTime && window.GoogleAuthUI.refreshSyncTime();
         }
-        NotificationSystem && NotificationSystem.success('資料已完整同步至雲端 ☁️');
-        console.log('✅ 同步完成:', syncStatus.lastSyncTime);
+        NotificationSystem && NotificationSystem.success('鞈?撌脣??游?甇亥?脩垢 ??');
+        console.log('???郊摰?:', syncStatus.lastSyncTime);
         return true;
     } catch (error) {
-        console.error('同步失敗:', error);
+        console.error('?郊憭望?:', error);
         typeof LoadingIndicator !== 'undefined' && LoadingIndicator.hide();
-        NotificationSystem && NotificationSystem.error('同步失敗: ' + error.message);
+        NotificationSystem && NotificationSystem.error('?郊憭望?: ' + error.message);
         return false;
     } finally {
         syncStatus.isSyncing = false;
     }
 }
 
-// ─────────────────────────────────────────────────────
-// 從雲端下載資料（靜默）→ 返回資料物件
-// ─────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????
+// 敺蝡臭?頛?????嚗? 餈?鞈??拐辣
+// ?????????????????????????????????????????????????????
 async function syncFromCloud() {
     if (!window.FirebaseConfig.isConnected()) return null;
     try {
-        typeof LoadingIndicator !== 'undefined' && LoadingIndicator.show('正在讀取雲端資料...');
+        typeof LoadingIndicator !== 'undefined' && LoadingIndicator.show('甇?霈?蝡航???..');
 
         const db = window.FirebaseConfig.getDb();
         const userId = window.FirebaseConfig.getCurrentUserId();
@@ -309,7 +309,7 @@ async function syncFromCloud() {
             downloadSingleDoc(COLLECTIONS.APP_SETTINGS, 'lottery'),
         ]);
 
-        // 作業繳交狀態 — 使用動態路徑（修正多班級漏洞）
+        // 雿平蝜喃漱?????雿輻??頝臬?嚗耨甇???剔?瞍?嚗?
         const checksCol = getUserCollection(COLLECTIONS.HOMEWORK_CHECKS);
         const cloudChecks = {};
         if (checksCol) {
@@ -317,7 +317,7 @@ async function syncFromCloud() {
             checksSnap.forEach(doc => { cloudChecks[doc.id] = doc.data().checks || {}; });
         }
 
-        // 下載班級清單 classProfiles（全域 meta 節點）
+        // 銝??剔?皜 classProfiles嚗??meta 蝭暺?
         let cloudProfiles = null;
         try {
             const db = window.FirebaseConfig.getDb();
@@ -325,7 +325,7 @@ async function syncFromCloud() {
             const metaDoc = await db.collection('users').doc(userId)
                 .collection('_meta').doc('classProfiles').get();
             if (metaDoc.exists) cloudProfiles = metaDoc.data().profiles;
-        } catch (e) { /* 無 meta 則略過 */ }
+        } catch (e) { /* ??meta ???*/ }
 
         typeof LoadingIndicator !== 'undefined' && LoadingIndicator.hide();
 
@@ -343,30 +343,30 @@ async function syncFromCloud() {
             examAttendance: examAttendDoc?.data ?? {},
             clockSettings: clockDoc ?? null,
             lotterySettings: lotterySettingDoc ?? null,
-            classProfiles: cloudProfiles,  // ← 新增：帶回班級清單
+            classProfiles: cloudProfiles,  // ???啣?嚗葆?蝝???
         };
 
     } catch (error) {
-        console.error('下載失敗:', error);
+        console.error('銝?憭望?:', error);
         typeof LoadingIndicator !== 'undefined' && LoadingIndicator.hide();
-        NotificationSystem && NotificationSystem.error('讀取雲端失敗: ' + error.message);
+        NotificationSystem && NotificationSystem.error('霈?蝡臬仃?? ' + error.message);
         return null;
     }
 }
 
-// ─────────────────────────────────────────────────────
-// 從雲端還原並覆蓋本地（核心覆蓋邏輯，接受已下載的 cloudData）
-// ─────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????
+// 敺蝡舫??蒂閬??砍嚗敹???頛荔??亙?撌脖?頛? cloudData嚗?
+// ?????????????????????????????????????????????????????
 async function loadFromCloudData(cloudData) {
     if (!cloudData) return false;
-    // 防止並行執行
+    // ?脫迫銝西??瑁?
     if (syncStatus.isSyncing) {
-        console.warn('[Sync] 同步進行中，跳過 loadFromCloudData');
+        console.warn('[Sync] ?郊?脰?銝哨?頝喲? loadFromCloudData');
         return false;
     }
     syncStatus.isSyncing = true;
     try {
-        // 主資料覆蓋（優先使用 ClassDB，自動備份至 localStorage）
+        // 銝餉??????芸?雿輻 ClassDB嚗??隞質 localStorage嚗?
         const dbSave = (typeof ClassDB !== 'undefined' && ClassDB.isReady)
             ? (k, v) => ClassDB.save(k, v)
             : (k, v) => localStorage.setItem(k, JSON.stringify(v));
@@ -381,8 +381,8 @@ async function loadFromCloudData(cloudData) {
             dbSave('homeworkChecks', cloudData.homeworkChecks),
         ]);
 
-        // ✅ 同步更新記憶體中的全域變數
-        // getLocalStats() 讀取全域變數，若不更新則 getLocalStats() 永遠回傳 0
+        // ???郊?湔閮擃葉?????
+        // getLocalStats() 霈????賂??乩??湔??getLocalStats() 瘞賊?? 0
         window.students = cloudData.students || [];
         window.pointsHistory = cloudData.pointsHistory || [];
         window.groups = cloudData.groups || [];
@@ -391,7 +391,7 @@ async function loadFromCloudData(cloudData) {
         window.lotteryHistory = cloudData.lotteryHistory || [];
         window.homeworkChecks = cloudData.homeworkChecks || {};
 
-        // 還原班級清單 classProfiles
+        // ???剔?皜 classProfiles
         if (cloudData.classProfiles && Array.isArray(cloudData.classProfiles)) {
             try {
                 const localRaw = localStorage.getItem('classProfiles');
@@ -400,18 +400,18 @@ async function loadFromCloudData(cloudData) {
                 const localOnlyProfiles = localProfiles.filter(p => !cloudIds.has(p.id));
                 const merged = [...cloudData.classProfiles, ...localOnlyProfiles];
                 localStorage.setItem('classProfiles', JSON.stringify(merged));
-                console.log(`[MultiClass] 已還原 classProfiles（${merged.length} 個班級）`);
+                console.log(`[MultiClass] 撌脤???classProfiles嚗?{merged.length} ?蝝?`);
             } catch (e) {
-                console.warn('[MultiClass] classProfiles 還原失敗:', e);
+                console.warn('[MultiClass] classProfiles ??憭望?:', e);
             }
         }
 
-        // 公告
+        // ?砍?
         if (cloudData.announcements && cloudData.announcements.length > 0) {
             await dbSave('classAnnouncements', cloudData.announcements);
         }
 
-        // 考試監考設定
+        // ?岫??身摰?
         if (cloudData.examSubjects && cloudData.examSubjects.length > 0) {
             await dbSave('examSubjects', cloudData.examSubjects);
         }
@@ -422,7 +422,7 @@ async function loadFromCloudData(cloudData) {
             await dbSave('examAttendance', cloudData.examAttendance);
         }
 
-        // App 設定
+        // App 閮剖?
         if (cloudData.clockSettings) {
             await dbSave('clockSettings', cloudData.clockSettings);
         }
@@ -430,11 +430,11 @@ async function loadFromCloudData(cloudData) {
             localStorage.setItem('noRepeatLottery', cloudData.lotterySettings.noRepeatLottery);
         }
 
-        // ✅ 更新同步時間，防止 AutoSync 還原後立即再觸發
+        // ???湔?郊??嚗甇?AutoSync ??敺??喳?閫貊
         syncStatus.lastSyncTime = new Date();
         localStorage.setItem('lastSyncTime', syncStatus.lastSyncTime.toISOString());
 
-        // 重繪 UI
+        // ?鼓 UI
         if (typeof renderStudents === 'function') renderStudents();
         if (typeof renderGroups === 'function') renderGroups();
         if (typeof renderNotebook === 'function') renderNotebook();
@@ -443,44 +443,44 @@ async function loadFromCloudData(cloudData) {
         if (typeof updatePointsStudentSelect === 'function') updatePointsStudentSelect();
         if (typeof updateHomeworkSelect === 'function') updateHomeworkSelect();
 
-        NotificationSystem && NotificationSystem.success('已從雲端完整還原資料 ✅');
+        NotificationSystem && NotificationSystem.success('撌脣??脩垢摰??鞈? ??);
         return true;
     } finally {
         syncStatus.isSyncing = false;
     }
 }
 
-// 從雲端下載後還原（公開 API，兼容舊版呼叫）
+// 敺蝡臭?頛???嚗??API嚗摰寡???恬?
 async function loadFromCloud() {
     const cloudData = await syncFromCloud();
     return loadFromCloudData(cloudData);
 }
 
-// ─────────────────────────────────────────────────────
-// 合併雲端與本地資料
-// ─────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????
+// ?蔥?脩垢??啗???
+// ?????????????????????????????????????????????????????
 async function mergeWithCloud() {
     if (!window.FirebaseConfig.isConnected()) return false;
     try {
-        typeof LoadingIndicator !== 'undefined' && LoadingIndicator.show('正在合併資料...');
+        typeof LoadingIndicator !== 'undefined' && LoadingIndicator.show('甇??蔥鞈?...');
         const cloudData = await syncFromCloud();
-        if (!cloudData) throw new Error('無法取得雲端資料');
+        if (!cloudData) throw new Error('?⊥????脩垢鞈?');
 
-        // 學生：本地優先 + 雲端獨有
+        // 摮貊?嚗?啣??+ ?脩垢?冽?
         const localIds = new Set((students || []).map(s => s.id));
         students = [
             ...(students || []),
             ...(cloudData.students || []).filter(s => !localIds.has(s.id))
         ];
 
-        // 加扣分記錄：合併去重
+        // ??????蔥?駁?
         const localHistIds = new Set((pointsHistory || []).map(h => h.id));
         pointsHistory = [
             ...(pointsHistory || []),
             ...(cloudData.pointsHistory || []).filter(h => !localHistIds.has(h.id))
         ].sort((a, b) => new Date(b.time || 0) - new Date(a.time || 0));
 
-        // 公告：合併去重
+        // ?砍?嚗?雿萄??
         const localAnn = safeLS('classAnnouncements', []);
         const localAnnIds = new Set(localAnn.map(a => a.id));
         const mergedAnn = [
@@ -489,13 +489,13 @@ async function mergeWithCloud() {
         ];
         localStorage.setItem('classAnnouncements', JSON.stringify(mergedAnn));
 
-        // 其餘：本地為空才用雲端
+        // ?園?嚗?啁蝛箸??券蝡?
         if (!groups.length && cloudData.groups.length) groups = cloudData.groups;
         if (!notebookEntries.length && cloudData.notebookEntries.length) notebookEntries = cloudData.notebookEntries;
         if (!homeworkList.length && cloudData.homeworkList.length) homeworkList = cloudData.homeworkList;
         if (!lotteryHistory.length && cloudData.lotteryHistory.length) lotteryHistory = cloudData.lotteryHistory;
 
-        // 考試監考設定：本地無則採雲端
+        // ?岫??身摰??砍?∪??⊿蝡?
         if (!safeLS('examSubjects', null) && cloudData.examSubjects?.length) {
             localStorage.setItem('examSubjects', JSON.stringify(cloudData.examSubjects));
         }
@@ -503,18 +503,18 @@ async function mergeWithCloud() {
             localStorage.setItem('clockSettings', JSON.stringify(cloudData.clockSettings));
         }
 
-        // 存 localStorage
-        localStorage.setItem('students', JSON.stringify(students));
+        // 摮?localStorage
+        localStorage.setItem(window.STUDENTS_KEY || 'students', JSON.stringify(students));
         localStorage.setItem('pointsHistory', JSON.stringify(pointsHistory));
         localStorage.setItem('groups', JSON.stringify(groups));
         localStorage.setItem('notebookEntries', JSON.stringify(notebookEntries));
         localStorage.setItem('homeworkList', JSON.stringify(homeworkList));
         localStorage.setItem('lotteryHistory', JSON.stringify(lotteryHistory));
 
-        // 上傳合併結果
+        // 銝?蔥蝯?
         await syncToCloud();
 
-        // 重繪
+        // ?鼓
         if (typeof renderStudents === 'function') renderStudents();
         if (typeof renderNotebook === 'function') renderNotebook();
         if (typeof renderHomework === 'function') renderHomework();
@@ -522,47 +522,47 @@ async function mergeWithCloud() {
         if (typeof updatePointsStudentSelect === 'function') updatePointsStudentSelect();
 
         typeof LoadingIndicator !== 'undefined' && LoadingIndicator.hide();
-        NotificationSystem && NotificationSystem.success('合併完成！資料已同步 🎉');
+        NotificationSystem && NotificationSystem.success('?蔥摰?嚗??歇?郊 ??');
         return true;
     } catch (error) {
-        console.error('合併失敗:', error);
+        console.error('?蔥憭望?:', error);
         typeof LoadingIndicator !== 'undefined' && LoadingIndicator.hide();
-        NotificationSystem && NotificationSystem.error('合併失敗: ' + error.message);
+        NotificationSystem && NotificationSystem.error('?蔥憭望?: ' + error.message);
         return false;
     }
 }
 
-// ─────────────────────────────────────────────────────
-// 同步確認 Modal：本地 vs. 雲端詳細差異預覽
-// ─────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????
+// ?郊蝣箄? Modal嚗??vs. ?脩垢閰喟敦撌桃?汗
+// ?????????????????????????????????????????????????????
 
 /**
- * 建立差異預覽 Modal HTML
+ * 撱箇?撌桃?汗 Modal HTML
  * @param {'upload'|'download'} direction
- * @param {Object} local  本地統計
- * @param {Object} cloud  雲端統計（null 表示讀取失敗）
+ * @param {Object} local  ?砍蝯梯?
+ * @param {Object} cloud  ?脩垢蝯梯?嚗ull 銵函內霈?仃??
  */
 function buildSyncPreviewHTML(direction, local, cloud) {
     const isUpload = direction === 'upload';
-    const icon = isUpload ? '📤' : '📥';
-    const title = isUpload ? '立即同步（本地 → 雲端）' : '從雲端還原（雲端 → 本地）';
+    const icon = isUpload ? '?' : '?';
+    const title = isUpload ? '蝡?郊嚗?????脩垢嚗? : '敺蝡舫????脩垢 ???砍嚗?;
     const warn = isUpload
-        ? '⚠️ 雲端資料將被本地資料<b>完整覆蓋</b>，此操作無法復原。'
-        : '⚠️ 本地資料將被雲端資料<b>完整覆蓋</b>，未同步的本地變更將遺失。';
-    const btnText = isUpload ? '✅ 確認上傳' : '✅ 確認還原';
+        ? '?? ?脩垢鞈?撠◤?砍鞈?<b>摰閬?</b>嚗迨???⊥?敺拙???
+        : '?? ?砍鞈?撠◤?脩垢鞈?<b>摰閬?</b>嚗?郊??啗??游??箏仃??;
+    const btnText = isUpload ? '??蝣箄?銝' : '??蝣箄???';
     const btnClass = isUpload ? 'gauth-btn-primary' : 'gauth-btn-danger';
 
     const ITEMS = [
-        { key: 'students', emoji: '👥', label: '學生名單', unit: '人' },
-        { key: 'pointsHistory', emoji: '📊', label: '加扣分記錄', unit: '筆' },
-        { key: 'notebookEntries', emoji: '📝', label: '聯絡簿記錄', unit: '則' },
-        { key: 'homeworkList', emoji: '📋', label: '作業列表', unit: '份' },
-        { key: 'homeworkChecks', emoji: '✔️', label: '作業繳交狀態', unit: '科' },
-        { key: 'lotteryHistory', emoji: '🎲', label: '抽籤歷史', unit: '筆' },
-        { key: 'announcements', emoji: '📢', label: '班級公告', unit: '則' },
-        { key: 'groups', emoji: '🧩', label: '分組記錄', unit: '份' },
-        { key: 'examData', emoji: '🎓', label: '考試監考設定', unit: '份' },
-        { key: 'clockSettings', emoji: '⏰', label: '時鐘設定', unit: '份' },
+        { key: 'students', emoji: '?', label: '摮貊??', unit: '鈭? },
+        { key: 'pointsHistory', emoji: '??', label: '?????, unit: '蝑? },
+        { key: 'notebookEntries', emoji: '??', label: '?舐窗蝪輯???, unit: '?? },
+        { key: 'homeworkList', emoji: '??', label: '雿平?”', unit: '隞? },
+        { key: 'homeworkChecks', emoji: '??', label: '雿平蝜喃漱???, unit: '蝘? },
+        { key: 'lotteryHistory', emoji: '?', label: '?賜惜甇瑕', unit: '蝑? },
+        { key: 'announcements', emoji: '?', label: '?剔??砍?', unit: '?? },
+        { key: 'groups', emoji: '?妝', label: '??閮?', unit: '隞? },
+        { key: 'examData', emoji: '??', label: '?岫??身摰?, unit: '隞? },
+        { key: 'clockSettings', emoji: '??, label: '??閮剖?', unit: '隞? },
     ];
 
     const rows = ITEMS.map(item => {
@@ -575,7 +575,7 @@ function buildSyncPreviewHTML(direction, local, cloud) {
         if (cloud !== null) {
             const diff = lv - (cloud[item.key] || 0);
             if (diff === 0) {
-                diffHtml = `<span style="color:#6b7280">（無變化）</span>`;
+                diffHtml = `<span style="color:#6b7280">嚗霈?嚗?/span>`;
             } else {
                 const sign = isUpload ? diff : -diff;
                 const color = sign > 0 ? '#059669' : '#dc2626';
@@ -583,14 +583,14 @@ function buildSyncPreviewHTML(direction, local, cloud) {
             }
         }
 
-        const fromLabel = from === '?' ? '<span style="color:#9ca3af">讀取失敗</span>' : `${from} ${item.unit}`;
-        const toLabel = to === '?' ? '<span style="color:#9ca3af">讀取失敗</span>' : `${to} ${item.unit}`;
+        const fromLabel = from === '?' ? '<span style="color:#9ca3af">霈?仃??/span>' : `${from} ${item.unit}`;
+        const toLabel = to === '?' ? '<span style="color:#9ca3af">霈?仃??/span>' : `${to} ${item.unit}`;
 
         return `
         <tr style="border-bottom:1px solid #f3f4f6">
           <td style="padding:8px 4px;font-size:.95rem">${item.emoji} ${item.label}</td>
           <td style="padding:8px 8px;text-align:right;color:#374151">${fromLabel}</td>
-          <td style="padding:8px 4px;color:#9ca3af;text-align:center">→</td>
+          <td style="padding:8px 4px;color:#9ca3af;text-align:center">??/td>
           <td style="padding:8px 8px;text-align:left;color:#374151">${toLabel}</td>
           <td style="padding:8px 4px;text-align:right">${diffHtml}</td>
         </tr>`;
@@ -610,22 +610,22 @@ function buildSyncPreviewHTML(direction, local, cloud) {
         <!-- Header -->
         <div style="background:linear-gradient(135deg,#3b82f6,#6366f1);padding:18px 24px;color:#fff">
           <div style="font-size:1.4rem;font-weight:700">${icon} ${title}</div>
-          <div style="font-size:.85rem;opacity:.85;margin-top:4px">確認後將執行以下資料操作</div>
+          <div style="font-size:.85rem;opacity:.85;margin-top:4px">蝣箄?敺??瑁?隞乩?鞈???</div>
         </div>
 
         <!-- Table -->
         <div style="overflow-y:auto;flex:1;padding:0 20px">
           <p style="font-size:.8rem;color:#6b7280;margin:12px 0 4px">
-            ${isUpload ? '從' : '從'}<b>${isUpload ? '本地' : '雲端'}</b>→ 覆蓋 <b>${isUpload ? '雲端' : '本地'}</b>
+            ${isUpload ? '敺? : '敺?}<b>${isUpload ? '?砍' : '?脩垢'}</b>??閬? <b>${isUpload ? '?脩垢' : '?砍'}</b>
           </p>
           <table style="width:100%;border-collapse:collapse">
             <thead>
               <tr style="border-bottom:2px solid #e5e7eb">
-                <th style="padding:6px 4px;text-align:left;font-size:.8rem;color:#6b7280">資料類別</th>
-                <th style="padding:6px 8px;text-align:right;font-size:.8rem;color:#6b7280">${isUpload ? '本地' : '雲端'}</th>
+                <th style="padding:6px 4px;text-align:left;font-size:.8rem;color:#6b7280">鞈?憿</th>
+                <th style="padding:6px 8px;text-align:right;font-size:.8rem;color:#6b7280">${isUpload ? '?砍' : '?脩垢'}</th>
                 <th style="padding:6px 4px"></th>
-                <th style="padding:6px 8px;text-align:left;font-size:.8rem;color:#6b7280">${isUpload ? '雲端（同步後）' : '本地（還原後）'}</th>
-                <th style="padding:6px 4px;text-align:right;font-size:.8rem;color:#6b7280">差異</th>
+                <th style="padding:6px 8px;text-align:left;font-size:.8rem;color:#6b7280">${isUpload ? '?脩垢嚗?甇亙?嚗? : '?砍嚗???嚗?}</th>
+                <th style="padding:6px 4px;text-align:right;font-size:.8rem;color:#6b7280">撌桃</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
@@ -642,7 +642,7 @@ function buildSyncPreviewHTML(direction, local, cloud) {
           <button id="sync-modal-cancel" style="
               padding:9px 20px;border-radius:8px;border:1.5px solid #d1d5db;
               background:#fff;color:#374151;font-size:.9rem;cursor:pointer;font-weight:500;
-          ">取消</button>
+          ">??</button>
           <button id="sync-modal-confirm" class="${btnClass}" style="
               padding:9px 22px;border-radius:8px;border:none;
               background:${isUpload ? 'linear-gradient(135deg,#3b82f6,#6366f1)' : 'linear-gradient(135deg,#dc2626,#b91c1c)'};
@@ -654,7 +654,7 @@ function buildSyncPreviewHTML(direction, local, cloud) {
 }
 
 /**
- * 計算雲端資料統計數量
+ * 閮??脩垢鞈?蝯梯??賊?
  */
 function getCloudStats(cloudData) {
     if (!cloudData) return null;
@@ -674,29 +674,29 @@ function getCloudStats(cloudData) {
 }
 
 /**
- * 顯示同步確認 Modal（上傳 or 下載）
+ * 憿舐內?郊蝣箄? Modal嚗???or 銝?嚗?
  */
 async function showSyncConfirmModal(direction) {
     if (!window.FirebaseConfig.isConnected()) {
-        NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號');
+        NotificationSystem && NotificationSystem.warning('隢??餃 Google 撣唾?');
         return;
     }
 
-    // 顯示讀取中提示
+    // 憿舐內霈?葉?內
     const tempDiv = document.createElement('div');
     tempDiv.id = 'sync-loading-tip';
     tempDiv.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1f2937;color:#fff;padding:10px 20px;border-radius:24px;z-index:9998;font-size:.9rem';
-    tempDiv.textContent = '☁️ 正在讀取雲端狀態...';
+    tempDiv.textContent = '?? 甇?霈?蝡舐???..';
     document.body.appendChild(tempDiv);
 
-    // 靜默取得雲端資料作比對
+    // ?????脩垢鞈?雿?撠?
     const cloudData = await syncFromCloud();
     document.getElementById('sync-loading-tip')?.remove();
 
     const localStats = getLocalStats();
     const cloudStats = getCloudStats(cloudData);
 
-    // 注入 Modal
+    // 瘜典 Modal
     const wrap = document.createElement('div');
     wrap.innerHTML = buildSyncPreviewHTML(direction, localStats, cloudStats);
     document.body.appendChild(wrap.firstElementChild);
@@ -711,7 +711,7 @@ async function showSyncConfirmModal(direction) {
             if (direction === 'upload') {
                 await syncToCloud();
             } else {
-                // ✅ 直接使用已下載的 cloudData，避免二次讀取 Firebase
+                // ???湔雿輻撌脖?頛? cloudData嚗??甈∟???Firebase
                 await loadFromCloudData(cloudData);
             }
             resolve(true);
@@ -719,16 +719,16 @@ async function showSyncConfirmModal(direction) {
     });
 }
 
-// ─────────────────────────────────────────────────────
-// 舊版 showSyncDialog（相容保留，改呼叫新 Modal）
-// ─────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????
+// ?? showSyncDialog嚗摰嫣????孵?急 Modal嚗?
+// ?????????????????????????????????????????????????????
 async function showSyncDialog() {
     await showSyncConfirmModal('upload');
 }
 
-// ─────────────────────────────────────────────────────
-// 匯出所有資料為 JSON
-// ─────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????
+// ?臬???? JSON
+// ?????????????????????????????????????????????????????
 function exportAllData() {
     const exportData = {
         exportDate: new Date().toISOString(),
@@ -748,22 +748,22 @@ function exportAllData() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `班級資料備份_${new Date().toLocaleDateString('zh-TW').replace(/\//g, '-')}.json`;
+    link.download = `?剔?鞈??遢_${new Date().toLocaleDateString('zh-TW').replace(/\//g, '-')}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    NotificationSystem && NotificationSystem.success('資料已完整匯出 ✅');
+    NotificationSystem && NotificationSystem.success('鞈?撌脣??游????);
 }
 
-// ─────────────────────────────────────────────────────
-// 初始化 Firebase
-// ─────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????
+// ????Firebase
+// ?????????????????????????????????????????????????????
 async function initFirebaseAndSync() {
     const initialized = await window.FirebaseConfig.initialize();
-    if (!initialized) { console.error('Firebase 初始化失敗'); return false; }
+    if (!initialized) { console.error('Firebase ???仃??); return false; }
     const userId = await window.FirebaseConfig.signIn();
-    if (!userId) { console.error('登入失敗'); return false; }
+    if (!userId) { console.error('?餃憭望?'); return false; }
     updateCloudStatusUI(true);
     return true;
 }
@@ -772,14 +772,14 @@ function updateCloudStatusUI(connected) {
     const statusEl = document.getElementById('cloud-status');
     if (statusEl) {
         statusEl.innerHTML = connected
-            ? '<span class="text-green-600">☁️ 已連線</span>'
-            : '<span class="text-gray-400">☁️ 離線</span>';
+            ? '<span class="text-green-600">?? 撌脤??</span>'
+            : '<span class="text-gray-400">?? ?Ｙ?</span>';
     }
 }
 
-// ─────────────────────────────────────────────────────
-// 導出
-// ─────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????
+// 撠
+// ?????????????????????????????????????????????????????
 window.FirebaseSync = {
     syncToCloud,
     syncFromCloud,
@@ -788,13 +788,13 @@ window.FirebaseSync = {
     mergeWithCloud,
     exportAllData,
     showSyncDialog,
-    showSyncConfirmModal,   // 新增：供 UI 直接呼叫
+    showSyncConfirmModal,   // ?啣?嚗? UI ?湔?澆
     init: initFirebaseAndSync,
     uploadItem,
     deleteItem,
 };
 
-// 頁面載入時自動初始化
+// ?頛???憪?
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => setTimeout(initFirebaseAndSync, 500));
 } else {

@@ -1,14 +1,14 @@
-/**
- * 排行榜增強模組
- * 提供動畫效果、視覺增強和 RWD 支援
+﻿/**
+ * ??璁?撘瑟芋蝯?
+ * ???????閬箏?撘瑕? RWD ?舀
  */
 
 (function () {
     'use strict';
 
-    // === 注入 CSS 樣式 ===
+    // === 瘜典 CSS 璅?? ===
     const leaderboardStyles = `
-        /* 排行榜動畫樣式 */
+        /* ??璁??急見撘?*/
         @keyframes leaderboard-slide-in {
             from {
                 opacity: 0;
@@ -55,7 +55,7 @@
             }
         }
 
-        /* 進階彩花特效 */
+        /* ?脤?敶抵?寞? */
         @keyframes confetti-burst {
             0% {
                 transform: translate(0, 0) rotate(0deg) scale(0);
@@ -171,7 +171,7 @@
             left: 6px;
         }
 
-        /* 排行榜容器 */
+        /* ??璁捆??*/
         .leaderboard-modal-enhanced {
             backdrop-filter: blur(8px);
         }
@@ -183,7 +183,7 @@
             overflow: hidden;
         }
 
-        /* 標題區域 */
+        /* 璅????*/
         .leaderboard-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -226,7 +226,7 @@
             transform: scale(1.1);
         }
 
-        /* 排名項目 */
+        /* ??? */
         .leaderboard-item {
             display: flex;
             align-items: center;
@@ -244,7 +244,7 @@
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
         }
 
-        /* 前三名特殊樣式 */
+        /* ???畾見撘?*/
         .leaderboard-item.rank-1 {
             background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
             border: 2px solid #f59e0b;
@@ -265,7 +265,7 @@
             border: 1px solid #e2e8f0;
         }
 
-        /* 獎牌圖標 */
+        /* ???? */
         .leaderboard-medal {
             font-size: 1.75rem;
             min-width: 50px;
@@ -284,7 +284,7 @@
             text-align: center;
         }
 
-        /* 學生資訊 */
+        /* 摮貊?鞈? */
         .leaderboard-student-info {
             flex: 1;
             margin-left: 0.5rem;
@@ -318,7 +318,7 @@
             background: linear-gradient(90deg, #ef4444 0%, #f87171 100%);
         }
 
-        /* 分數顯示 */
+        /* ?憿舐內 */
         .leaderboard-score {
             font-weight: 700;
             font-size: 1.125rem;
@@ -334,7 +334,7 @@
             color: #dc2626;
         }
 
-        /* 關閉按鈕區域 */
+        /* ???????*/
         .leaderboard-footer {
             padding: 1rem;
             background: #f8fafc;
@@ -361,7 +361,7 @@
             transform: scale(0.95);
         }
 
-        /* 空狀態 */
+        /* 蝛箇???*/
         .leaderboard-empty {
             text-align: center;
             padding: 3rem 1rem;
@@ -373,7 +373,7 @@
             margin-bottom: 1rem;
         }
 
-        /* RWD 支援 */
+        /* RWD ?舀 */
         @media (max-width: 640px) {
             .leaderboard-container {
                 margin: 0.5rem;
@@ -417,7 +417,7 @@
             }
         }
 
-        /* 平板適配 */
+        /* 撟單?拚? */
         @media (min-width: 641px) and (max-width: 1024px) {
             .leaderboard-container {
                 max-width: 500px;
@@ -425,7 +425,7 @@
         }
     `;
 
-    // 注入樣式
+    // 瘜典璅??
     function injectStyles() {
         if (document.getElementById('leaderboard-enhancement-styles')) return;
 
@@ -435,58 +435,58 @@
         document.head.appendChild(styleEl);
     }
 
-    // === 增強版 showLeaderboard 函數 ===
+    // === 憓撥??showLeaderboard ?賣 ===
     function showLeaderboardEnhanced() {
         const modal = document.getElementById('leaderboardModal');
 
-        // === 骨架屏：立刻顯示 Modal 並插入骨架 ===
+        // === 撉冽撅?蝡憿舐內 Modal 銝行??仿爸??===
         modal.className = 'fixed inset-0 bg-black bg-opacity-60 leaderboard-modal-enhanced flex items-center justify-center p-2 sm:p-4 z-50';
         modal.classList.remove('hidden');
 
-        // 建立暫時的容器放骨架屏
+        // 撱箇??急??捆?冽撉冽撅?
         modal.innerHTML = `
             <div onclick="event.stopPropagation()" class="leaderboard-container w-full max-w-md sm:max-w-lg">
                 <div class="leaderboard-header">
-                    <h3><span class="trophy-icon">🏆</span> 即時排行榜</h3>
+                    <h3><span class="trophy-icon">??</span> ?單???璁?/h3>
                     <button onclick="hideLeaderboard()" class="leaderboard-close-btn">&times;</button>
                 </div>
                 <div id="leaderboardSkeletonArea" class="p-2 sm:p-4 max-h-[60vh] overflow-y-auto"></div>
                 <div class="leaderboard-footer">
                     <button onclick="hideLeaderboard()" class="leaderboard-close-btn-footer">
-                        ✨ 關閉排行榜
+                        ??????璁?
                     </button>
                 </div>
             </div>
         `;
 
-        // 在骨架區插入骨架屏動畫
+        // ?券爸?嗅??撉冽撅???
         if (typeof SkeletonManager !== 'undefined') {
             SkeletonManager.show('leaderboardSkeletonArea', 'leaderboard', 5);
         }
 
-        // 延遲 200ms 後渲染真實資料（讓骨架屏有時間展現）
+        // 撱園 200ms 敺葡??撖西???霈爸?嗅??????橘?
         setTimeout(() => _renderLeaderboardContent(modal), 200);
     }
 
     /**
-     * 排行榜真實內容渲染（內部函式）
+     * ??璁?撖血摰寞葡???折?賢?嚗?
      */
     function _renderLeaderboardContent(modal) {
-        // 直接從 localStorage 讀取學生資料
-        const students = JSON.parse(localStorage.getItem('students')) || [];
+        // ?湔敺?localStorage 霈?飛????
+        const students = JSON.parse(localStorage.getItem(window.STUDENTS_KEY || 'students')) || [];
 
         const sortedStudents = [...students].sort((a, b) => b.points - a.points);
         const maxPoints = Math.max(...sortedStudents.map(s => Math.abs(s.points)), 1);
 
-        // 構建增強版 HTML
+        // 瑽遣憓撥??HTML
         let contentHTML = '';
 
         if (sortedStudents.length === 0) {
             contentHTML = `
                 <div class="leaderboard-empty">
-                    <div class="leaderboard-empty-icon">🏆</div>
-                    <p>目前沒有學生可以排名</p>
-                    <p class="text-sm mt-2">請先新增學生！</p>
+                    <div class="leaderboard-empty-icon">??</div>
+                    <p>?桀?瘝?摮貊??臭誑??</p>
+                    <p class="text-sm mt-2">隢??啣?摮貊?嚗?/p>
                 </div>
             `;
         } else {
@@ -496,13 +496,13 @@
                 let rankClass = 'rank-other';
 
                 if (rank === 1) {
-                    medalHTML = '<span class="leaderboard-medal gold">🥇</span>';
+                    medalHTML = '<span class="leaderboard-medal gold">??</span>';
                     rankClass = 'rank-1';
                 } else if (rank === 2) {
-                    medalHTML = '<span class="leaderboard-medal">🥈</span>';
+                    medalHTML = '<span class="leaderboard-medal">??</span>';
                     rankClass = 'rank-2';
                 } else if (rank === 3) {
-                    medalHTML = '<span class="leaderboard-medal">🥉</span>';
+                    medalHTML = '<span class="leaderboard-medal">??</span>';
                     rankClass = 'rank-3';
                 } else {
                     medalHTML = `<span class="leaderboard-rank-number">#${rank}</span>`;
@@ -521,17 +521,17 @@
                                 <div class="leaderboard-score-bar ${scoreClass}" style="width: ${scorePercentage}%; animation-delay: ${animationDelay + 0.3}s;"></div>
                             </div>
                         </div>
-                        <span class="leaderboard-score ${scoreClass}">${student.points} 分</span>
+                        <span class="leaderboard-score ${scoreClass}">${student.points} ??/span>
                     </div>
                 `;
             }).join('');
         }
 
-        // 更新 Modal 內容（覆蓋骨架屏）
+        // ?湔 Modal ?批捆嚗??爸?嗅?嚗?
         modal.innerHTML = `
             <div onclick="event.stopPropagation()" class="leaderboard-container w-full max-w-md sm:max-w-lg">
                 <div class="leaderboard-header">
-                    <h3><span class="trophy-icon">🏆</span> 即時排行榜</h3>
+                    <h3><span class="trophy-icon">??</span> ?單???璁?/h3>
                     <button onclick="hideLeaderboard()" class="leaderboard-close-btn">&times;</button>
                 </div>
                 <div class="p-2 sm:p-4 max-h-[60vh] overflow-y-auto">
@@ -539,13 +539,13 @@
                 </div>
                 <div class="leaderboard-footer">
                     <button onclick="hideLeaderboard()" class="leaderboard-close-btn-footer">
-                        ✨ 關閉排行榜
+                        ??????璁?
                     </button>
                 </div>
             </div>
         `;
 
-        // 觸發特效
+        // 閫貊?寞?
         if (typeof triggerConfetti === 'function') {
             triggerConfetti();
         }
@@ -554,7 +554,7 @@
         }
     }
 
-    // === 增強版彩花特效 ===
+    // === 憓撥?蔗?梁??===
     function triggerConfettiEnhanced() {
         const colors = [
             '#ff6b6b', '#feca57', '#48dbfb', '#ff9ff3', '#54a0ff',
@@ -565,7 +565,7 @@
         const shapes = ['circle', 'square', 'ribbon'];
         const confettiCount = 80;
 
-        // 創建彩花容器
+        // ?萄遣敶抵摰孵
         const container = document.createElement('div');
         container.className = 'confetti-container';
         container.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999; overflow: hidden;';
@@ -583,7 +583,7 @@
 
             confetti.className = `confetti-enhanced confetti-${shape}`;
 
-            // 設置樣式
+            // 閮剔蔭璅??
             confetti.style.cssText = `
                 position: absolute;
                 left: ${startX}%;
@@ -596,7 +596,7 @@
                 animation: confetti-spiral ${duration}s ease-out ${delay}s forwards;
             `;
 
-            // 添加飄動效果
+            // 瘛餃?憌???
             if (Math.random() > 0.5) {
                 confetti.style.animation += `, confetti-float ${duration / 2}s ease-in-out ${delay}s infinite`;
             }
@@ -604,8 +604,8 @@
             container.appendChild(confetti);
         }
 
-        // 添加大型形狀（星星、愛心）
-        const specialShapes = ['🌟', '⭐', '✨', '💫', '🎉', '🎊'];
+        // 瘛餃?憭批?敶Ｙ?嚗???敹?
+        const specialShapes = ['??', '潃?, '??, '?', '??', '??'];
         for (let i = 0; i < 15; i++) {
             const special = document.createElement('div');
             const emoji = specialShapes[Math.floor(Math.random() * specialShapes.length)];
@@ -625,33 +625,33 @@
             container.appendChild(special);
         }
 
-        // 清理
+        // 皜?
         setTimeout(() => {
             container.remove();
         }, 5000);
     }
 
-    // === 初始化 ===
+    // === ????===
     function init() {
-        // 注入樣式
+        // 瘜典璅??
         injectStyles();
 
-        // 覆寫原始函數
+        // 閬神???賣
         if (typeof window.showLeaderboard === 'function') {
             window._originalShowLeaderboard = window.showLeaderboard;
         }
         window.showLeaderboard = showLeaderboardEnhanced;
 
-        // 覆寫彩花特效
+        // 閬神敶抵?寞?
         if (typeof window.triggerConfetti === 'function') {
             window._originalTriggerConfetti = window.triggerConfetti;
         }
         window.triggerConfetti = triggerConfettiEnhanced;
 
-        console.log('✅ 排行榜增強模組已載入');
+        console.log('????璁?撘瑟芋蝯歇頛');
     }
 
-    // 當 DOM 載入完成後初始化
+    // ??DOM 頛摰?敺?憪?
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {

@@ -1,89 +1,89 @@
-/**
- * 教室考試監考系統模組 v4
+﻿/**
+ * ?恕?岫??頂蝯望芋蝯?v4
  * Exam Proctor Enhancement Module
  * 
- * 功能：
- * - 考試科目管理（新增/編輯/刪除）- 點擊即可編輯時間
- * - 即時狀態顯示（進行中/剩餘時間）
- * - 進度條倒數顯示
- * - 多則提醒語設定（考試中/下課休息）
- * - 全螢幕監考模式（深色/淺色）
- * - 缺考人數記錄 - 可點擊輸入
+ * ?嚗?
+ * - ?岫蝘蝞∠?嚗憓?蝺刻摩/?芷嚗? 暺??喳蝺刻摩??
+ * - ?單???＊蝷綽??脰?銝??拚???嚗?
+ * - ?脣漲璇憿舐內
+ * - 憭???隤身摰??岫銝?銝玨隡嚗?
+ * - ?刻撟?芋撘?瘛梯/瘛箄嚗?
+ * - 蝻箄犖?貉???- ?舫??撓??
  */
 
 (function () {
     'use strict';
 
     // ========================================
-    // 資料結構與狀態
+    // 鞈?蝯?????
     // ========================================
 
-    // 考試科目列表
+    // ?岫蝘?”
     let examSubjects = JSON.parse(localStorage.getItem('examSubjects')) || [
-        { id: 1, name: '國語', startTime: '08:45', endTime: '09:25' },
-        { id: 2, name: '數學', startTime: '09:35', endTime: '10:15' },
-        { id: 3, name: '社會', startTime: '10:25', endTime: '11:05' }
+        { id: 1, name: '??', startTime: '08:45', endTime: '09:25' },
+        { id: 2, name: '?詨飛', startTime: '09:35', endTime: '10:15' },
+        { id: 3, name: '蝷暹?', startTime: '10:25', endTime: '11:05' }
     ];
 
-    // 多則提醒語（考試中 + 下課休息）
+    // 憭???隤??岫銝?+ 銝玨隡嚗?
     let examReminders = JSON.parse(localStorage.getItem('examReminders')) || {
         exam: [
-            '考卷記得寫上班級姓名座號',
-            '有問題舉手問老師，需要撿東西請監考老師幫',
-            '不會寫的題目跳過寫會的題目',
-            '耐心、細心、小心',
-            '考卷有不會的問題等出題老師來了再問',
-            '不要轉頭玩東西，寫完多檢查',
-            '檢查完再檢查或趴下休息',
-            '考試即將結束，檢查有沒有寫答案抄錯'
+            '?閮?撖思??剔?憪?摨扯?',
+            '??憿????葦嚗?閬?梯正隢?葦撟?,
+            '銝?撖怎?憿頝喲?撖急?????,
+            '???敦敹?敹?,
+            '???????蝑憿葦靘???',
+            '銝?頧?拇镼選?撖怠?憭炎??,
+            '瑼Ｘ摰?瑼Ｘ?韌銝???,
+            '?岫?喳?蝯?嚗炎?交?瘝?撖怎?獢???
         ],
         break: [
-            '等監考老師點完再離開座位下課',
-            '利用下課準備下個科目與文具用品',
-            '提早上廁所喝水',
-            '桌面淨空',
-            '準備考試、收拾位置、坐在位置上'
+            '蝑?葦暺???漣雿?隤?,
+            '?拍銝玨皞?銝??株???典?',
+            '?銝???偌',
+            '獢瘛函征',
+            '皞??岫??曆?蝵柴??其?蝵桐?'
         ]
     };
 
-    // 當前顯示的提醒索引
+    // ?嗅?憿舐內???揣撘?
     let currentReminderIndex = 0;
     let reminderRotationInterval = null;
 
-    // 缺考記錄（擴展版 - 支援各科目缺考學生記錄）
+    // 蝻箄????游???- ?舀???桃撩?飛????
     let examAttendance = JSON.parse(localStorage.getItem('examAttendance')) || {
         expected: 0,
         present: 0,
         absentNote: ''
     };
 
-    // 缺考學生詳細記錄
+    // 蝻箄飛?底蝝啗???
     let absenceRecords = JSON.parse(localStorage.getItem('examAbsenceRecords')) || [];
 
-    // 缺考原因類型
+    // 蝻箄?????
     const AbsenceTypes = {
-        sick: { label: '病假', icon: '🤒', color: '#ef4444' },
-        personal: { label: '事假', icon: '📝', color: '#f59e0b' },
-        official: { label: '公假', icon: '🏫', color: '#3b82f6' },
-        other: { label: '其他', icon: '❓', color: '#6b7280' }
+        sick: { label: '??', icon: '??', color: '#ef4444' },
+        personal: { label: '鈭?', icon: '??', color: '#f59e0b' },
+        official: { label: '?砍?', icon: '?', color: '#3b82f6' },
+        other: { label: '?嗡?', icon: '??, color: '#6b7280' }
     };
 
-    // 全螢幕更新計時器
+    // ?刻撟?啗??
     let examClockInterval = null;
 
-    // 淺色模式
+    // 瘛箄璅∪?
     let isLightMode = JSON.parse(localStorage.getItem('examLightMode')) || false;
 
-    // 類比時鐘模式
+    // 憿???璅∪?
     let isAnalogClock = JSON.parse(localStorage.getItem('examAnalogClock')) || false;
 
 
     // ========================================
-    // 注入 CSS 樣式 - 增強版 v4
+    // 瘜典 CSS 璅?? - 憓撥??v4
     // ========================================
 
     const examStyles = `
-        /* 考試監考全螢幕 Modal */
+        /* ?岫???Ｗ? Modal */
         .exam-fullscreen-modal {
             position: fixed;
             inset: 0;
@@ -94,7 +94,7 @@
             transition: background 0.3s ease;
         }
 
-        /* 淺色模式 */
+        /* 瘛箄璅∪? */
         .exam-fullscreen-modal.light-mode {
             background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f0fdf4 100%);
         }
@@ -107,7 +107,7 @@
             overflow: hidden;
         }
 
-        /* 左上區域 - 時鐘 */
+        /* 撌虫????- ?? */
         .exam-clock-area {
             grid-column: 1;
             grid-row: 1 / 3;
@@ -151,13 +151,13 @@
             text-shadow: 2px 2px 4px rgba(0,0,0,0.05);
         }
 
-        /* 隱藏數位時鐘（當類比時鐘模式開啟時） */
+        /* ?梯??訾???嚗憿???璅∪????? */
         .analog-mode .exam-time-display,
         .analog-mode .exam-date-display {
             display: none;
         }
 
-        /* 類比時鐘樣式 - 保持正圓形 */
+        /* 憿???璅?? - 靽?甇??敶?*/
         .exam-analog-clock {
             display: none;
             position: relative;
@@ -187,7 +187,7 @@
                 0 8px 25px rgba(0, 0, 0, 0.12);
         }
 
-        /* 時鐘中心點 */
+        /* ??銝剖?暺?*/
         .exam-clock-center {
             position: absolute;
             top: 50%;
@@ -206,7 +206,7 @@
             box-shadow: 0 2px 6px rgba(30, 64, 175, 0.5);
         }
 
-        /* 時鐘刻度容器 */
+        /* ???餃漲摰孵 */
         .exam-clock-marks {
             position: absolute;
             inset: 0;
@@ -215,7 +215,7 @@
             border-radius: 50%;
         }
 
-        /* 刻度線 - 從時鐘邊緣向內 */
+        /* ?餃漲蝺?- 敺???蝺????*/
         .exam-clock-mark {
             position: absolute;
             top: 4%;
@@ -244,7 +244,7 @@
             background: rgba(0, 0, 0, 0.4);
         }
 
-        /* 時鐘數字 - 使用絕對定位環繞圓心 */
+        /* ???詨? - 雿輻蝯?摰??啁??? */
         .exam-clock-numbers {
             position: absolute;
             inset: 0;
@@ -269,7 +269,7 @@
             color: #475569;
         }
 
-        /* 時針 - 使用百分比確保比例正確 */
+        /* ?? - 雿輻?曉?瘥Ⅱ靽?靘迤蝣?*/
         .exam-clock-hand-hour {
             position: absolute;
             top: 50%;
@@ -288,7 +288,7 @@
             background: linear-gradient(to top, #1e293b 0%, #475569 100%);
         }
 
-        /* 分針 */
+        /* ?? */
         .exam-clock-hand-minute {
             position: absolute;
             top: 50%;
@@ -307,7 +307,7 @@
             background: linear-gradient(to top, #1d4ed8 0%, #3b82f6 100%);
         }
 
-        /* 秒針 */
+        /* 蝘? */
         .exam-clock-hand-second {
             position: absolute;
             top: 50%;
@@ -322,7 +322,7 @@
             z-index: 5;
         }
 
-        /* 類比模式下的日期顯示 */
+        /* 憿?璅∪?銝??交?憿舐內 */
         .exam-analog-date {
             display: none;
             margin-top: 0.75rem;
@@ -340,7 +340,7 @@
             color: #475569;
         }
 
-        /* 右上區域 - 狀態條與進度條 */
+        /* ?喃????- ????脣漲璇?*/
         .exam-status-area {
             grid-column: 2;
             grid-row: 1;
@@ -398,7 +398,7 @@
             min-width: auto;
         }
 
-        /* 進度條容器 */
+        /* ?脣漲璇捆??*/
         .exam-progress-container {
             width: 100%;
             max-width: 500px;
@@ -450,7 +450,7 @@
             50% { opacity: 0.7; }
         }
 
-        /* 左下區域 - 科目列表與缺考記錄 */
+        /* 撌虫????- 蝘?”?撩????*/
         .exam-subjects-area {
             grid-column: 1;
             grid-row: 3;
@@ -537,7 +537,7 @@
         }
 
         .exam-subject-name::after {
-            content: '✏️';
+            content: '??';
             position: absolute;
             right: -1.5rem;
             top: 50%;
@@ -585,7 +585,7 @@
             font-size: 1.2em;
         }
 
-        /* 缺考記錄區 */
+        /* 蝻箄??? */
         .exam-attendance-area {
             display: flex;
             align-items: stretch;
@@ -729,7 +729,7 @@
             color: white;
         }
 
-        /* 右下區域 - 提醒語 */
+        /* ?喃????- ??隤?*/
         .exam-reminder-area {
             grid-column: 2;
             grid-row: 2 / 4;
@@ -777,7 +777,7 @@
             opacity: 0.7;
         }
 
-        /* 關閉與控制按鈕 */
+        /* ????嗆???*/
         .exam-fullscreen-controls {
             position: absolute;
             top: 1rem;
@@ -816,7 +816,7 @@
             background: rgba(0, 0, 0, 0.15);
         }
 
-        /* 小標簽提示 */
+        /* 撠?蝪賣?蝷?*/
         .exam-fullscreen-hint {
             position: absolute;
             right: 1rem;
@@ -830,7 +830,7 @@
         }
 
         /* ========================================
-           設定提醒面板 - 優化版
+           閮剖????Ｘ - ?芸???
            ======================================== */
         .exam-settings-panel {
             position: fixed;
@@ -889,7 +889,7 @@
         }
 
         .exam-settings-title::before {
-            content: '⚙️';
+            content: '??';
             font-size: 1.3rem;
         }
 
@@ -949,7 +949,7 @@
         }
 
         .exam-settings-column-title.exam-type::before {
-            content: '📝';
+            content: '??';
         }
 
         .exam-settings-column-title.break-type {
@@ -957,7 +957,7 @@
         }
 
         .exam-settings-column-title.break-type::before {
-            content: '☕';
+            content: '??;
         }
 
         .exam-settings-add-btn {
@@ -1078,7 +1078,7 @@
             transform: scale(1.1);
         }
 
-        /* 休息時間倒數樣式 */
+        /* 隡???璅?? */
         .exam-break-countdown {
             display: flex;
             flex-direction: column;
@@ -1200,7 +1200,7 @@
             background: #fef2f2;
         }
 
-        /* 時間選擇器彈窗 */
+        /* ???豢??典?蝒?*/
         .exam-time-picker {
             position: fixed;
             z-index: 10000;
@@ -1253,7 +1253,7 @@
             border-color: #3b82f6;
         }
 
-        /* RWD 調整 - 平板與中等螢幕 */
+        /* RWD 隤踵 - 撟單?葉蝑撟?*/
         @media (max-width: 1200px) {
             .exam-fullscreen-modal.active {
                 grid-template-columns: 1fr;
@@ -1313,7 +1313,7 @@
             }
         }
 
-        /* RWD 調整 - 手機 */
+        /* RWD 隤踵 - ?? */
         @media (max-width: 640px) {
             .exam-clock-area {
                 padding: 0.75rem;
@@ -1403,7 +1403,7 @@
         }
 
         /* ========================================
-           缺考學生管理面板樣式
+           蝻箄飛?恣??踵見撘?
            ======================================== */
         .absence-manager-panel {
             position: fixed;
@@ -1678,7 +1678,7 @@
             background: #f3f4f6;
         }
 
-        /* 衝突指示器動畫 */
+        /* 銵??內?典???*/
         @keyframes pulse-warning {
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.7; transform: scale(1.1); }
@@ -1706,7 +1706,7 @@
     `;
 
     // ========================================
-    // 工具函數
+    // 撌亙?賣
     // ========================================
 
     function getCurrentTimeString() {
@@ -1716,20 +1716,20 @@
     }
 
     /**
-     * 顯示通知訊息
-     * @param {string} message - 訊息內容
-     * @param {string} type - 類型 (success, warning, error, info)
+     * 憿舐內?閮
+     * @param {string} message - 閮?批捆
+     * @param {string} type - 憿? (success, warning, error, info)
      */
     function showNotification(message, type = 'info') {
-        // 移除舊通知
+        // 蝘駁?
         const oldNotif = document.querySelector('.exam-toast-notification');
         if (oldNotif) oldNotif.remove();
 
         const colors = {
-            success: { bg: 'linear-gradient(135deg, #22c55e, #16a34a)', icon: '✅' },
-            warning: { bg: 'linear-gradient(135deg, #f59e0b, #d97706)', icon: '⚠️' },
-            error: { bg: 'linear-gradient(135deg, #ef4444, #dc2626)', icon: '❌' },
-            info: { bg: 'linear-gradient(135deg, #3b82f6, #2563eb)', icon: 'ℹ️' }
+            success: { bg: 'linear-gradient(135deg, #22c55e, #16a34a)', icon: '?? },
+            warning: { bg: 'linear-gradient(135deg, #f59e0b, #d97706)', icon: '??' },
+            error: { bg: 'linear-gradient(135deg, #ef4444, #dc2626)', icon: '?? },
+            info: { bg: 'linear-gradient(135deg, #3b82f6, #2563eb)', icon: '?對?' }
         };
         const style = colors[type] || colors.info;
 
@@ -1755,7 +1755,7 @@
 
         document.body.appendChild(notif);
 
-        // 3秒後自動移除
+        // 3蝘??芸?蝘駁
         setTimeout(() => {
             notif.style.animation = 'slideOutRight 0.3s ease forwards';
             setTimeout(() => notif.remove(), 300);
@@ -1798,9 +1798,9 @@
         const year = now.getFullYear() - 1911;
         const month = now.getMonth() + 1;
         const day = now.getDate();
-        const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+        const weekdays = ['??, '銝', '鈭?, '銝?, '??, '鈭?, '??];
         const weekday = weekdays[now.getDay()];
-        return `民國${year}年${month}月${day}日 星期${weekday}`;
+        return `瘞?${year}撟?{month}??{day}????${weekday}`;
     }
 
     function formatTime() {
@@ -1824,7 +1824,7 @@
     }
 
     // ========================================
-    // UI 渲染函數
+    // UI 皜脫??賣
     // ========================================
 
     function renderSubjectList() {
@@ -1832,7 +1832,7 @@
         if (!container) return;
 
         if (examSubjects.length === 0) {
-            container.innerHTML = '<div class="text-gray-500 text-center p-6 text-lg">尚未新增考試科目</div>';
+            container.innerHTML = '<div class="text-gray-500 text-center p-6 text-lg">撠?啣??岫蝘</div>';
             return;
         }
 
@@ -1842,17 +1842,17 @@
                     <span class="font-bold text-gray-800 text-lg sm:text-xl cursor-pointer hover:text-teal-600 hover:underline transition-colors" onclick="editSubjectName(${subject.id})">${escapeHtml(subject.name)}</span>
                     <div class="flex items-center gap-2 text-base sm:text-lg">
                         <span class="text-teal-600 font-semibold cursor-pointer hover:text-teal-800 hover:underline px-2 py-1 rounded hover:bg-teal-50 transition-colors" onclick="openSubjectTimePicker(${subject.id}, 'start', event)">
-                            🕐 ${subject.startTime}
+                            ?? ${subject.startTime}
                         </span>
                         <span class="text-gray-400 font-medium">~</span>
                         <span class="text-teal-600 font-semibold cursor-pointer hover:text-teal-800 hover:underline px-2 py-1 rounded hover:bg-teal-50 transition-colors" onclick="openSubjectTimePicker(${subject.id}, 'end', event)">
-                            ${subject.endTime} 🕐
+                            ${subject.endTime} ??
                         </span>
                     </div>
                 </div>
                 <button onclick="deleteExamSubject(${subject.id})" 
                     class="text-red-400 hover:text-red-600 text-lg px-3 py-2 rounded-lg hover:bg-red-50 transition-colors">
-                    🗑️
+                    ??儭?
                 </button>
             </div>
         `).join('');
@@ -1864,14 +1864,14 @@
 
         const allReminders = [...examReminders.exam.slice(0, 3), ...examReminders.break.slice(0, 2)];
         if (allReminders.length === 0) {
-            container.innerHTML = '<div class="text-gray-400 text-center">尚無提醒</div>';
+            container.innerHTML = '<div class="text-gray-400 text-center">撠??</div>';
             return;
         }
 
         container.innerHTML = allReminders.map((r, i) =>
             `<div class="truncate">${i + 1}. ${escapeHtml(r)}</div>`
         ).join('') + (examReminders.exam.length + examReminders.break.length > 5
-            ? `<div class="text-teal-600 cursor-pointer" onclick="openExamSettings()">...共 ${examReminders.exam.length + examReminders.break.length} 則</div>`
+            ? `<div class="text-teal-600 cursor-pointer" onclick="openExamSettings()">...??${examReminders.exam.length + examReminders.break.length} ??/div>`
             : '');
     }
 
@@ -1884,18 +1884,18 @@
         container.innerHTML = examSubjects.map(subject => {
             const isActive = currentExam && currentExam.id === subject.id;
             const startHour = parseInt(subject.startTime.split(':')[0]);
-            const period = startHour < 12 ? '上午' : '下午';
+            const period = startHour < 12 ? '銝?' : '銝?';
             return `
                 <div class="exam-subject-item ${isActive ? 'active' : ''}" data-id="${subject.id}">
-                    <span class="exam-subject-name" onclick="editSubjectName(${subject.id})" style="cursor: pointer;" title="點擊編輯科目名稱">${escapeHtml(subject.name)}</span>
+                    <span class="exam-subject-name" onclick="editSubjectName(${subject.id})" style="cursor: pointer;" title="暺?蝺刻摩蝘?迂">${escapeHtml(subject.name)}</span>
                     <span class="exam-subject-time" onclick="openTimePicker(${subject.id}, 'start', event)">
-                        <span class="clock-icon">${isActive ? '🔴' : '🕐'}</span>
+                        <span class="clock-icon">${isActive ? '?' : '??'}</span>
                         ${period} ${subject.startTime}
                     </span>
                     <span style="color: inherit; opacity: 0.5;">~</span>
                     <span class="exam-subject-time" onclick="openTimePicker(${subject.id}, 'end', event)">
                         ${period} ${subject.endTime}
-                        <span class="clock-icon">🕐</span>
+                        <span class="clock-icon">??</span>
                     </span>
                 </div>
             `;
@@ -1920,13 +1920,13 @@
         const currentExam = getCurrentExam();
         const isExamTime = !!currentExam;
 
-        // 更新提醒語（根據考試/休息時間）
+        // ?湔??隤??寞??岫/隡??嚗?
         const reminders = isExamTime ? examReminders.exam : examReminders.break;
         if (reminderEl && reminders.length > 0) {
             if (currentReminderIndex >= reminders.length) {
                 currentReminderIndex = 0;
             }
-            reminderEl.textContent = reminders[currentReminderIndex] || '準備開始';
+            reminderEl.textContent = reminders[currentReminderIndex] || '皞???';
         }
         if (reminderCounterEl && reminders.length > 0) {
             reminderCounterEl.textContent = `${currentReminderIndex + 1} / ${reminders.length}`;
@@ -1935,7 +1935,7 @@
         if (statusEl) {
             if (currentExam) {
                 const remaining = getRemainingMinutes(currentExam);
-                statusEl.innerHTML = `考試進行中<br><span class="exam-status-remaining">剩餘時間還有 ${remaining} 分鐘</span>`;
+                statusEl.innerHTML = `?岫?脰?銝?br><span class="exam-status-remaining">?拚????? ${remaining} ??</span>`;
                 statusEl.className = 'exam-status-bar';
 
                 if (progressFill) {
@@ -1952,11 +1952,11 @@
                 if (progressElapsed) {
                     const start = timeToMinutes(currentExam.startTime);
                     const current = timeToMinutes(getCurrentTimeString());
-                    progressElapsed.textContent = `已進行 ${current - start} 分鐘`;
+                    progressElapsed.textContent = `撌脤脰? ${current - start} ??`;
                 }
 
                 if (progressRemaining) {
-                    progressRemaining.textContent = `剩餘 ${remaining} 分鐘`;
+                    progressRemaining.textContent = `?拚? ${remaining} ??`;
                 }
             } else {
                 const currentMinutes = timeToMinutes(getCurrentTimeString());
@@ -1968,23 +1968,23 @@
                     const now = new Date();
                     const secs = 60 - now.getSeconds();
 
-                    // 選擇有趣的 emoji
-                    const breakEmojis = ['☕', '🧘', '🎯', '📚', '💪', '🌟'];
+                    // ?豢??閎??emoji
+                    const breakEmojis = ['??, '??', '?', '??', '?', '??'];
                     const emojiIndex = Math.floor(now.getSeconds() / 10) % breakEmojis.length;
 
                     statusEl.innerHTML = `
                         <div class="exam-break-countdown">
                             <div class="exam-break-emoji">${breakEmojis[emojiIndex]}</div>
-                            <div class="exam-break-message">距離 ${nextExam.name} 開始</div>
+                            <div class="exam-break-message">頝 ${nextExam.name} ??</div>
                             <div class="exam-break-time">
                                 <div>
                                     <div class="exam-break-digit">${mins.toString().padStart(2, '0')}</div>
-                                    <div class="exam-break-label">分鐘</div>
+                                    <div class="exam-break-label">??</div>
                                 </div>
                                 <div class="exam-break-separator">:</div>
                                 <div>
                                     <div class="exam-break-digit">${secs.toString().padStart(2, '0')}</div>
-                                    <div class="exam-break-label">秒</div>
+                                    <div class="exam-break-label">蝘?/div>
                                 </div>
                             </div>
                         </div>
@@ -1993,16 +1993,16 @@
                 } else {
                     statusEl.innerHTML = `
                         <div class="exam-break-countdown">
-                            <div class="exam-break-emoji">🎉</div>
-                            <div class="exam-break-message">今日考試已結束！辛苦了！</div>
+                            <div class="exam-break-emoji">??</div>
+                            <div class="exam-break-message">隞?岫撌脩???颲鈭?</div>
                         </div>
                     `;
                     statusEl.className = 'exam-status-bar finished';
                 }
 
-                // 休息時間也顯示進度條（到下一場考試的進度）
+                // 隡??銋＊蝷粹脣漲璇??唬?銝?渲岫?脣漲嚗?
                 if (progressFill && nextExam) {
-                    // 計算上一場考試結束到下一場考試開始的休息時間進度
+                    // 閮?銝??渲岫蝯??唬?銝?渲岫?????舀??脣漲
                     const prevExam = examSubjects.filter(s => timeToMinutes(s.endTime) <= currentMinutes).pop();
                     const breakStart = prevExam ? timeToMinutes(prevExam.endTime) : timeToMinutes(examSubjects[0].startTime) - 10;
                     const breakEnd = timeToMinutes(nextExam.startTime);
@@ -2018,8 +2018,8 @@
                     progressFill.classList.remove('warning', 'danger');
                     progressFill.style.background = 'linear-gradient(90deg, #22c55e 0%, #4ade80 100%)';
                 }
-                if (progressElapsed) progressElapsed.textContent = nextExam ? '休息中' : '已完成';
-                if (progressRemaining) progressRemaining.textContent = nextExam ? `${Math.floor(timeToMinutes(nextExam.startTime) - currentMinutes)} 分鐘後開始` : '今日結束';
+                if (progressElapsed) progressElapsed.textContent = nextExam ? '隡銝? : '撌脣???;
+                if (progressRemaining) progressRemaining.textContent = nextExam ? `${Math.floor(timeToMinutes(nextExam.startTime) - currentMinutes)} ??敺?憪 : '隞蝯?';
             }
         }
 
@@ -2028,7 +2028,7 @@
 
         renderFullscreenSubjects();
 
-        // === 音效提醒問卵 ===
+        // === ?單???? ===
         if (typeof ExamSounds !== 'undefined') {
             const _examForSound = getCurrentExam();
             const _remForSound = _examForSound ? getRemainingMinutes(_examForSound) : 0;
@@ -2037,7 +2037,7 @@
     }
 
     // ========================================
-    // 管理操作函數
+    // 蝞∠????賣
     // ========================================
 
     window.addExamSubject = function () {
@@ -2050,15 +2050,15 @@
         const endTime = endInput?.value;
 
         if (!name) {
-            if (typeof NotificationSystem !== 'undefined') NotificationSystem.warning('請輸入科目名稱');
+            if (typeof NotificationSystem !== 'undefined') NotificationSystem.warning('隢撓?亦??桀?蝔?);
             return;
         }
         if (!startTime || !endTime) {
-            if (typeof NotificationSystem !== 'undefined') NotificationSystem.warning('請設定開始與結束時間');
+            if (typeof NotificationSystem !== 'undefined') NotificationSystem.warning('隢身摰?憪?蝯???');
             return;
         }
         if (timeToMinutes(startTime) >= timeToMinutes(endTime)) {
-            if (typeof NotificationSystem !== 'undefined') NotificationSystem.warning('結束時間必須晚於開始時間');
+            if (typeof NotificationSystem !== 'undefined') NotificationSystem.warning('蝯???敹??????');
             return;
         }
 
@@ -2072,28 +2072,28 @@
         startInput.value = '';
         endInput.value = '';
 
-        if (typeof NotificationSystem !== 'undefined') NotificationSystem.success(`已新增科目：${name}`);
+        if (typeof NotificationSystem !== 'undefined') NotificationSystem.success(`撌脫憓??殷?${name}`);
     };
 
     window.deleteExamSubject = function (id) {
-        if (!confirm('確定要刪除這個科目嗎？')) return;
+        if (!confirm('蝣箏?閬?日??桀?嚗?)) return;
         examSubjects = examSubjects.filter(s => s.id !== id);
         saveData();
         renderSubjectList();
-        if (typeof NotificationSystem !== 'undefined') NotificationSystem.success('科目已刪除');
+        if (typeof NotificationSystem !== 'undefined') NotificationSystem.success('蝘撌脣??);
     };
 
     window.editSubjectName = function (id) {
         const subject = examSubjects.find(s => s.id === id);
         if (!subject) return;
 
-        const newName = prompt('請輸入新的科目名稱：', subject.name);
+        const newName = prompt('隢撓?交???桀?蝔梧?', subject.name);
         if (newName && newName.trim() && newName.trim() !== subject.name) {
             subject.name = newName.trim();
             saveData();
             renderSubjectList();
             updateFullscreenStatus();
-            if (typeof NotificationSystem !== 'undefined') NotificationSystem.success(`科目已更新為：${newName.trim()}`);
+            if (typeof NotificationSystem !== 'undefined') NotificationSystem.success(`蝘撌脫?啁嚗?{newName.trim()}`);
         }
     };
 
@@ -2106,13 +2106,13 @@
                 saveData();
                 renderReminderPreview();
                 textarea.value = '';
-                if (typeof NotificationSystem !== 'undefined') NotificationSystem.success('提醒語已儲存');
+                if (typeof NotificationSystem !== 'undefined') NotificationSystem.success('??隤歇?脣?');
             }
         }
     };
 
     // ========================================
-    // 淺色模式切換
+    // 瘛箄璅∪???
     // ========================================
 
     window.toggleExamLightMode = function () {
@@ -2123,16 +2123,16 @@
         modal.classList.toggle('light-mode', isLightMode);
         saveData();
 
-        // 更新按鈕圖示
+        // ?湔???內
         const btn = document.getElementById('examLightModeBtn');
         if (btn) {
-            btn.textContent = isLightMode ? '🌙' : '☀️';
-            btn.title = isLightMode ? '切換深色模式' : '切換淺色模式';
+            btn.textContent = isLightMode ? '??' : '?儭?;
+            btn.title = isLightMode ? '??瘛梯璅∪?' : '??瘛箄璅∪?';
         }
     };
 
     // ========================================
-    // 時鐘模式切換（數位/類比）
+    // ??璅∪???嚗雿?憿?嚗?
     // ========================================
 
     window.toggleExamClockMode = function () {
@@ -2143,30 +2143,30 @@
         modal.classList.toggle('analog-mode', isAnalogClock);
         localStorage.setItem('examAnalogClock', JSON.stringify(isAnalogClock));
 
-        // 更新按鈕圖示
+        // ?湔???內
         const btn = document.getElementById('examClockModeBtn');
         if (btn) {
-            btn.textContent = isAnalogClock ? '🔢' : '🕐';
-            btn.title = isAnalogClock ? '切換數位時鐘' : '切換圓形時鐘';
+            btn.textContent = isAnalogClock ? '?' : '??';
+            btn.title = isAnalogClock ? '???訾???' : '???耦??';
         }
 
-        // 如果是類比時鐘模式，初始化時鐘
+        // 憒??舫?瘥??芋撘???????
         if (isAnalogClock) {
             initAnalogClock();
             updateAnalogClock();
         }
     };
 
-    // 初始化類比時鐘（生成刻度和數字）
+    // ????瘥??????餃漲?摮?
     function initAnalogClock() {
         const marksContainer = document.getElementById('examClockMarks');
         const numbersContainer = document.getElementById('examClockNumbers');
 
         if (!marksContainer || marksContainer.children.length > 0) return;
 
-        // 生成 60 個刻度（只生成小時刻度，分鐘刻度太密集）
+        // ?? 60 ?摨佗??芰????摨佗????餃漲憭芸???
         for (let i = 0; i < 60; i++) {
-            // 只生成每5分鐘的刻度（12個小時刻度）
+            // ?芰???5???摨佗?12???摨佗?
             if (i % 5 === 0) {
                 const mark = document.createElement('div');
                 mark.className = 'exam-clock-mark hour-mark';
@@ -2175,9 +2175,9 @@
             }
         }
 
-        // 生成 12 個數字
+        // ?? 12 ?摮?
         if (numbersContainer && numbersContainer.children.length === 0) {
-            const radius = 38; // 數字距離中心的百分比
+            const radius = 38; // ?詨?頝銝剖????
             for (let i = 1; i <= 12; i++) {
                 const number = document.createElement('div');
                 number.className = 'exam-clock-number';
@@ -2192,7 +2192,7 @@
         }
     }
 
-    // 更新類比時鐘指針
+    // ?湔憿?????
     function updateAnalogClock() {
         const now = new Date();
         const hours = now.getHours() % 12;
@@ -2205,19 +2205,19 @@
         const secondHand = document.getElementById('examSecondHand');
         const analogDate = document.getElementById('examAnalogDate');
 
-        // 時針：每小時30度 + 每分鐘0.5度
+        // ??嚗?撠?30摨?+ 瘥???.5摨?
         if (hourHand) {
             const hourDeg = (hours * 30) + (minutes * 0.5);
             hourHand.style.transform = `translateY(-100%) rotate(${hourDeg}deg)`;
         }
 
-        // 分針：每分鐘6度 + 每秒0.1度
+        // ??嚗???6摨?+ 瘥?0.1摨?
         if (minuteHand) {
             const minuteDeg = (minutes * 6) + (seconds * 0.1);
             minuteHand.style.transform = `translateY(-100%) rotate(${minuteDeg}deg)`;
         }
 
-        // 秒針：每秒6度（加上毫秒讓動畫更順滑）
+        // 蝘?嚗?蝘?摨佗???瘥怎?霈??急??嚗?
         if (secondHand) {
             const secondDeg = (seconds * 6) + (milliseconds * 0.006);
             secondHand.style.transform = `translateY(-100%) rotate(${secondDeg}deg)`;
@@ -2228,7 +2228,7 @@
         }
     }
 
-    // 確保在每秒更新時也更新類比時鐘
+    // 蝣箔??冽?蝘?唳?銋?圈?瘥???
     const originalUpdateFullscreenStatus = updateFullscreenStatus;
     updateFullscreenStatus = function () {
         originalUpdateFullscreenStatus();
@@ -2237,19 +2237,19 @@
         }
     };
 
-    // 暴露際需給音效模組使用的 helper
+    // ?湧??蝯阡?芋蝯蝙?函? helper
     window.getCurrentExam = getCurrentExam;
     window.getRemainingMinutes = getRemainingMinutes;
 
 
     // ========================================
-    // 點擊輸入人數功能
+    // 暺?頛詨鈭箸?
     // ========================================
 
     window.editExamAttendance = function (field) {
         const currentValue = examAttendance[field] || 0;
-        const label = field === 'expected' ? '應到人數' : '實到人數';
-        const newValue = prompt(`請輸入${label}：`, currentValue);
+        const label = field === 'expected' ? '?鈭箸' : '撖血鈭箸';
+        const newValue = prompt(`隢撓??{label}嚗, currentValue);
 
         if (newValue !== null) {
             const num = parseInt(newValue);
@@ -2262,10 +2262,10 @@
     };
 
     window.setExamExpected = function () {
-        const expected = prompt('請輸入應到人數：', examAttendance.expected);
+        const expected = prompt('隢撓?交??唬犖?賂?', examAttendance.expected);
         if (expected !== null) {
             examAttendance.expected = Math.max(0, parseInt(expected) || 0);
-            const present = prompt('請輸入實到人數：', examAttendance.present);
+            const present = prompt('隢撓?亙祕?唬犖?賂?', examAttendance.present);
             if (present !== null) {
                 examAttendance.present = Math.max(0, parseInt(present) || 0);
             }
@@ -2275,7 +2275,7 @@
     };
 
     // ========================================
-    // 時間選擇器
+    // ???豢???
     // ========================================
 
     let activeTimePicker = null;
@@ -2302,10 +2302,10 @@
         const picker = document.createElement('div');
         picker.className = 'exam-time-picker active';
         picker.innerHTML = `
-            <div class="exam-time-picker-header">${timeType === 'start' ? '開始時間' : '結束時間'}</div>
+            <div class="exam-time-picker-header">${timeType === 'start' ? '????' : '蝯???'}</div>
             <div style="display: flex; gap: 0.5rem;">
                 <div>
-                    <div style="font-size: 0.75rem; color: #6b7280; margin-bottom: 0.25rem; text-align: center;">時</div>
+                    <div style="font-size: 0.75rem; color: #6b7280; margin-bottom: 0.25rem; text-align: center;">??/div>
                     <div class="exam-time-picker-grid" id="hourPicker" style="grid-template-columns: repeat(3, 1fr); max-height: 150px; overflow-y: auto;">
                         ${Array.from({ length: 12 }, (_, i) => i + 7).map(h =>
             `<button class="exam-time-picker-btn ${h === currentHour ? 'selected' : ''}" data-hour="${h}">${h.toString().padStart(2, '0')}</button>`
@@ -2313,7 +2313,7 @@
                     </div>
                 </div>
                 <div>
-                    <div style="font-size: 0.75rem; color: #6b7280; margin-bottom: 0.25rem; text-align: center;">分</div>
+                    <div style="font-size: 0.75rem; color: #6b7280; margin-bottom: 0.25rem; text-align: center;">??/div>
                     <div class="exam-time-picker-grid" id="minPicker" style="grid-template-columns: repeat(3, 1fr); max-height: 150px; overflow-y: auto;">
                         ${Array.from({ length: 12 }, (_, i) => i * 5).map(m =>
             `<button class="exam-time-picker-btn ${m === currentMin ? 'selected' : ''}" data-min="${m}">${m.toString().padStart(2, '0')}</button>`
@@ -2321,13 +2321,13 @@
                     </div>
                 </div>
             </div>
-            <button style="width: 100%; margin-top: 0.75rem; padding: 0.5rem; background: #14b8a6; color: white; border: none; border-radius: 0.375rem; cursor: pointer; font-weight: 500;" onclick="confirmTimePicker(${subjectId}, '${timeType}')">確定</button>
+            <button style="width: 100%; margin-top: 0.75rem; padding: 0.5rem; background: #14b8a6; color: white; border: none; border-radius: 0.375rem; cursor: pointer; font-weight: 500;" onclick="confirmTimePicker(${subjectId}, '${timeType}')">蝣箏?</button>
         `;
 
         document.body.appendChild(picker);
         activeTimePicker = picker;
 
-        // 使用 requestAnimationFrame 確保 DOM 完成渲染後再計算位置
+        // 雿輻 requestAnimationFrame 蝣箔? DOM 摰?皜脫?敺?閮?雿蔭
         requestAnimationFrame(() => {
             const rect = event.target.getBoundingClientRect();
             const pickerRect = picker.getBoundingClientRect();
@@ -2337,33 +2337,33 @@
             const viewportHeight = window.innerHeight;
             const viewportWidth = window.innerWidth;
 
-            // 計算水平位置
+            // 閮?瘞游像雿蔭
             let left = rect.left;
             if (left + pickerWidth > viewportWidth - margin) {
                 left = viewportWidth - pickerWidth - margin;
             }
             left = Math.max(margin, left);
 
-            // 計算垂直位置
+            // 閮??雿蔭
             const spaceBelow = viewportHeight - rect.bottom - margin;
             const spaceAbove = rect.top - margin;
             let top;
 
             if (spaceBelow >= pickerHeight) {
-                // 下方空間足夠
+                // 銝蝛粹?頞喳?
                 top = rect.bottom + 5;
             } else if (spaceAbove >= pickerHeight) {
-                // 上方空間足夠，往上顯示
+                // 銝蝛粹?頞喳?嚗?銝＊蝷?
                 top = rect.top - pickerHeight - 5;
             } else {
-                // 空間都不夠，將選擇器定位在視窗中央並加入滾動
+                // 蝛粹??賭?憭?撠?摰??刻?蝒葉憭桐蒂?皛曉?
                 top = Math.max(margin, (viewportHeight - pickerHeight) / 2);
                 picker.style.maxHeight = `${viewportHeight - margin * 2}px`;
             }
 
-            // 確保不會超出視窗頂部
+            // 蝣箔?銝?頞閬??
             top = Math.max(margin, top);
-            // 確保不會超出視窗底部
+            // 蝣箔?銝?頞閬?摨
             if (top + pickerHeight > viewportHeight - margin) {
                 top = viewportHeight - pickerHeight - margin;
                 top = Math.max(margin, top);
@@ -2425,7 +2425,7 @@
     });
 
     // ========================================
-    // 設定提醒面板
+    // 閮剖????Ｘ
     // ========================================
 
     window.openExamSettings = function () {
@@ -2453,20 +2453,20 @@
         panel.innerHTML = `
             <div class="exam-settings-content">
                 <div class="exam-settings-header">
-                    <div class="exam-settings-title">設定提醒內容與順序</div>
-                    <button class="exam-settings-close" onclick="closeExamSettings()">關閉</button>
+                    <div class="exam-settings-title">閮剖????批捆??摨?/div>
+                    <button class="exam-settings-close" onclick="closeExamSettings()">??</button>
                 </div>
                 <div class="exam-settings-body">
                     <div class="exam-settings-column">
                         <div class="exam-settings-column-header">
-                            <div class="exam-settings-column-title exam-type">考試中提醒 (<span id="examReminderCount">0</span>則)</div>
+                            <div class="exam-settings-column-title exam-type">?岫銝剜???(<span id="examReminderCount">0</span>??</div>
                             <button class="exam-settings-add-btn" onclick="addExamReminderItem('exam')">+</button>
                         </div>
                         <div class="exam-reminder-list" id="examReminderListEdit" data-type="exam"></div>
                     </div>
                     <div class="exam-settings-column">
                         <div class="exam-settings-column-header">
-                            <div class="exam-settings-column-title break-type">下課/休息提醒 (<span id="breakReminderCount">0</span>則)</div>
+                            <div class="exam-settings-column-title break-type">銝玨/隡?? (<span id="breakReminderCount">0</span>??</div>
                             <button class="exam-settings-add-btn" onclick="addExamReminderItem('break')">+</button>
                         </div>
                         <div class="exam-reminder-list" id="breakReminderListEdit" data-type="break"></div>
@@ -2492,11 +2492,11 @@
 
             list.innerHTML = items.map((text, index) => `
                 <div class="exam-reminder-item" draggable="true" data-index="${index}" data-type="${type}">
-                    <span class="exam-reminder-drag">↕</span>
+                    <span class="exam-reminder-drag">??/span>
                     <div class="exam-reminder-input" contenteditable="true" 
                         onblur="updateReminderText('${type}', ${index}, this.textContent)"
-                        title="點擊編輯">${escapeHtml(text)}</div>
-                    <button class="exam-reminder-delete" onclick="deleteReminderItem('${type}', ${index})">🗑️</button>
+                        title="暺?蝺刻摩">${escapeHtml(text)}</div>
+                    <button class="exam-reminder-delete" onclick="deleteReminderItem('${type}', ${index})">??儭?/button>
                 </div>
             `).join('');
 
@@ -2546,7 +2546,7 @@
     }
 
     window.addExamReminderItem = function (type) {
-        const newText = prompt('請輸入新的提醒內容：');
+        const newText = prompt('隢撓?交???摰對?');
         if (newText && newText.trim()) {
             examReminders[type].push(newText.trim());
             saveData();
@@ -2562,7 +2562,7 @@
     };
 
     window.deleteReminderItem = function (type, index) {
-        if (confirm('確定要刪除這則提醒嗎？')) {
+        if (confirm('蝣箏?閬?日?????')) {
             examReminders[type].splice(index, 1);
             saveData();
             renderSettingsReminders();
@@ -2570,20 +2570,20 @@
     };
 
     // ========================================
-    // 全螢幕模式
+    // ?刻撟芋撘?
     // ========================================
 
     window.openExamFullscreen = function () {
         const modal = document.getElementById('examFullscreenModal');
         if (!modal) return;
 
-        // 動態新增時鐘切換按鈕（如果不存在）
+        // ???啣???????嚗???摮嚗?
         injectClockModeButton();
 
-        // 動態新增缺考記錄按鈕（如果不存在）
+        // ???啣?蝻箄?????憒?銝??剁?
         injectAbsenceButton();
 
-        // 動態新增類比時鐘 HTML（如果不存在）
+        // ???啣?憿??? HTML嚗???摮嚗?
         injectAnalogClockHTML();
 
         modal.classList.add('active');
@@ -2594,21 +2594,21 @@
         const noteInput = document.getElementById('examAbsentNote');
         if (noteInput) noteInput.value = examAttendance.absentNote;
 
-        // 更新淺色模式按鈕
+        // ?湔瘛箄璅∪???
         const lightBtn = document.getElementById('examLightModeBtn');
         if (lightBtn) {
-            lightBtn.textContent = isLightMode ? '🌙' : '☀️';
-            lightBtn.title = isLightMode ? '切換深色模式' : '切換淺色模式';
+            lightBtn.textContent = isLightMode ? '??' : '?儭?;
+            lightBtn.title = isLightMode ? '??瘛梯璅∪?' : '??瘛箄璅∪?';
         }
 
-        // 更新時鐘模式按鈕
+        // ?湔??璅∪???
         const clockBtn = document.getElementById('examClockModeBtn');
         if (clockBtn) {
-            clockBtn.textContent = isAnalogClock ? '🔢' : '🕐';
-            clockBtn.title = isAnalogClock ? '切換數位時鐘' : '切換圓形時鐘';
+            clockBtn.textContent = isAnalogClock ? '?' : '??';
+            clockBtn.title = isAnalogClock ? '???訾???' : '???耦??';
         }
 
-        // 如果是類比時鐘模式，初始化時鐘
+        // 憒??舫?瘥??芋撘???????
         if (isAnalogClock) {
             initAnalogClock();
             updateAnalogClock();
@@ -2629,7 +2629,7 @@
         }, 10000);
     };
 
-    // 動態插入時鐘切換按鈕
+    // ?????????
     function injectClockModeButton() {
         if (document.getElementById('examClockModeBtn')) return;
 
@@ -2640,12 +2640,12 @@
         btn.id = 'examClockModeBtn';
         btn.className = 'exam-control-btn';
         btn.onclick = window.toggleExamClockMode;
-        btn.title = isAnalogClock ? '切換數位時鐘' : '切換圓形時鐘';
-        btn.textContent = isAnalogClock ? '🔢' : '🕐';
+        btn.title = isAnalogClock ? '???訾???' : '???耦??';
+        btn.textContent = isAnalogClock ? '?' : '??';
         controls.appendChild(btn);
     }
 
-    // 動態插入缺考記錄按鈕
+    // ???蝻箄?????
     function injectAbsenceButton() {
         if (document.getElementById('examAbsenceBtn')) return;
 
@@ -2656,19 +2656,19 @@
         btn.id = 'examAbsenceBtn';
         btn.className = 'exam-control-btn';
         btn.onclick = () => openAbsenceManager();
-        btn.title = '缺考學生記錄';
-        btn.textContent = '📋';
+        btn.title = '蝻箄飛????;
+        btn.textContent = '??';
         controls.appendChild(btn);
     }
 
-    // 動態插入類比時鐘 HTML
+    // ???憿??? HTML
     function injectAnalogClockHTML() {
         if (document.getElementById('examAnalogClock')) return;
 
         const clockArea = document.querySelector('.exam-clock-area');
         if (!clockArea) return;
 
-        // 創建類比時鐘容器
+        // ?萄遣憿???摰孵
         const analogClock = document.createElement('div');
         analogClock.id = 'examAnalogClock';
         analogClock.className = 'exam-analog-clock';
@@ -2682,7 +2682,7 @@
         `;
         clockArea.appendChild(analogClock);
 
-        // 創建類比模式下的日期顯示
+        // ?萄遣憿?璅∪?銝??交?憿舐內
         const analogDate = document.createElement('div');
         analogDate.id = 'examAnalogDate';
         analogDate.className = 'exam-analog-date';
@@ -2708,11 +2708,11 @@
     };
 
     // ========================================
-    // 時間衝突檢測功能
+    // ??銵?瑼Ｘ葫?
     // ========================================
 
     /**
-     * 解析時間字串為分鐘數
+     * 閫????摮葡?箏??
      */
     function parseTimeToMinutes(timeStr) {
         const [hours, minutes] = timeStr.split(':').map(Number);
@@ -2720,7 +2720,7 @@
     }
 
     /**
-     * 檢測兩個時間段是否衝突
+     * 瑼Ｘ葫?拙??挾?臬銵?
      */
     function isTimeConflict(subject1, subject2) {
         const start1 = parseTimeToMinutes(subject1.startTime);
@@ -2728,21 +2728,21 @@
         const start2 = parseTimeToMinutes(subject2.startTime);
         const end2 = parseTimeToMinutes(subject2.endTime);
 
-        // 時間重疊判斷
+        // ?????斗
         return start1 < end2 && end1 > start2;
     }
 
     /**
-     * 檢測科目時間衝突
-     * @param {Object} newSubject - 要檢測的科目
-     * @param {Array} existingSubjects - 現有科目列表
-     * @returns {Array} 衝突的科目列表
+     * 瑼Ｘ葫蝘??銵?
+     * @param {Object} newSubject - 閬炎皜祉?蝘
+     * @param {Array} existingSubjects - ?暹?蝘?”
+     * @returns {Array} 銵????桀?銵?
      */
     function checkTimeConflicts(newSubject, existingSubjects) {
         const conflicts = [];
 
         existingSubjects.forEach(subject => {
-            if (subject.id === newSubject.id) return; // 跳過自己
+            if (subject.id === newSubject.id) return; // 頝喲??芸楛
 
             if (isTimeConflict(newSubject, subject)) {
                 conflicts.push({
@@ -2757,16 +2757,16 @@
     }
 
     /**
-     * 顯示時間衝突警告
+     * 憿舐內??銵?霅血?
      */
     function showConflictWarning(conflicts, subjectName) {
-        const conflictNames = conflicts.map(c => `${c.name} (${c.time})`).join('、');
-        const message = `⚠️ 時間衝突警告\n\n「${subjectName}」與以下科目時間重疊：\n${conflictNames}\n\n是否仍要儲存？`;
+        const conflictNames = conflicts.map(c => `${c.name} (${c.time})`).join('??);
+        const message = `?? ??銵?霅血?\n\n??{subjectName}??隞乩?蝘????嚗n${conflictNames}\n\n?臬隞??脣?嚗;
         return confirm(message);
     }
 
     /**
-     * 取得所有衝突的科目配對
+     * ?????蝒?蝘??
      */
     function getAllConflicts() {
         const allConflicts = [];
@@ -2786,7 +2786,7 @@
     }
 
     /**
-     * 渲染衝突指示器到科目列表
+     * 皜脫?銵??內?典蝘?”
      */
     function addConflictIndicators() {
         const conflicts = getAllConflicts();
@@ -2805,8 +2805,8 @@
                 if (!indicator) {
                     const badge = document.createElement('span');
                     badge.className = 'conflict-indicator';
-                    badge.innerHTML = '⚠️';
-                    badge.title = '此科目與其他科目時間衝突';
+                    badge.innerHTML = '??';
+                    badge.title = '甇斤??株??嗡?蝘??銵?';
                     badge.style.cssText = 'margin-left: 0.5rem; cursor: pointer; animation: pulse-warning 1s ease-in-out infinite;';
                     badge.onclick = (e) => {
                         e.stopPropagation();
@@ -2821,24 +2821,24 @@
     }
 
     /**
-     * 顯示衝突詳情
+     * 憿舐內銵?閰單?
      */
     function showConflictDetails(subjectId) {
         const subject = examSubjects.find(s => s.id === subjectId);
         if (!subject) return;
 
         const conflicts = checkTimeConflicts(subject, examSubjects);
-        const details = conflicts.map(c => `• ${c.name}: ${c.time}`).join('\n');
+        const details = conflicts.map(c => `??${c.name}: ${c.time}`).join('\n');
 
-        alert(`「${subject.name}」(${subject.startTime}-${subject.endTime}) 與以下科目時間衝突：\n\n${details}`);
+        alert(`??{subject.name}??${subject.startTime}-${subject.endTime}) ?誑銝??格???蝒?\n\n${details}`);
     }
 
     // ========================================
-    // 缺考學生記錄功能
+    // 蝻箄飛??????
     // ========================================
 
     /**
-     * 取得今日考試記錄 ID
+     * ??隞?岫閮? ID
      */
     function getTodayExamId() {
         const today = new Date();
@@ -2846,7 +2846,7 @@
     }
 
     /**
-     * 取得或建立今日缺考記錄
+     * ???遣蝡??亦撩????
      */
     function getTodayAbsenceRecord() {
         const examId = getTodayExamId();
@@ -2865,7 +2865,7 @@
     }
 
     /**
-     * 取得特定科目的缺考記錄
+     * ???孵?蝘?撩????
      */
     function getSubjectAbsences(subjectId) {
         const record = getTodayAbsenceRecord();
@@ -2875,7 +2875,7 @@
             const subject = examSubjects.find(s => s.id === subjectId);
             subjectRecord = {
                 subjectId: subjectId,
-                subjectName: subject?.name || '未知科目',
+                subjectName: subject?.name || '?芰蝘',
                 absences: []
             };
             record.subjects.push(subjectRecord);
@@ -2885,14 +2885,14 @@
     }
 
     /**
-     * 新增缺考學生
+     * ?啣?蝻箄飛??
      */
     window.addAbsentStudent = function (subjectId, studentName, absenceType, note) {
         const subjectRecord = getSubjectAbsences(subjectId);
 
-        // 檢查是否已存在
+        // 瑼Ｘ?臬撌脣???
         if (subjectRecord.absences.find(a => a.name === studentName)) {
-            showNotification('此學生已在缺考名單中', 'warning');
+            showNotification('甇文飛?歇?函撩???桐葉', 'warning');
             return false;
         }
 
@@ -2905,13 +2905,13 @@
         });
 
         saveAbsenceRecords();
-        syncFullscreenAttendance(subjectId); // 同步全螢幕模式（傳遞科目 ID）
-        showNotification(`已記錄 ${studentName} 缺考`, 'success');
+        syncFullscreenAttendance(subjectId); // ?郊?刻撟芋撘??喲?蝘 ID嚗?
+        showNotification(`撌脰???${studentName} 蝻箄, 'success');
         return true;
     };
 
     /**
-     * 移除缺考學生
+     * 蝘駁蝻箄飛??
      */
     window.removeAbsentStudent = function (subjectId, absenceId) {
         const subjectRecord = getSubjectAbsences(subjectId);
@@ -2920,26 +2920,26 @@
         if (index > -1) {
             const removed = subjectRecord.absences.splice(index, 1)[0];
             saveAbsenceRecords();
-            syncFullscreenAttendance(subjectId); // 同步全螢幕模式（傳遞科目 ID）
-            showNotification(`已移除 ${removed.name}`, 'info');
+            syncFullscreenAttendance(subjectId); // ?郊?刻撟芋撘??喲?蝘 ID嚗?
+            showNotification(`撌脩宏??${removed.name}`, 'info');
             return true;
         }
         return false;
     };
 
     /**
-     * 儲存缺考記錄
+     * ?脣?蝻箄???
      */
     function saveAbsenceRecords() {
         localStorage.setItem('examAbsenceRecords', JSON.stringify(absenceRecords));
     }
 
     /**
-     * 同步全螢幕模式的出席人數
-     * @param {number} subjectId - 科目 ID（可選，預設為當前科目）
+     * ?郊?刻撟芋撘??箏葉鈭箸
+     * @param {number} subjectId - 蝘 ID嚗?賂??身?箇???殷?
      */
     function syncFullscreenAttendance(subjectId) {
-        // 取得指定科目的缺考人數（若未提供則用當前科目）
+        // ????蝘?撩?犖?賂??交????嗅?蝘嚗?
         const targetExam = subjectId ?
             examSubjects.find(s => s.id === subjectId) :
             (getCurrentExam() || examSubjects[0]);
@@ -2948,13 +2948,13 @@
         const subjectRecord = getSubjectAbsences(targetExam.id);
         const absentCount = subjectRecord.absences.length;
 
-        // 更新 examAttendance
+        // ?湔 examAttendance
         const totalStudents = getStudentCount();
         examAttendance.expected = totalStudents;
         examAttendance.present = totalStudents - absentCount;
         saveData();
 
-        // 更新全螢幕顯示 (使用 ID 選擇器)
+        // ?湔?刻撟＊蝷?(雿輻 ID ?豢???
         const expectedEl = document.getElementById('examExpectedCount');
         const presentEl = document.getElementById('examPresentCount');
 
@@ -2963,7 +2963,7 @@
     }
 
     /**
-     * 取得學生總數
+     * ??摮貊?蝮賣
      */
     function getStudentCount() {
         if (typeof AppState !== 'undefined' && AppState.students && AppState.students.length > 0) {
@@ -2972,7 +2972,7 @@
             return window.students.length;
         } else {
             try {
-                const savedStudents = JSON.parse(localStorage.getItem('students') || '[]');
+                const savedStudents = JSON.parse(localStorage.getItem(window.STUDENTS_KEY || 'students') || '[]');
                 return savedStudents.length;
             } catch (e) {
                 return examAttendance.expected || 0;
@@ -2981,7 +2981,7 @@
     }
 
     /**
-     * 開啟缺考學生管理面板
+     * ??蝻箄飛?恣???
      */
     window.openAbsenceManager = function (subjectId) {
         const currentSubject = subjectId ?
@@ -2989,32 +2989,32 @@
             getCurrentExam() || examSubjects[0];
 
         if (!currentSubject) {
-            showNotification('請先新增考試科目', 'warning');
+            showNotification('隢??啣??岫蝘', 'warning');
             return;
         }
 
         const subjectRecord = getSubjectAbsences(currentSubject.id);
 
-        // 從多個來源取得學生名單
+        // 敺???皞?敺飛????
         let students = [];
         if (typeof AppState !== 'undefined' && AppState.students && AppState.students.length > 0) {
             students = AppState.students;
         } else if (window.students && window.students.length > 0) {
             students = window.students;
         } else {
-            // 嘗試從 localStorage 讀取
+            // ?岫敺?localStorage 霈??
             try {
-                const savedStudents = JSON.parse(localStorage.getItem('students') || '[]');
+                const savedStudents = JSON.parse(localStorage.getItem(window.STUDENTS_KEY || 'students') || '[]');
                 students = savedStudents;
             } catch (e) {
-                console.warn('[AbsenceManager] 無法讀取學生名單');
+                console.warn('[AbsenceManager] ?⊥?霈?飛????);
             }
         }
 
-        // 排序學生（按座號）
+        // ??摮貊?嚗?摨扯?嚗?
         students = [...students].sort((a, b) => (a.number || 0) - (b.number || 0));
 
-        // 創建面板
+        // ?萄遣?Ｘ
         let panel = document.getElementById('absenceManagerPanel');
         if (panel) panel.remove();
 
@@ -3025,7 +3025,7 @@
             <div class="absence-manager-overlay" onclick="closeAbsenceManager()"></div>
             <div class="absence-manager-content">
                 <div class="absence-manager-header">
-                    <h3>📋 缺考學生記錄</h3>
+                    <h3>?? 蝻箄飛????/h3>
                     <div class="absence-subject-selector">
                         <select id="absenceSubjectSelect" onchange="switchAbsenceSubject(this.value)">
                             ${examSubjects.map(s => `
@@ -3035,30 +3035,30 @@
                             `).join('')}
                         </select>
                     </div>
-                    <button class="absence-manager-close" onclick="closeAbsenceManager()">✕</button>
+                    <button class="absence-manager-close" onclick="closeAbsenceManager()">??/button>
                 </div>
                 
                 <div class="absence-manager-body">
                     <div class="absence-add-section">
-                        <h4>新增缺考學生</h4>
+                        <h4>?啣?蝻箄飛??/h4>
                         <div class="absence-add-form">
                             <select id="absenceStudentSelect" class="absence-input">
-                                <option value="">-- 選擇學生 --</option>
+                                <option value="">-- ?豢?摮貊? --</option>
                                 ${students.map(s => `<option value="${escapeHtml(s.name)}">${s.number ? s.number + '. ' : ''}${escapeHtml(s.name)}</option>`).join('')}
                             </select>
-                            <input type="text" id="absenceStudentName" class="absence-input" placeholder="或直接輸入姓名">
+                            <input type="text" id="absenceStudentName" class="absence-input" placeholder="??亥撓?亙???>
                             <select id="absenceTypeSelect" class="absence-input">
                                 ${Object.entries(AbsenceTypes).map(([key, val]) =>
             `<option value="${key}">${val.icon} ${val.label}</option>`
         ).join('')}
                             </select>
-                            <input type="text" id="absenceNote" class="absence-input" placeholder="備註（選填）">
-                            <button class="absence-add-btn" onclick="submitAbsentStudent()">➕ 新增</button>
+                            <input type="text" id="absenceNote" class="absence-input" placeholder="?酉嚗憛恬?">
+                            <button class="absence-add-btn" onclick="submitAbsentStudent()">???啣?</button>
                         </div>
                     </div>
                     
                     <div class="absence-list-section">
-                        <h4>已記錄缺考學生 (<span id="absenceCount">${subjectRecord.absences.length}</span>人)</h4>
+                        <h4>撌脰??撩?飛??(<span id="absenceCount">${subjectRecord.absences.length}</span>鈭?</h4>
                         <div class="absence-list" id="absenceList">
                             ${renderAbsenceList(currentSubject.id)}
                         </div>
@@ -3066,15 +3066,15 @@
                     
                     <div class="absence-stats-section">
                         <div class="absence-stat">
-                            <span class="stat-label">應到人數</span>
-                            <span class="stat-value" id="absenceStatsExpected">${students.length || '未設定'}</span>
+                            <span class="stat-label">?鈭箸</span>
+                            <span class="stat-value" id="absenceStatsExpected">${students.length || '?芾身摰?}</span>
                         </div>
                         <div class="absence-stat">
-                            <span class="stat-label">實到人數</span>
+                            <span class="stat-label">撖血鈭箸</span>
                             <span class="stat-value" id="absenceStatsPresent">${students.length - subjectRecord.absences.length}</span>
                         </div>
                         <div class="absence-stat">
-                            <span class="stat-label">出席率</span>
+                            <span class="stat-label">?箏葉??/span>
                             <span class="stat-value" id="absenceStatsRate">${students.length ?
                 Math.round(((students.length - subjectRecord.absences.length) / students.length) * 100) + '%' :
                 '-'}</span>
@@ -3083,15 +3083,15 @@
                 </div>
                 
                 <div class="absence-manager-footer">
-                    <button class="absence-export-btn" onclick="exportAbsenceReport()">📤 匯出報告</button>
-                    <button class="absence-close-btn" onclick="closeAbsenceManager()">關閉</button>
+                    <button class="absence-export-btn" onclick="exportAbsenceReport()">? ?臬?勗?</button>
+                    <button class="absence-close-btn" onclick="closeAbsenceManager()">??</button>
                 </div>
             </div>
         `;
 
         document.body.appendChild(panel);
 
-        // 綁定下拉選單事件
+        // 蝬?銝??詨鈭辣
         const studentSelect = document.getElementById('absenceStudentSelect');
         const studentInput = document.getElementById('absenceStudentName');
         if (studentSelect && studentInput) {
@@ -3104,13 +3104,13 @@
     };
 
     /**
-     * 渲染缺考學生列表
+     * 皜脫?蝻箄飛??銵?
      */
     function renderAbsenceList(subjectId) {
         const subjectRecord = getSubjectAbsences(subjectId);
 
         if (subjectRecord.absences.length === 0) {
-            return '<div class="absence-empty">目前沒有缺考記錄</div>';
+            return '<div class="absence-empty">?桀?瘝?蝻箄???/div>';
         }
 
         return subjectRecord.absences.map(absence => {
@@ -3121,14 +3121,14 @@
                     <span class="absence-name">${escapeHtml(absence.name)}</span>
                     <span class="absence-type-label">${typeInfo.label}</span>
                     ${absence.note ? `<span class="absence-note">${escapeHtml(absence.note)}</span>` : ''}
-                    <button class="absence-remove-btn" onclick="removeAbsentStudent(${subjectId}, ${absence.id}); refreshAbsenceList(${subjectId});">🗑️</button>
+                    <button class="absence-remove-btn" onclick="removeAbsentStudent(${subjectId}, ${absence.id}); refreshAbsenceList(${subjectId});">??儭?/button>
                 </div>
             `;
         }).join('');
     }
 
     /**
-     * 刷新缺考列表
+     * ?瑟蝻箄?銵?
      */
     window.refreshAbsenceList = function (subjectId) {
         const list = document.getElementById('absenceList');
@@ -3138,7 +3138,7 @@
         if (list) list.innerHTML = renderAbsenceList(subjectId);
         if (count) count.textContent = subjectRecord.absences.length;
 
-        // 更新統計區
+        // ?湔蝯梯??
         const totalStudents = getStudentCount();
         const absentCount = subjectRecord.absences.length;
         const presentCount = totalStudents - absentCount;
@@ -3148,13 +3148,13 @@
         const presentEl = document.getElementById('absenceStatsPresent');
         const rateEl = document.getElementById('absenceStatsRate');
 
-        if (expectedEl) expectedEl.textContent = totalStudents || '未設定';
+        if (expectedEl) expectedEl.textContent = totalStudents || '?芾身摰?;
         if (presentEl) presentEl.textContent = presentCount;
         if (rateEl) rateEl.textContent = totalStudents ? attendanceRate + '%' : '-';
     };
 
     /**
-     * 切換缺考記錄科目
+     * ??蝻箄?????
      */
     window.switchAbsenceSubject = function (subjectId) {
         const id = parseInt(subjectId);
@@ -3162,7 +3162,7 @@
     };
 
     /**
-     * 提交缺考學生
+     * ?漱蝻箄飛??
      */
     window.submitAbsentStudent = function () {
         const subjectSelect = document.getElementById('absenceSubjectSelect');
@@ -3176,24 +3176,24 @@
         const note = noteInput?.value?.trim();
 
         if (!studentName) {
-            showNotification('請輸入或選擇學生姓名', 'warning');
+            showNotification('隢撓?交??豢?摮貊?憪?', 'warning');
             return;
         }
 
         if (addAbsentStudent(subjectId, studentName, absenceType, note)) {
-            // 清空輸入
+            // 皜征頛詨
             if (studentInput) studentInput.value = '';
             if (noteInput) noteInput.value = '';
             const studentSelect = document.getElementById('absenceStudentSelect');
             if (studentSelect) studentSelect.value = '';
 
-            // 刷新列表
+            // ?瑟?”
             refreshAbsenceList(subjectId);
         }
     };
 
     /**
-     * 關閉缺考管理面板
+     * ??蝻箄恣???
      */
     window.closeAbsenceManager = function () {
         const panel = document.getElementById('absenceManagerPanel');
@@ -3201,42 +3201,42 @@
     };
 
     /**
-     * 匯出缺考報告
+     * ?臬蝻箄??
      */
     window.exportAbsenceReport = function () {
         const record = getTodayAbsenceRecord();
 
-        let report = `缺考記錄報告\n`;
-        report += `日期：${record.date}\n`;
+        let report = `蝻箄???n`;
+        report += `?交?嚗?{record.date}\n`;
         report += `=`.repeat(40) + '\n\n';
 
         record.subjects.forEach(s => {
-            report += `【${s.subjectName}】\n`;
+            report += `??{s.subjectName}?n`;
             if (s.absences.length === 0) {
-                report += '  (無缺考)\n';
+                report += '  (?∠撩??\n';
             } else {
                 s.absences.forEach(a => {
                     const typeInfo = AbsenceTypes[a.type] || AbsenceTypes.other;
-                    report += `  • ${a.name} - ${typeInfo.label}${a.note ? ` (${a.note})` : ''}\n`;
+                    report += `  ??${a.name} - ${typeInfo.label}${a.note ? ` (${a.note})` : ''}\n`;
                 });
             }
             report += '\n';
         });
 
-        // 下載文件
+        // 銝??辣
         const blob = new Blob([report], { type: 'text/plain;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `缺考記錄_${record.date}.txt`;
+        a.download = `蝻箄??${record.date}.txt`;
         a.click();
         URL.revokeObjectURL(url);
 
-        showNotification('報告已匯出', 'success');
+        showNotification('?勗?撌脣??, 'success');
     };
 
     // ========================================
-    // 初始化
+    // ????
     // ========================================
 
     function injectStyles() {
@@ -3261,7 +3261,7 @@
                 if (reminderText && examReminders.exam.length > 0) {
                     reminderText.placeholder = examReminders.exam[0];
                 }
-                console.log('✅ 考試監考系統模組 v4 已載入');
+                console.log('???岫??頂蝯望芋蝯?v4 撌脰???);
             }
         }, 100);
 

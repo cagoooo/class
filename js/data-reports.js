@@ -1,20 +1,20 @@
-/**
- * 數據報表與備份模組
+﻿/**
+ * ?豢??梯”??隞賣芋蝯?
  * Data Reports and Backup Module
  * 
- * 功能：
- * 1. 學生報告卡
- * 2. 匯出 Excel
- * 3. 數據視覺化（圖表）
- * 4. 自動備份
+ * ?嚗?
+ * 1. 摮貊??勗???
+ * 2. ?臬 Excel
+ * 3. ?豢?閬死???”嚗?
+ * 4. ?芸??遢
  */
 
 (function () {
     'use strict';
 
-    // ==================== CSS 樣式 ====================
+    // ==================== CSS 璅?? ====================
     const reportStyles = `
-        /* 報告卡 Modal */
+        /* ?勗???Modal */
         .report-card {
             background: white;
             border-radius: 1rem;
@@ -123,7 +123,7 @@
             font-size: 0.875rem;
         }
 
-        /* 圖表區域 */
+        /* ?”???*/
         .chart-container {
             background: white;
             border-radius: 1rem;
@@ -182,7 +182,7 @@
             color: white;
         }
 
-        /* 備份提示 */
+        /* ?遢?內 */
         .backup-toast {
             position: fixed;
             bottom: 1rem;
@@ -206,7 +206,7 @@
             transform: translateY(0);
         }
 
-        /* 數據面板按鈕 */
+        /* ?豢??Ｘ?? */
         .data-panel-btn {
             background: linear-gradient(135deg, #10b981, #059669);
             color: white;
@@ -227,10 +227,10 @@
         }
     `;
 
-    // ==================== 學生報告卡 ====================
+    // ==================== 摮貊??勗???====================
 
     /**
-     * 顯示學生報告卡
+     * 憿舐內摮貊??勗???
      */
     window.showStudentReport = function (studentId) {
         const student = students?.find(s => s.id === studentId);
@@ -238,7 +238,7 @@
 
         document.getElementById('student-report-modal')?.remove();
 
-        // 計算統計數據
+        // 閮?蝯梯??豢?
         const records = student.records || [];
         const positiveRecords = records.filter(r => r.points > 0);
         const negativeRecords = records.filter(r => r.points < 0);
@@ -252,40 +252,40 @@
 
         const tags = student.tags || [];
         const tagConfig = {
-            'leader': { name: '幹部', icon: '👑' },
-            'helper': { name: '小老師', icon: '📖' },
-            'tutor': { name: '課輔', icon: '✏️' },
-            'special': { name: '特殊需求', icon: '💝' },
-            'monitor': { name: '班長', icon: '🎖️' },
-            'vice': { name: '副班長', icon: '🏅' }
+            'leader': { name: '撟寥', icon: '??' },
+            'helper': { name: '撠葦', icon: '??' },
+            'tutor': { name: '隤脰?', icon: '??' },
+            'special': { name: '?寞??瘙?, icon: '??' },
+            'monitor': { name: '?剝', icon: '??儭? },
+            'vice': { name: '?舐??, icon: '??' }
         };
 
         modal.innerHTML = `
             <div class="report-card" onclick="event.stopPropagation()">
                 <div class="report-header">
-                    <div class="report-avatar">${student.avatar || '😊'}</div>
+                    <div class="report-avatar">${student.avatar || '??'}</div>
                     <div class="report-name">${student.name}</div>
-                    <div class="report-number">座號：${student.number}</div>
+                    <div class="report-number">摨扯?嚗?{student.number}</div>
                 </div>
 
                 <div class="report-stats">
                     <div class="report-stat">
                         <div class="report-stat-value" style="color: ${student.points >= 0 ? '#10b981' : '#ef4444'}">${student.points}</div>
-                        <div class="report-stat-label">目前分數</div>
+                        <div class="report-stat-label">?桀??</div>
                     </div>
                     <div class="report-stat">
                         <div class="report-stat-value" style="color: #10b981">+${totalPositive}</div>
-                        <div class="report-stat-label">累積加分</div>
+                        <div class="report-stat-label">蝝舐???</div>
                     </div>
                     <div class="report-stat">
                         <div class="report-stat-value" style="color: #ef4444">-${totalNegative}</div>
-                        <div class="report-stat-label">累積扣分</div>
+                        <div class="report-stat-label">蝝舐????</div>
                     </div>
                 </div>
 
                 ${tags.length > 0 ? `
                 <div class="report-section">
-                    <div class="report-section-title">🏷️ 標籤</div>
+                    <div class="report-section-title">?儭?璅惜</div>
                     <div class="report-tags">
                         ${tags.map(t => `<span class="report-tag">${tagConfig[t]?.icon || ''} ${tagConfig[t]?.name || t}</span>`).join('')}
                     </div>
@@ -293,27 +293,27 @@
                 ` : ''}
 
                 <div class="report-section">
-                    <div class="report-section-title">📜 最近記錄 (${records.length})</div>
+                    <div class="report-section-title">?? ?餈???(${records.length})</div>
                     <div class="report-history">
                         ${records.length > 0 ? records.slice(-10).reverse().map(r => `
                             <div class="report-history-item">
-                                <span>${r.reason || '無說明'}</span>
+                                <span>${r.reason || '?∟牧??}</span>
                                 <span style="color: ${r.points >= 0 ? '#10b981' : '#ef4444'}; font-weight: 600;">
                                     ${r.points > 0 ? '+' : ''}${r.points}
                                 </span>
                             </div>
-                        `).join('') : '<div class="text-gray-500 text-center py-4">尚無記錄</div>'}
+                        `).join('') : '<div class="text-gray-500 text-center py-4">撠閮?</div>'}
                     </div>
                 </div>
 
                 <div class="p-4 flex gap-2">
                     <button onclick="document.getElementById('student-report-modal').remove()"
                         class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
-                        關閉
+                        ??
                     </button>
                     <button onclick="exportStudentReport(${studentId})"
                         class="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
-                        📥 匯出
+                        ? ?臬
                     </button>
                 </div>
             </div>
@@ -323,44 +323,44 @@
     };
 
     /**
-     * 匯出單一學生報告
+     * ?臬?桐?摮貊??勗?
      */
     window.exportStudentReport = function (studentId) {
         const student = students?.find(s => s.id === studentId);
         if (!student) return;
 
         const records = student.records || [];
-        let content = `學生報告卡\n`;
+        let content = `摮貊??勗??﹏n`;
         content += `====================\n`;
-        content += `姓名：${student.name}\n`;
-        content += `座號：${student.number}\n`;
-        content += `目前分數：${student.points}\n`;
-        content += `\n記錄：\n`;
+        content += `憪?嚗?{student.name}\n`;
+        content += `摨扯?嚗?{student.number}\n`;
+        content += `?桀??嚗?{student.points}\n`;
+        content += `\n閮?嚗n`;
         records.forEach(r => {
-            content += `  ${r.date || ''} | ${r.reason || '無說明'} | ${r.points > 0 ? '+' : ''}${r.points}\n`;
+            content += `  ${r.date || ''} | ${r.reason || '?∟牧??} | ${r.points > 0 ? '+' : ''}${r.points}\n`;
         });
 
-        downloadFile(`${student.name}_報告卡.txt`, content);
+        downloadFile(`${student.name}_?勗???txt`, content);
         if (typeof NotificationSystem !== 'undefined') {
-            NotificationSystem.success('已匯出報告卡');
+            NotificationSystem.success('撌脣?箏?');
         }
     };
 
-    // ==================== 匯出 Excel ====================
+    // ==================== ?臬 Excel ====================
 
     /**
-     * 匯出全班資料為 CSV
+     * ?臬?函鞈???CSV
      */
     window.exportClassData = function () {
         if (!students || students.length === 0) {
             if (typeof NotificationSystem !== 'undefined') {
-                NotificationSystem.warning('沒有學生資料可匯出');
+                NotificationSystem.warning('瘝?摮貊?鞈??臬??);
             }
             return;
         }
 
-        // CSV 表頭
-        let csv = '\uFEFF座號,姓名,分數,加分次數,扣分次數,標籤\n';
+        // CSV 銵券
+        let csv = '\uFEFF摨扯?,憪?,?,??甈⊥,???甈⊥,璅惜\n';
 
         students.forEach(s => {
             const records = s.records || [];
@@ -371,38 +371,38 @@
             csv += `${s.number},"${s.name}",${s.points},${positiveCount},${negativeCount},"${tags}"\n`;
         });
 
-        downloadFile('班級成績單.csv', csv);
+        downloadFile('?剔??蜀??csv', csv);
         if (typeof NotificationSystem !== 'undefined') {
-            NotificationSystem.success('已匯出班級成績單');
+            NotificationSystem.success('撌脣?箇蝝?蝮曉');
         }
     };
 
     /**
-     * 匯出分數歷史記錄
+     * ?臬?甇瑕閮?
      */
     window.exportPointsHistory = function () {
         const history = JSON.parse(localStorage.getItem('pointsHistory')) || [];
 
         if (history.length === 0) {
             if (typeof NotificationSystem !== 'undefined') {
-                NotificationSystem.warning('沒有分數記錄可匯出');
+                NotificationSystem.warning('瘝??閮??臬??);
             }
             return;
         }
 
-        let csv = '\uFEFF日期,學生,分數變動,原因\n';
+        let csv = '\uFEFF?交?,摮貊?,?霈?,??\n';
         history.forEach(h => {
             csv += `"${h.date || ''}","${h.studentName || ''}",${h.points > 0 ? '+' : ''}${h.points},"${h.reason || ''}"\n`;
         });
 
-        downloadFile('分數歷史記錄.csv', csv);
+        downloadFile('?甇瑕閮?.csv', csv);
         if (typeof NotificationSystem !== 'undefined') {
-            NotificationSystem.success('已匯出分數歷史');
+            NotificationSystem.success('撌脣?箏??豢風??);
         }
     };
 
     /**
-     * 下載檔案
+     * 銝?瑼?
      */
     function downloadFile(filename, content) {
         const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
@@ -414,10 +414,10 @@
         URL.revokeObjectURL(url);
     }
 
-    // ==================== 數據視覺化 ====================
+    // ==================== ?豢?閬死??====================
 
     /**
-     * 顯示數據面板
+     * 憿舐內?豢??Ｘ
      */
     window.showDataPanel = function () {
         document.getElementById('data-panel-modal')?.remove();
@@ -427,15 +427,15 @@
         modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
         modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
 
-        // 計算統計數據
+        // 閮?蝯梯??豢?
         const totalStudents = students?.length || 0;
         const avgScore = totalStudents > 0 ? (students.reduce((sum, s) => sum + s.points, 0) / totalStudents).toFixed(1) : 0;
         const maxScore = totalStudents > 0 ? Math.max(...students.map(s => s.points)) : 0;
         const minScore = totalStudents > 0 ? Math.min(...students.map(s => s.points)) : 0;
 
-        // 分數分佈
+        // ???
         const scoreRanges = [
-            { label: '負分', min: -999, max: -1, color: '#ef4444' },
+            { label: '鞎?', min: -999, max: -1, color: '#ef4444' },
             { label: '0-9', min: 0, max: 9, color: '#f59e0b' },
             { label: '10-19', min: 10, max: 19, color: '#eab308' },
             { label: '20-29', min: 20, max: 29, color: '#84cc16' },
@@ -452,34 +452,34 @@
         modal.innerHTML = `
             <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-auto" onclick="event.stopPropagation()">
                 <div class="flex items-center justify-between p-4 border-b bg-gradient-to-r from-green-500 to-teal-500 rounded-t-2xl">
-                    <h3 class="text-xl font-bold text-white">📊 數據統計面板</h3>
-                    <button onclick="document.getElementById('data-panel-modal').remove()" class="text-white hover:text-gray-200 text-2xl">✕</button>
+                    <h3 class="text-xl font-bold text-white">?? ?豢?蝯梯??Ｘ</h3>
+                    <button onclick="document.getElementById('data-panel-modal').remove()" class="text-white hover:text-gray-200 text-2xl">??/button>
                 </div>
 
                 <div class="p-4 space-y-4">
-                    <!-- 概覽 -->
+                    <!-- 璁汗 -->
                     <div class="grid grid-cols-4 gap-3">
                         <div class="bg-blue-50 p-3 rounded-lg text-center">
                             <div class="text-2xl font-bold text-blue-600">${totalStudents}</div>
-                            <div class="text-xs text-gray-600">總人數</div>
+                            <div class="text-xs text-gray-600">蝮賭犖??/div>
                         </div>
                         <div class="bg-green-50 p-3 rounded-lg text-center">
                             <div class="text-2xl font-bold text-green-600">${avgScore}</div>
-                            <div class="text-xs text-gray-600">平均分</div>
+                            <div class="text-xs text-gray-600">撟喳???/div>
                         </div>
                         <div class="bg-purple-50 p-3 rounded-lg text-center">
                             <div class="text-2xl font-bold text-purple-600">${maxScore}</div>
-                            <div class="text-xs text-gray-600">最高分</div>
+                            <div class="text-xs text-gray-600">?擃?</div>
                         </div>
                         <div class="bg-red-50 p-3 rounded-lg text-center">
                             <div class="text-2xl font-bold text-red-600">${minScore}</div>
-                            <div class="text-xs text-gray-600">最低分</div>
+                            <div class="text-xs text-gray-600">?雿?</div>
                         </div>
                     </div>
 
-                    <!-- 分數分佈圖 -->
+                    <!-- ?????-->
                     <div class="chart-container">
-                        <div class="chart-title">📈 分數分佈</div>
+                        <div class="chart-title">?? ???</div>
                         <div class="bar-chart">
                             ${distribution.map(d => `
                                 <div class="bar-item">
@@ -494,28 +494,28 @@
                         </div>
                     </div>
 
-                    <!-- 前5名 -->
+                    <!-- ????-->
                     <div class="chart-container">
-                        <div class="chart-title">🏆 班級前 5 名</div>
+                        <div class="chart-title">?? ?剔???5 ??/div>
                         <div class="space-y-2">
                             ${[...(students || [])].sort((a, b) => b.points - a.points).slice(0, 5).map((s, i) => `
                                 <div class="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
-                                    <span class="text-lg">${['🥇', '🥈', '🥉', '4️⃣', '5️⃣'][i]}</span>
-                                    <span class="text-xl">${s.avatar || '😊'}</span>
+                                    <span class="text-lg">${['??', '??', '??', '4儭', '5儭'][i]}</span>
+                                    <span class="text-xl">${s.avatar || '??'}</span>
                                     <span class="flex-1 font-medium">${s.name}</span>
-                                    <span class="font-bold text-green-600">${s.points} 分</span>
+                                    <span class="font-bold text-green-600">${s.points} ??/span>
                                 </div>
                             `).join('')}
                         </div>
                     </div>
 
-                    <!-- 匯出按鈕 -->
+                    <!-- ?臬?? -->
                     <div class="flex gap-2">
                         <button onclick="exportClassData()" class="flex-1 data-panel-btn">
-                            📥 匯出成績單
+                            ? ?臬?蜀??
                         </button>
                         <button onclick="exportPointsHistory()" class="flex-1 data-panel-btn">
-                            📜 匯出歷史記錄
+                            ?? ?臬甇瑕閮?
                         </button>
                     </div>
                 </div>
@@ -525,24 +525,24 @@
         document.body.appendChild(modal);
     };
 
-    // ==================== 自動備份 ====================
+    // ==================== ?芸??遢 ====================
     const BACKUP_KEY = 'classManager_autoBackup';
-    const BACKUP_INTERVAL = 5 * 60 * 1000; // 5 分鐘
+    const BACKUP_INTERVAL = 5 * 60 * 1000; // 5 ??
 
     /**
-     * 執行自動備份
+     * ?瑁??芸??遢
      */
     function performAutoBackup() {
         const backupData = {
             timestamp: new Date().toISOString(),
-            students: JSON.parse(localStorage.getItem('students') || '[]'),
+            students: JSON.parse(localStorage.getItem(window.STUDENTS_KEY || 'students') || '[]'),
             pointsHistory: JSON.parse(localStorage.getItem('pointsHistory') || '[]'),
             notebookEntries: JSON.parse(localStorage.getItem('notebookEntries') || '[]'),
             groups: JSON.parse(localStorage.getItem('groups') || '[]'),
             seatingConfig: JSON.parse(localStorage.getItem('seatingConfig') || '{}')
         };
 
-        // 保留最近 5 個備份
+        // 靽??餈?5 ??隞?
         let backups = JSON.parse(localStorage.getItem(BACKUP_KEY) || '[]');
         backups.unshift(backupData);
         backups = backups.slice(0, 5);
@@ -551,12 +551,12 @@
             localStorage.setItem(BACKUP_KEY, JSON.stringify(backups));
             showBackupToast();
         } catch (e) {
-            console.warn('自動備份失敗：', e);
+            console.warn('?芸??遢憭望?嚗?, e);
         }
     }
 
     /**
-     * 顯示備份提示
+     * 憿舐內?遢?內
      */
     function showBackupToast() {
         let toast = document.getElementById('backup-toast');
@@ -564,7 +564,7 @@
             toast = document.createElement('div');
             toast.id = 'backup-toast';
             toast.className = 'backup-toast';
-            toast.innerHTML = '💾 已自動備份';
+            toast.innerHTML = '? 撌脰??隞?;
             document.body.appendChild(toast);
         }
 
@@ -573,28 +573,28 @@
     }
 
     /**
-     * 恢復備份
+     * ?Ｗ儔?遢
      */
     window.restoreBackup = function (index = 0) {
         const backups = JSON.parse(localStorage.getItem(BACKUP_KEY) || '[]');
         if (backups.length === 0 || !backups[index]) {
             if (typeof NotificationSystem !== 'undefined') {
-                NotificationSystem.warning('沒有可用的備份');
+                NotificationSystem.warning('瘝??舐??隞?);
             }
             return;
         }
 
         const backup = backups[index];
 
-        if (confirm(`確定要恢復 ${new Date(backup.timestamp).toLocaleString()} 的備份嗎？\n\n⚠️ 目前資料將被覆蓋！`)) {
-            localStorage.setItem('students', JSON.stringify(backup.students));
+        if (confirm(`蝣箏?閬敺?${new Date(backup.timestamp).toLocaleString()} ??隞賢?嚗n\n?? ?桀?鞈?撠◤閬?嚗)) {
+            localStorage.setItem(window.STUDENTS_KEY || 'students', JSON.stringify(backup.students));
             localStorage.setItem('pointsHistory', JSON.stringify(backup.pointsHistory));
             localStorage.setItem('notebookEntries', JSON.stringify(backup.notebookEntries));
             localStorage.setItem('groups', JSON.stringify(backup.groups));
             localStorage.setItem('seatingConfig', JSON.stringify(backup.seatingConfig));
 
             if (typeof NotificationSystem !== 'undefined') {
-                NotificationSystem.success('已恢復備份，重新載入頁面...');
+                NotificationSystem.success('撌脫敺拙?隞踝??頛?...');
             }
 
             setTimeout(() => location.reload(), 1500);
@@ -602,7 +602,7 @@
     };
 
     /**
-     * 顯示備份管理
+     * 憿舐內?遢蝞∠?
      */
     window.showBackupManager = function () {
         const backups = JSON.parse(localStorage.getItem(BACKUP_KEY) || '[]');
@@ -617,8 +617,8 @@
         modal.innerHTML = `
             <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4" onclick="event.stopPropagation()">
                 <div class="flex items-center justify-between p-4 border-b bg-gradient-to-r from-purple-500 to-pink-500 rounded-t-2xl">
-                    <h3 class="text-xl font-bold text-white">💾 備份管理</h3>
-                    <button onclick="document.getElementById('backup-modal').remove()" class="text-white hover:text-gray-200 text-2xl">✕</button>
+                    <h3 class="text-xl font-bold text-white">? ?遢蝞∠?</h3>
+                    <button onclick="document.getElementById('backup-modal').remove()" class="text-white hover:text-gray-200 text-2xl">??/button>
                 </div>
 
                 <div class="p-4 space-y-3">
@@ -626,16 +626,16 @@
                         <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                             <div>
                                 <div class="font-medium">${new Date(b.timestamp).toLocaleString()}</div>
-                                <div class="text-xs text-gray-500">${b.students?.length || 0} 位學生</div>
+                                <div class="text-xs text-gray-500">${b.students?.length || 0} 雿飛??/div>
                             </div>
                             <button onclick="restoreBackup(${i})" class="px-3 py-1 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600">
-                                恢復
+                                ?Ｗ儔
                             </button>
                         </div>
-                    `).join('') : '<div class="text-center text-gray-500 py-8">尚無備份</div>'}
+                    `).join('') : '<div class="text-center text-gray-500 py-8">撠?遢</div>'}
                     
                     <button onclick="performManualBackup()" class="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600">
-                        📦 立即備份
+                        ? 蝡?遢
                     </button>
                 </div>
             </div>
@@ -645,21 +645,21 @@
     };
 
     /**
-     * 手動備份
+     * ???遢
      */
     window.performManualBackup = function () {
         performAutoBackup();
         if (typeof NotificationSystem !== 'undefined') {
-            NotificationSystem.success('已完成手動備份');
+            NotificationSystem.success('撌脣?????隞?);
         }
         document.getElementById('backup-modal')?.remove();
         showBackupManager();
     };
 
-    // ==================== 初始化 ====================
+    // ==================== ????====================
 
     function init() {
-        // 注入樣式
+        // 瘜典璅??
         if (!document.getElementById('report-styles')) {
             const style = document.createElement('style');
             style.id = 'report-styles';
@@ -667,36 +667,36 @@
             document.head.appendChild(style);
         }
 
-        // 啟動自動備份
+        // ???芸??遢
         setInterval(performAutoBackup, BACKUP_INTERVAL);
 
-        // 首次備份（30 秒後）
+        // 擐活?遢嚗?0 蝘?嚗?
         setTimeout(performAutoBackup, 30000);
 
-        // 添加數據面板按鈕
+        // 瘛餃??豢??Ｘ??
         setTimeout(addDataPanelButton, 700);
 
-        console.log('✅ 數據報表與備份模組已載入');
+        console.log('???豢??梯”??隞賣芋蝯歇頛');
     }
 
     /**
-     * 添加數據面板按鈕到學生管理區
+     * 瘛餃??豢??Ｘ???啣飛?恣??
      */
     function addDataPanelButton() {
         const studentSection = document.getElementById('students-section');
         if (!studentSection || document.getElementById('data-panel-btn')) return;
 
-        // 使用 id 精確定位班級統計區域，避免誤配學生卡片
+        // 雿輻 id 蝎曄Ⅱ摰??剔?蝯梯?????踹?隤日?摮貊??∠?
         const statsArea = document.getElementById('class-stats-panel');
         if (statsArea) {
             const btnContainer = document.createElement('div');
             btnContainer.className = 'flex gap-2 mt-3';
             btnContainer.innerHTML = `
                 <button id="data-panel-btn" onclick="showDataPanel()" class="flex-1 data-panel-btn">
-                    📊 數據面板
+                    ?? ?豢??Ｘ
                 </button>
                 <button onclick="showBackupManager()" class="flex-1 data-panel-btn" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);">
-                    💾 備份管理
+                    ? ?遢蝞∠?
                 </button>
             `;
             statsArea.appendChild(btnContainer);
