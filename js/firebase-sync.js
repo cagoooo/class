@@ -397,9 +397,9 @@ async function loadFromCloudData(cloudData) {
             : (k, v) => localStorage.setItem(k, JSON.stringify(v));
 
         await Promise.all([
-            dbSave('students', cloudData.students),
-            dbSave('pointsHistory', cloudData.pointsHistory),
-            dbSave('groups', cloudData.groups),
+            dbSave(window.STUDENTS_KEY || 'students', cloudData.students),
+            dbSave(window.POINTS_HISTORY_KEY || 'pointsHistory', cloudData.pointsHistory),
+            dbSave(window.GROUPS_KEY || 'groups', cloudData.groups),
             dbSave('notebookEntries', cloudData.notebookEntries),
             dbSave('homeworkList', cloudData.homeworkList),
             dbSave('lotteryHistory', cloudData.lotteryHistory),
@@ -914,6 +914,13 @@ async function syncAllClassesToCloud(onProgress) {
             const localHomeworks = JSON.parse(localStorage.getItem('homeworkList') || '[]');
             const localLottery = JSON.parse(localStorage.getItem('lotteryHistory') || '[]');
             const localAnn = JSON.parse(localStorage.getItem('classAnnouncements') || '[]');
+            // 考試監考 / App 設定
+            const examSubjects = JSON.parse(localStorage.getItem('examSubjects') || '[]');
+            const examReminders = JSON.parse(localStorage.getItem('examReminders') || 'null');
+            const examAttendance = JSON.parse(localStorage.getItem('examAttendance') || '{}');
+            const clockSettings = JSON.parse(localStorage.getItem('clockSettings') || '{}');
+            const noRepeat = localStorage.getItem('noRepeatLottery');
+            const localChecks = JSON.parse(localStorage.getItem('homeworkChecks') || '{}');
 
             try {
                 await Promise.all([
@@ -924,6 +931,38 @@ async function syncAllClassesToCloud(onProgress) {
                     uploadCollectionForClass(COLLECTIONS.HOMEWORKS, localHomeworks, classId),
                     uploadCollectionForClass(COLLECTIONS.LOTTERY_HISTORY, localLottery, classId),
                     uploadCollectionForClass(COLLECTIONS.ANNOUNCEMENTS, localAnn, classId),
+                    // 考試監考設定（單一 doc）
+                    (async () => {
+                        const col = getUserCollectionForClass(COLLECTIONS.EXAM_DATA, classId);
+                        if (col) {
+                            const db = window.FirebaseConfig.getDb();
+                            const b = db.batch();
+                            b.set(col.doc('subjects'), { data: examSubjects, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                            b.set(col.doc('reminders'), { data: examReminders, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                            b.set(col.doc('attendance'), { data: examAttendance, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                            await b.commit();
+                        }
+                    })(),
+                    // App 設定
+                    (async () => {
+                        const col = getUserCollectionForClass(COLLECTIONS.APP_SETTINGS, classId);
+                        if (col) {
+                            const db = window.FirebaseConfig.getDb();
+                            const b = db.batch();
+                            b.set(col.doc('clock'), { ...clockSettings, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                            b.set(col.doc('lottery'), { noRepeatLottery: noRepeat, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                            await b.commit();
+                        }
+                    })(),
+                    // 作業繳交狀態
+                    (async () => {
+                        if (!localChecks || Object.keys(localChecks).length === 0) return;
+                        const col = getUserCollectionForClass(COLLECTIONS.HOMEWORK_CHECKS, classId);
+                        if (!col) return;
+                        for (const [hwId, checks] of Object.entries(localChecks)) {
+                            await col.doc(String(hwId)).set({ checks, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                        }
+                    })(),
                 ]);
                 results.push({ name: cls.name, status: 'ok', count: localStudents.length });
                 onProgress && onProgress(i + 1, allClasses.length, cls.name, 'ok', localStudents.length);
@@ -1138,6 +1177,38 @@ async function syncAllClassesFromCloud(onProgress) {
                 if (cloudHomeworks.length > 0) localStorage.setItem('homeworkList', JSON.stringify(cloudHomeworks));
                 if (cloudLottery.length > 0) localStorage.setItem('lotteryHistory', JSON.stringify(cloudLottery));
                 if (cloudAnn.length > 0) localStorage.setItem('classAnnouncements', JSON.stringify(cloudAnn));
+                // 寫入各班 localStorage（考試監考、App 設定、作業繳交狀態）
+                const colExam = getUserCollectionForClass(COLLECTIONS.EXAM_DATA, classId);
+                if (colExam) {
+                    const [subjDoc, remDoc, attDoc] = await Promise.all([
+                        colExam.doc('subjects').get(),
+                        colExam.doc('reminders').get(),
+                        colExam.doc('attendance').get(),
+                    ]);
+                    if (subjDoc.exists && subjDoc.data().data?.length) localStorage.setItem('examSubjects', JSON.stringify(subjDoc.data().data));
+                    if (remDoc.exists && remDoc.data().data) localStorage.setItem('examReminders', JSON.stringify(remDoc.data().data));
+                    if (attDoc.exists && Object.keys(attDoc.data().data || {}).length) localStorage.setItem('examAttendance', JSON.stringify(attDoc.data().data));
+                }
+                const colApp = getUserCollectionForClass(COLLECTIONS.APP_SETTINGS, classId);
+                if (colApp) {
+                    const [clockDoc, lotteryDoc] = await Promise.all([
+                        colApp.doc('clock').get(),
+                        colApp.doc('lottery').get(),
+                    ]);
+                    if (clockDoc.exists) localStorage.setItem('clockSettings', JSON.stringify(clockDoc.data()));
+                    if (lotteryDoc.exists && lotteryDoc.data().noRepeatLottery !== undefined) {
+                        localStorage.setItem('noRepeatLottery', lotteryDoc.data().noRepeatLottery);
+                    }
+                }
+                const colChecks = getUserCollectionForClass(COLLECTIONS.HOMEWORK_CHECKS, classId);
+                if (colChecks) {
+                    const checksSnap = await colChecks.get();
+                    if (!checksSnap.empty) {
+                        const checks = {};
+                        checksSnap.forEach(doc => { checks[doc.id] = doc.data().checks || {}; });
+                        localStorage.setItem('homeworkChecks', JSON.stringify(checks));
+                    }
+                }
 
                 results.push({ name: cls.name, status: 'ok', count: cloudStudents.length });
                 onProgress && onProgress(i + 1, allClasses.length, cls.name, 'ok', cloudStudents.length);
