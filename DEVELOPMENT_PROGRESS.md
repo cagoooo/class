@@ -1,17 +1,21 @@
 # 班級小管家 - 開發進度記錄
 
-## 📅 最後更新：2026-03-04 08:08
+## 📅 最後更新：2026-03-04 13:04
 
-## 🎯 當前版本：v3.0.4
+## 🎯 當前版本：v3.0.5
 
-## ✅ 最新工作階段 (2026-03-04) 雲端同步無限循環修復
+## ✅ 最新工作階段 (2026-03-04) 多班級資料隔離 & 核心 Bug 修復
 
-### v3.0.4 同步防護機制完善（`js/firebase-sync.js`）
-- [x] **`syncStatus` 掛到 `window`** - 修復 `auto-sync.js` 讀取的防護物件不一致問題
-- [x] **`loadFromCloudData()` 新函式** - 加入 `isSyncing` 互斥鎖、還原後更新 `lastSyncTime`
-- [x] **全域變數同步更新** - 還原後立即更新 `window.students` 等，`getLocalStats()` 不再回傳 0
-- [x] **避免二次讀取 Firebase** - `showSyncConfirmModal` 確認時直接傳入已下載資料
-- [x] **`sw.js` + `manifest.json`** - 版本升至 v3.0.4
+### v3.0.5 多班級隔離與系統穩定性
+- [x] **`window.CLASS_KEYS`** - 建立全域 localStorage key 管理，8 種資料類型全隔離
+- [x] **7 個 JS 模組更新** - notebook/homework/grouping/semester-archive/backup/data-reports/firebase-sync 均使用 CLASS_KEYS
+- [x] **全班一鍵上傳按鈕** - google-auth-ui.js 新增功能，輸出完整同步摘要
+- [x] **`showSection` 核心函數補缺** - classnew.html 補上此函數，修復所有功能區塊按鈕
+- [x] **`syncAllClassesToCloud` key 修復** - 各班動態讀取正確的 localStorage key
+- [x] **`NotificationSystem` ReferenceError 修復** - 改為 typeof 安全檢查
+- [x] **陣列防禦性檢查** - Array.isArray() 保護所有 uploadCollection 呼叫
+- [x] **`notebookEntries` 未定義修復** - 防禦性 typeof 檢查
+- [x] **navigation-enhancement 無限重試修復** - 加入 30 次上限
 
 ---
 

@@ -1,5 +1,34 @@
 # 班級小管家 Changelog
 
+## [v3.0.5] - 2026-03-04
+
+### 🚀 新功能
+- **多班級資料完整隔離**（`classnew.html` + 7 個 JS 模組）：建立 `window.CLASS_KEYS` 統一管理 8 種 localStorage key，各班資料（加分記錄、分組、聯絡簿、作業、抽籤記錄）完全獨立，切換班級不再互相干擾
+- **🚀 全班一鍵上傳**（`google-auth-ui.js`）：新增「全班一鍵上傳」按鈕（桌面版 + 行動版），一次同步所有班級資料到 Firebase，並顯示完整結果摘要
+
+### 🐛 修復
+- **`showSection` 核心函數補缺**（`classnew.html`）：此函數從未被定義，導致所有功能區塊按鈕（學生管理、加扣分、分組等）點擊完全無效——已直接在主 script 補上完整實作
+- **`syncAllClassesToCloud` 讀取正確班級 key**（`firebase-sync.js`）：全班同步時，各班的 `pointsHistory-{id}`、`groups-{id}` 等 key 改以動態模式讀取，而非固定讀 default key
+- **`NotificationSystem` ReferenceError**（`firebase-sync.js`）：`NotificationSystem &&` 在未宣告環境下仍拋出錯誤，改為 `typeof NotificationSystem !== 'undefined' &&`
+- **`dataArray.forEach is not a function`**（`firebase-sync.js`）：上傳集合前改用 `Array.isArray()` 驗證，`notebookEntries`/`lotteryHistory` 加 `typeof` 保護
+- **`notebookEntries is not defined`**（`notebook-enhancement.js`）：`renderNotebookEnhanced()` 開頭加防禦性 `typeof` 檢查，模組初始化比主程式快時不再崩潰
+- **`navigation-enhancement.js` 無限重試**：`showSection` 函數找不到時，重試次數上限設為 30 次（6 秒），之後停止並印警告
+
+### 📁 更新檔案
+- `classnew.html` - 補上 `showSection` 函數、`window.CLASS_KEYS` 初始化
+- `js/firebase-sync.js` - 全班同步、防禦性檢查、版號升至 v3.0.5
+- `js/notebook-enhancement.js` - 防禦性初始化檢查
+- `js/navigation-enhancement.js` - 重試上限
+- `js/homework-enhancement.js` - CLASS_KEYS 隔離
+- `js/grouping-enhancement.js` - CLASS_KEYS 隔離
+- `js/semester-archive.js` - CLASS_KEYS 隔離
+- `js/backup.js` - CLASS_KEYS 隔離
+- `js/data-reports.js` - CLASS_KEYS 隔離
+- `js/google-auth-ui.js` - 全班一鍵上傳按鈕
+- `sw.js` / `manifest.json` - 版本号升至 v3.0.5
+
+---
+
 ## [v3.0.4] - 2026-03-04
 
 ### 🐛 修復
