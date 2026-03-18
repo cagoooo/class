@@ -17,6 +17,7 @@
 
     let currentFilter = 'all';
     let isFromDashboard = false;
+    let dashboardView = localStorage.getItem('homeworkDashboardView') || 'cards'; // 'cards' or 'table'
 
     // 等待 DOM 載入完成
     if (document.readyState === 'loading') {
@@ -767,6 +768,123 @@
                     grid-template-columns: repeat(2, 1fr);
                 }
             }
+
+            /* ========== 作業總覽表格視圖樣式 ========== */
+            .homework-dashboard-table-container {
+                padding: 1rem 1.5rem;
+                overflow: auto;
+                max-height: calc(100vh - 220px);
+                position: relative;
+            }
+
+            .homework-dashboard-table {
+                width: 100%;
+                border-collapse: separate;
+                border-spacing: 0;
+                background: white;
+                border-radius: 0.75rem;
+                overflow: hidden;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                font-size: 0.875rem;
+            }
+
+            .dark .homework-dashboard-table {
+                background: #1e293b;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            }
+
+            .homework-dashboard-table th, .homework-dashboard-table td {
+                padding: 0.75rem;
+                border: 1px solid #e2e8f0;
+                text-align: center;
+                min-width: 80px;
+            }
+
+            .dark .homework-dashboard-table th, .dark .homework-dashboard-table td {
+                border-color: #334155;
+            }
+
+            .homework-dashboard-table thead th {
+                background: #f8fafc;
+                font-weight: 700;
+                color: #475569;
+                position: sticky;
+                top: 0;
+                z-index: 20;
+            }
+
+            .dark .homework-dashboard-table thead th {
+                background: #1e293b;
+                color: #f1f5f9;
+            }
+
+            .homework-dashboard-table .sticky-col {
+                position: sticky;
+                left: 0;
+                z-index: 10;
+                background: #f8fafc;
+                min-width: 150px;
+                text-align: left;
+                font-weight: 600;
+                box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+            }
+
+            .dark .homework-dashboard-table .sticky-col {
+                background: #1e293b;
+            }
+
+            .homework-dashboard-table thead th.sticky-col {
+                z-index: 30;
+            }
+
+            .homework-table-cell {
+                cursor: pointer;
+                transition: background 0.2s ease;
+                user-select: none;
+            }
+
+            .homework-table-cell:hover {
+                filter: brightness(0.95);
+            }
+
+            .dark .homework-table-cell:hover {
+                filter: brightness(1.2);
+            }
+
+            .homework-view-toggle {
+                display: flex;
+                background: #f1f5f9;
+                padding: 0.25rem;
+                border-radius: 0.75rem;
+                gap: 0.25rem;
+            }
+
+            .dark .homework-view-toggle {
+                background: #334155;
+            }
+
+            .homework-view-btn {
+                padding: 0.375rem 0.75rem;
+                border-radius: 0.5rem;
+                font-size: 0.75rem;
+                font-weight: 600;
+                border: none;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                color: #64748b;
+                background: transparent;
+            }
+
+            .homework-view-btn.active {
+                background: white;
+                color: #1e293b;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            }
+
+            .dark .homework-view-btn.active {
+                background: #1e293b;
+                color: #f1f5f9;
+            }
         `;
         document.head.appendChild(styles);
     }
@@ -1108,14 +1226,21 @@
                         </div>
                     </div>
                 </div>
-                
-                <div class="homework-dashboard-actions">
-                    <button class="homework-dashboard-btn primary" onclick="openAddHomeworkFromDashboard()">
-                        ➕ 新增作業
-                    </button>
-                    <button class="homework-dashboard-btn secondary" onclick="exportHomeworkReport()">
-                        📊 匯出報告
-                    </button>
+
+                <div class="flex items-center gap-4">
+                    <div class="homework-view-toggle">
+                        <button id="view-cards" class="homework-view-btn active" onclick="toggleDashboardView('cards')">🔲 卡片</button>
+                        <button id="view-table" class="homework-view-btn" onclick="toggleDashboardView('table')">📊 表格</button>
+                    </div>
+                    
+                    <div class="homework-dashboard-actions">
+                        <button class="homework-dashboard-btn primary" onclick="openAddHomeworkFromDashboard()">
+                            ➕ 新增作業
+                        </button>
+                        <button class="homework-dashboard-btn secondary" onclick="exportHomeworkReport()">
+                            📊 匯出報告
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -1125,6 +1250,10 @@
 
             <div id="homeworkDashboardGrid" class="homework-dashboard-grid">
                 <!-- 作業卡片由 JS 生成 -->
+            </div>
+
+            <div id="homeworkDashboardTableContainer" class="homework-dashboard-table-container hidden">
+                <div id="homeworkDashboardTable"></div>
             </div>
         `;
         document.body.appendChild(modal);
@@ -1181,19 +1310,130 @@
         modal.classList.add('active');
         document.body.style.overflow = 'hidden';
 
-        // 在作業卡片網格容器插入骨架屏（計算合理顯示數量）
-        if (typeof SkeletonManager !== 'undefined') {
-            const hwCount = (typeof homeworkList !== 'undefined' && homeworkList.length > 0)
-                ? Math.min(homeworkList.length, 6)
-                : 4;
-            SkeletonManager.show('homeworkDashboardGrid', 'homework', hwCount);
+        // 恢復上次的視圖狀態
+        const savedView = localStorage.getItem('homeworkDashboardView') || 'cards';
+        toggleDashboardView(savedView, true); // true 表示初次開啟，不執行動畫
+
+        // 渲染統計
+        renderDashboardStats();
+    };
+
+    // === 切換儀表板視圖 ===
+    window.toggleDashboardView = function (view, isInit = false) {
+        dashboardView = view;
+        localStorage.setItem('homeworkDashboardView', view);
+
+        const gridContainer = document.getElementById('homeworkDashboardGrid');
+        const tableContainer = document.getElementById('homeworkDashboardTableContainer');
+        const cardBtn = document.getElementById('view-cards');
+        const tableBtn = document.getElementById('view-table');
+
+        if (view === 'cards') {
+            gridContainer.classList.remove('hidden');
+            tableContainer.classList.add('hidden');
+            cardBtn.classList.add('active');
+            tableBtn.classList.remove('active');
+
+            // 骨架屏處理
+            if (!isInit && typeof SkeletonManager !== 'undefined') {
+                const hwCount = (typeof homeworkList !== 'undefined') ? Math.min(homeworkList.length, 6) : 4;
+                SkeletonManager.show('homeworkDashboardGrid', 'homework', hwCount);
+                setTimeout(renderDashboardCards, 200);
+            } else {
+                renderDashboardCards();
+            }
+        } else {
+            gridContainer.classList.add('hidden');
+            tableContainer.classList.remove('hidden');
+            cardBtn.classList.remove('active');
+            tableBtn.classList.add('active');
+
+            renderDashboardTable();
+        }
+    };
+
+    // === 渲染表格視圖 ===
+    function renderDashboardTable() {
+        const container = document.getElementById('homeworkDashboardTable');
+        if (!container) return;
+
+        const homeworks = (typeof homeworkList !== 'undefined') ? homeworkList : [];
+        const studentList = (typeof students !== 'undefined') ? [...students].sort((a, b) => (a.number || 999) - (b.number || 999)) : [];
+        const checks = (typeof homeworkChecks !== 'undefined') ? homeworkChecks : {};
+
+        if (homeworks.length === 0) {
+            container.innerHTML = `<div class="text-center py-12 text-gray-500">尚無作業項目</div>`;
+            return;
         }
 
-        // 延遲 200ms 後渲染真實資料（骨架屏動畫有時間展現）
-        setTimeout(() => {
-            renderDashboardStats();
-            renderDashboardCards();
-        }, 200);
+        // 按日期排序 (最新的在前面)
+        const sortedHomeworks = [...homeworks].sort((a, b) => new Date(b.due) - new Date(a.due));
+
+        let html = `
+            <table class="homework-dashboard-table">
+                <thead>
+                    <tr>
+                        <th class="sticky-col">作業名稱 / 學生</th>
+                        ${studentList.map(s => `<th>${s.number ? s.number + '.' : ''}${s.name}</th>`).join('')}
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        sortedHomeworks.forEach(homework => {
+            html += `
+                <tr>
+                    <td class="sticky-col hover:text-indigo-600 cursor-pointer" onclick="openHomeworkFromDashboard(${homework.id})">
+                        ${escapeHtml(homework.name)}
+                    </td>
+            `;
+
+            studentList.forEach(student => {
+                const status = (checks[homework.id] && checks[homework.id][student.id]) ? checks[homework.id][student.id] : 'unchecked';
+                const config = STATUS_CONFIG[status];
+                html += `
+                    <td class="homework-table-cell ${status}" 
+                        onclick="cycleTableStatus(${homework.id}, ${student.id}, this)"
+                        title="${student.name}: ${config.label}">
+                        ${config.icon}
+                    </td>
+                `;
+            });
+
+            html += `</tr>`;
+        });
+
+        html += `
+                </tbody>
+            </table>
+        `;
+
+        container.innerHTML = html;
+    }
+
+    // === 表格內循環切換狀態 ===
+    window.cycleTableStatus = function (homeworkId, studentId, element) {
+        if (typeof homeworkChecks === 'undefined') return;
+
+        if (!homeworkChecks[homeworkId]) homeworkChecks[homeworkId] = {};
+
+        const currentStatus = homeworkChecks[homeworkId][studentId] || 'unchecked';
+        const statusOrder = ['unchecked', 'completed', 'incomplete', 'needs_correction', 'late'];
+        const currentIndex = statusOrder.indexOf(currentStatus);
+        const nextStatus = statusOrder[(currentIndex + 1) % statusOrder.length];
+
+        homeworkChecks[homeworkId][studentId] = nextStatus;
+        localStorage.setItem('homeworkChecks', JSON.stringify(homeworkChecks));
+
+        // 即時更新元件 UI
+        const config = STATUS_CONFIG[nextStatus];
+        element.className = `homework-table-cell ${nextStatus}`;
+        element.innerHTML = config.icon;
+        element.title = `${element.title.split(':')[0]}: ${config.label}`;
+
+        // 同步至主畫面與儀表板統計
+        renderDashboardStats();
+        syncToMainView();
     };
 
     // === 關閉儀表板 ===

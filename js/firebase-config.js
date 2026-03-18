@@ -5,12 +5,12 @@
 
 // Firebase 配置
 const firebaseConfig = {
-    apiKey: "AIzaSyDynhVxuEH5jlN3StcIpfiyVBQJBHZEfzo",
-    authDomain: "class-4719f.firebaseapp.com",
-    projectId: "class-4719f",
-    storageBucket: "class-4719f.firebasestorage.app",
-    messagingSenderId: "528903484088",
-    appId: "1:528903484088:web:340a2300f9a110c02a3a4d"
+    apiKey: "__FIREBASE_API_KEY__",
+    authDomain: "__FIREBASE_AUTH_DOMAIN__",
+    projectId: "__FIREBASE_PROJECT_ID__",
+    storageBucket: "__FIREBASE_STORAGE_BUCKET__",
+    messagingSenderId: "__FIREBASE_MESSAGING_SENDER_ID__",
+    appId: "__FIREBASE_APP_ID__"
 };
 
 // Firebase 實例

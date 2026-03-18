@@ -1,47 +1,17 @@
 rules_version = '2';
 
-// ─────────────────────────────────────────────────────────────────────────
-// 班級小管家 Firestore Security Rules
-// 版本：v3.0.2（配合多班級系統）
-// 最後更新：2026-03-04
-//
-// 資料路徑說明：
-//   users/{uid}/                    → 預設班級（向下相容）
-//   users/{uid}/classes/{classId}/  → 新班級獨立路徑
-//   users/{uid}/_meta/              → 班級清單（classProfiles）同步節點
-//   users/{uid}/.../archives/       → 學期封存資料（Q01）
-// ─────────────────────────────────────────────────────────────────────────
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ─── 核心規則：使用者只能讀寫自己的所有資料（含所有子路徑） ───
-    // {document=**} 是萬用的路徑匹配，可覆蓋：
-    //   - 預設班級資料  users/{uid}/students/...
-    //   - 多班級資料   users/{uid}/classes/{classId}/students/...
-    //   - 元資料       users/{uid}/_meta/classProfiles
-    //   - 學期封存     users/{uid}/classes/{classId}/archives/...
-    //   - 作業繳交     users/{uid}/homeworkChecks/...
     match /users/{userId}/{document=**} {
       allow read, write: if request.auth != null
                          && request.auth.uid == userId;
     }
 
-    // ─── 明確列出多班級子路徑（提升可讀性，實際已由上方覆蓋） ───
-    // 多班級資料路徑
-    match /users/{userId}/classes/{classId}/{document=**} {
-      allow read, write: if request.auth != null
-                         && request.auth.uid == userId;
+    match /artifacts/{appId}/public/{document=**} {
+      allow read, write: if request.auth != null;
     }
 
-    // _meta 路徑（classProfiles 同步、stats 摘要）
-    match /users/{userId}/_meta/{document=**} {
-      allow read, write: if request.auth != null
-                         && request.auth.uid == userId;
-    }
-
-    // ─── 禁止所有其他路徑的讀寫 ───
-    // （Firestore 預設行為，明確宣告以防萬一）
     match /{document=**} {
       allow read, write: if false;
     }
