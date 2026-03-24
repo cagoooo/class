@@ -1,10 +1,12 @@
 {
     "name": "class-manager",
-    "version": "3.0.6",
+    "version": "3.0.7",
     "description": "班級小管家 - 教師班級管理 PWA",
     "scripts": {
         "update-sw": "node scripts/update-sw-version.js",
-        "preversion": "node scripts/update-sw-version.js"
+        "preversion": "node scripts/update-sw-version.js",
+        "dev:apply": "python scripts/apply-secrets.py",
+        "dev:restore": "python scripts/restore-placeholders.py"
     },
     "keywords": [
         "education",

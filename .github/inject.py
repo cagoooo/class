@@ -1,5 +1,15 @@
 import os
 import re
+import sys
+
+# 解決 Windows 終端機編碼問題
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except AttributeError:
+        # 舊版本 Python 相容性
+        import codecs
+        sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
 
 def inject_secrets():
     # 定義要掃描的檔案路徑
@@ -23,7 +33,7 @@ def inject_secrets():
         if not os.path.exists(file_path):
             continue
             
-        print(f"💉 正在向 {file_path} 注入秘密...")
+        print(f"[Inject] 正在向 {file_path} 注入秘密...")
         with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read()
 
@@ -33,14 +43,14 @@ def inject_secrets():
             if value:
                 content = content.replace(placeholder, value)
             else:
-                print(f"⚠️ 警告: 找不到環境變數 {env_var}")
+                print(f"[Warning] 警告: 找不到環境變數 {env_var}")
 
         if content != original_content:
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(content)
-            print(f"✅ {file_path} 注入成功。")
+            print(f"[Success] {file_path} 注入成功。")
         else:
-            print(f"ℹ️ {file_path} 未發現佔位符，略過。")
+            print(f"[Info] {file_path} 未發現佔位符，略過。")
 
 if __name__ == "__main__":
     inject_secrets()

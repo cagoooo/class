@@ -8,9 +8,9 @@ const firebaseConfig = {
     apiKey: "__FIREBASE_API_KEY__",
     authDomain: "__FIREBASE_AUTH_DOMAIN__",
     projectId: "__FIREBASE_PROJECT_ID__",
-    storageBucket: "__FIREBASE_STORAGE_BUCKET__",
+    storageBucket: "__FIREBASE_PROJECT_ID__.firebasestorage.app",
     messagingSenderId: "__FIREBASE_MESSAGING_SENDER_ID__",
-    appId: "__FIREBASE_APP_ID__"
+    appId: "1:__FIREBASE_MESSAGING_SENDER_ID__:web:340a2300f9a110c02a3a4d"
 };
 
 // Firebase 實例

@@ -33,6 +33,17 @@
 - Firebase Firestore
 - SheetJS (Excel 處理)
 
+## 🛠️ 開發與安全性規範
+
+為了確保 Firebase API Key 不會意外外洩至 GitHub，本專案採用「編譯時佔位」機制。
+
+### 本地開發指令
+- **套用金鑰**：`npm run dev:apply` (讀取 `.env` 並注入金鑰)
+- **還原佔位符**：`npm run dev:restore` (將金鑰替換回佔位符，**Push 前必跑**)
+
+> [!CAUTION]
+> 在執行 `git push` 之前，請務必確認已執行 `npm run dev:restore`！
+
 ## 授權
 
 MIT License

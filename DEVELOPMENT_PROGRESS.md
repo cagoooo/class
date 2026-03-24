@@ -1,17 +1,31 @@
 # 班級小管家 - 開發進度記錄
 
-## 📅 最後更新：2026-03-04 14:55
+## 📅 最後更新：2026-03-18 16:35
 
-## 🎯 當前版本：v3.0.5
+## 🎯 當前版本：v3.0.6
 
-## ✅ 最新工作階段 (2026-03-04) 多班級學生資料隔離
+## ✅ 最新工作階段 (2026-03-24) 金鑰管理優化與腳本強化
+ 
+### v3.0.7 安全開發流程優化
+- [x] **修正 Windows 編碼衝突** - 移除 `inject.py` 中的 Emoji 並加入 `sys.stdout` UTF-8 配置。
+- [x] **建立自動化開發腳本** - 新增 `dev:apply` 與 `dev:restore` 提升開發效率並防止金鑰誤傳。
+- [x] **版本號同步更新** - `package.json`, `manifest.json`, `sw.js` 均升級至 `v3.0.7`。
 
-### v3.0.5 多班級資料隔離完整實作
-- [x] **`classnew.html` 初始化 `STUDENTS_KEY`** - 班級 ID 對應唯一 localStorage key（如 `students-1772592454136`），預設班維持 `students` 向下相容
-- [x] **9 個 JS 模組更新** - `student-enhancement`, `ui-enhancement`, `firebase-sync`, `backup`, `semester-archive`, `data-reports`, `leaderboard-enhancement`, `lottery-enhancement`, `exam-proctor` 全部改用 `STUDENTS_KEY`
-- [x] **語法安全替換** - 採用逐行精確替換，避免 PowerShell 批次替換破壞 emoji 字串
-- [x] **同步確認 Modal 優化** - 顯示目前班級名稱（如「602」），提示「只同步當前班資料，其他班不受影響」
-- [x] **`sw.js` + `manifest.json`** - 版本升至 v3.0.5
+---
++
++## ✅ 工作階段 (2026-03-18) 作業概覽表格視圖 & 安全佈署強化
+
+### v3.0.6 作業概覽表格視圖
+- [x] **新增表格視圖 (Table View)** - 提供直觀的作業繳交狀況網格，支援橫向/縱向固定標題。
+- [x] **快速狀態切換** - 點擊表格單元格可循環切換「未檢查/已完成/未完成/待訂正/遲交」狀態。
+- [x] **自動同步機制** - 表格內的所有更動會即時同步至 `localStorage`、儀表板統計數據及主畫面。
+- [x] **視圖首選項持久化** - 系統會記住使用者最後選擇的是「卡片」或「表格」模式。
+- [x] **版本號碼同步更新** - `package.json`, `manifest.json`, `sw.js` 均升級至 `v3.0.6`。
+
+### 🛡️ 安全佈署自動化 (GHA)
+- [x] **API 金鑰保護** - 實作「編譯時佔位」機制，原始碼中使用 `__PLACEHOLDER__` 並由 `inject.py` 進行動態注入。
+- [x] **GitHub Actions 直接佈署** - 採用 `deploy-pages` 策略，避免在 `gh-pages` 分支殘留敏感資訊。
+- [x] **本地環境隔離** - 新增 `.env` 檔案與 `.gitignore` 設定，確保開發環境不洩漏金鑰。
 
 ---
 

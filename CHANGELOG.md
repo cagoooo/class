@@ -1,5 +1,25 @@
 # 班級小管家 Changelog
 
+## [v3.0.7] - 2026-03-24
+
+### 🔐 安全性與開發流程優化
+
+#### 💉 Firebase API Key 注入機制強化（`inject.py` + 新增開發腳本）
+
+**改進說明**：
+- **Windows 相容性修補**：修正了 `inject.py` 在 Windows 環境下執行時，因 Emoji 字元導致的 `UnicodeEncodeError` 與 `UnicodeDecodeError`。
+- **本地開發自動化**：新增 `scripts/apply-secrets.py` 與 `scripts/restore-placeholders.py`，大幅簡化本地開發時套用與還原金鑰的流程。
+- **快捷指令整合**：在 `package.json` 中新增 `npm run dev:apply` 與 `npm run dev:restore` 腳本，落實「零洩漏」安全性規範。
+
+### 📁 更新/新增檔案
+- `.github/inject.py` - 修正編碼問題
+- `scripts/apply-secrets.py` **[新增]** - 本地金鑰注入工具
+- `scripts/restore-placeholders.py` **[新增]** - 佔位符還原工具
+- `package.json` / `manifest.json` - 版本號升至 v3.0.7
+- `sw.js` - 快取版本同步更新至 v3.0.7
+
+---
+
 ## [v3.0.6] - 2026-03-18
 
 ### 🆕 新功能
