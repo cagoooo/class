@@ -34,7 +34,7 @@ def apply_local_secrets():
     print("[Inject] 執行注入腳本...")
     try:
         # 確保在根目錄執行
-        result = subprocess.run(['python', '.github/inject.py'], capture_output=True, text=True)
+        result = subprocess.run(['python', '.github/inject.py'], capture_output=True, text=True, encoding='utf-8')
         print(result.stdout)
         if result.stderr:
             print(f"[Warning] 錯誤輸出: {result.stderr}")
