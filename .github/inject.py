@@ -40,10 +40,14 @@ def inject_secrets():
         original_content = content
         for placeholder, env_var in secrets.items():
             value = os.environ.get(env_var)
-            if value:
+            if value and value.strip():
+                # 若為 CI 環境，遮罩部分金鑰以示安全但在日誌中確認存在
+                is_ci = os.environ.get('GITHUB_ACTIONS') == 'true'
+                display_val = f"{value[:6]}...{value[-4:]}" if is_ci and len(value) > 10 else value
+                print(f"  - 正在替換 {placeholder} (變數: {env_var})")
                 content = content.replace(placeholder, value)
             else:
-                print(f"[Warning] 警告: 找不到環境變數 {env_var}")
+                print(f"  - [Skip] 找不到環境變數 {env_var} 或值為空")
 
         if content != original_content:
             with open(file_path, 'w', encoding='utf-8') as f:
