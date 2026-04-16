@@ -21,8 +21,8 @@
     // 考試科目列表
     let examSubjects = JSON.parse(localStorage.getItem('examSubjects')) || [
         { id: 1, name: '國語', startTime: '08:45', endTime: '09:25' },
-        { id: 2, name: '數學', startTime: '09:35', endTime: '10:15' },
-        { id: 3, name: '社會', startTime: '10:25', endTime: '11:05' }
+        { id: 2, name: '自然', startTime: '09:35', endTime: '10:15' },
+        { id: 3, name: '英文', startTime: '10:25', endTime: '11:05' }
     ];
 
     // 多則提醒語（考試中 + 下課休息）

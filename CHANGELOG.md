@@ -1,5 +1,23 @@
 # 班級小管家 Changelog
 
+## [v3.0.9] - 2026-04-16
+
+### ✨ UX 小改進
+- **URL Hash 深連結**：支援用網址直接跳轉到指定區塊，提升分享連結的可用性。
+  - 例：`classnew.html#exam` 直接開啟考試監考、`classnew.html#announcement` 直接開啟班級公告。
+  - 支援的區塊：`students` / `points` / `grouping` / `lottery` / `timer` / `notebook` / `homework` / `exam` / `announcement`。
+  - `showSection()` 切換時會自動同步 URL hash（使用 `history.replaceState`，不污染瀏覽歷史）。
+  - 新增 `hashchange` 監聽，允許手動改網址切換區塊。
+- **考試監考預設科目調整**：新使用者（首次載入）的預設科目由 `國語 / 數學 / 社會` 改為 `國語 / 自然 / 英文`（已有自訂科目的使用者不受影響）。
+
+### 📁 更新檔案
+- `classnew.html` - 新增 `VALID_SECTIONS` 常數、`showSection` 同步 hash、初始化時依 hash 跳轉、`hashchange` 監聽。
+- `js/announcement.js` - 公告模組的 `showSection` wrapper 同步 hash。
+- `js/exam-proctor.js` - 預設科目改為「國語 / 自然 / 英文」。
+- `package.json` / `manifest.json` / `sw.js` - 版本號升至 v3.0.9。
+
+---
+
 ## [v3.0.8] - 2026-03-24
 ### 🔧 部署與安全修復
 - **部署來源轉換**：將 GitHub Pages 的部署來源從分支 (Branch) 切換為 **GitHub Actions**，確保金鑰注入腳本能正確執行。

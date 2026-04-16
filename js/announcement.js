@@ -832,6 +832,12 @@
                 const annSection = document.getElementById('announcement-section');
                 if (annSection) annSection.classList.remove('hidden');
                 renderList();
+                // 同步 URL hash（與 classnew.html 的 showSection 行為一致）
+                try {
+                    if (location.hash !== '#announcement') {
+                        history.replaceState(null, '', '#announcement');
+                    }
+                } catch (e) { /* 忽略 hash 更新失敗 */ }
             } else {
                 // 其他 section 交給原始函式，但先隱藏公告 section
                 const annSection = document.getElementById('announcement-section');

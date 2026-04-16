@@ -1868,7 +1868,29 @@
         document.addEventListener('DOMContentLoaded', function () {
             updateTime();
             setInterval(updateTime, 1000);
-            showSection('students');
+
+            // 依 URL hash 初始化顯示的區塊（例：classnew.html#exam 直接開啟考試監考）
+            const _initialHash = (location.hash || '').slice(1);
+            if (VALID_SECTIONS.includes(_initialHash) && _initialHash !== 'announcement') {
+                showSection(_initialHash);
+            } else {
+                showSection('students');
+                // announcement-section 由 announcement.js 動態注入，需等初始化完成
+                if (_initialHash === 'announcement') {
+                    setTimeout(() => {
+                        if (typeof window.showSection === 'function') window.showSection('announcement');
+                    }, 350);
+                }
+            }
+
+            // 監聽 hashchange：允許手動修改網址或分享連結切換區塊
+            window.addEventListener('hashchange', () => {
+                const s = (location.hash || '').slice(1);
+                if (VALID_SECTIONS.includes(s) && typeof window.showSection === 'function') {
+                    window.showSection(s);
+                }
+            });
+
             renderStudents();
             updatePointsStudentSelect();
             renderPointsHistory();
@@ -1937,12 +1959,21 @@
             document.getElementById('currentTime').textContent = timeString;
         }
 
+        // 有效的 section 名稱（供 URL hash 深連結使用）
+        const VALID_SECTIONS = ['students', 'points', 'grouping', 'lottery', 'timer', 'notebook', 'homework', 'exam', 'announcement'];
+
         function showSection(sectionName) {
             document.querySelectorAll('.section').forEach(section => section.classList.add('hidden'));
             document.getElementById(sectionName + '-section').classList.remove('hidden');
             if (sectionName === 'points') {
                 renderPointsStudentList();
             }
+            // 同步 URL hash，讓使用者可直接用連結跳轉到指定區塊（例：classnew.html#exam）
+            try {
+                if (location.hash !== '#' + sectionName) {
+                    history.replaceState(null, '', '#' + sectionName);
+                }
+            } catch (e) { /* 忽略 hash 更新失敗（如本機檔案協定限制） */ }
         }
 
         // === 學生管理（已優化） ===
