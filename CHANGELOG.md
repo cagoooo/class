@@ -1,5 +1,18 @@
 # 班級小管家 Changelog
 
+## [v3.0.11] - 2026-04-16
+
+### ✨ Deep-link 主要行動按鈕優先顯示
+- **考試監考 deep-link 直接看到「啟動全螢幕監考模式」按鈕**：透過 `classnew.html#exam` 進入頁面時，自動捲動至主要 CTA 按鈕，讓使用者一進來就能直接開始監考，不需要再往下滑找按鈕。
+- **`data-primary-action` 機制**：在 HTML 元素加上 `data-primary-action="true"` 即可標記為該區塊的主要行動按鈕，初始化 deep-link 時會優先捲至該按鈕位於視窗底部（`scrollIntoView({block: 'end'})`）。未標記的區塊仍然捲到頂部（`block: 'start'`）。
+- **時序修正**：將 deep-link 自動捲動延遲調整為 500ms（原 150ms），確保晚於 `navigation-enhancement.js` 的捲動邏輯，避免被覆蓋。
+
+### 📁 更新檔案
+- `classnew.html` - `_autoScrollToSection` helper 新增 `data-primary-action` 優先邏輯；啟動全螢幕監考模式按鈕加上 `data-primary-action="true"` 標記與 `scroll-margin-bottom`。
+- `package.json` / `manifest.json` / `sw.js` - 版本號升至 v3.0.11。
+
+---
+
 ## [v3.0.10] - 2026-04-16
 
 ### ✨ Deep-link UX 優化

@@ -2,9 +2,19 @@
 
 ## 📅 最後更新：2026-04-16
 
-## 🎯 當前版本：v3.0.10
+## 🎯 當前版本：v3.0.11
 
-## ✅ 最新工作階段 (2026-04-16) Deep-link 自動捲動
+## ✅ 最新工作階段 (2026-04-16) Deep-link 主要行動按鈕優先
+
+### v3.0.11 Deep-link 顯示主要 CTA
+- [x] **考試監考 deep-link 直接看到「啟動全螢幕監考模式」按鈕** - 使用 `scrollIntoView({block: 'end'})` 讓按鈕出現在視窗底部。
+- [x] **`data-primary-action` 機制** - 通用的 HTML 標記，允許任何區塊指定自己的主要 CTA 按鈕。
+- [x] **時序修正** - deep-link 捲動延遲調整為 500ms，避免被 `navigation-enhancement.js` 的捲動覆蓋。
+- [x] **版本號同步更新** - `package.json`, `manifest.json`, `sw.js` 均升級至 `v3.0.11`。
+
+---
+
+## ✅ 工作階段 (2026-04-16) Deep-link 自動捲動
 
 ### v3.0.10 Deep-link UX 優化
 - [x] **分享連結進入自動捲動至區塊** - 使用 URL hash 深連結（例：`classnew.html#exam`）進入頁面時，自動捲動到對應區塊（使用 `behavior: 'auto'` instant scroll）。

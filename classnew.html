@@ -1264,8 +1264,8 @@
                 </div>
             </div>
         </div>
-        <div class="mt-6">
-            <button onclick="openExamFullscreen()"
+        <div class="mt-6" style="scroll-margin-bottom: 24px;">
+            <button onclick="openExamFullscreen()" data-primary-action="true"
                 class="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white py-3 rounded-lg hover:from-teal-600 hover:to-cyan-600 transition-all duration-300 text-base sm:text-lg font-semibold active:scale-95 shadow-lg">
                 🖥️ 啟動全螢幕監考模式
             </button>
@@ -1876,19 +1876,27 @@
             const _autoScrollToSection = (name) => {
                 const target = document.getElementById(name + '-section');
                 if (!target) return;
-                target.scrollIntoView({ behavior: 'auto', block: 'start' });
+                // 若該區塊有標記主要行動按鈕（data-primary-action），優先捲至該按鈕位於視窗底部
+                // 讓使用者進入 deep-link 後能立即看到主要 CTA（例：考試監考 → 啟動全螢幕監考模式）
+                const primaryAction = target.querySelector('[data-primary-action]');
+                if (primaryAction) {
+                    primaryAction.scrollIntoView({ behavior: 'auto', block: 'end' });
+                } else {
+                    target.scrollIntoView({ behavior: 'auto', block: 'start' });
+                }
             };
             if (VALID_SECTIONS.includes(_initialHash) && _initialHash !== 'announcement') {
                 showSection(_initialHash);
-                // 等版面穩定後再捲動（其他 render 呼叫可能會影響高度計算）
-                setTimeout(() => _autoScrollToSection(_initialHash), 150);
+                // 延遲到 500ms 後再捲動：確保晚於 navigation-enhancement.js 的 setTimeout(50)
+                // 否則 deep-link 的目標捲動會被 navigation-enhancement 的預設捲動覆蓋
+                setTimeout(() => _autoScrollToSection(_initialHash), 500);
             } else {
                 showSection('students');
                 // announcement-section 由 announcement.js 動態注入，需等初始化完成
                 if (_initialHash === 'announcement') {
                     setTimeout(() => {
                         if (typeof window.showSection === 'function') window.showSection('announcement');
-                        setTimeout(() => _autoScrollToSection('announcement'), 100);
+                        setTimeout(() => _autoScrollToSection('announcement'), 500);
                     }, 350);
                 }
             }
