@@ -2,9 +2,19 @@
 
 ## 📅 最後更新：2026-04-16
 
-## 🎯 當前版本：v3.0.9
+## 🎯 當前版本：v3.0.10
 
-## ✅ 最新工作階段 (2026-04-16) URL Hash 深連結 & 預設科目調整
+## ✅ 最新工作階段 (2026-04-16) Deep-link 自動捲動
+
+### v3.0.10 Deep-link UX 優化
+- [x] **分享連結進入自動捲動至區塊** - 使用 URL hash 深連結（例：`classnew.html#exam`）進入頁面時，自動捲動到對應區塊（使用 `behavior: 'auto'` instant scroll）。
+- [x] **未帶 hash 載入維持原行為** - 正常進入頁面 scrollY=0，頂部 nav 完整可見。
+- [x] **點擊 tab 切換維持既有 smooth scroll** - 由 `navigation-enhancement.js` 處理，不受影響。
+- [x] **版本號同步更新** - `package.json`, `manifest.json`, `sw.js` 均升級至 `v3.0.10`。
+
+---
+
+## ✅ 工作階段 (2026-04-16) URL Hash 深連結 & 預設科目調整
 
 ### v3.0.9 UX 小改進
 - [x] **URL Hash 深連結** - 支援用網址直接跳轉到指定區塊（例：`classnew.html#exam` 直接開啟考試監考）。

@@ -1,5 +1,18 @@
 # 班級小管家 Changelog
 
+## [v3.0.10] - 2026-04-16
+
+### ✨ Deep-link UX 優化
+- **分享連結進入後自動捲動**：透過 URL hash 深連結（例：`classnew.html#exam`）進入頁面時，自動捲動到對應區塊，使用者不再需要手動往下滑。
+- **為什麼用 instant 而非 smooth**：分享連結進入的情境下，使用者期待「立即看到目標內容」，不需等動畫。點擊 tab 切換時仍然由 `navigation-enhancement.js` 提供既有的 smooth scroll。
+- **無 hash 載入維持原行為**：未帶 hash 的正常進入（`classnew.html`）保持 scrollY=0，頂部 nav 完整可見。
+
+### 📁 更新檔案
+- `classnew.html` - 初始化流程新增 `_autoScrollToSection` helper 與 deep-link 專用捲動邏輯。
+- `package.json` / `manifest.json` / `sw.js` - 版本號升至 v3.0.10。
+
+---
+
 ## [v3.0.9] - 2026-04-16
 
 ### ✨ UX 小改進

@@ -1870,15 +1870,25 @@
             setInterval(updateTime, 1000);
 
             // 依 URL hash 初始化顯示的區塊（例：classnew.html#exam 直接開啟考試監考）
+            // 並自動捲動到該區塊（Deep-link UX：分享連結進入後直接看到目標區塊）
+            // 使用 instant（auto）而非 smooth — 分享連結進入應立即定位，不需等動畫
             const _initialHash = (location.hash || '').slice(1);
+            const _autoScrollToSection = (name) => {
+                const target = document.getElementById(name + '-section');
+                if (!target) return;
+                target.scrollIntoView({ behavior: 'auto', block: 'start' });
+            };
             if (VALID_SECTIONS.includes(_initialHash) && _initialHash !== 'announcement') {
                 showSection(_initialHash);
+                // 等版面穩定後再捲動（其他 render 呼叫可能會影響高度計算）
+                setTimeout(() => _autoScrollToSection(_initialHash), 150);
             } else {
                 showSection('students');
                 // announcement-section 由 announcement.js 動態注入，需等初始化完成
                 if (_initialHash === 'announcement') {
                     setTimeout(() => {
                         if (typeof window.showSection === 'function') window.showSection('announcement');
+                        setTimeout(() => _autoScrollToSection('announcement'), 100);
                     }, 350);
                 }
             }
