@@ -1,12 +1,12 @@
 /**
  * 班級小管家 Service Worker
- * @version 3.1.0
+ * @version 3.1.1
  * @description PWA 離線支援與快取策略優化
  */
 
-const CACHE_NAME = 'class-manager-v3.1.0';
-const STATIC_CACHE = 'class-manager-static-v3.1.0';
-const DYNAMIC_CACHE = 'class-manager-dynamic-v3.1.0';
+const CACHE_NAME = 'class-manager-v3.1.1';
+const STATIC_CACHE = 'class-manager-static-v3.1.1';
+const DYNAMIC_CACHE = 'class-manager-dynamic-v3.1.1';
 
 
 // 靜態資源列表（安裝時預快取）

@@ -36,12 +36,13 @@
         const s = document.createElement('style');
         s.id = 'sync-status-style';
         s.textContent = `
+/* 定位於「一鍵更新」按鈕（#pwaManualUpdateBtn，bottom:24px right:24px 寬約 130px）左側，避免重疊 */
 #sync-status-indicator {
     position: fixed;
-    bottom: 20px;
-    right: 20px;
-    width: 48px;
-    height: 48px;
+    bottom: 28px;
+    right: 172px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     background: #fff;
     box-shadow: 0 4px 16px rgba(0,0,0,0.12);
@@ -49,10 +50,10 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    z-index: 998;
+    z-index: 9998;
     transition: all 0.25s;
     border: 2px solid currentColor;
-    font-size: 1.25rem;
+    font-size: 1.1rem;
 }
 #sync-status-indicator:hover {
     transform: scale(1.1);
@@ -67,8 +68,8 @@
 }
 #sync-status-tooltip {
     position: fixed;
-    bottom: 80px;
-    right: 20px;
+    bottom: 78px;
+    right: 152px;
     background: #1f2937;
     color: #fff;
     padding: 0.6rem 0.9rem;
@@ -79,7 +80,7 @@
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.2s;
-    z-index: 997;
+    z-index: 9997;
     line-height: 1.4;
 }
 #sync-status-tooltip.show { opacity: 1; }
@@ -87,7 +88,7 @@
     content: '';
     position: absolute;
     bottom: -6px;
-    right: 24px;
+    right: 20px;
     width: 0; height: 0;
     border-left: 6px solid transparent;
     border-right: 6px solid transparent;
@@ -95,9 +96,24 @@
 }
 .sync-tooltip-title { font-weight: 700; margin-bottom: 0.25rem; }
 .sync-tooltip-detail { font-size: 0.75rem; color: #d1d5db; }
+/* 手機版：一鍵更新按鈕位置為 bottom:16px right:16px 寬約 110px */
 @media (max-width: 640px) {
-    #sync-status-indicator { width: 40px; height: 40px; font-size: 1.05rem; bottom: 12px; right: 12px; }
-    #sync-status-tooltip { bottom: 60px; right: 12px; }
+    #sync-status-indicator {
+        width: 36px;
+        height: 36px;
+        font-size: 1rem;
+        bottom: 18px;
+        right: 140px;
+    }
+    #sync-status-tooltip {
+        bottom: 62px;
+        right: 16px;
+        font-size: 0.78rem;
+        max-width: calc(100vw - 32px);
+    }
+    #sync-status-tooltip::after {
+        right: 150px;
+    }
 }
         `;
         document.head.appendChild(s);
