@@ -1,5 +1,23 @@
 # 班級小管家 Changelog
 
+## [v3.0.12] - 2026-04-16
+
+### ✨ Google 帳號登入提醒通知
+- **首次使用者引導 Banner**：未登入的老師進入頁面 3 秒後，底部會出現浮動提醒卡片，說明「登入 Google 帳號可以雲端備份班級數據、跨裝置同步」。
+- **三種自動不再顯示的條件**：
+  - 已登入 Google 帳號的老師：不會出現提醒。
+  - 曾登入過的老師（即使後來登出）：不會再出現。
+  - 點擊「不再提醒」或「✕」的老師：永久不再顯示。
+- **行動按鈕**：Banner 提供「立即登入」（一鍵觸發 Google OAuth）及「不再提醒」兩個選項。
+- **RWD 支援**：手機版按鈕自動堆疊為全寬。
+- **無障礙**：`aria-label` 標記、鍵盤可操作。
+
+### 📁 更新檔案
+- `js/google-auth-ui.js` - 新增登入提醒 Banner CSS、`showLoginReminder` / `dismissLoginReminder` / `shouldShowLoginReminder` 邏輯、`onAuthStateChanged` 整合、公開 API `dismissReminder`。
+- `package.json` / `manifest.json` / `sw.js` - 版本號升至 v3.0.12。
+
+---
+
 ## [v3.0.11] - 2026-04-16
 
 ### ✨ Deep-link 主要行動按鈕優先顯示

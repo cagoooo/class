@@ -2,9 +2,21 @@
 
 ## 📅 最後更新：2026-04-16
 
-## 🎯 當前版本：v3.0.11
+## 🎯 當前版本：v3.0.12
 
-## ✅ 最新工作階段 (2026-04-16) Deep-link 主要行動按鈕優先
+## ✅ 最新工作階段 (2026-04-16) Google 帳號登入提醒通知
+
+### v3.0.12 首次使用者引導
+- [x] **登入提醒 Banner** - 未登入的老師進入 3 秒後顯示底部浮動卡片，引導登入 Google 帳號雲端備份。
+- [x] **三種不再顯示條件** - 已登入 / 曾登入 / 點擊「不再提醒」，均以 localStorage 持久記錄。
+- [x] **整合 onAuthStateChanged** - 已登入者直接設定 flag 永久關閉；未登入者延遲 3 秒顯示。
+- [x] **公開 API `GoogleAuthUI.dismissReminder()`** - 供 HTML onclick 調用。
+- [x] **RWD + 無障礙支援** - 手機版自動堆疊、`aria-label` 標記。
+- [x] **版本號同步更新** - `package.json`, `manifest.json`, `sw.js` 均升級至 `v3.0.12`。
+
+---
+
+## ✅ 工作階段 (2026-04-16) Deep-link 主要行動按鈕優先
 
 ### v3.0.11 Deep-link 顯示主要 CTA
 - [x] **考試監考 deep-link 直接看到「啟動全螢幕監考模式」按鈕** - 使用 `scrollIntoView({block: 'end'})` 讓按鈕出現在視窗底部。

@@ -147,6 +147,107 @@
 .gauth-btn-secondary  { background: #f3f4f6; color: #374151; }
 .gauth-btn-accent     { background: #10b981; color: #fff; }
 .gauth-btn-danger     { background: #ef4444; color: #fff; }
+
+/* 登入提醒 Banner（首次使用者引導） */
+#gauth-login-reminder {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(120%);
+    z-index: 1000;
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s;
+    max-width: 480px;
+    width: calc(100% - 32px);
+    opacity: 0;
+}
+#gauth-login-reminder.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+}
+.gauth-reminder-card {
+    background: linear-gradient(135deg, #f0f7ff 0%, #fff 50%, #f0fdf4 100%);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15), 0 0 0 1px rgba(99,102,241,0.1);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.gauth-reminder-close {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    background: none;
+    border: none;
+    font-size: 1.1rem;
+    cursor: pointer;
+    color: #9ca3af;
+    padding: 4px 6px;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+.gauth-reminder-close:hover { color: #6b7280; background: rgba(0,0,0,0.05); }
+.gauth-reminder-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+.gauth-reminder-icon {
+    font-size: 2rem;
+    flex-shrink: 0;
+    line-height: 1;
+}
+.gauth-reminder-title {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: #1f2937;
+    margin-bottom: 2px;
+}
+.gauth-reminder-desc {
+    font-size: 0.82rem;
+    color: #6b7280;
+    line-height: 1.5;
+}
+.gauth-reminder-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.gauth-reminder-login {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 20px;
+    background: #4285f4;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.88rem;
+    cursor: pointer;
+    transition: background 0.2s;
+    box-shadow: 0 2px 6px rgba(66,133,244,0.3);
+}
+.gauth-reminder-login:hover { background: #3367d6; }
+.gauth-reminder-login:active { transform: scale(0.97); }
+.gauth-reminder-dismiss {
+    padding: 9px 16px;
+    background: none;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    color: #6b7280;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.gauth-reminder-dismiss:hover { background: #f3f4f6; border-color: #9ca3af; }
+@media (max-width: 480px) {
+    #gauth-login-reminder { bottom: 12px; }
+    .gauth-reminder-card { padding: 16px; }
+    .gauth-reminder-actions { flex-direction: column; }
+    .gauth-reminder-login, .gauth-reminder-dismiss { width: 100%; justify-content: center; }
+}
         `;
         document.head.appendChild(style);
     }
@@ -581,6 +682,59 @@
     }
 
     // ────────────────────────────────────────────────────────
+    // 登入提醒 Banner（首次使用者引導）
+    // ────────────────────────────────────────────────────────
+    const LOGIN_REMINDER_KEY = 'gauthLoginReminderDismissed';
+
+    function shouldShowLoginReminder() {
+        return !localStorage.getItem(LOGIN_REMINDER_KEY);
+    }
+
+    function dismissLoginReminder(permanently) {
+        if (permanently) {
+            localStorage.setItem(LOGIN_REMINDER_KEY, 'true');
+        }
+        const banner = document.getElementById('gauth-login-reminder');
+        if (banner) {
+            banner.classList.remove('show');
+            setTimeout(() => banner.remove(), 400);
+        }
+    }
+
+    function showLoginReminder() {
+        if (!shouldShowLoginReminder()) return;
+        if (document.getElementById('gauth-login-reminder')) return; // 已顯示
+
+        const banner = document.createElement('div');
+        banner.id = 'gauth-login-reminder';
+        banner.innerHTML = `
+            <div class="gauth-reminder-card">
+                <button class="gauth-reminder-close" onclick="GoogleAuthUI.dismissReminder(true)" title="不再提醒" aria-label="關閉">✕</button>
+                <div class="gauth-reminder-header">
+                    <div class="gauth-reminder-icon">☁️</div>
+                    <div>
+                        <div class="gauth-reminder-title">登入 Google 帳號，資料自動備份到雲端</div>
+                        <div class="gauth-reminder-desc">班級數據雲端備份，回到家也能繼續處理學生的互動成績內容。</div>
+                    </div>
+                </div>
+                <div class="gauth-reminder-actions">
+                    <button class="gauth-reminder-login" onclick="GoogleAuthUI.dismissReminder(true); GoogleAuthUI.login();">
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G" style="width:16px;height:16px;">
+                        立即登入
+                    </button>
+                    <button class="gauth-reminder-dismiss" onclick="GoogleAuthUI.dismissReminder(true)">不再提醒</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(banner);
+
+        // 延遲出現動畫
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => banner.classList.add('show'));
+        });
+    }
+
+    // ────────────────────────────────────────────────────────
     // 公開 API
     // ────────────────────────────────────────────────────────
     window.GoogleAuthUI = {
@@ -612,6 +766,8 @@
 
             if (!profile) return; // 使用者取消
 
+            // 登入成功 → 永久關閉登入提醒 Banner
+            dismissLoginReminder(true);
             showLoggedIn(profile);
 
             // 首次登入：確認是否曾同步
@@ -654,6 +810,11 @@
             refreshSyncTime();
             const dd = document.getElementById('gauth-dropdown-mobile');
             if (dd) dd.style.display = (dd.style.display === 'block') ? 'none' : 'block';
+        },
+
+        /** 關閉登入提醒 Banner（permanently=true 則永久不再顯示） */
+        dismissReminder(permanently) {
+            dismissLoginReminder(permanently);
         },
 
         async syncUp() {
@@ -790,10 +951,17 @@
             window.FirebaseConfig.onAuthStateChanged((user, profile) => {
                 if (user && !user.isAnonymous && profile) {
                     showLoggedIn(profile);
+                    // 已登入 → 永久關閉提醒（已經知道此功能）
+                    dismissLoginReminder(true);
                 } else {
                     showLoggedOut();
+                    // 未登入且未曾關閉提醒 → 延遲 3 秒後顯示登入提醒 Banner
+                    setTimeout(showLoginReminder, 3000);
                 }
             });
+        } else {
+            // FirebaseConfig 未載入（離線等情況），也嘗試顯示提醒
+            setTimeout(showLoginReminder, 4000);
         }
 
         // 每分鐘刷新「上次同步時間」
