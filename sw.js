@@ -1,12 +1,12 @@
 /**
  * 班級小管家 Service Worker
- * @version 3.0.12
+ * @version 3.0.13
  * @description PWA 離線支援與快取策略優化
  */
 
-const CACHE_NAME = 'class-manager-v3.0.12';
-const STATIC_CACHE = 'class-manager-static-v3.0.12';
-const DYNAMIC_CACHE = 'class-manager-dynamic-v3.0.12';
+const CACHE_NAME = 'class-manager-v3.0.13';
+const STATIC_CACHE = 'class-manager-static-v3.0.13';
+const DYNAMIC_CACHE = 'class-manager-dynamic-v3.0.13';
 
 
 // 靜態資源列表（安裝時預快取）
@@ -26,6 +26,7 @@ const STATIC_ASSETS = [
     './css/rwd-breakpoints.css',
     './css/pwa-install.css',
     // 核心 JS
+    './js/class-aware-storage.js',
     './js/app-state.js',
     './js/event-bus.js',
     './js/error-handler.js',

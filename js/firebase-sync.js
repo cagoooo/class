@@ -231,9 +231,19 @@ async function syncToCloud() {
         const examSubjects = safeLS('examSubjects', []);
         const examReminders = safeLS('examReminders', { exam: [], break: [] });
         const examAttendance = safeLS('examAttendance', {});
+        const examAbsenceRecords = safeLS('examAbsenceRecords', {});  // 缺考詳細記錄
         // 讀取 App 設定
         const clockSettings = safeLS('clockSettings', {});
         const noRepeat = localStorage.getItem('noRepeatLottery');
+        // 讀取座位表（依班級隔離，由攔截器處理）
+        const seatingConfig = safeLS('seatingConfig', null);
+        // 讀取抽籤已抽出 ID 清單（依班級隔離）
+        const drawnStudentIds = safeLS('drawnStudentIds', []);
+        // UI 偏好（全域，不依班級）
+        const examLightMode = localStorage.getItem('examLightMode');
+        const examAnalogClock = localStorage.getItem('examAnalogClock');
+        const examSoundsEnabled = localStorage.getItem('examSoundsEnabled');
+        const homeworkDashboardView = localStorage.getItem('homeworkDashboardView');
 
         // ── 並行上傳全部集合 ──
         await Promise.all([
@@ -248,9 +258,17 @@ async function syncToCloud() {
             uploadSingleDoc(COLLECTIONS.EXAM_DATA, 'subjects', { data: examSubjects }),
             uploadSingleDoc(COLLECTIONS.EXAM_DATA, 'reminders', { data: examReminders }),
             uploadSingleDoc(COLLECTIONS.EXAM_DATA, 'attendance', { data: examAttendance }),
-            // App 設定
+            uploadSingleDoc(COLLECTIONS.EXAM_DATA, 'absenceRecords', { data: examAbsenceRecords }),
+            // App 設定（時鐘 + 抽籤偏好 + 座位表 + 已抽 ID + UI 偏好）
             uploadSingleDoc(COLLECTIONS.APP_SETTINGS, 'clock', clockSettings),
-            uploadSingleDoc(COLLECTIONS.APP_SETTINGS, 'lottery', { noRepeatLottery: noRepeat }),
+            uploadSingleDoc(COLLECTIONS.APP_SETTINGS, 'lottery', {
+                noRepeatLottery: noRepeat,
+                drawnStudentIds: drawnStudentIds
+            }),
+            uploadSingleDoc(COLLECTIONS.APP_SETTINGS, 'seating', { data: seatingConfig }),
+            uploadSingleDoc(COLLECTIONS.APP_SETTINGS, 'uiPrefs', {
+                examLightMode, examAnalogClock, examSoundsEnabled, homeworkDashboardView
+            }),
         ]);
 
         // 作業繳交狀態（特殊結構）— 使用動態路徑（修正多班級漏洞）
@@ -317,8 +335,8 @@ async function syncFromCloud() {
             cloudStudents, cloudPoints, cloudGroups,
             cloudNotebooks, cloudHomeworks, cloudLottery,
             cloudAnn,
-            examSubjectsDoc, examRemindersDoc, examAttendDoc,
-            clockDoc, lotterySettingDoc
+            examSubjectsDoc, examRemindersDoc, examAttendDoc, examAbsenceDoc,
+            clockDoc, lotterySettingDoc, seatingDoc, uiPrefsDoc
         ] = await Promise.all([
             downloadCollection(COLLECTIONS.STUDENTS),
             downloadCollection(COLLECTIONS.POINTS_HISTORY),
@@ -330,8 +348,11 @@ async function syncFromCloud() {
             downloadSingleDoc(COLLECTIONS.EXAM_DATA, 'subjects'),
             downloadSingleDoc(COLLECTIONS.EXAM_DATA, 'reminders'),
             downloadSingleDoc(COLLECTIONS.EXAM_DATA, 'attendance'),
+            downloadSingleDoc(COLLECTIONS.EXAM_DATA, 'absenceRecords'),
             downloadSingleDoc(COLLECTIONS.APP_SETTINGS, 'clock'),
             downloadSingleDoc(COLLECTIONS.APP_SETTINGS, 'lottery'),
+            downloadSingleDoc(COLLECTIONS.APP_SETTINGS, 'seating'),
+            downloadSingleDoc(COLLECTIONS.APP_SETTINGS, 'uiPrefs'),
         ]);
 
         // 作業繳交狀態 — 使用動態路徑（修正多班級漏洞）
@@ -366,9 +387,12 @@ async function syncFromCloud() {
             examSubjects: examSubjectsDoc?.data ?? [],
             examReminders: examRemindersDoc?.data ?? { exam: [], break: [] },
             examAttendance: examAttendDoc?.data ?? {},
+            examAbsenceRecords: examAbsenceDoc?.data ?? null,   // 新增：缺考詳細記錄
             clockSettings: clockDoc ?? null,
-            lotterySettings: lotterySettingDoc ?? null,
-            classProfiles: cloudProfiles,  // ← 新增：帶回班級清單
+            lotterySettings: lotterySettingDoc ?? null,         // 包含 noRepeatLottery + drawnStudentIds
+            seatingConfig: seatingDoc?.data ?? null,            // 新增：座位表
+            uiPrefs: uiPrefsDoc ?? null,                        // 新增：UI 偏好（examLightMode/examAnalogClock 等）
+            classProfiles: cloudProfiles,
         };
 
     } catch (error) {
@@ -446,6 +470,10 @@ async function loadFromCloudData(cloudData) {
         if (cloudData.examAttendance && Object.keys(cloudData.examAttendance).length > 0) {
             await dbSave('examAttendance', cloudData.examAttendance);
         }
+        // 缺考詳細記錄（含座號、原因等）
+        if (cloudData.examAbsenceRecords && Object.keys(cloudData.examAbsenceRecords).length > 0) {
+            await dbSave('examAbsenceRecords', cloudData.examAbsenceRecords);
+        }
 
         // App 設定
         if (cloudData.clockSettings) {
@@ -453,6 +481,22 @@ async function loadFromCloudData(cloudData) {
         }
         if (cloudData.lotterySettings?.noRepeatLottery !== undefined) {
             localStorage.setItem('noRepeatLottery', cloudData.lotterySettings.noRepeatLottery);
+        }
+        // 抽籤已抽出 ID 清單（依班級隔離，由攔截器處理）
+        if (cloudData.lotterySettings?.drawnStudentIds && Array.isArray(cloudData.lotterySettings.drawnStudentIds)) {
+            await dbSave('drawnStudentIds', cloudData.lotterySettings.drawnStudentIds);
+        }
+        // 座位表（依班級隔離）
+        if (cloudData.seatingConfig) {
+            await dbSave('seatingConfig', cloudData.seatingConfig);
+        }
+        // UI 偏好（全域）
+        if (cloudData.uiPrefs) {
+            ['examLightMode', 'examAnalogClock', 'examSoundsEnabled', 'homeworkDashboardView'].forEach(k => {
+                if (cloudData.uiPrefs[k] !== null && cloudData.uiPrefs[k] !== undefined) {
+                    localStorage.setItem(k, cloudData.uiPrefs[k]);
+                }
+            });
         }
 
         // ✅ 更新同步時間，防止 AutoSync 還原後立即再觸發
@@ -903,24 +947,36 @@ async function syncAllClassesToCloud(onProgress) {
             onProgress && onProgress(i, allClasses.length, cls.name, 'syncing');
 
             // 讀取各班 localStorage 資料
-            const sKey = classId === 'default' ? 'students' : `students-${classId}`;
-            const gKey = classId === 'default' ? 'groups' : `groups-${classId}`;
-            const pKey = classId === 'default' ? 'pointsHistory' : `pointsHistory-${classId}`;
+            // ⚠️ 重要：必須繞過 ClassAwareStorage 攔截器，直接讀取每個班級的 per-class key
+            //         否則會永遠讀到當前班級的資料，覆蓋其他班級
+            const _raw = window.ClassAwareStorage?.rawGet
+                ? window.ClassAwareStorage.rawGet
+                : (k) => localStorage.getItem(k);
+            const _classKey = (k) => (classId === 'default' ? k : `${k}-${classId}`);
 
-            const localStudents = JSON.parse(localStorage.getItem(sKey) || '[]');
-            const localGroups = JSON.parse(localStorage.getItem(gKey) || '[]');
-            const localPoints = JSON.parse(localStorage.getItem(pKey) || '[]');
-            const localNotebooks = JSON.parse(localStorage.getItem('notebookEntries') || '[]');
-            const localHomeworks = JSON.parse(localStorage.getItem('homeworkList') || '[]');
-            const localLottery = JSON.parse(localStorage.getItem('lotteryHistory') || '[]');
-            const localAnn = JSON.parse(localStorage.getItem('classAnnouncements') || '[]');
-            // 考試監考 / App 設定
-            const examSubjects = JSON.parse(localStorage.getItem('examSubjects') || '[]');
-            const examReminders = JSON.parse(localStorage.getItem('examReminders') || 'null');
-            const examAttendance = JSON.parse(localStorage.getItem('examAttendance') || '{}');
-            const clockSettings = JSON.parse(localStorage.getItem('clockSettings') || '{}');
-            const noRepeat = localStorage.getItem('noRepeatLottery');
-            const localChecks = JSON.parse(localStorage.getItem('homeworkChecks') || '{}');
+            // class-isolated keys
+            const localStudents = JSON.parse(_raw(_classKey('students')) || '[]');
+            const localGroups = JSON.parse(_raw(_classKey('groups')) || '[]');
+            const localPoints = JSON.parse(_raw(_classKey('pointsHistory')) || '[]');
+            const localNotebooks = JSON.parse(_raw(_classKey('notebookEntries')) || '[]');
+            const localHomeworks = JSON.parse(_raw(_classKey('homeworkList')) || '[]');
+            const localLottery = JSON.parse(_raw(_classKey('lotteryHistory')) || '[]');
+            const localAnn = JSON.parse(_raw(_classKey('classAnnouncements')) || '[]');
+            const examSubjects = JSON.parse(_raw(_classKey('examSubjects')) || '[]');
+            const examReminders = JSON.parse(_raw(_classKey('examReminders')) || 'null');
+            const examAttendance = JSON.parse(_raw(_classKey('examAttendance')) || '{}');
+            const examAbsenceRecords = JSON.parse(_raw(_classKey('examAbsenceRecords')) || '{}');
+            const seatingConfig = JSON.parse(_raw(_classKey('seatingConfig')) || 'null');
+            const drawnStudentIds = JSON.parse(_raw(_classKey('drawnStudentIds')) || '[]');
+            const localChecks = JSON.parse(_raw(_classKey('homeworkChecks')) || '{}');
+
+            // global keys (UI 偏好 / 系統設定，跨班共用)
+            const clockSettings = JSON.parse(_raw('clockSettings') || '{}');
+            const noRepeat = _raw('noRepeatLottery');
+            const examLightMode = _raw('examLightMode');
+            const examAnalogClock = _raw('examAnalogClock');
+            const examSoundsEnabled = _raw('examSoundsEnabled');
+            const homeworkDashboardView = _raw('homeworkDashboardView');
 
             try {
                 await Promise.all([
@@ -940,17 +996,27 @@ async function syncAllClassesToCloud(onProgress) {
                             b.set(col.doc('subjects'), { data: examSubjects, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
                             b.set(col.doc('reminders'), { data: examReminders, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
                             b.set(col.doc('attendance'), { data: examAttendance, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                            b.set(col.doc('absenceRecords'), { data: examAbsenceRecords, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
                             await b.commit();
                         }
                     })(),
-                    // App 設定
+                    // App 設定（時鐘 + 抽籤偏好+已抽 ID + 座位表 + UI 偏好）
                     (async () => {
                         const col = getUserCollectionForClass(COLLECTIONS.APP_SETTINGS, classId);
                         if (col) {
                             const db = window.FirebaseConfig.getDb();
                             const b = db.batch();
                             b.set(col.doc('clock'), { ...clockSettings, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-                            b.set(col.doc('lottery'), { noRepeatLottery: noRepeat, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                            b.set(col.doc('lottery'), {
+                                noRepeatLottery: noRepeat,
+                                drawnStudentIds: drawnStudentIds,
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                            b.set(col.doc('seating'), { data: seatingConfig, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                            b.set(col.doc('uiPrefs'), {
+                                examLightMode, examAnalogClock, examSoundsEnabled, homeworkDashboardView,
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            });
                             await b.commit();
                         }
                     })(),
@@ -1149,9 +1215,11 @@ async function syncAllClassesFromCloud(onProgress) {
             const classId = cls.id;
             onProgress && onProgress(i, allClasses.length, cls.name, 'syncing');
 
-            const sKey = classId === 'default' ? 'students' : `students-${classId}`;
-            const gKey = classId === 'default' ? 'groups' : `groups-${classId}`;
-            const pKey = classId === 'default' ? 'pointsHistory' : `pointsHistory-${classId}`;
+            // 用 raw 寫入避開 ClassAwareStorage 攔截，明確指定每個班級的 key
+            const _rawSet = window.ClassAwareStorage?.rawSet
+                ? window.ClassAwareStorage.rawSet
+                : (k, v) => localStorage.setItem(k, v);
+            const _classKey = (k) => (classId === 'default' ? k : `${k}-${classId}`);
 
             try {
                 // 從對應班級的 Firebase 路徑下載
@@ -1168,45 +1236,66 @@ async function syncAllClassesFromCloud(onProgress) {
                     (async () => { const col = getUserCollectionForClass(COLLECTIONS.ANNOUNCEMENTS, classId); if (!col) return []; const s = await col.get(); return s.docs.map(d => ({ id: d.id, ...d.data() })); })(),
                 ]);
 
-                // 寫入各班 localStorage
-                localStorage.setItem(sKey, JSON.stringify(cloudStudents));
-                localStorage.setItem(gKey, JSON.stringify(cloudGroups));
-                localStorage.setItem(pKey, JSON.stringify(cloudPoints));
-                // 聯絡簿、作業、抽籤、公告共用（寫入目前 key）— 目前為全班共用
-                if (cloudNotebooks.length > 0) localStorage.setItem('notebookEntries', JSON.stringify(cloudNotebooks));
-                if (cloudHomeworks.length > 0) localStorage.setItem('homeworkList', JSON.stringify(cloudHomeworks));
-                if (cloudLottery.length > 0) localStorage.setItem('lotteryHistory', JSON.stringify(cloudLottery));
-                if (cloudAnn.length > 0) localStorage.setItem('classAnnouncements', JSON.stringify(cloudAnn));
-                // 寫入各班 localStorage（考試監考、App 設定、作業繳交狀態）
+                // 寫入該班級的 per-class localStorage（每個班級獨立保存，不互相覆蓋！）
+                _rawSet(_classKey('students'), JSON.stringify(cloudStudents));
+                _rawSet(_classKey('groups'), JSON.stringify(cloudGroups));
+                _rawSet(_classKey('pointsHistory'), JSON.stringify(cloudPoints));
+                _rawSet(_classKey('notebookEntries'), JSON.stringify(cloudNotebooks));
+                _rawSet(_classKey('homeworkList'), JSON.stringify(cloudHomeworks));
+                _rawSet(_classKey('lotteryHistory'), JSON.stringify(cloudLottery));
+                _rawSet(_classKey('classAnnouncements'), JSON.stringify(cloudAnn));
+
+                // 寫入該班級的考試監考設定
                 const colExam = getUserCollectionForClass(COLLECTIONS.EXAM_DATA, classId);
                 if (colExam) {
-                    const [subjDoc, remDoc, attDoc] = await Promise.all([
+                    const [subjDoc, remDoc, attDoc, absDoc] = await Promise.all([
                         colExam.doc('subjects').get(),
                         colExam.doc('reminders').get(),
                         colExam.doc('attendance').get(),
+                        colExam.doc('absenceRecords').get(),
                     ]);
-                    if (subjDoc.exists && subjDoc.data().data?.length) localStorage.setItem('examSubjects', JSON.stringify(subjDoc.data().data));
-                    if (remDoc.exists && remDoc.data().data) localStorage.setItem('examReminders', JSON.stringify(remDoc.data().data));
-                    if (attDoc.exists && Object.keys(attDoc.data().data || {}).length) localStorage.setItem('examAttendance', JSON.stringify(attDoc.data().data));
+                    if (subjDoc.exists && subjDoc.data().data?.length) _rawSet(_classKey('examSubjects'), JSON.stringify(subjDoc.data().data));
+                    if (remDoc.exists && remDoc.data().data) _rawSet(_classKey('examReminders'), JSON.stringify(remDoc.data().data));
+                    if (attDoc.exists && Object.keys(attDoc.data().data || {}).length) _rawSet(_classKey('examAttendance'), JSON.stringify(attDoc.data().data));
+                    if (absDoc.exists && absDoc.data().data) _rawSet(_classKey('examAbsenceRecords'), JSON.stringify(absDoc.data().data));
                 }
+                // App 設定
                 const colApp = getUserCollectionForClass(COLLECTIONS.APP_SETTINGS, classId);
                 if (colApp) {
-                    const [clockDoc, lotteryDoc] = await Promise.all([
+                    const [clockDoc, lotteryDoc, seatingDoc, uiPrefsDoc] = await Promise.all([
                         colApp.doc('clock').get(),
                         colApp.doc('lottery').get(),
+                        colApp.doc('seating').get(),
+                        colApp.doc('uiPrefs').get(),
                     ]);
-                    if (clockDoc.exists) localStorage.setItem('clockSettings', JSON.stringify(clockDoc.data()));
-                    if (lotteryDoc.exists && lotteryDoc.data().noRepeatLottery !== undefined) {
-                        localStorage.setItem('noRepeatLottery', lotteryDoc.data().noRepeatLottery);
+                    // 時鐘設定（全域，最後一班會覆蓋；可接受因為是 UI 偏好）
+                    if (clockDoc.exists) _rawSet('clockSettings', JSON.stringify(clockDoc.data()));
+                    // 抽籤偏好 + 已抽 ID
+                    if (lotteryDoc.exists) {
+                        const ld = lotteryDoc.data();
+                        if (ld.noRepeatLottery !== undefined) _rawSet('noRepeatLottery', String(ld.noRepeatLottery));
+                        if (Array.isArray(ld.drawnStudentIds)) _rawSet(_classKey('drawnStudentIds'), JSON.stringify(ld.drawnStudentIds));
+                    }
+                    // 座位表（per-class）
+                    if (seatingDoc.exists && seatingDoc.data().data) {
+                        _rawSet(_classKey('seatingConfig'), JSON.stringify(seatingDoc.data().data));
+                    }
+                    // UI 偏好（全域）
+                    if (uiPrefsDoc.exists) {
+                        const u = uiPrefsDoc.data();
+                        ['examLightMode', 'examAnalogClock', 'examSoundsEnabled', 'homeworkDashboardView'].forEach(k => {
+                            if (u[k] !== null && u[k] !== undefined) _rawSet(k, String(u[k]));
+                        });
                     }
                 }
+                // 作業繳交狀態（per-class）
                 const colChecks = getUserCollectionForClass(COLLECTIONS.HOMEWORK_CHECKS, classId);
                 if (colChecks) {
                     const checksSnap = await colChecks.get();
                     if (!checksSnap.empty) {
                         const checks = {};
                         checksSnap.forEach(doc => { checks[doc.id] = doc.data().checks || {}; });
-                        localStorage.setItem('homeworkChecks', JSON.stringify(checks));
+                        _rawSet(_classKey('homeworkChecks'), JSON.stringify(checks));
                     }
                 }
 

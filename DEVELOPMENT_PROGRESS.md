@@ -2,9 +2,23 @@
 
 ## 📅 最後更新：2026-04-16
 
-## 🎯 當前版本：v3.0.12
+## 🎯 當前版本：v3.0.13
 
-## ✅ 最新工作階段 (2026-04-16) Google 帳號登入提醒通知
+## ✅ 最新工作階段 (2026-04-16) 多班級資料隔離與同步完整性大修
+
+### v3.0.13 跨班級同步全面修補
+- [x] **補上 3 個高/中風險缺漏功能性資料** - `examAbsenceRecords`、`seatingConfig`、`drawnStudentIds`。
+- [x] **補上 4 個 UI 偏好同步** - `examLightMode`、`examAnalogClock`、`examSoundsEnabled`、`homeworkDashboardView`。
+- [x] **新增 `js/class-aware-storage.js` 攔截器** - 透明地把 11 個共用 key 依班級隔離，零模組改動。
+- [x] **預設班級向下相容** - 沿用原 key，老用戶資料完全不受影響。
+- [x] **一次性升級遷移** - 升級到 v3.0.13 時自動把現有資料遷移到 per-class 結構。
+- [x] **`firebase-sync.js` 全面更新** - 單班 + 全班同步路徑都加入新 key。
+- [x] **sw.js 加入 class-aware-storage.js** - 確保 PWA 離線可用。
+- [x] **版本號同步更新** - `package.json`, `manifest.json`, `sw.js` 均升級至 `v3.0.13`。
+
+---
+
+## ✅ 工作階段 (2026-04-16) Google 帳號登入提醒通知
 
 ### v3.0.12 首次使用者引導
 - [x] **登入提醒 Banner** - 未登入的老師進入 3 秒後顯示底部浮動卡片，引導登入 Google 帳號雲端備份。

@@ -2,6 +2,9 @@
 <html lang="zh-TW">
 
 <head>
+    <!-- 🔒 多班級資料隔離：必須在所有模組之前載入，攔截 localStorage 自動依班級路由 -->
+    <script src="js/class-aware-storage.js"></script>
+
     <!-- 🔧 開發環境：localhost 自動清除 Service Worker 快取，避免 404 攔截問題 -->
     <script>
         if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {

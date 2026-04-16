@@ -1,5 +1,50 @@
 # 班級小管家 Changelog
 
+## [v3.0.13] - 2026-04-16
+
+### 🔒 多班級資料隔離與同步完整性大修
+本次版本針對「科任老師教多班」的核心痛點做全面修補：
+
+#### Phase 1：補上 3 個遺漏的功能性資料
+- ✅ **`examAbsenceRecords`**（考試缺考詳細記錄）— 之前漏掉，換裝置後缺考記錄消失
+- ✅ **`seatingConfig`**（座位表）— 之前漏掉，老師排好的座位換裝置後要重排
+- ✅ **`drawnStudentIds`**（抽籤已抽出學生 ID）— 之前漏掉，換裝置後抽過的學生會被重複抽
+
+#### Phase 2：補上 4 個 UI 偏好同步
+- `examLightMode` / `examAnalogClock`（全螢幕監考的淺色模式 / 類比時鐘偏好）
+- `examSoundsEnabled`（考試音效開關）
+- `homeworkDashboardView`（作業檢查的卡片/表格視圖偏好）
+
+#### Phase 3：多班級資料完全隔離（架構性改進）⭐
+**新增 `js/class-aware-storage.js` — 透明的 localStorage 攔截器**
+
+之前的問題：聯絡簿、作業列表、考試科目、班級公告等 11 個 key 是**全域共用**，多班級老師切換班級時資料會互相覆蓋（科任老師 601 班的公告，切到 602 班會被取代）。
+
+修補方式：
+- 攔截 `localStorage.{getItem, setItem, removeItem}`，對 11 個共用 key 自動加上 `-{classId}` 後綴
+- **完全透明，零模組修改** — 現有 `js/announcement.js`、`js/exam-proctor.js`、`js/homework-enhancement.js` 等模組依舊用 `localStorage.getItem('notebookEntries')`，攔截器自動路由到正確的 per-class key
+- 預設班級沿用原 key（向下相容，老用戶資料不丟失）
+- 一次性遷移：升級時若使用者目前在非預設班級，自動把全域 key 的資料複製到 per-class key
+
+完整隔離的 11 個 key：
+`notebookEntries`、`homeworkList`、`homeworkChecks`、`lotteryHistory`、`classAnnouncements`、`examSubjects`、`examReminders`、`examAttendance`、`examAbsenceRecords`、`seatingConfig`、`drawnStudentIds`
+
+#### 同步覆蓋矩陣（升級後）
+| 資料 | 單班同步 | 全班同步 | 班級隔離 |
+|---|---|---|---|
+| 9 大功能區塊核心資料 | ✅ | ✅ | ✅ 各班獨立 |
+| `examAbsenceRecords` / `seatingConfig` / `drawnStudentIds` | ✅ **新增** | ✅ **新增** | ✅ |
+| UI 偏好（4 項） | ✅ **新增** | ✅ **新增** | ⚪ 全域（合理）|
+
+### 📁 更新檔案
+- `js/class-aware-storage.js` **【新增】** - localStorage 攔截器（11 共用 key 自動依班級隔離）
+- `classnew.html` - 在 `<head>` 最早載入攔截器
+- `js/firebase-sync.js` - `syncToCloud` / `loadFromCloudData` / `syncAllClassesToCloud` / `syncAllClassesFromCloud` 全部加入 7 個新 key
+- `sw.js` - 加入新檔案到 PRECACHE
+- `package.json` / `manifest.json` / `sw.js` - 版本號升至 v3.0.13
+
+---
+
 ## [v3.0.12] - 2026-04-16
 
 ### ✨ Google 帳號登入提醒通知
