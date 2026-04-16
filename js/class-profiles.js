@@ -31,6 +31,34 @@
     const DEFAULT_ID = 'default';
     const DEFAULT_NAME = '預設班級';
 
+    // ── 班級視覺差異化：顏色 + Emoji 調色盤（v3.1.0 新增） ──
+    // 新增班級時自動分配下一個未用過的組合，老師可視覺立即辨識
+    const CLASS_PALETTE = [
+        { color: '#6366f1', gradient: 'linear-gradient(135deg,#6366f1,#818cf8)', shadow: 'rgba(99,102,241,0.35)', icon: '📚' },
+        { color: '#10b981', gradient: 'linear-gradient(135deg,#10b981,#34d399)', shadow: 'rgba(16,185,129,0.35)', icon: '🌟' },
+        { color: '#f59e0b', gradient: 'linear-gradient(135deg,#f59e0b,#fbbf24)', shadow: 'rgba(245,158,11,0.35)', icon: '🎨' },
+        { color: '#ef4444', gradient: 'linear-gradient(135deg,#ef4444,#f87171)', shadow: 'rgba(239,68,68,0.35)', icon: '🚀' },
+        { color: '#06b6d4', gradient: 'linear-gradient(135deg,#06b6d4,#22d3ee)', shadow: 'rgba(6,182,212,0.35)', icon: '🌈' },
+        { color: '#8b5cf6', gradient: 'linear-gradient(135deg,#8b5cf6,#a78bfa)', shadow: 'rgba(139,92,246,0.35)', icon: '🎯' },
+        { color: '#ec4899', gradient: 'linear-gradient(135deg,#ec4899,#f472b6)', shadow: 'rgba(236,72,153,0.35)', icon: '🌸' },
+        { color: '#14b8a6', gradient: 'linear-gradient(135deg,#14b8a6,#2dd4bf)', shadow: 'rgba(20,184,166,0.35)', icon: '🍀' },
+    ];
+
+    /** 依 index 取得調色盤（超過 8 個自動循環） */
+    function paletteAt(index) {
+        return CLASS_PALETTE[((index % CLASS_PALETTE.length) + CLASS_PALETTE.length) % CLASS_PALETTE.length];
+    }
+
+    /** 為 profile 補齊視覺資料（若缺失則依其在 list 中的順序自動分配） */
+    function ensureProfileVisual(profile, index) {
+        if (!profile.icon || !profile.color) {
+            const p = paletteAt(index);
+            if (!profile.icon) profile.icon = p.icon;
+            if (!profile.color) profile.color = p.color;
+        }
+        return profile;
+    }
+
     // ==================== Profile 資料操作 ====================
 
     /** 讀取所有班級（保證至少有 default） */
@@ -46,11 +74,21 @@
                     createdAt: new Date().toISOString(),
                     isDefault: true,
                 });
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles));
             }
+            // v3.1.0：為缺少視覺資料的 profile 自動補上 icon/color
+            let mutated = false;
+            profiles.forEach((p, i) => {
+                if (!p.icon || !p.color) {
+                    ensureProfileVisual(p, i);
+                    mutated = true;
+                }
+            });
+            if (mutated) localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles));
             return profiles;
         } catch (e) {
-            return [{ id: DEFAULT_ID, name: DEFAULT_NAME, createdAt: new Date().toISOString(), isDefault: true }];
+            const fallback = { id: DEFAULT_ID, name: DEFAULT_NAME, createdAt: new Date().toISOString(), isDefault: true };
+            ensureProfileVisual(fallback, 0);
+            return [fallback];
         }
     }
 
@@ -195,6 +233,7 @@
 .cs-class-item:hover { background: #f5f5ff; }
 .cs-class-item.active { background: #eef2ff; color: #4338ca; font-weight: 700; }
 .cs-class-item .cs-check { font-size: 0.75rem; color: #6366f1; }
+.cs-class-item .cs-item-icon { font-size: 1rem; margin-right: 0.25rem; }
 .cs-divider { height: 1px; background: #f0f0f0; margin: 0; }
 .cs-action-btn {
     display: flex;
@@ -307,8 +346,9 @@
 
         const items = profiles.map(p => `
             <button class="cs-class-item ${p.id === curId ? 'active' : ''}"
-                    onclick="ClassProfiles.switchTo('${p.id}')">
-                <span>📚 ${_esc(p.name)}</span>
+                    onclick="ClassProfiles.switchTo('${p.id}')"
+                    ${p.id === curId ? `style="border-left:4px solid ${p.color || '#6366f1'};"` : ''}>
+                <span><span class="cs-item-icon" style="color:${p.color || '#6366f1'};">${p.icon || '📚'}</span> ${_esc(p.name)}</span>
                 ${p.id === curId ? '<span class="cs-check">✓</span>' : ''}
             </button>
         `).join('');
@@ -327,13 +367,22 @@
     }
 
     function injectUI() {
+        // v3.1.0：取得目前班級的調色盤
+        const curProfile = _getCurrentProfile();
+        const curPalette = CLASS_PALETTE.find(p => p.icon === curProfile?.icon)
+            || paletteAt(loadProfiles().findIndex(p => p.id === getCurrentId()));
+        const curIcon = curProfile?.icon || '📚';
+        const curGradient = curPalette?.gradient || 'linear-gradient(135deg,#6366f1,#818cf8)';
+        const curShadow = curPalette?.shadow || 'rgba(99,102,241,0.35)';
+
         // 桌面版：注入到 auth-nav-slot 左側的佔位 div
         const desktopTarget = document.getElementById('class-selector-slot');
         if (desktopTarget) {
             desktopTarget.innerHTML = `
                 <div id="class-selector-wrap">
-                    <button id="class-selector-btn" onclick="ClassProfiles.toggleDropdown()">
-                        <span>📚</span>
+                    <button id="class-selector-btn" onclick="ClassProfiles.toggleDropdown()"
+                        style="background:${curGradient};box-shadow:0 2px 8px ${curShadow};">
+                        <span>${curIcon}</span>
                         <span class="cs-name" id="cs-current-name">${_esc(_getCurrentName())}</span>
                         <span>▾</span>
                     </button>
@@ -353,11 +402,11 @@
                         title="${_esc(_getCurrentName())}"
                         style="
                             display:flex;align-items:center;gap:3px;
-                            padding:5px 8px;background:linear-gradient(135deg,#6366f1,#818cf8);
+                            padding:5px 8px;background:${curGradient};
                             border:none;border-radius:50px;cursor:pointer;font-size:0.75rem;
-                            font-weight:700;color:#fff;box-shadow:0 2px 8px rgba(99,102,241,0.35);
+                            font-weight:700;color:#fff;box-shadow:0 2px 8px ${curShadow};
                         ">
-                        📚
+                        ${curIcon}
                     </button>
                     <div id="class-selector-dropdown-mobile"
                         style="display:none;position:absolute;top:calc(100% + 8px);left:0;right:auto;min-width:210px;
@@ -423,6 +472,12 @@
         const profiles = loadProfiles();
         const curId = getCurrentId();
         return profiles.find(p => p.id === curId)?.name || DEFAULT_NAME;
+    }
+
+    function _getCurrentProfile() {
+        const profiles = loadProfiles();
+        const curId = getCurrentId();
+        return profiles.find(p => p.id === curId);
     }
 
     function _esc(str) {
@@ -540,13 +595,28 @@
             location.reload();
         },
 
-        /** 新增班級 */
+        /** 新增班級（自動分配視覺調色盤） */
         async add(name) {
             const profiles = loadProfiles();
             const id = String(Date.now());
-            profiles.push({ id, name, createdAt: new Date().toISOString(), isDefault: false });
+            // 下一個未用過的調色盤（若超過 8 個則循環）
+            const usedIcons = new Set(profiles.map(p => p.icon).filter(Boolean));
+            let assigned = null;
+            for (let i = 0; i < CLASS_PALETTE.length; i++) {
+                if (!usedIcons.has(CLASS_PALETTE[i].icon)) { assigned = CLASS_PALETTE[i]; break; }
+            }
+            if (!assigned) assigned = paletteAt(profiles.length);  // 全用過時按順序循環
+
+            profiles.push({
+                id,
+                name,
+                createdAt: new Date().toISOString(),
+                isDefault: false,
+                icon: assigned.icon,
+                color: assigned.color,
+            });
             saveProfiles(profiles);
-            console.log(`[ClassProfiles] 新增班級: ${name} (${id})`);
+            console.log(`[ClassProfiles] 新增班級: ${name} (${id}, ${assigned.icon})`);
             return id;
         },
 

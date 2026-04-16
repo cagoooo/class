@@ -215,7 +215,22 @@ function _doRenderStudents(container) {
     updateSearchStats(filteredStudents.length, safeStudents.length);
 
     if (safeStudents.length === 0) {
-        container.innerHTML = `<div class="col-span-full text-center text-gray-500 p-6 bg-gray-50 rounded-lg">目前沒有學生，請從上方新增學生。</div>`;
+        if (typeof EmptyState !== 'undefined') {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'col-span-full';
+            wrapper.innerHTML = EmptyState.html({
+                icon: '👥',
+                title: '還沒有學生',
+                desc: '從 Excel 一鍵匯入，或手動逐個新增，開始打造你的班級。',
+                actionLabel: '📁 從 Excel 匯入',
+                actionOnClick: "document.getElementById('excelFile')?.click()",
+                tip: '或往下滑用「管理功能」手動新增學生',
+            });
+            container.innerHTML = '';
+            container.appendChild(wrapper);
+        } else {
+            container.innerHTML = `<div class="col-span-full text-center text-gray-500 p-6 bg-gray-50 rounded-lg">目前沒有學生，請從上方新增學生。</div>`;
+        }
     } else if (filteredStudents.length === 0) {
         container.innerHTML = `
             <div class="col-span-full text-center p-6 bg-gray-50 rounded-lg">

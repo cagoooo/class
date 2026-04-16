@@ -1,5 +1,88 @@
 # 班級小管家 Changelog
 
+## [v3.1.0] - 2026-04-16 🎉 快速勝利套餐
+
+里程碑版本！一次打包 7 項 P0/P1 UX 改良，配合前面 v3.0.9–v3.0.13 的累積改動，整體體驗大幅提升。
+
+### ✨ 新增功能
+
+#### 🎯 A1：為 7 個區塊標記主要行動按鈕（`data-primary-action`）
+延伸 v3.0.11 的通用機制。現在透過 `classnew.html#{section}` 深連結進入時，除了區塊標題，還會自動捲動到該區塊的**主要行動按鈕**。
+- 🎲 分組：「產生分組」
+- 🎰 抽籤：「開始抽籤」
+- ⏱ 計時器：「開始」
+- 📝 聯絡簿：「新增聯絡事項」
+- 📋 作業：「新增作業項目」
+- 🖥 考試監考：「啟動全螢幕監考模式」（原本就有）
+- 📢 班級公告：「發布公告」
+
+#### 🎨 B2：班級視覺差異化（顏色 + emoji）
+**預防「切錯班級寫錯資料」的頭號風險**。
+- 新增 8 組顏色 + emoji 調色盤（📚🌟🎨🚀🌈🎯🌸🍀）
+- 新增班級時自動分配下一組未使用的視覺識別
+- 右上角班級切換按鈕依目前班級的顏色動態渲染（漸層 + 陰影）
+- 下拉選單的每個班級顯示自己的 emoji 與顏色
+- 自動遷移：老用戶現有班級會被自動補上 icon/color
+
+#### 🌱 D2：空狀態視覺與引導（EmptyState 元件）
+**全新檔案 `js/empty-state.js`**：通用的空狀態元件，讓各區塊沒資料時不再是冷冰冰的灰色文字。
+- 4 個區塊已整合：學生管理、聯絡簿、作業檢查、班級公告
+- 每個空狀態包含：emoji、主標題、說明、行動按鈕、小提示
+- Bob 彈跳動畫 + FadeIn 淡入動畫
+- RWD 支援：可用 `compact: true` 參數產生縮小版
+
+#### ☁️ C3：同步狀態常駐指示器
+**全新檔案 `js/sync-status-indicator.js`**：右下角浮動雲端圖示，一眼看出資料是否已安全上雲。
+- 五種狀態：🟢 已同步 / 🟡 未同步 / 🔵 同步中 / 🔴 失敗 / ⚫ 未登入
+- Hover 顯示「上次同步 X 分鐘前」
+- Click 一鍵觸發手動同步
+- 自動攔截 `localStorage.setItem`，有新變動時由 🟢 變 🟡
+- 每分鐘重新計算（超過 2 分鐘未同步會從 🟢 變 🟡 提醒）
+
+#### ⌨️ B1：Ctrl+K 班級快速切換器
+**全新檔案 `js/class-quick-switcher.js`**：類似 VSCode / Slack 的 command palette。
+- `Ctrl+K` 或 `Cmd+K` 開啟
+- 即時搜尋（班號 / 班名）
+- `↑↓` 選擇、`Enter` 切換、`Esc` 關閉
+- 數字鍵 1-9 快速切換前 9 個班級
+- 點擊班級項目也可直接切換
+- 顯示目前班級的綠色「目前」badge
+
+### 🔧 技術債修正
+
+#### E1：修掉 `classnew.html:1274` 多餘的 `</div>`
+v3.0.9 Session 發現的 HTML 結構不平衡問題。真實瀏覽器容錯，但某些預覽工具對此敏感。
+
+#### E2：GitHub Actions Node.js 20 棄用警告
+在 workflow 加入 `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"`，主動 opt-in 到 Node.js 24。2026-09-16 Node 20 移除前完成升級準備。
+
+### 📁 更新檔案
+
+**新增**：
+- `js/empty-state.js` 【新】通用空狀態元件
+- `js/sync-status-indicator.js` 【新】同步狀態指示器
+- `js/class-quick-switcher.js` 【新】Ctrl+K 快速切換器
+
+**修改**：
+- `classnew.html` - 7 處 `data-primary-action`、3 處 `?v=3.1.0` cache-buster、新腳本掛載、E1 多餘 div 移除、空狀態整合
+- `js/class-profiles.js` - 加入調色盤、自動分配、UI 動態渲染
+- `js/announcement.js` - 發布按鈕 `data-primary-action`、空狀態整合
+- `js/student-enhancement.js` - 空狀態整合
+- `js/notebook-enhancement.js` - 空狀態整合
+- `js/homework-enhancement.js` - 空狀態整合
+- `.github/workflows/deploy.yml` - E2 Node.js 24 env var
+- `sw.js` - 新增 3 個檔案到 PRECACHE
+- `package.json` / `manifest.json` - 版本號升至 **v3.1.0**
+
+### 💡 使用者可感知的差異
+- ✨ **點擊 `classnew.html#timer` 後直接看到「開始」按鈕**（原本需要再往下捲）
+- 🎨 **切到不同班級時右上角按鈕顏色會變**（預防切錯班）
+- ⌨️ **按 Ctrl+K 秒切班級**（不用再點下拉選單）
+- ☁️ **右下角隨時看到同步狀態**（不用再打開下拉選單找上次同步時間）
+- 🌱 **空畫面變成友善引導**（新老師知道下一步該做什麼）
+
+---
+
 ## [v3.0.13] - 2026-04-16
 
 ### 🔒 多班級資料隔離與同步完整性大修

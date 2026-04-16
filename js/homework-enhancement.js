@@ -1362,7 +1362,17 @@
         const checks = (typeof homeworkChecks !== 'undefined') ? homeworkChecks : {};
 
         if (homeworks.length === 0) {
-            container.innerHTML = `<div class="text-center py-12 text-gray-500">尚無作業項目</div>`;
+            if (typeof EmptyState !== 'undefined') {
+                EmptyState.render(container, {
+                    icon: '📋',
+                    title: '還沒有作業項目',
+                    desc: '分派作業後，可以追蹤每位學生的繳交狀況。',
+                    actionLabel: '➕ 新增作業',
+                    onAction: () => document.getElementById('homeworkName')?.focus(),
+                });
+            } else {
+                container.innerHTML = `<div class="text-center py-12 text-gray-500">尚無作業項目</div>`;
+            }
             return;
         }
 

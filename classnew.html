@@ -3,7 +3,9 @@
 
 <head>
     <!-- 🔒 多班級資料隔離：必須在所有模組之前載入，攔截 localStorage 自動依班級路由 -->
-    <script src="js/class-aware-storage.js"></script>
+    <script src="js/class-aware-storage.js?v=3.1.0"></script>
+    <!-- 🌱 通用空狀態元件：各區塊沒資料時顯示友善引導 -->
+    <script src="js/empty-state.js?v=3.1.0"></script>
 
     <!-- 🔧 開發環境：localhost 自動清除 Service Worker 快取，避免 404 攔截問題 -->
     <script>
@@ -936,7 +938,7 @@
                             <input type="number" id="groupingValue" value="2" min="1"
                                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 text-sm">
                         </div>
-                        <button onclick="startGrouping()"
+                        <button onclick="startGrouping()" data-primary-action="true"
                             class="w-full bg-cyan-500 text-white py-2 rounded-lg hover:bg-cyan-600 transition-colors font-semibold active:scale-95">產生分組</button>
                     </div>
                     <div class="mt-6">
@@ -1002,7 +1004,7 @@
                                 <span>已抽：<span id="drawnCount" class="font-semibold text-gray-500">0</span> 人</span>
                             </div>
                         </div>
-                        <button id="startLotteryBtn" onclick="startLottery()"
+                        <button id="startLotteryBtn" onclick="startLottery()" data-primary-action="true"
                             class="w-full bg-purple-500 text-white py-3 rounded-lg hover:bg-purple-600 transition-colors text-base sm:text-lg font-semibold active:scale-95">🎲
                             開始抽籤</button>
                     </div>
@@ -1065,7 +1067,7 @@
 
                         <!-- 通用操作按鈕 -->
                         <div class="grid grid-cols-2 gap-2">
-                            <button onclick="startTimer()" id="timerBtn"
+                            <button onclick="startTimer()" id="timerBtn" data-primary-action="true"
                                 class="w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition-colors text-sm active:scale-95">開始</button>
                             <button onclick="resetTimer()" id="timerResetBtn"
                                 class="w-full bg-gray-400 text-white py-2 rounded-lg hover:bg-gray-500 transition-colors text-sm active:scale-95">重設</button>
@@ -1118,7 +1120,7 @@
                         </select>
                         <textarea id="notebookContent" placeholder="聯絡事項內容..." rows="4"
                             class="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 resize-none text-sm sm:text-base"></textarea>
-                        <button onclick="addNotebook()"
+                        <button onclick="addNotebook()" data-primary-action="true"
                             class="w-full bg-yellow-500 text-white py-2 rounded-lg hover:bg-yellow-600 transition-colors text-sm sm:text-base active:scale-95">新增聯絡事項</button>
                     </div>
                 </div>
@@ -1175,7 +1177,7 @@
                             class="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm sm:text-base">
                         <input type="date" id="homeworkDue"
                             class="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm sm:text-base">
-                        <button onclick="addHomework()"
+                        <button onclick="addHomework()" data-primary-action="true"
                             class="w-full bg-indigo-500 text-white py-2 rounded-lg hover:bg-indigo-600 transition-colors text-sm sm:text-base active:scale-95">新增作業項目</button>
                     </div>
                     <div class="mt-6">
@@ -1273,7 +1275,6 @@
                 🖥️ 啟動全螢幕監考模式
             </button>
         </div>
-    </div>
     </div>
 
     <!-- 全螢幕考試監考 Modal -->
@@ -2127,7 +2128,22 @@
             const container = document.getElementById('studentsList');
             container.innerHTML = '';
             if (students.length === 0) {
-                container.innerHTML = `<div class="col-span-full text-center text-gray-500 p-6 bg-gray-50 rounded-lg">目前沒有學生，請從上方新增學生。</div>`;
+                if (typeof EmptyState !== 'undefined') {
+                    // 包一層 col-span-full 確保在 grid 裡佔滿整列
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'col-span-full';
+                    wrapper.innerHTML = EmptyState.html({
+                        icon: '👥',
+                        title: '還沒有學生',
+                        desc: '從 Excel 一鍵匯入，或手動逐個新增，開始打造你的班級。',
+                        actionLabel: '📁 從 Excel 匯入',
+                        actionOnClick: "document.getElementById('excelFile')?.click()",
+                        tip: '或往下滑用「管理功能」手動新增學生',
+                    });
+                    container.appendChild(wrapper);
+                } else {
+                    container.innerHTML = `<div class="col-span-full text-center text-gray-500 p-6 bg-gray-50 rounded-lg">目前沒有學生，請從上方新增學生。</div>`;
+                }
             } else {
                 students.sort((a, b) => (a.number || 999) - (b.number || 999)).forEach(student => {
                     const div = document.createElement('div');
@@ -2800,7 +2816,17 @@
             container.innerHTML = '';
 
             if (notebookEntries.length === 0) {
-                container.innerHTML = '<div class="text-gray-500 text-center p-4">尚無聯絡事項</div>';
+                if (typeof EmptyState !== 'undefined') {
+                    EmptyState.render(container, {
+                        icon: '📝',
+                        title: '還沒有聯絡事項',
+                        desc: '每天記下班級大事，讓家長清楚知道孩子的學習狀況。',
+                        actionLabel: '✏️ 新增第一則',
+                        onAction: () => document.getElementById('notebookContent')?.focus(),
+                    });
+                } else {
+                    container.innerHTML = '<div class="text-gray-500 text-center p-4">尚無聯絡事項</div>';
+                }
                 return;
             }
 
@@ -2902,7 +2928,22 @@
         function removeHomework(id) { if (confirm('確定要刪除這項作業嗎？相關的檢查記錄也會被刪除。')) { homeworkList = homeworkList.filter(h => h.id !== id); delete homeworkChecks[id]; localStorage.setItem('homeworkList', JSON.stringify(homeworkList)); localStorage.setItem('homeworkChecks', JSON.stringify(homeworkChecks)); renderHomework(); updateHomeworkSelect(); updateHomeworkCheckList(); } }
         function renderHomework() {
             const container = document.getElementById('homeworkList');
-            container.innerHTML = homeworkList.length === 0 ? '<div class="text-gray-500 text-center">尚無作業項目</div>' : '';
+            if (homeworkList.length === 0) {
+                if (typeof EmptyState !== 'undefined') {
+                    EmptyState.render(container, {
+                        icon: '📋',
+                        title: '還沒有作業項目',
+                        desc: '分派作業後，可以追蹤每位學生的繳交狀況。',
+                        actionLabel: '➕ 新增作業',
+                        onAction: () => document.getElementById('homeworkName')?.focus(),
+                        compact: true,
+                    });
+                } else {
+                    container.innerHTML = '<div class="text-gray-500 text-center">尚無作業項目</div>';
+                }
+                return;
+            }
+            container.innerHTML = '';
             homeworkList.forEach(homework => {
                 const div = document.createElement('div');
                 div.className = 'flex justify-between items-center p-3 bg-indigo-50 border-l-4 border-indigo-500 rounded';
@@ -3696,14 +3737,14 @@
     <script src="js/firebase-ui.js"></script>
     <script src="js/storage-manager.js"></script>
     <script src="js/app-state.js"></script>
-    <script src="js/homework-enhancement.js"></script>
-    <script src="js/notebook-enhancement.js"></script>
+    <script src="js/homework-enhancement.js?v=3.1.0"></script>
+    <script src="js/notebook-enhancement.js?v=3.1.0"></script>
     <script src="js/leaderboard-enhancement.js"></script>
     <script src="js/timer-enhancement.js"></script>
     <script src="js/theme-toggle.js"></script>
     <script src="js/lottery-enhancement.js"></script>
     <script src="js/grouping-enhancement.js"></script>
-    <script src="js/student-enhancement.js"></script>
+    <script src="js/student-enhancement.js?v=3.1.0"></script>
     <script src="js/pomodoro.js"></script>
     <script src="js/keyboard-shortcuts.js"></script>
     <script src="js/ui-enhancement.js"></script>
@@ -3711,7 +3752,7 @@
     <script src="js/data-reports.js"></script>
     <script src="js/exam-proctor.js"></script>
     <script src="js/exam-sounds.js"></script>
-    <script src="js/announcement.js"></script>
+    <script src="js/announcement.js?v=3.1.0"></script>
 
     <!-- PWA 支援 -->
     <script src="js/pwa-install.js"></script>
@@ -3794,11 +3835,16 @@
     <script src="./js/semester-archive.js"></script>
 
     <!-- 多班級管理模組（在 google-auth-ui.js 之前載入，確保 nav slot 就緒） -->
-    <script src="./js/class-profiles.js"></script>
+    <script src="./js/class-profiles.js?v=3.1.0"></script>
+    <!-- v3.1.0：Ctrl+K 班級快速切換器 -->
+    <script src="./js/class-quick-switcher.js?v=3.1.0"></script>
 
 
     <!-- Google 帳號登入 UI 模組（必須在所有 Firebase 模組之後載入） -->
     <script src="./js/google-auth-ui.js"></script>
+
+    <!-- v3.1.0：同步狀態常駐指示器（右下角） -->
+    <script src="./js/sync-status-indicator.js?v=3.1.0"></script>
 
 
 

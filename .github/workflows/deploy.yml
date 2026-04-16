@@ -15,6 +15,12 @@ concurrency:
   group: "pages"
   cancel-in-progress: true
 
+# 主動讓所有 actions 使用 Node.js 24 執行
+# GitHub 會於 2026-06-02 起預設為 Node 24，Node 20 於 2026-09-16 移除
+# 主動 opt-in 可提早發現相容性問題並消除 workflow log 的 deprecation 警告
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   deploy:
     environment:

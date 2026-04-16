@@ -179,7 +179,17 @@ function renderNotebookEnhanced() {
     container.innerHTML = '';
 
     if (notebookEntries.length === 0) {
-        container.innerHTML = '<div class="text-gray-500 text-center py-4">尚無聯絡事項</div>';
+        if (typeof EmptyState !== 'undefined') {
+            EmptyState.render(container, {
+                icon: '📝',
+                title: '還沒有聯絡事項',
+                desc: '每天記下班級大事，讓家長清楚知道孩子的學習狀況。',
+                actionLabel: '✏️ 新增第一則',
+                onAction: () => document.getElementById('notebookContent')?.focus(),
+            });
+        } else {
+            container.innerHTML = '<div class="text-gray-500 text-center py-4">尚無聯絡事項</div>';
+        }
         return;
     }
 

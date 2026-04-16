@@ -550,7 +550,7 @@
                                 style="font-size:0.75rem;color:#9ca3af;background:none;border:none;cursor:pointer;">清除</button>
                         </div>
                     </div>
-                    <button onclick="submitAnnouncement()" class="ann-submit-btn">發布公告</button>
+                    <button onclick="submitAnnouncement()" data-primary-action="true" class="ann-submit-btn">發布公告</button>
                 </div>
             </div>
 
@@ -657,11 +657,21 @@
         const items = currentTab === 'active' ? Announcement.getActive() : Announcement.getExpired();
 
         if (items.length === 0) {
-            container.innerHTML = `
-                <div class="ann-empty">
-                    <div class="ann-empty-icon">${currentTab === 'active' ? '📭' : '🕒'}</div>
-                    <div>${currentTab === 'active' ? '尚無有效公告' : '沒有已過期的公告'}</div>
-                </div>`;
+            if (typeof EmptyState !== 'undefined' && currentTab === 'active') {
+                container.innerHTML = EmptyState.html({
+                    icon: '📢',
+                    title: '還沒有班級公告',
+                    desc: '緊急通知、活動提醒、重要公告都可以在這裡發布，班級學生都能看到。',
+                    actionLabel: '✏️ 發布第一則公告',
+                    actionOnClick: "document.getElementById('annTitleInput')?.focus()",
+                });
+            } else {
+                container.innerHTML = `
+                    <div class="ann-empty">
+                        <div class="ann-empty-icon">${currentTab === 'active' ? '📭' : '🕒'}</div>
+                        <div>${currentTab === 'active' ? '尚無有效公告' : '沒有已過期的公告'}</div>
+                    </div>`;
+            }
         } else {
             container.innerHTML = items.map(a => renderCard(a)).join('');
         }
