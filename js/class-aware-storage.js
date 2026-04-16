@@ -36,6 +36,7 @@
         'examAbsenceRecords',       // 考試缺考詳細記錄
         'seatingConfig',            // 座位表
         'drawnStudentIds',          // 抽籤已抽出學生
+        'examDayPresets',           // 考試多日預設（第一天/第二天...）
     ]);
 
     // 取得原始 Storage 方法（避免被自己攔截）

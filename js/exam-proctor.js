@@ -18,12 +18,45 @@
     // 資料結構與狀態
     // ========================================
 
-    // 考試科目列表
-    let examSubjects = JSON.parse(localStorage.getItem('examSubjects')) || [
-        { id: 1, name: '國語', startTime: '08:45', endTime: '09:25' },
-        { id: 2, name: '自然', startTime: '09:35', endTime: '10:15' },
-        { id: 3, name: '英文', startTime: '10:25', endTime: '11:05' }
-    ];
+    // ── 考試多日預設機制（v3.1.2 新增） ──
+    // examDayPresets: { currentDay: 1, days: { "1": [...], "2": [...] } }
+    const DEFAULT_DAY_PRESETS = {
+        currentDay: 1,
+        days: {
+            "1": [
+                { id: 1, name: '國語', startTime: '08:45', endTime: '09:25' },
+                { id: 2, name: '自然', startTime: '09:35', endTime: '10:15' },
+                { id: 3, name: '英文', startTime: '10:25', endTime: '11:05' }
+            ],
+            "2": [
+                { id: 1, name: '數學', startTime: '08:45', endTime: '09:25' },
+                { id: 2, name: '社會', startTime: '09:35', endTime: '10:15' }
+            ]
+        }
+    };
+
+    let examDayPresets = JSON.parse(localStorage.getItem('examDayPresets') || 'null');
+
+    // 遷移：如果 examDayPresets 不存在（舊版升級），從現有 examSubjects 建立
+    if (!examDayPresets) {
+        const existingSubjects = JSON.parse(localStorage.getItem('examSubjects') || 'null');
+        if (existingSubjects && existingSubjects.length > 0) {
+            // 舊資料存為第一天，第二天使用預設
+            examDayPresets = {
+                currentDay: 1,
+                days: {
+                    "1": existingSubjects,
+                    "2": DEFAULT_DAY_PRESETS.days["2"]
+                }
+            };
+        } else {
+            examDayPresets = JSON.parse(JSON.stringify(DEFAULT_DAY_PRESETS));
+        }
+        localStorage.setItem('examDayPresets', JSON.stringify(examDayPresets));
+    }
+
+    // 考試科目列表（載入目前天數的科目）
+    let examSubjects = examDayPresets.days[String(examDayPresets.currentDay)] || DEFAULT_DAY_PRESETS.days["1"];
 
     // 多則提醒語（考試中 + 下課休息）
     let examReminders = JSON.parse(localStorage.getItem('examReminders')) || {
@@ -1815,6 +1848,11 @@
         localStorage.setItem('examReminders', JSON.stringify(examReminders));
         localStorage.setItem('examAttendance', JSON.stringify(examAttendance));
         localStorage.setItem('examLightMode', JSON.stringify(isLightMode));
+        // v3.1.2：同步目前天的科目到 presets
+        if (examDayPresets) {
+            examDayPresets.days[String(examDayPresets.currentDay)] = examSubjects;
+            localStorage.setItem('examDayPresets', JSON.stringify(examDayPresets));
+        }
     }
 
     function escapeHtml(text) {
@@ -1827,12 +1865,97 @@
     // UI 渲染函數
     // ========================================
 
+    // ── 考試天數切換 Tab UI ──
+    function renderDayTabs() {
+        const target = document.getElementById('examDayTabs');
+        if (!target) return;
+        const curDay = examDayPresets.currentDay;
+        const dayKeys = Object.keys(examDayPresets.days).sort((a, b) => Number(a) - Number(b));
+        target.innerHTML = `
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                ${dayKeys.map(d => `
+                    <button onclick="switchExamDay(${d})"
+                        style="
+                            padding:6px 16px;border-radius:999px;font-size:0.88rem;font-weight:600;
+                            cursor:pointer;transition:all 0.2s;border:2px solid transparent;
+                            ${String(d) === String(curDay)
+                                ? 'background:linear-gradient(135deg,#14b8a6,#06b6d4);color:#fff;border-color:transparent;box-shadow:0 2px 8px rgba(20,184,166,0.35);'
+                                : 'background:#f3f4f6;color:#6b7280;border-color:#e5e7eb;'
+                            }
+                        "
+                        ${String(d) === String(curDay) ? 'disabled' : ''}>
+                        📅 第${d}天
+                    </button>
+                `).join('')}
+                <button onclick="addExamDay()" title="新增考試天數"
+                    style="padding:4px 10px;border-radius:999px;font-size:0.88rem;cursor:pointer;
+                           background:none;border:2px dashed #d1d5db;color:#9ca3af;transition:all 0.2s;"
+                    onmouseover="this.style.borderColor='#14b8a6';this.style.color='#14b8a6';"
+                    onmouseout="this.style.borderColor='#d1d5db';this.style.color='#9ca3af';">
+                    ＋
+                </button>
+            </div>
+            <div style="font-size:0.75rem;color:#9ca3af;margin-top:4px;">
+                目前：第${curDay}天（${examSubjects.map(s => s.name).join('、') || '無科目'}）
+            </div>
+        `;
+    }
+
+    window.switchExamDay = function (dayNum) {
+        const dayKey = String(dayNum);
+        if (dayKey === String(examDayPresets.currentDay)) return;
+
+        // 先儲存目前天的科目到 preset
+        examDayPresets.days[String(examDayPresets.currentDay)] = examSubjects;
+
+        // 切換到目標天
+        examDayPresets.currentDay = Number(dayKey);
+        examSubjects = examDayPresets.days[dayKey] || [];
+
+        // 持久化
+        localStorage.setItem('examDayPresets', JSON.stringify(examDayPresets));
+        localStorage.setItem('examSubjects', JSON.stringify(examSubjects));
+
+        // 重繪
+        renderSubjectList();
+        renderDayTabs();
+
+        if (typeof NotificationSystem !== 'undefined') {
+            NotificationSystem.success(`已切換至第${dayKey}天（${examSubjects.map(s => s.name).join('、') || '無科目'}）`);
+        }
+    };
+
+    window.addExamDay = function () {
+        const dayKeys = Object.keys(examDayPresets.days).map(Number);
+        const nextDay = Math.max(...dayKeys) + 1;
+        examDayPresets.days[String(nextDay)] = [];
+        localStorage.setItem('examDayPresets', JSON.stringify(examDayPresets));
+        renderDayTabs();
+        if (typeof NotificationSystem !== 'undefined') {
+            NotificationSystem.info(`已新增第${nextDay}天（可自行新增科目）`);
+        }
+    };
+
     function renderSubjectList() {
         const container = document.getElementById('examSubjectList');
         if (!container) return;
 
+        // 渲染天數 Tab（每次都重新渲染，確保同步）
+        renderDayTabs();
+
         if (examSubjects.length === 0) {
-            container.innerHTML = '<div class="text-gray-500 text-center p-6 text-lg">尚未新增考試科目</div>';
+            if (typeof EmptyState !== 'undefined') {
+                EmptyState.render(container, {
+                    icon: '📝',
+                    title: '這一天還沒有考試科目',
+                    desc: '從上方表單新增科目，或切換到其他天。',
+                    actionLabel: '➕ 新增科目',
+                    onAction: () => document.getElementById('examSubjectName')?.focus(),
+                    compact: true,
+                });
+            } else {
+                container.innerHTML = '<div class="text-gray-500 text-center p-6 text-lg">尚未新增考試科目</div>';
+            }
             return;
         }
 

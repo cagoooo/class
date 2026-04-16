@@ -1,5 +1,25 @@
 # 班級小管家 Changelog
 
+## [v3.1.2] - 2026-04-16
+
+### ✨ 新功能：考試監考多日切換
+- **📅 第一天 / 第二天 Tab 切換按鈕**：在科目列表上方新增天數切換 Tab，老師可以一鍵切換不同考試日的科目組合。
+  - 第一天預設：國語、自然、英文
+  - 第二天預設：數學、社會
+- **自動儲存與還原**：切換天數時自動儲存當前天的科目，載入目標天的科目。新增/刪除/修改科目時也自動同步到當前天的 preset。
+- **＋ 新增天數**：可動態新增第三天、第四天...（按「＋」按鈕），滿足段考 / 期末考多天需求。
+- **舊版升級遷移**：舊版的 `examSubjects` 自動成為第一天，第二天使用預設值。
+- **空狀態整合**：某一天沒有科目時顯示 EmptyState 引導。
+- **班級隔離**：`examDayPresets` 已加入 `ClassAwareStorage` 的 SHARED_KEYS，各班級的考試天數獨立。
+
+### 📁 更新檔案
+- `js/exam-proctor.js` - 新增 `examDayPresets` 資料結構、`switchExamDay()`、`addExamDay()`、`renderDayTabs()`、`saveData()` 同步 preset。
+- `js/class-aware-storage.js` - SHARED_KEYS 加入 `examDayPresets`。
+- `classnew.html` - 新增 `#examDayTabs` 容器。
+- `package.json` / `manifest.json` / `sw.js` - 版本號升至 v3.1.2。
+
+---
+
 ## [v3.1.1] - 2026-04-16
 
 ### 🐛 修復
