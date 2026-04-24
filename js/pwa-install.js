@@ -20,6 +20,17 @@
             this.registerServiceWorker();
             this.bindManualUpdateBtn();
 
+            // v3.1.3：監聽 controllerchange - 使用者點擊更新後新 SW 接管，自動重載
+            if ('serviceWorker' in navigator) {
+                let refreshing = false;
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    if (refreshing) return;
+                    refreshing = true;
+                    console.log('[PWA] 新版本已套用，重新載入頁面');
+                    window.location.reload();
+                });
+            }
+
             // 延遲顯示安裝提示（首次訪問後 30 秒）
             const hasSeenPrompt = localStorage.getItem('pwaPromptSeen');
             const installDismissed = localStorage.getItem('pwaInstallDismissed');
@@ -95,55 +106,71 @@
 
                 console.log('[PWA] Service Worker 註冊成功:', registration.scope);
 
-                // 監聽更新
+                // 儲存 registration 到全域以供 sync-status-indicator 存取
+                window.__pwaRegistration = registration;
+
+                // 監聽更新：不再跳出攔路橫幅，改為靜默下載 + 通知 sync-status-indicator
                 registration.addEventListener('updatefound', () => {
                     const newWorker = registration.installing;
-                    console.log('[PWA] 發現新版本 Service Worker');
+                    console.log('[PWA] 背景發現新版本，靜默下載中...');
 
                     newWorker.addEventListener('statechange', () => {
                         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            // 有新版本可用
-                            this.showUpdatePrompt(registration);
+                            // 有新版本已下載並 waiting，但不強制套用
+                            console.log('[PWA] 新版本已下載，等待使用者主動套用');
+                            this.notifyUpdateAvailable(registration);
                         }
                     });
                 });
 
-                // 檢查更新
-                registration.update();
+                // 已有 waiting 版本（之前載入時下載過但未套用）
+                if (registration.waiting) {
+                    this.notifyUpdateAvailable(registration);
+                }
+
+                // v3.1.3 節流：只在首次載入或超過 30 分鐘才檢查更新
+                // 避免每次切換班級 reload 都重新檢查（高頻干擾老師）
+                const LAST_CHECK_KEY = 'pwaLastUpdateCheck';
+                const CHECK_INTERVAL = 30 * 60 * 1000; // 30 分鐘
+                const lastCheck = parseInt(localStorage.getItem(LAST_CHECK_KEY) || '0', 10);
+                const now = Date.now();
+                if (now - lastCheck > CHECK_INTERVAL) {
+                    console.log('[PWA] 節流通過，背景檢查更新');
+                    registration.update();
+                    localStorage.setItem(LAST_CHECK_KEY, String(now));
+                } else {
+                    const minsLeft = Math.ceil((CHECK_INTERVAL - (now - lastCheck)) / 60000);
+                    console.log(`[PWA] 節流跳過本次更新檢查（${minsLeft} 分鐘後再檢查）`);
+                }
 
             } catch (error) {
                 console.error('[PWA] Service Worker 註冊失敗:', error);
             }
         },
 
-        // 顯示更新提示
-        showUpdatePrompt(registration) {
-            const updateBanner = document.createElement('div');
-            updateBanner.id = 'pwa-update-banner';
-            updateBanner.className = 'pwa-update-banner';
-            updateBanner.innerHTML = `
-        <div class="update-content">
-          <span class="update-icon">🔄</span>
-          <span class="update-text">發現新版本！</span>
-          <button class="update-btn" id="pwaUpdateBtn">立即更新</button>
-          <button class="update-close" id="pwaUpdateClose">✕</button>
-        </div>
-      `;
+        // v3.1.3：通知 sync-status-indicator「有新版本可套用」
+        // 不顯示攔路橫幅，使用者可在下次自然 reload 時自動套用，或主動點同步指示器套用
+        notifyUpdateAvailable(registration) {
+            window.__pwaUpdateAvailable = true;
+            window.__pwaUpdateRegistration = registration;
+            // 若 sync-status-indicator 已載入，通知它顯示更新可用
+            if (window.SyncStatusIndicator?.setUpdateAvailable) {
+                window.SyncStatusIndicator.setUpdateAvailable(true);
+            }
+            // 事件廣播，讓其他模組也能監聽
+            window.dispatchEvent(new CustomEvent('pwa-update-available', { detail: { registration } }));
+        },
 
-            document.body.appendChild(updateBanner);
-
-            // 更新按鈕
-            document.getElementById('pwaUpdateBtn').addEventListener('click', () => {
-                if (registration.waiting) {
-                    registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-                }
-                window.location.reload();
-            });
-
-            // 關閉按鈕
-            document.getElementById('pwaUpdateClose').addEventListener('click', () => {
-                updateBanner.remove();
-            });
+        // 主動套用等待中的新 SW（由使用者明確操作觸發）
+        applyPendingUpdate() {
+            const reg = window.__pwaUpdateRegistration || window.__pwaRegistration;
+            if (!reg || !reg.waiting) {
+                console.warn('[PWA] 沒有等待中的新版本');
+                return false;
+            }
+            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+            // SW 接管後會觸發 controllerchange，然後重載頁面
+            return true;
         },
 
         // 顯示安裝按鈕（Header 中）
@@ -366,8 +393,9 @@
 
         // ==================== 手動一鍵更新 ====================
         /**
-         * 清除所有 SW 快取並重新整理頁面
-         * 一般使用者點擊「一鍵更新」時呼叫
+         * 一鍵更新：v3.1.3 改為智能版
+         * - 優先：若有 waiting 的新 SW，直接 SKIP_WAITING 接管（快速，~1 秒）
+         * - 備援：清除所有快取 + unregister + reload（慢速，需重新下載）
          */
         async manualUpdate() {
             const btn = document.getElementById('pwaManualUpdateBtn');
@@ -377,21 +405,29 @@
             }
 
             try {
-                // 1. 取消所有已註冊的 Service Worker
+                // 快速路徑：有待套用的新 SW
+                const reg = window.__pwaUpdateRegistration || window.__pwaRegistration;
+                if (reg && reg.waiting) {
+                    console.log('[PWA] 使用快速更新路徑（postMessage SKIP_WAITING）');
+                    if (btn) btn.textContent = '✅ 套用更新中…';
+                    reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                    // controllerchange 事件會自動 reload，但仍加一個備援
+                    setTimeout(() => window.location.reload(), 1500);
+                    return;
+                }
+
+                // 慢速路徑：清除所有快取
+                console.log('[PWA] 使用完整重置路徑（清除快取 + unregister）');
                 if ('serviceWorker' in navigator) {
                     const registrations = await navigator.serviceWorker.getRegistrations();
                     await Promise.all(registrations.map(r => r.unregister()));
                     console.log('[PWA] 已取消所有 Service Worker 註冊');
                 }
-
-                // 2. 清除所有快取
                 if ('caches' in window) {
                     const cacheNames = await caches.keys();
                     await Promise.all(cacheNames.map(name => caches.delete(name)));
                     console.log('[PWA] 已清除所有快取:', cacheNames);
                 }
-
-                // 3. 顯示成功訊息後重新載入
                 if (btn) btn.textContent = '✅ 更新完成，重新載入中…';
                 setTimeout(() => window.location.reload(true), 800);
 

@@ -1,12 +1,12 @@
 /**
  * 班級小管家 Service Worker
- * @version 3.1.2
+ * @version 3.1.3
  * @description PWA 離線支援與快取策略優化
  */
 
-const CACHE_NAME = 'class-manager-v3.1.2';
-const STATIC_CACHE = 'class-manager-static-v3.1.2';
-const DYNAMIC_CACHE = 'class-manager-dynamic-v3.1.2';
+const CACHE_NAME = 'class-manager-v3.1.3';
+const STATIC_CACHE = 'class-manager-static-v3.1.3';
+const DYNAMIC_CACHE = 'class-manager-dynamic-v3.1.3';
 
 
 // 靜態資源列表（安裝時預快取）
@@ -66,6 +66,9 @@ const NETWORK_FIRST_PATTERNS = [
 ];
 
 // ==================== 安裝事件 ====================
+// v3.1.3：移除 skipWaiting()，新 SW 會停留在 waiting 狀態，
+// 直到所有舊 tab 關閉、或使用者主動點擊更新（postMessage SKIP_WAITING）才接管。
+// 好處：老師上課時不會被強制切換版本，中斷正在使用的抽籤/加扣分等即時互動。
 self.addEventListener('install', (event) => {
     console.log('[SW] 安裝中...', CACHE_NAME);
 
@@ -83,13 +86,15 @@ self.addEventListener('install', (event) => {
                 );
             })
             .then(() => {
-                console.log('[SW] 安裝完成，跳過等待');
-                return self.skipWaiting();
+                console.log('[SW] 安裝完成，新版本在背景等待使用者主動套用');
+                // 不再自動 skipWaiting()，改由 message handler 觸發
             })
     );
 });
 
 // ==================== 啟用事件 ====================
+// v3.1.3：移除 clients.claim()，讓舊 tab 繼續使用舊 SW 直到自然 reload。
+// 新 tab 才會使用新 SW，避免中途換版造成資源不一致。
 self.addEventListener('activate', (event) => {
     console.log('[SW] 啟用中...', CACHE_NAME);
 
@@ -111,10 +116,17 @@ self.addEventListener('activate', (event) => {
                 );
             })
             .then(() => {
-                console.log('[SW] 啟用完成，接管所有頁面');
-                return self.clients.claim();
+                console.log('[SW] 啟用完成（僅接管新開啟的頁面，舊頁面維持舊 SW）');
             })
     );
+});
+
+// ==================== 訊息處理（v3.1.3：支援手動觸發更新） ====================
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        console.log('[SW] 收到 SKIP_WAITING 指令，接管頁面');
+        self.skipWaiting();
+    }
 });
 
 // ==================== 請求攔截 ====================

@@ -1,5 +1,77 @@
 # 班級小管家 Changelog
 
+## [v3.1.3] - 2026-04-16 🎯 課堂不打擾更新
+
+### ⭐ 解決老師反映的核心 UX 問題
+> 「常常要使用就必須更新等待，每次要抽籤或加扣分就更新等待」
+> 「自動更新的頻率太高，反而影響上課即時互動」
+
+### 🐛 根本原因分析
+1. **更新橫幅出現在螢幕底部正中央**（`bottom:1rem; left:50%; z-index:10000`）— 正好蓋住「開始抽籤」「產生分組」等主要按鈕
+2. **每次頁面載入都檢查更新** — 切換班級 `location.reload()` 觸發，一天 10+ 次
+3. **`skipWaiting()` + `clients.claim()` 立即接管** — 老師上課到一半 SW 強制換版
+4. **高頻部署放大問題** — 一天內部署數個版本，每次都讓線上老師看到更新通知
+
+### ✨ 修復方案（三管齊下）
+
+#### 1. 🙅 移除攔路橫幅
+- **刪除** `showUpdatePrompt()` 創建的置中浮動橫幅
+- 改為**靜默下載**，通知改到右下角 sync-status-indicator 的小紅點徽章
+- 上課時完全不打擾，老師想更新時才套用
+
+#### 2. ⏰ 節流更新檢查
+- `registration.update()` 加入 **30 分鐘節流**
+- 切換班級（一天 10+ 次 reload）不再重複檢查
+- 首次載入 or 距離上次檢查 > 30 分鐘才觸發
+
+#### 3. ⏸️ 延遲套用新 SW
+- **移除 `self.skipWaiting()`** - 新 SW 停留在 waiting 狀態
+- **移除 `self.clients.claim()`** - 老師正在用的舊 tab 維持舊版本
+- 新增 **`message` handler** 接收 `SKIP_WAITING` 指令，僅在使用者主動觸發時接管
+- 🟢 老師上課途中完全不會被打斷
+
+### 🎯 新的更新流程
+
+```
+背景：使用者開啟頁面 → SW 檢查更新（節流後）→ 新版本下載到 waiting
+通知：sync-status-indicator 跳出小紅點徽章（非侵入式）
+選擇：
+  A. 老師不理它 → 繼續使用舊版本，沒人被打擾
+  B. 老師點擊指示器 → postMessage SKIP_WAITING → SW 接管 → 自動 reload
+  C. 老師點「一鍵更新」按鈕 → 智能選擇快速/慢速路徑
+```
+
+### 📁 更新檔案
+- `js/pwa-install.js`
+  - `registerServiceWorker()` 加入 30 分鐘節流
+  - 新增 `notifyUpdateAvailable()` 通知 sync-status-indicator
+  - 新增 `applyPendingUpdate()` 觸發 SKIP_WAITING
+  - 移除 `showUpdatePrompt()` 置中橫幅
+  - `manualUpdate()` 改為智能版（優先快速路徑，備援慢速路徑）
+  - 監聽 `controllerchange` 事件自動 reload
+- `sw.js`
+  - 移除 `install` 事件的 `self.skipWaiting()`
+  - 移除 `activate` 事件的 `self.clients.claim()`
+  - 新增 `message` handler 接收 `SKIP_WAITING`
+- `js/sync-status-indicator.js`
+  - 新增 `setUpdateAvailable(bool)` API
+  - 新增藍色小紅點徽章樣式（脈動動畫）
+  - `handleClick` 優先處理「套用更新」
+  - `showTooltip` 顯示「🎁 新版本可用」
+  - 監聽 `pwa-update-available` 事件
+- `package.json` / `manifest.json` / `sw.js` - 版本號升至 v3.1.3
+
+### 💡 使用者端 Before / After
+
+| 情境 | v3.1.2 之前 | v3.1.3 之後 |
+|---|---|---|
+| 上課中有新版本 | 底部橫幅擋住按鈕 😱 | 右下角藍點，不干擾 ✨ |
+| 切換班級後 | 每次都可能跳更新 | 30 分鐘內不重複檢查 |
+| 老師誤按更新 | 被迫 reload 等 10+ 秒 | 只能主動點擊才套用 |
+| 想更新 | 必須點橫幅的按鈕 | 點右下角指示器 / 下次自然 reload |
+
+---
+
 ## [v3.1.2] - 2026-04-16
 
 ### ✨ 新功能：考試監考多日切換

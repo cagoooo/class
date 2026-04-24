@@ -29,6 +29,7 @@
 
     let currentState = 'offline';
     let lastChangedAt = null;  // 最後一次 setItem 時間（pending 計時用）
+    let updateAvailable = false;  // v3.1.3：是否有新版本可套用
 
     // ── CSS 注入 ──
     function injectCSS() {
@@ -65,6 +66,24 @@
 @keyframes ssiPulse {
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.08); box-shadow: 0 6px 24px rgba(59,130,246,0.45); }
+}
+/* v3.1.3：有新版本時顯示的小紅點徽章 */
+#sync-status-indicator .ssi-update-dot {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #3b82f6;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 0 rgba(59,130,246,0.7);
+    animation: ssiDotPulse 2s infinite;
+}
+@keyframes ssiDotPulse {
+    0% { box-shadow: 0 0 0 0 rgba(59,130,246,0.7); }
+    70% { box-shadow: 0 0 0 8px rgba(59,130,246,0); }
+    100% { box-shadow: 0 0 0 0 rgba(59,130,246,0); }
 }
 #sync-status-tooltip {
     position: fixed;
@@ -142,9 +161,13 @@
         const btn = document.getElementById('sync-status-indicator');
         if (!btn) return;
         const state = STATES[currentState];
-        btn.innerHTML = state.icon;
+        const dotHtml = updateAvailable ? '<span class="ssi-update-dot"></span>' : '';
+        btn.innerHTML = state.icon + dotHtml;
         btn.style.color = state.color;
         btn.classList.toggle('syncing', currentState === 'syncing');
+        btn.title = updateAvailable
+            ? '有新版本可套用（點擊套用 & 重新整理）'
+            : state.title;
     }
 
     function showTooltip() {
@@ -155,11 +178,20 @@
         const lastSyncText = lastSync
             ? '上次同步：' + formatRelativeTime(new Date(lastSync))
             : '從未同步';
-        tt.innerHTML = `
-            <div class="sync-tooltip-title">${state.label}</div>
-            <div>${state.title}</div>
-            <div class="sync-tooltip-detail">${lastSyncText}</div>
-        `;
+        // v3.1.3：若有新版本可用，tooltip 優先顯示更新提示
+        if (updateAvailable) {
+            tt.innerHTML = `
+                <div class="sync-tooltip-title">🎁 新版本可用</div>
+                <div>點擊套用更新並重新整理</div>
+                <div class="sync-tooltip-detail">${lastSyncText}</div>
+            `;
+        } else {
+            tt.innerHTML = `
+                <div class="sync-tooltip-title">${state.label}</div>
+                <div>${state.title}</div>
+                <div class="sync-tooltip-detail">${lastSyncText}</div>
+            `;
+        }
         tt.classList.add('show');
     }
     function hideTooltip() {
@@ -183,6 +215,20 @@
     // ── 處理點擊 ──
     async function handleClick() {
         hideTooltip();
+
+        // v3.1.3：若有新版本可用，優先處理「套用更新」
+        if (updateAvailable) {
+            if (window.PWAInstaller?.applyPendingUpdate) {
+                const applied = window.PWAInstaller.applyPendingUpdate();
+                if (applied && typeof NotificationSystem !== 'undefined') {
+                    NotificationSystem.info('正在套用新版本，即將重新整理...');
+                }
+            } else {
+                window.location.reload();
+            }
+            return;
+        }
+
         if (currentState === 'offline') {
             // 未登入 → 提示登入
             if (typeof NotificationSystem !== 'undefined') {
@@ -289,6 +335,18 @@
         setTimeout(init, 900);
     }
 
+    // ── 更新可用狀態（v3.1.3：由 pwa-install.js 呼叫） ──
+    function setUpdateAvailable(hasUpdate) {
+        updateAvailable = !!hasUpdate;
+        updateUI();
+    }
+
+    // 監聽全域事件（若 pwa-install.js 晚於此模組載入，透過事件也能收到）
+    window.addEventListener('pwa-update-available', () => setUpdateAvailable(true));
+
+    // 若 pwa-install.js 已在初始化前標記 __pwaUpdateAvailable，補上狀態
+    if (window.__pwaUpdateAvailable) setUpdateAvailable(true);
+
     // 暴露給外部
-    window.SyncStatusIndicator = { setState, updateStateBasedOnSync };
+    window.SyncStatusIndicator = { setState, updateStateBasedOnSync, setUpdateAvailable };
 })();
