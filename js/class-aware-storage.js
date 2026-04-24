@@ -58,12 +58,137 @@
         return key + '-' + classId;
     }
 
-    // ───── 攔截 localStorage 方法 ─────
+    // ───── 緊急清理：localStorage 滿時自動釋放非必要空間 ─────
+    // v3.1.4 新增：老師反映 QuotaExceededError 導致加扣分等操作失敗
+    //           自動清理非必要資料（備份、暫存），保住核心功能
+    function emergencyCleanup() {
+        let freedBytes = 0;
+        // 清理優先序：先清最大、最安全的資料
+        const CLEANUP_TARGETS = [
+            'classManager_autoBackup',      // 最大（5 份快照），雲端同步者不需要
+            'classManager_lastSync',         // 暫存
+            'pwaLastUpdateCheck',            // 節流時間戳
+            'swLastUpdateCheck',             // 節流時間戳
+        ];
+        CLEANUP_TARGETS.forEach(k => {
+            const v = _origGet.call(localStorage, k);
+            if (v !== null) {
+                freedBytes += (k.length + v.length) * 2;  // UTF-16 roughly 2 bytes/char
+                _origRemove.call(localStorage, k);
+            }
+        });
+        // 額外清理：舊的 Firestore 持久化暫存（若存在）
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+            const k = _origGet ? localStorage.key(i) : null;
+            if (!k) continue;
+            if (k.startsWith('firebase:') && k.includes('/offline')) {
+                const v = _origGet.call(localStorage, k);
+                if (v) freedBytes += (k.length + v.length) * 2;
+                _origRemove.call(localStorage, k);
+            }
+        }
+        return freedBytes;
+    }
+
+    let quotaDialogShown = false;
+    function showQuotaDialog() {
+        if (quotaDialogShown) return;
+        if (typeof document === 'undefined') return;
+        if (document.getElementById('cas-quota-dialog')) return;
+        quotaDialogShown = true;
+        const modal = document.createElement('div');
+        modal.id = 'cas-quota-dialog';
+        modal.innerHTML = `
+            <style>
+                #cas-quota-dialog {
+                    position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+                    z-index: 99999; display: flex; align-items: center; justify-content: center;
+                    padding: 1rem; animation: casQuotaFade 0.2s ease;
+                }
+                @keyframes casQuotaFade { from { opacity: 0; } to { opacity: 1; } }
+                .cas-quota-box {
+                    background: #fff; border-radius: 16px; max-width: 460px; width: 100%;
+                    padding: 1.75rem; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+                    animation: casQuotaPop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+                }
+                @keyframes casQuotaPop { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+                .cas-quota-icon { font-size: 2.5rem; text-align: center; margin-bottom: 0.5rem; }
+                .cas-quota-title { font-size: 1.1rem; font-weight: 700; color: #1f2937; text-align: center; margin-bottom: 0.5rem; }
+                .cas-quota-desc { font-size: 0.88rem; color: #6b7280; text-align: center; line-height: 1.6; margin-bottom: 1rem; }
+                .cas-quota-actions { display: flex; gap: 0.5rem; flex-direction: column; }
+                .cas-quota-btn {
+                    padding: 0.75rem 1rem; border-radius: 8px; border: none; font-weight: 600;
+                    font-size: 0.92rem; cursor: pointer; transition: all 0.15s;
+                }
+                .cas-quota-btn-primary { background: linear-gradient(135deg,#3b82f6,#6366f1); color: #fff; }
+                .cas-quota-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(99,102,241,0.4); }
+                .cas-quota-btn-secondary { background: #f3f4f6; color: #374151; }
+                .cas-quota-btn-secondary:hover { background: #e5e7eb; }
+            </style>
+            <div class="cas-quota-box">
+                <div class="cas-quota-icon">💾</div>
+                <div class="cas-quota-title">瀏覽器儲存空間已滿</div>
+                <div class="cas-quota-desc">
+                    累積的資料已超過瀏覽器可用空間，導致加扣分等操作失敗。<br>
+                    建議點擊下方「一鍵清理」釋放空間（不會刪除學生資料）。<br>
+                    <span style="color:#059669;font-weight:600;">已登入 Google 帳號的老師，雲端仍保有完整資料。</span>
+                </div>
+                <div class="cas-quota-actions">
+                    <button class="cas-quota-btn cas-quota-btn-primary" onclick="window.__casQuotaClean()">
+                        🧹 一鍵清理（釋放空間）
+                    </button>
+                    <button class="cas-quota-btn cas-quota-btn-secondary" onclick="window.__casQuotaClose()">
+                        稍後再說
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        window.__casQuotaClose = () => {
+            modal.remove();
+            quotaDialogShown = false;
+            delete window.__casQuotaClose;
+            delete window.__casQuotaClean;
+        };
+        window.__casQuotaClean = () => {
+            const freed = emergencyCleanup();
+            const kb = (freed / 1024).toFixed(1);
+            modal.remove();
+            quotaDialogShown = false;
+            alert('✅ 已釋放 ' + kb + ' KB 空間！\n\n接著請按「一鍵更新」按鈕重新載入，即可恢復正常使用。');
+        };
+    }
+
+    // ───── 攔截 localStorage 方法（v3.1.4 加入 quota-safe 包裝） ─────
     _proto.getItem = function (key) {
         return _origGet.call(this, classKey(key));
     };
     _proto.setItem = function (key, value) {
-        return _origSet.call(this, classKey(key), value);
+        const actualKey = classKey(key);
+        try {
+            return _origSet.call(this, actualKey, value);
+        } catch (err) {
+            // QuotaExceededError 或 similar
+            if (err && (err.name === 'QuotaExceededError' || err.code === 22 || err.code === 1014)) {
+                console.warn('[ClassAwareStorage] localStorage 已滿，嘗試緊急清理...');
+                const freed = emergencyCleanup();
+                if (freed > 0) {
+                    console.log('[ClassAwareStorage] 已釋放 ' + (freed / 1024).toFixed(1) + ' KB，重試儲存');
+                    try {
+                        return _origSet.call(this, actualKey, value);
+                    } catch (retryErr) {
+                        // 仍失敗 → 顯示對話框讓使用者處理
+                        showQuotaDialog();
+                        throw retryErr;
+                    }
+                } else {
+                    // 沒有可清理的，直接提示使用者
+                    showQuotaDialog();
+                }
+            }
+            throw err;
+        }
     };
     _proto.removeItem = function (key) {
         return _origRemove.call(this, classKey(key));

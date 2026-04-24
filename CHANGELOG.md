@@ -1,5 +1,63 @@
 # 班級小管家 Changelog
 
+## [v3.1.4] - 2026-04-24 🚑 緊急修復 localStorage 配額爆滿
+
+### 🐛 問題
+有老師反映教室電腦上加扣分時出現紅色錯誤訊息：
+```
+Failed to execute 'setItem' on 'Storage':
+Setting the value of 'students-1772598689573' exceeded the quota.
+```
+導致無法使用加分、改動學生資料等任何儲存操作。
+
+### 🔍 根本原因
+1. **5 份自動備份佔用過多空間**：`performAutoBackup` 保留 5 份完整快照（students + pointsHistory + notebook + groups + seatingConfig），每份可達數百 KB
+2. **累積歷史過多**：老師使用半年後，pointsHistory 可能數千筆
+3. **瀏覽器 localStorage quota**：Chrome 預設約 5-10 MB
+4. **沒有優雅降級**：setItem 失敗直接 throw，頁面紅色錯誤訊息擋住 UI
+
+### ✨ 三層修復
+
+#### 1. 🚑 緊急恢復機制（`js/class-aware-storage.js`）
+- 攔截 `setItem`，若遇 `QuotaExceededError` 自動執行緊急清理：
+  - 清除 `classManager_autoBackup`（最大、最安全）
+  - 清除節流時間戳（`pwaLastUpdateCheck`、`swLastUpdateCheck`）
+  - 清除 Firestore 離線暫存（`firebase:*offline`）
+- 釋放空間後自動重試 `setItem`
+- 若重試仍失敗，顯示友善對話框
+
+#### 2. 💾 減少備份體積（`js/data-reports.js`）
+- **自動備份數量：5 → 2 份**（大幅減少空間）
+- **已登入 Google 者跳過本地備份**（雲端已有完整資料）
+- 備份失敗時主動清空 `classManager_autoBackup`
+
+#### 3. 🎨 友善錯誤對話框
+- 跳出模態對話框：「瀏覽器儲存空間已滿」
+- 提供「🧹 一鍵清理」按鈕
+- 告知已登入者雲端資料完整無虞
+- 清理後顯示釋放的 KB 數
+
+### 📁 更新檔案
+- `js/class-aware-storage.js` - 新增 `emergencyCleanup()`、`showQuotaDialog()`、quota-safe setItem 包裝
+- `js/data-reports.js` - `performAutoBackup` 加入雲端檢查，備份數 5 → 2
+- `classnew.html` - cache-buster `?v=3.1.4`
+- `package.json` / `manifest.json` / `sw.js` - 版本號升至 v3.1.4
+
+### 💡 立即效益
+- 🚑 **已爆滿的老師**：載入新版後，第一次加分時自動清理空間，操作成功
+- 🛡️ **預防未來**：已登入雲端者不再占用本地空間儲存備份
+- 📉 **空間占用下降 60%**：5 份備份 → 2 份
+
+### 🧪 受影響老師請這樣做
+1. 硬重新整理頁面（`Ctrl+Shift+R`）
+2. 等新版本載入
+3. 再次嘗試加扣分 → 應該會出現「瀏覽器儲存空間已滿」對話框
+4. 點「🧹 一鍵清理」→ 彈出「已釋放 XXX KB」
+5. 點「🔄 一鍵更新」重新載入
+6. 恢復正常使用 ✅
+
+---
+
 ## [v3.1.3] - 2026-04-16 🎯 課堂不打擾更新
 
 ### ⭐ 解決老師反映的核心 UX 問題

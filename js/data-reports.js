@@ -528,11 +528,24 @@
     // ==================== 自動備份 ====================
     const BACKUP_KEY = 'classManager_autoBackup';
     const BACKUP_INTERVAL = 5 * 60 * 1000; // 5 分鐘
+    const BACKUP_MAX_COUNT = 2;  // v3.1.4：5 → 2，大幅減少 localStorage 用量
 
     /**
      * 執行自動備份
+     * v3.1.4 優化：
+     * - 已登入 Google 者跳過本地備份（雲端已有完整資料，不需占 localStorage）
+     * - 備份數量減至 2 份
+     * - 若儲存失敗自動刪除所有舊備份後放棄（避免擋到主流程）
      */
     function performAutoBackup() {
+        // 已登入雲端同步者跳過本地備份（避免與 Firebase 同步資料重複）
+        try {
+            if (window.FirebaseConfig?.isConnected?.()) {
+                // 已登入，雲端已有完整資料，不需要佔用 localStorage
+                return;
+            }
+        } catch (e) { /* FirebaseConfig 可能尚未載入，繼續備份 */ }
+
         const backupData = {
             timestamp: new Date().toISOString(),
             students: JSON.parse(localStorage.getItem(window.STUDENTS_KEY || 'students') || '[]'),
@@ -542,16 +555,18 @@
             seatingConfig: JSON.parse(localStorage.getItem('seatingConfig') || '{}')
         };
 
-        // 保留最近 5 個備份
+        // 保留最近 N 個備份
         let backups = JSON.parse(localStorage.getItem(BACKUP_KEY) || '[]');
         backups.unshift(backupData);
-        backups = backups.slice(0, 5);
+        backups = backups.slice(0, BACKUP_MAX_COUNT);
 
         try {
             localStorage.setItem(BACKUP_KEY, JSON.stringify(backups));
             showBackupToast();
         } catch (e) {
-            console.warn('自動備份失敗：', e);
+            console.warn('自動備份失敗（localStorage 可能已滿）：', e);
+            // 失敗時主動清空備份，避免每次都卡
+            try { localStorage.removeItem(BACKUP_KEY); } catch (_) { }
         }
     }
 
