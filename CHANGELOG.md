@@ -1,5 +1,27 @@
 # 班級小管家 Changelog
 
+## [v3.1.5] - 2026-04-24 🏷️ 版本號顯示強化
+
+### ✨ 新功能
+- **📌 瀏覽器分頁 title 顯示版本**：從「班級小管家」→「班級小管家 v3.1.5」，老師一眼看出是否為最新版
+- **🏷️ Header 版本徽章**：在「📚 班級小管家」右側顯示 `v3.1.5` 小膠囊按鈕（藍色）
+- **🔗 點擊徽章開啟 CHANGELOG**：點 Header 的版本徽章會在新分頁開啟 GitHub 上的更新紀錄
+- **🧮 `window.APP_VERSION` 全域常數**：其他模組可透過此常數取得版本資訊，方便未來開發
+
+### 🔧 開發者體驗強化
+- **`scripts/update-sw-version.js` 增強**：現在會**自動同步**更新以下位置的版本號：
+  - `sw.js` 的 `CACHE_NAME` / `STATIC_CACHE` / `DYNAMIC_CACHE` / `@version`
+  - `classnew.html` 的 `<title>` / `window.APP_VERSION` / Header 版本徽章
+- **單一真相來源**：`manifest.json` 的 version 欄位為唯一權威版本號，其他檔案全部由 script 自動同步
+- **零遺漏保證**：未來升版只需改 `package.json` + `manifest.json` + `npm run update-sw`，其他 7 處版本標記自動同步
+
+### 📁 更新檔案
+- `classnew.html` - 新增 `<title> v3.1.5`、`window.APP_VERSION`、Header 版本徽章（可點擊）
+- `scripts/update-sw-version.js` - 支援同步更新 HTML 內的 3 處版本標記
+- `package.json` / `manifest.json` / `sw.js` - 版本號升至 v3.1.5
+
+---
+
 ## [v3.1.4] - 2026-04-24 🚑 緊急修復 localStorage 配額爆滿
 
 ### 🐛 問題

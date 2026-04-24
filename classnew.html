@@ -37,7 +37,9 @@
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="icon" type="image/png" href="icons/icon-192.png">
     <link rel="shortcut icon" href="favicon.ico">
-    <title>班級小管家</title>
+    <title>班級小管家 v3.1.5</title>
+    <!-- 📦 版本號（由 scripts/update-sw-version.js 自動同步） -->
+    <script>window.APP_VERSION = '3.1.5';</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/rwd-breakpoints.css">
     <link rel="stylesheet" href="css/pwa-install.css">
@@ -611,7 +613,15 @@
                 <div class="flex flex-row items-center justify-between lg:justify-start">
                     <!-- 左側 Logo -->
                     <div class="flex flex-row items-center gap-2 sm:gap-3">
-                        <div class="text-xl sm:text-2xl font-bold text-blue-600">📚 班級小管家</div>
+                        <div class="text-xl sm:text-2xl font-bold text-blue-600 flex items-center gap-1.5">
+                            📚 班級小管家
+                            <span id="app-version-badge"
+                                title="目前版本（點擊查看更新資訊）"
+                                class="text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 cursor-pointer hover:bg-blue-200 transition-colors"
+                                onclick="window.open('https://github.com/cagoooo/class/blob/main/CHANGELOG.md', '_blank')">
+                                v3.1.5
+                            </span>
+                        </div>
                         <div class="hidden sm:block text-xs sm:text-sm text-gray-600">讓課堂管理變得簡單有趣</div>
                     </div>
                     <!-- 手機/平板版班級切換器（由 class-profiles.js 注入） -->

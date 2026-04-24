@@ -5,9 +5,10 @@
  * 用法：node scripts/update-sw-version.js
  * 或透過 package.json "preversion" 自動執行
  *
- * 功能：從 manifest.json 讀取 version，
- * 自動更新 sw.js 中的 CACHE_NAME、STATIC_CACHE、DYNAMIC_CACHE
- * 以及 @version 標籤，確保每次升版不會漏改。
+ * 功能：從 manifest.json 讀取 version，自動更新：
+ *   - sw.js 中的 CACHE_NAME、STATIC_CACHE、DYNAMIC_CACHE 與 @version 標籤
+ *   - classnew.html 中的 <title>、window.APP_VERSION、版本徽章 v3.x.x
+ *   確保每次升版不會漏改。
  */
 
 const fs = require('fs');
@@ -17,6 +18,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const MANIFEST_PATH = path.join(ROOT, 'manifest.json');
 const SW_PATH = path.join(ROOT, 'sw.js');
+const HTML_PATH = path.join(ROOT, 'classnew.html');
 
 // 讀取 manifest.json 取得版本號
 const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'));
@@ -29,14 +31,11 @@ if (!version) {
 
 console.log(`📦 讀取版本號：v${version}`);
 
-// 讀取 sw.js
+// ─────────────── 更新 sw.js ───────────────
 let sw = fs.readFileSync(SW_PATH, 'utf8');
-
-// 記錄替換前的版本
 const prevMatch = sw.match(/CACHE_NAME = 'class-manager-v([\d.]+)'/);
 const prevVersion = prevMatch ? prevMatch[1] : '???';
 
-// 替換三個快取常數
 sw = sw.replace(
     /const CACHE_NAME = 'class-manager-v[\d.]+'/g,
     `const CACHE_NAME = 'class-manager-v${version}'`
@@ -49,16 +48,52 @@ sw = sw.replace(
     /const DYNAMIC_CACHE = 'class-manager-dynamic-v[\d.]+'/g,
     `const DYNAMIC_CACHE = 'class-manager-dynamic-v${version}'`
 );
-
-// 同步更新 @version JSDoc 標籤
 sw = sw.replace(
     /\* @version [\d.]+/g,
     `* @version ${version}`
 );
 
-// 寫回 sw.js
 fs.writeFileSync(SW_PATH, sw, 'utf8');
 console.log(`✅ sw.js 已從 v${prevVersion} 更新至 v${version}`);
-console.log(`   - CACHE_NAME = 'class-manager-v${version}'`);
-console.log(`   - STATIC_CACHE = 'class-manager-static-v${version}'`);
-console.log(`   - DYNAMIC_CACHE = 'class-manager-dynamic-v${version}'`);
+
+// ─────────────── 更新 classnew.html ───────────────
+let html = fs.readFileSync(HTML_PATH, 'utf8');
+let htmlChanged = false;
+const htmlChanges = [];
+
+// 1. <title>班級小管家 v3.x.x</title>
+const titleBefore = html;
+html = html.replace(
+    /<title>班級小管家(?:\s+v[\d.]+)?<\/title>/,
+    `<title>班級小管家 v${version}</title>`
+);
+if (html !== titleBefore) { htmlChanged = true; htmlChanges.push(`<title> → 班級小管家 v${version}`); }
+
+// 2. window.APP_VERSION = '3.x.x';
+const appVerBefore = html;
+html = html.replace(
+    /window\.APP_VERSION\s*=\s*'[\d.]+'\s*;/,
+    `window.APP_VERSION = '${version}';`
+);
+if (html !== appVerBefore) { htmlChanged = true; htmlChanges.push(`window.APP_VERSION → '${version}'`); }
+
+// 3. 版本徽章內容：id="app-version-badge" 的 <span> 內容
+//    匹配「>  v3.1.4  <」這種形式（含可能的空白與換行）
+const badgeBefore = html;
+html = html.replace(
+    /(id="app-version-badge"[\s\S]*?>)\s*v[\d.]+\s*(<\/span>)/,
+    `$1\n                                v${version}\n                            $2`
+);
+if (html !== badgeBefore) { htmlChanged = true; htmlChanges.push(`版本徽章 → v${version}`); }
+
+if (htmlChanged) {
+    fs.writeFileSync(HTML_PATH, html, 'utf8');
+    console.log(`✅ classnew.html 已更新：`);
+    htmlChanges.forEach(c => console.log(`   - ${c}`));
+} else {
+    console.log(`ℹ️  classnew.html 無需更新（已是 v${version}）`);
+}
+
+console.log(`\n🎯 總結：`);
+console.log(`   - CACHE_NAME / STATIC_CACHE / DYNAMIC_CACHE = 'class-manager-v${version}'`);
+console.log(`   - <title> / window.APP_VERSION / 版本徽章 = v${version}`);
