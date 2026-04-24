@@ -60,26 +60,39 @@
 
     // ───── 緊急清理：localStorage 滿時自動釋放非必要空間 ─────
     // v3.1.4 新增：老師反映 QuotaExceededError 導致加扣分等操作失敗
-    //           自動清理非必要資料（備份、暫存），保住核心功能
+    // v3.1.6 加強：先判斷是否已登入雲端，再決定是否清理本地備份
+    //           - 已登入：可以安全清 autoBackup（雲端有完整資料）
+    //           - 未登入：只清節流/暫存，保留 autoBackup 避免資料永久遺失
+    function isLoggedInToCloud() {
+        try {
+            return !!(window.FirebaseConfig?.isConnected?.());
+        } catch (e) { return false; }
+    }
+
     function emergencyCleanup() {
         let freedBytes = 0;
-        // 清理優先序：先清最大、最安全的資料
+        const isLoggedIn = isLoggedInToCloud();
+        // 清理順序依「資料安全性」排序
         const CLEANUP_TARGETS = [
-            'classManager_autoBackup',      // 最大（5 份快照），雲端同步者不需要
-            'classManager_lastSync',         // 暫存
-            'pwaLastUpdateCheck',            // 節流時間戳
-            'swLastUpdateCheck',             // 節流時間戳
+            // 一律安全可清（純暫存/節流時間戳）
+            { key: 'classManager_lastSync', alwaysSafe: true },
+            { key: 'pwaLastUpdateCheck', alwaysSafe: true },
+            { key: 'swLastUpdateCheck', alwaysSafe: true },
+            // 需要雲端備份才能安全清（本地備份快照）
+            { key: 'classManager_autoBackup', alwaysSafe: false },
         ];
-        CLEANUP_TARGETS.forEach(k => {
-            const v = _origGet.call(localStorage, k);
+        CLEANUP_TARGETS.forEach(target => {
+            // 未登入 + 非 alwaysSafe → 跳過，保留本地備份
+            if (!target.alwaysSafe && !isLoggedIn) return;
+            const v = _origGet.call(localStorage, target.key);
             if (v !== null) {
-                freedBytes += (k.length + v.length) * 2;  // UTF-16 roughly 2 bytes/char
-                _origRemove.call(localStorage, k);
+                freedBytes += (target.key.length + v.length) * 2;  // UTF-16 roughly 2 bytes/char
+                _origRemove.call(localStorage, target.key);
             }
         });
-        // 額外清理：舊的 Firestore 持久化暫存（若存在）
+        // 額外清理：舊的 Firestore 持久化暫存（永遠安全，只是快取）
         for (let i = localStorage.length - 1; i >= 0; i--) {
-            const k = _origGet ? localStorage.key(i) : null;
+            const k = localStorage.key(i);
             if (!k) continue;
             if (k.startsWith('firebase:') && k.includes('/offline')) {
                 const v = _origGet.call(localStorage, k);
@@ -87,6 +100,7 @@
                 _origRemove.call(localStorage, k);
             }
         }
+        console.log(`[ClassAwareStorage] emergencyCleanup 釋放 ${(freedBytes/1024).toFixed(1)} KB（登入狀態: ${isLoggedIn ? '已登入' : '未登入'}）`);
         return freedBytes;
     }
 
@@ -130,8 +144,10 @@
                 <div class="cas-quota-title">瀏覽器儲存空間已滿</div>
                 <div class="cas-quota-desc">
                     累積的資料已超過瀏覽器可用空間，導致加扣分等操作失敗。<br>
-                    建議點擊下方「一鍵清理」釋放空間（不會刪除學生資料）。<br>
-                    <span style="color:#059669;font-weight:600;">已登入 Google 帳號的老師，雲端仍保有完整資料。</span>
+                    ` + (isLoggedInToCloud()
+                        ? '建議點擊下方「一鍵清理」釋放空間（不會刪除學生資料）。<br><span style="color:#059669;font-weight:600;">已登入 Google 帳號，雲端保有完整資料，安全無虞。</span>'
+                        : '<span style="color:#d97706;font-weight:600;">⚠️ 尚未登入 Google 帳號。</span><br>建議先登入雲端同步後再清理，以免本地備份遺失。現在只會清理暫存資料（不會刪除備份）。')
+                    + `
                 </div>
                 <div class="cas-quota-actions">
                     <button class="cas-quota-btn cas-quota-btn-primary" onclick="window.__casQuotaClean()">

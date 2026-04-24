@@ -232,6 +232,7 @@ async function syncToCloud() {
         const examReminders = safeLS('examReminders', { exam: [], break: [] });
         const examAttendance = safeLS('examAttendance', {});
         const examAbsenceRecords = safeLS('examAbsenceRecords', {});  // 缺考詳細記錄
+        const examDayPresets = safeLS('examDayPresets', null);        // v3.1.6：多日考試預設（第一天/第二天...）
         // 讀取 App 設定
         const clockSettings = safeLS('clockSettings', {});
         const noRepeat = localStorage.getItem('noRepeatLottery');
@@ -244,6 +245,7 @@ async function syncToCloud() {
         const examAnalogClock = localStorage.getItem('examAnalogClock');
         const examSoundsEnabled = localStorage.getItem('examSoundsEnabled');
         const homeworkDashboardView = localStorage.getItem('homeworkDashboardView');
+        const theme = localStorage.getItem('theme');  // v3.1.6：深色/淺色模式偏好
 
         // ── 並行上傳全部集合 ──
         await Promise.all([
@@ -259,6 +261,7 @@ async function syncToCloud() {
             uploadSingleDoc(COLLECTIONS.EXAM_DATA, 'reminders', { data: examReminders }),
             uploadSingleDoc(COLLECTIONS.EXAM_DATA, 'attendance', { data: examAttendance }),
             uploadSingleDoc(COLLECTIONS.EXAM_DATA, 'absenceRecords', { data: examAbsenceRecords }),
+            uploadSingleDoc(COLLECTIONS.EXAM_DATA, 'dayPresets', { data: examDayPresets }),  // v3.1.6
             // App 設定（時鐘 + 抽籤偏好 + 座位表 + 已抽 ID + UI 偏好）
             uploadSingleDoc(COLLECTIONS.APP_SETTINGS, 'clock', clockSettings),
             uploadSingleDoc(COLLECTIONS.APP_SETTINGS, 'lottery', {
@@ -267,7 +270,7 @@ async function syncToCloud() {
             }),
             uploadSingleDoc(COLLECTIONS.APP_SETTINGS, 'seating', { data: seatingConfig }),
             uploadSingleDoc(COLLECTIONS.APP_SETTINGS, 'uiPrefs', {
-                examLightMode, examAnalogClock, examSoundsEnabled, homeworkDashboardView
+                examLightMode, examAnalogClock, examSoundsEnabled, homeworkDashboardView, theme
             }),
         ]);
 
@@ -335,7 +338,7 @@ async function syncFromCloud() {
             cloudStudents, cloudPoints, cloudGroups,
             cloudNotebooks, cloudHomeworks, cloudLottery,
             cloudAnn,
-            examSubjectsDoc, examRemindersDoc, examAttendDoc, examAbsenceDoc,
+            examSubjectsDoc, examRemindersDoc, examAttendDoc, examAbsenceDoc, examDayPresetsDoc,
             clockDoc, lotterySettingDoc, seatingDoc, uiPrefsDoc
         ] = await Promise.all([
             downloadCollection(COLLECTIONS.STUDENTS),
@@ -349,6 +352,7 @@ async function syncFromCloud() {
             downloadSingleDoc(COLLECTIONS.EXAM_DATA, 'reminders'),
             downloadSingleDoc(COLLECTIONS.EXAM_DATA, 'attendance'),
             downloadSingleDoc(COLLECTIONS.EXAM_DATA, 'absenceRecords'),
+            downloadSingleDoc(COLLECTIONS.EXAM_DATA, 'dayPresets'),  // v3.1.6
             downloadSingleDoc(COLLECTIONS.APP_SETTINGS, 'clock'),
             downloadSingleDoc(COLLECTIONS.APP_SETTINGS, 'lottery'),
             downloadSingleDoc(COLLECTIONS.APP_SETTINGS, 'seating'),
@@ -388,6 +392,7 @@ async function syncFromCloud() {
             examReminders: examRemindersDoc?.data ?? { exam: [], break: [] },
             examAttendance: examAttendDoc?.data ?? {},
             examAbsenceRecords: examAbsenceDoc?.data ?? null,   // 新增：缺考詳細記錄
+            examDayPresets: examDayPresetsDoc?.data ?? null,    // v3.1.6：多日考試預設
             clockSettings: clockDoc ?? null,
             lotterySettings: lotterySettingDoc ?? null,         // 包含 noRepeatLottery + drawnStudentIds
             seatingConfig: seatingDoc?.data ?? null,            // 新增：座位表
@@ -474,6 +479,10 @@ async function loadFromCloudData(cloudData) {
         if (cloudData.examAbsenceRecords && Object.keys(cloudData.examAbsenceRecords).length > 0) {
             await dbSave('examAbsenceRecords', cloudData.examAbsenceRecords);
         }
+        // v3.1.6：考試多日預設（第一天/第二天... 完整科目清單）
+        if (cloudData.examDayPresets && cloudData.examDayPresets.days) {
+            await dbSave('examDayPresets', cloudData.examDayPresets);
+        }
 
         // App 設定
         if (cloudData.clockSettings) {
@@ -492,7 +501,7 @@ async function loadFromCloudData(cloudData) {
         }
         // UI 偏好（全域）
         if (cloudData.uiPrefs) {
-            ['examLightMode', 'examAnalogClock', 'examSoundsEnabled', 'homeworkDashboardView'].forEach(k => {
+            ['examLightMode', 'examAnalogClock', 'examSoundsEnabled', 'homeworkDashboardView', 'theme'].forEach(k => {
                 if (cloudData.uiPrefs[k] !== null && cloudData.uiPrefs[k] !== undefined) {
                     localStorage.setItem(k, cloudData.uiPrefs[k]);
                 }
@@ -966,6 +975,7 @@ async function syncAllClassesToCloud(onProgress) {
             const examReminders = JSON.parse(_raw(_classKey('examReminders')) || 'null');
             const examAttendance = JSON.parse(_raw(_classKey('examAttendance')) || '{}');
             const examAbsenceRecords = JSON.parse(_raw(_classKey('examAbsenceRecords')) || '{}');
+            const examDayPresets = JSON.parse(_raw(_classKey('examDayPresets')) || 'null');  // v3.1.6：多日考試
             const seatingConfig = JSON.parse(_raw(_classKey('seatingConfig')) || 'null');
             const drawnStudentIds = JSON.parse(_raw(_classKey('drawnStudentIds')) || '[]');
             const localChecks = JSON.parse(_raw(_classKey('homeworkChecks')) || '{}');
@@ -977,6 +987,7 @@ async function syncAllClassesToCloud(onProgress) {
             const examAnalogClock = _raw('examAnalogClock');
             const examSoundsEnabled = _raw('examSoundsEnabled');
             const homeworkDashboardView = _raw('homeworkDashboardView');
+            const theme = _raw('theme');  // v3.1.6：深色/淺色模式
 
             try {
                 await Promise.all([
@@ -997,6 +1008,7 @@ async function syncAllClassesToCloud(onProgress) {
                             b.set(col.doc('reminders'), { data: examReminders, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
                             b.set(col.doc('attendance'), { data: examAttendance, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
                             b.set(col.doc('absenceRecords'), { data: examAbsenceRecords, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                            b.set(col.doc('dayPresets'), { data: examDayPresets, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });  // v3.1.6
                             await b.commit();
                         }
                     })(),
@@ -1014,7 +1026,7 @@ async function syncAllClassesToCloud(onProgress) {
                             });
                             b.set(col.doc('seating'), { data: seatingConfig, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
                             b.set(col.doc('uiPrefs'), {
-                                examLightMode, examAnalogClock, examSoundsEnabled, homeworkDashboardView,
+                                examLightMode, examAnalogClock, examSoundsEnabled, homeworkDashboardView, theme,
                                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                             });
                             await b.commit();
@@ -1248,16 +1260,21 @@ async function syncAllClassesFromCloud(onProgress) {
                 // 寫入該班級的考試監考設定
                 const colExam = getUserCollectionForClass(COLLECTIONS.EXAM_DATA, classId);
                 if (colExam) {
-                    const [subjDoc, remDoc, attDoc, absDoc] = await Promise.all([
+                    const [subjDoc, remDoc, attDoc, absDoc, dayDoc] = await Promise.all([
                         colExam.doc('subjects').get(),
                         colExam.doc('reminders').get(),
                         colExam.doc('attendance').get(),
                         colExam.doc('absenceRecords').get(),
+                        colExam.doc('dayPresets').get(),  // v3.1.6
                     ]);
                     if (subjDoc.exists && subjDoc.data().data?.length) _rawSet(_classKey('examSubjects'), JSON.stringify(subjDoc.data().data));
                     if (remDoc.exists && remDoc.data().data) _rawSet(_classKey('examReminders'), JSON.stringify(remDoc.data().data));
                     if (attDoc.exists && Object.keys(attDoc.data().data || {}).length) _rawSet(_classKey('examAttendance'), JSON.stringify(attDoc.data().data));
                     if (absDoc.exists && absDoc.data().data) _rawSet(_classKey('examAbsenceRecords'), JSON.stringify(absDoc.data().data));
+                    // v3.1.6：多日考試預設
+                    if (dayDoc.exists && dayDoc.data().data && dayDoc.data().data.days) {
+                        _rawSet(_classKey('examDayPresets'), JSON.stringify(dayDoc.data().data));
+                    }
                 }
                 // App 設定
                 const colApp = getUserCollectionForClass(COLLECTIONS.APP_SETTINGS, classId);
@@ -1283,7 +1300,7 @@ async function syncAllClassesFromCloud(onProgress) {
                     // UI 偏好（全域）
                     if (uiPrefsDoc.exists) {
                         const u = uiPrefsDoc.data();
-                        ['examLightMode', 'examAnalogClock', 'examSoundsEnabled', 'homeworkDashboardView'].forEach(k => {
+                        ['examLightMode', 'examAnalogClock', 'examSoundsEnabled', 'homeworkDashboardView', 'theme'].forEach(k => {
                             if (u[k] !== null && u[k] !== undefined) _rawSet(k, String(u[k]));
                         });
                     }
