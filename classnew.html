@@ -37,9 +37,9 @@
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="icon" type="image/png" href="icons/icon-192.png">
     <link rel="shortcut icon" href="favicon.ico">
-    <title>班級小管家 v3.6.0</title>
+    <title>班級小管家 v3.7.0</title>
     <!-- 📦 版本號（由 scripts/update-sw-version.js 自動同步） -->
-    <script>window.APP_VERSION = '3.6.0';</script>
+    <script>window.APP_VERSION = '3.7.0';</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/rwd-breakpoints.css">
     <link rel="stylesheet" href="css/pwa-install.css">
@@ -648,7 +648,7 @@
                                 title="目前版本（點擊查看更新資訊）"
                                 class="text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 cursor-pointer hover:bg-blue-200 transition-colors"
                                 onclick="window.open('https://github.com/cagoooo/class/blob/main/CHANGELOG.md', '_blank')">
-                                v3.6.0
+                                v3.7.0
                             </span>
                         </div>
                         <div class="hidden sm:block text-xs sm:text-sm text-gray-600">讓課堂管理變得簡單有趣</div>
@@ -760,6 +760,11 @@
                 class="bg-gradient-to-br from-cyan-50 to-teal-50 p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-cyan-500 active:scale-95">
                 <div class="text-2xl sm:text-3xl mb-1 sm:mb-2">🦷</div>
                 <div class="font-semibold text-gray-700 text-sm sm:text-base">潔牙勾選</div>
+            </button>
+            <button onclick="showSection('comment')"
+                class="bg-gradient-to-br from-violet-50 to-fuchsia-50 p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-purple-500 active:scale-95">
+                <div class="text-2xl sm:text-3xl mb-1 sm:mb-2">✍️</div>
+                <div class="font-semibold text-gray-700 text-sm sm:text-base">評語生成</div>
             </button>
         </div>
 
@@ -1443,6 +1448,59 @@
                     <div class="bc-teeth" id="bc-teeth"><!-- 30 顆牙齒由 JS 產生 --></div>
                     <div class="bc-done" id="bc-done">🎉 全班都潔牙完成囉！牙齒亮晶晶～</div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ✍️ 成績單評語生成器 -->
+    <div id="comment-section" class="section bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6 hidden">
+        <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mb-1 flex items-center flex-wrap gap-2">
+            <span class="text-2xl sm:text-3xl mr-1">✍️</span>成績單評語生成器
+        </h2>
+        <p class="cg-sub text-sm sm:text-base mb-4">點選學生的特質，自動生成通順的成績單評語，一鍵複製貼上！✨</p>
+
+        <div class="cg-name-row">
+            <label for="cg-name">學生姓名</label>
+            <input id="cg-name" type="text" placeholder="可留空（例：小明）" maxlength="10">
+            <span class="text-xs text-gray-400">留空時會用「你 / 該生」稱呼</span>
+        </div>
+
+        <!-- 三大類特質（由 JS 產生晶片） -->
+        <div id="cg-cats"></div>
+
+        <!-- 口氣 & 字數 & 動作 -->
+        <div class="cg-controls">
+            <div class="fld">
+                <label for="cg-tone">口氣</label>
+                <select id="cg-tone">
+                    <option value="warm" selected>溫暖鼓勵</option>
+                    <option value="neutral">客觀中性</option>
+                    <option value="formal">嚴謹正式</option>
+                    <option value="lively">活潑親切</option>
+                </select>
+            </div>
+            <div class="fld">
+                <label for="cg-length">字數</label>
+                <select id="cg-length">
+                    <option value="short">簡短</option>
+                    <option value="medium" selected>適中</option>
+                    <option value="detailed">詳細</option>
+                </select>
+            </div>
+            <button class="cg-btn cg-clear" onclick="CommentGen.clear()">🧹 清除選擇</button>
+            <button class="cg-btn cg-gen" onclick="CommentGen.generate()">✨ 生成評語</button>
+        </div>
+
+        <!-- 輸出 -->
+        <div class="cg-out-wrap">
+            <div id="cg-output" class="cg-output placeholder">（在上方點選特質後，按「生成評語」）</div>
+            <div class="cg-out-bar">
+                <span class="cg-charcount" id="cg-charcount"></span>
+                <span class="cg-out-actions">
+                    <span class="cg-toast" id="cg-toast"></span>
+                    <button class="cg-btn cg-regen" onclick="CommentGen.generate()">🔄 換句話說</button>
+                    <button class="cg-btn cg-copy" onclick="CommentGen.copy()">📋 複製</button>
+                </span>
             </div>
         </div>
     </div>
@@ -2257,7 +2315,7 @@
         }
 
         // 有效的 section 名稱（供 URL hash 深連結使用）
-        const VALID_SECTIONS = ['students', 'points', 'grouping', 'lottery', 'timer', 'notebook', 'homework', 'exam', 'zodiac', 'board', 'brush', 'announcement'];
+        const VALID_SECTIONS = ['students', 'points', 'grouping', 'lottery', 'timer', 'notebook', 'homework', 'exam', 'zodiac', 'board', 'brush', 'comment', 'announcement'];
 
         function showSection(sectionName) {
             document.querySelectorAll('.section').forEach(section => section.classList.add('hidden'));
@@ -2273,6 +2331,9 @@
             }
             if (sectionName === 'brush' && window.BrushCheck && typeof BrushCheck.init === 'function') {
                 BrushCheck.init();
+            }
+            if (sectionName === 'comment' && window.CommentGen && typeof CommentGen.init === 'function') {
+                CommentGen.init();
             }
             // 同步 URL hash，讓使用者可直接用連結跳轉到指定區塊（例：classnew.html#exam）
             try {
@@ -4142,6 +4203,9 @@
 
     <!-- 🦷 潔牙勾選表 -->
     <script src="./js/brush-check.js?v=3.6.0"></script>
+
+    <!-- ✍️ 成績單評語生成器 -->
+    <script src="./js/comment-gen.js?v=3.7.0"></script>
 
     <!-- 學期封存模組（Q01：一鍵封存學期資料至 Firebase archives/） -->
     <script src="./js/semester-archive.js"></script>
