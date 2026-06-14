@@ -45,11 +45,14 @@
     }
     function isLoggedInToCloud() {
         try {
-            if (window.FirebaseConfig) {
-                // 優先用「是否為 Google 登入（非匿名）」判斷，匿名連線不算真正登入
-                if (FirebaseConfig.isGoogleUser) return !!FirebaseConfig.isGoogleUser();
-                if (FirebaseConfig.isConnected) return !!FirebaseConfig.isConnected();
+            const fc = window.FirebaseConfig;
+            if (fc) {
+                if (fc.isGoogleUser && fc.isGoogleUser()) return true;            // 記憶體：Google 登入
+                if (fc.getCurrentProfile) { const p = fc.getCurrentProfile(); if (p && p.isAnonymous === false) return true; }
             }
+            // 後備：持久化登入資料（與右上角顯示同源，登入後即寫入），避免記憶體狀態尚未就緒
+            const raw = localStorage.getItem('firebaseUserProfile');
+            if (raw) { const pp = JSON.parse(raw); if (pp && pp.isAnonymous === false) return true; }
         } catch (e) { /* ignore */ }
         return false;
     }
