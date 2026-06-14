@@ -1,7 +1,7 @@
 /**
  * comment-gen.js
  * ✍️ 成績單評語生成器
- * @version 3.7.0
+ * @version 3.9.4
  *
  * 需求：
  *   - 三大類特質點選：人際關係 / 學習表現 / 日常生活表現
@@ -171,7 +171,7 @@
         .cg-chip:hover{transform:translateY(-2px)}
         .cg-chip.pos.on{background:linear-gradient(135deg,#34d399,#10b981);border-color:#10b981;color:#fff;box-shadow:0 4px 10px rgba(16,185,129,.35)}
         .cg-chip.neg.on{background:linear-gradient(135deg,#fbbf24,#f59e0b);border-color:#f59e0b;color:#fff;box-shadow:0 4px 10px rgba(245,158,11,.35)}
-        .cg-controls{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.9rem;margin:1rem 0;padding:1rem;background:#faf5ff;border-radius:1rem}
+        .cg-controls{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.9rem;margin:0;padding:1rem;background:#faf5ff;border-radius:1rem}
         .cg-controls .fld{display:flex;flex-direction:column;gap:.25rem}
         .cg-controls label{font-size:.82rem;font-weight:800;color:#6b21a8}
         .cg-controls select{padding:.5rem .8rem;border:2px solid #ddd6fe;border-radius:.7rem;font-size:.95rem;font-weight:700;color:#4b5563;background:#fff}
@@ -212,11 +212,16 @@
                     <div class="cg-chips">${cat.neg.map((t, i) => chip(cat.key, 'n', i, t.l, 'neg')).join('')}</div>
                 </div>
             </div>`).join('');
-        host.querySelectorAll('.cg-chip').forEach(c => c.addEventListener('click', () => {
-            const id = c.dataset.id;
-            if (selected.has(id)) { selected.delete(id); c.classList.remove('on'); }
-            else { selected.add(id); c.classList.add('on'); }
-        }));
+        host.querySelectorAll('.cg-chip').forEach(c => {
+            // 重新進入區塊時還原先前已選取的高亮狀態，避免「有評語卻沒亮燈」的錯亂
+            if (selected.has(c.dataset.id)) c.classList.add('on');
+            c.addEventListener('click', () => {
+                const id = c.dataset.id;
+                if (selected.has(id)) { selected.delete(id); c.classList.remove('on'); }
+                else { selected.add(id); c.classList.add('on'); }
+                generate(); // 即時生成：點選特質後右側立刻更新
+            });
+        });
     }
     function chip(catKey, pol, i, label, cls) {
         return `<span class="cg-chip ${cls}" data-id="${catKey}|${pol}|${i}">${esc(label)}</span>`;
@@ -268,7 +273,7 @@
         });
 
         if (!clauses.length) {
-            output('（請先在上方點選至少一個特質，再按「生成評語」）', true);
+            output('（在左側點選特質，這裡會即時生成評語 ✨）', true);
             return;
         }
         const parts = [];
@@ -303,12 +308,12 @@
     function clear() {
         selected.clear();
         document.querySelectorAll('#cg-cats .cg-chip.on').forEach(c => c.classList.remove('on'));
-        output('（在上方點選特質後，按「生成評語」）', true);
+        output('（在左側點選特質，這裡會即時生成評語 ✨）', true);
     }
 
     // ───────────── 對外 API ─────────────
     window.CommentGen = {
-        init() { injectCSS(); renderCats(); if (!lastText) output('（在上方點選特質後，按「生成評語」）', true); },
+        init() { injectCSS(); renderCats(); if (!lastText) output('（在左側點選特質，這裡會即時生成評語 ✨）', true); },
         generate, copy, clear
     };
 

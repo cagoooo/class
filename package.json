@@ -1,6 +1,6 @@
 {
     "name": "class-manager",
-    "version": "3.9.3",
+    "version": "3.9.4",
     "description": "班級小管家 - 教師班級管理 PWA",
     "scripts": {
         "update-sw": "node scripts/update-sw-version.js",
