@@ -3,7 +3,7 @@
 
 <head>
     <!-- 🔒 多班級資料隔離：必須在所有模組之前載入，攔截 localStorage 自動依班級路由 -->
-    <script src="js/class-aware-storage.js?v=3.3.0"></script>
+    <script src="js/class-aware-storage.js?v=3.5.0"></script>
     <!-- 🌱 通用空狀態元件：各區塊沒資料時顯示友善引導 -->
     <script src="js/empty-state.js?v=3.1.0"></script>
 
@@ -37,9 +37,9 @@
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="icon" type="image/png" href="icons/icon-192.png">
     <link rel="shortcut icon" href="favicon.ico">
-    <title>班級小管家 v3.4.0</title>
+    <title>班級小管家 v3.5.0</title>
     <!-- 📦 版本號（由 scripts/update-sw-version.js 自動同步） -->
-    <script>window.APP_VERSION = '3.4.0';</script>
+    <script>window.APP_VERSION = '3.5.0';</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/rwd-breakpoints.css">
     <link rel="stylesheet" href="css/pwa-install.css">
@@ -648,7 +648,7 @@
                                 title="目前版本（點擊查看更新資訊）"
                                 class="text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 cursor-pointer hover:bg-blue-200 transition-colors"
                                 onclick="window.open('https://github.com/cagoooo/class/blob/main/CHANGELOG.md', '_blank')">
-                                v3.4.0
+                                v3.5.0
                             </span>
                         </div>
                         <div class="hidden sm:block text-xs sm:text-sm text-gray-600">讓課堂管理變得簡單有趣</div>
@@ -750,6 +750,11 @@
                 class="bg-gradient-to-br from-rose-50 to-amber-50 p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-rose-500 active:scale-95">
                 <div class="text-2xl sm:text-3xl mb-1 sm:mb-2">🧧</div>
                 <div class="font-semibold text-gray-700 text-sm sm:text-base">新年拉霸</div>
+            </button>
+            <button onclick="showSection('board')"
+                class="bg-gradient-to-br from-violet-50 to-sky-50 p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-violet-500 active:scale-95">
+                <div class="text-2xl sm:text-3xl mb-1 sm:mb-2">🎨</div>
+                <div class="font-semibold text-gray-700 text-sm sm:text-base">經營白板</div>
             </button>
         </div>
 
@@ -1375,6 +1380,41 @@
 
         <!-- 統計列 -->
         <div class="zslot-stats">🎁 今日已拉 <span id="zslot-count">0</span> 次 · 人人有獎，新年好彩頭！</div>
+    </div>
+
+    <!-- 🎨 班級經營白板（公告白板 + 班級秩序 + 號碼抽籤） -->
+    <div id="board-section" class="section bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6 hidden">
+        <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mb-1 flex items-center flex-wrap gap-2">
+            <span class="text-2xl sm:text-3xl mr-1">🎨</span>班級經營白板
+        </h2>
+        <p class="cb-sub text-sm sm:text-base mb-4">打公告、切換班級狀態、抽號碼 —— 都能一鍵全螢幕投影給全班看！✨</p>
+
+        <div class="cb-grid">
+            <!-- 白板公告區 -->
+            <div class="cb-board-col">
+                <div class="cb-toolbar" id="cb-toolbar"><!-- 字級/顏色/粗細 由 JS 產生 --></div>
+                <textarea id="cb-text" class="cb-text" placeholder="在這裡打公告，例如：今天要帶直笛喔！🎵"></textarea>
+                <button class="cb-fsbtn" onclick="ClassBoard.fullscreenNote()">🖥️ 全螢幕顯示公告</button>
+            </div>
+            <!-- 右側工具列 -->
+            <div class="cb-tools-col">
+                <button class="cb-tool timer" onclick="showSection('timer')">
+                    <span class="ico">⏰</span><span>倒數計時器</span><span class="cap">點我去計時</span>
+                </button>
+                <button class="cb-tool lottery" onclick="ClassBoard.openLottery()">
+                    <span class="ico">🎲</span><span>號碼抽籤</span><span class="cap">設定號碼抽幾位</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 班級秩序管理 -->
+        <div class="cb-order">
+            <h3>🚦 班級秩序 <span class="cb-cur" id="cb-current">目前：尚未設定</span></h3>
+            <div class="cb-hint">點一個圖示切換現在的狀態，再點一次取消；按「全螢幕」投影給全班看。</div>
+            <div class="cb-acts" id="cb-activities"><!-- 6 個狀態卡由 JS 產生 --></div>
+            <button class="cb-fsbtn" style="margin-top:1rem;background:linear-gradient(135deg,#fbbf24,#f59e0b);box-shadow:0 4px 0 #b45309"
+                onclick="ClassBoard.fullscreenActivity()">🖥️ 全螢幕顯示目前狀態</button>
+        </div>
     </div>
 
     <!-- 全螢幕考試監考 Modal -->
@@ -2187,7 +2227,7 @@
         }
 
         // 有效的 section 名稱（供 URL hash 深連結使用）
-        const VALID_SECTIONS = ['students', 'points', 'grouping', 'lottery', 'timer', 'notebook', 'homework', 'exam', 'zodiac', 'announcement'];
+        const VALID_SECTIONS = ['students', 'points', 'grouping', 'lottery', 'timer', 'notebook', 'homework', 'exam', 'zodiac', 'board', 'announcement'];
 
         function showSection(sectionName) {
             document.querySelectorAll('.section').forEach(section => section.classList.add('hidden'));
@@ -2197,6 +2237,9 @@
             }
             if (sectionName === 'zodiac' && typeof window.zodiacInit === 'function') {
                 window.zodiacInit();
+            }
+            if (sectionName === 'board' && window.ClassBoard && typeof ClassBoard.init === 'function') {
+                ClassBoard.init();
             }
             // 同步 URL hash，讓使用者可直接用連結跳轉到指定區塊（例：classnew.html#exam）
             try {
@@ -4060,6 +4103,9 @@
 
     <!-- 🛟 資料保險把關（清除前強制備份 + 儲存空間預警） -->
     <script src="./js/data-safety-guard.js?v=3.3.0"></script>
+
+    <!-- 🎨 班級經營白板（公告白板 + 班級秩序 + 號碼抽籤） -->
+    <script src="./js/class-board.js?v=3.5.0"></script>
 
     <!-- 學期封存模組（Q01：一鍵封存學期資料至 Firebase archives/） -->
     <script src="./js/semester-archive.js"></script>

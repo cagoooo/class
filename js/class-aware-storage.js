@@ -37,6 +37,10 @@
         'seatingConfig',            // 座位表
         'drawnStudentIds',          // 抽籤已抽出學生
         'examDayPresets',           // 考試多日預設（第一天/第二天...）
+        'boardNote',                // 經營白板：公告文字
+        'boardNoteStyle',           // 經營白板：字級/顏色/粗細
+        'boardActivity',            // 經營白板：目前班級秩序狀態
+        'boardLotteryCfg',          // 經營白板：號碼抽籤設定
     ]);
 
     // 取得原始 Storage 方法（避免被自己攔截）
