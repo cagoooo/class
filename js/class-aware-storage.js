@@ -136,6 +136,8 @@
                 }
                 .cas-quota-btn-primary { background: linear-gradient(135deg,#3b82f6,#6366f1); color: #fff; }
                 .cas-quota-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(99,102,241,0.4); }
+                .cas-quota-btn-warn { background: linear-gradient(135deg,#f59e0b,#d97706); color: #fff; }
+                .cas-quota-btn-warn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(217,119,6,0.4); }
                 .cas-quota-btn-secondary { background: #f3f4f6; color: #374151; }
                 .cas-quota-btn-secondary:hover { background: #e5e7eb; }
             </style>
@@ -144,13 +146,17 @@
                 <div class="cas-quota-title">瀏覽器儲存空間已滿</div>
                 <div class="cas-quota-desc">
                     累積的資料已超過瀏覽器可用空間，導致加扣分等操作失敗。<br>
+                    <b style="color:#b91c1c">⚠️ 清理或清除前，請務必先下載備份，否則學生與加扣分紀錄可能永久消失！</b><br>
                     ` + (isLoggedInToCloud()
                         ? '建議點擊下方「一鍵清理」釋放空間（不會刪除學生資料）。<br><span style="color:#059669;font-weight:600;">已登入 Google 帳號，雲端保有完整資料，安全無虞。</span>'
                         : '<span style="color:#d97706;font-weight:600;">⚠️ 尚未登入 Google 帳號。</span><br>建議先登入雲端同步後再清理，以免本地備份遺失。現在只會清理暫存資料（不會刪除備份）。')
                     + `
                 </div>
                 <div class="cas-quota-actions">
-                    <button class="cas-quota-btn cas-quota-btn-primary" onclick="window.__casQuotaClean()">
+                    <button class="cas-quota-btn cas-quota-btn-primary" onclick="window.__casQuotaBackup()">
+                        📥 先下載備份檔（強烈建議）
+                    </button>
+                    <button class="cas-quota-btn cas-quota-btn-warn" onclick="window.__casQuotaClean()">
                         🧹 一鍵清理（釋放空間）
                     </button>
                     <button class="cas-quota-btn cas-quota-btn-secondary" onclick="window.__casQuotaClose()">
@@ -166,6 +172,18 @@
             quotaDialogShown = false;
             delete window.__casQuotaClose;
             delete window.__casQuotaClean;
+            delete window.__casQuotaBackup;
+        };
+        // 📥 先下載備份：優先走資料保險模組，其次直接用 DataBackup.export
+        window.__casQuotaBackup = () => {
+            try {
+                if (window.DataSafetyGuard && DataSafetyGuard.downloadBackup) { DataSafetyGuard.downloadBackup(); return; }
+                var _DB = (typeof DataBackup !== 'undefined') ? DataBackup : window.DataBackup;
+                if (_DB && _DB.export) { _DB.export(); return; }
+                alert('找不到備份功能，請到「學生管理 → 管理功能 → 匯出完整備份」手動下載後再清理。');
+            } catch (e) {
+                alert('備份失敗：' + (e && e.message || e));
+            }
         };
         window.__casQuotaClean = () => {
             const freed = emergencyCleanup();

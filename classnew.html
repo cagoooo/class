@@ -3,7 +3,7 @@
 
 <head>
     <!-- 🔒 多班級資料隔離：必須在所有模組之前載入，攔截 localStorage 自動依班級路由 -->
-    <script src="js/class-aware-storage.js?v=3.1.6"></script>
+    <script src="js/class-aware-storage.js?v=3.3.0"></script>
     <!-- 🌱 通用空狀態元件：各區塊沒資料時顯示友善引導 -->
     <script src="js/empty-state.js?v=3.1.0"></script>
 
@@ -37,9 +37,9 @@
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="icon" type="image/png" href="icons/icon-192.png">
     <link rel="shortcut icon" href="favicon.ico">
-    <title>班級小管家 v3.2.0</title>
+    <title>班級小管家 v3.3.0</title>
     <!-- 📦 版本號（由 scripts/update-sw-version.js 自動同步） -->
-    <script>window.APP_VERSION = '3.2.0';</script>
+    <script>window.APP_VERSION = '3.3.0';</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/rwd-breakpoints.css">
     <link rel="stylesheet" href="css/pwa-install.css">
@@ -648,7 +648,7 @@
                                 title="目前版本（點擊查看更新資訊）"
                                 class="text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 cursor-pointer hover:bg-blue-200 transition-colors"
                                 onclick="window.open('https://github.com/cagoooo/class/blob/main/CHANGELOG.md', '_blank')">
-                                v3.2.0
+                                v3.3.0
                             </span>
                         </div>
                         <div class="hidden sm:block text-xs sm:text-sm text-gray-600">讓課堂管理變得簡單有趣</div>
@@ -3320,8 +3320,16 @@
             }
         }
 
-        function clearAllStudents() {
-            if (confirm('確定要清除所有學生名單嗎？\n此操作將會刪除所有學生、分數、分組與作業記錄，且無法復原。')) {
+        async function clearAllStudents() {
+            // 🛟 資料保險把關：清除前強制先備份（避免再次發生清除後紀錄全失的悲劇）
+            const proceed = (window.DataSafetyGuard && DataSafetyGuard.guardClear)
+                ? await DataSafetyGuard.guardClear({
+                    title: '清除全班資料前，先存好備份！',
+                    message: '此操作會永久刪除：全班學生、加扣分紀錄、分組與作業紀錄。',
+                    dangerLabel: '確定清除全部'
+                })
+                : confirm('確定要清除所有學生名單嗎？\n此操作將會刪除所有學生、分數、分組與作業記錄，且無法復原。');
+            if (proceed) {
                 students = [];
                 pointsHistory = [];
                 groups = [];
@@ -3408,8 +3416,16 @@
             document.body.removeChild(link);
         }
 
-        function resetAllScores() {
-            if (confirm('確定要重置所有學生的分數嗎？此操作無法復原。')) {
+        async function resetAllScores() {
+            // 🛟 資料保險把關：重置分數會清空加扣分歷史，先強制備份
+            const proceed = (window.DataSafetyGuard && DataSafetyGuard.guardClear)
+                ? await DataSafetyGuard.guardClear({
+                    title: '重置分數前，先存好備份！',
+                    message: '此操作會把所有學生與小組分數歸零，並清空全部加扣分歷史紀錄。',
+                    dangerLabel: '確定重置分數'
+                })
+                : confirm('確定要重置所有學生的分數嗎？此操作無法復原。');
+            if (proceed) {
                 students.forEach(s => s.points = 0);
                 groups.forEach(g => g.score = 0);
                 pointsHistory = [];
@@ -3936,6 +3952,9 @@
 
     <!-- 🧧 十二生肖・新年拉霸機（開學破冰遊戲） -->
     <script src="./js/zodiac-slot.js?v=3.2.0"></script>
+
+    <!-- 🛟 資料保險把關（清除前強制備份 + 儲存空間預警） -->
+    <script src="./js/data-safety-guard.js?v=3.3.0"></script>
 
     <!-- 學期封存模組（Q01：一鍵封存學期資料至 Firebase archives/） -->
     <script src="./js/semester-archive.js"></script>
