@@ -1,12 +1,12 @@
 /**
  * 班級小管家 Service Worker
- * @version 3.9.6
+ * @version 3.10.0
  * @description PWA 離線支援與快取策略優化
  */
 
-const CACHE_NAME = 'class-manager-v3.9.6';
-const STATIC_CACHE = 'class-manager-static-v3.9.6';
-const DYNAMIC_CACHE = 'class-manager-dynamic-v3.9.6';
+const CACHE_NAME = 'class-manager-v3.10.0';
+const STATIC_CACHE = 'class-manager-static-v3.10.0';
+const DYNAMIC_CACHE = 'class-manager-dynamic-v3.10.0';
 
 
 // 靜態資源列表（安裝時預快取）
@@ -66,7 +66,9 @@ const STATIC_ASSETS = [
     // v3.7.0 新增模組
     './js/comment-gen.js',
     // v3.8.0 新增模組
-    './js/dialogue-school.js'
+    './js/dialogue-school.js',
+    // v3.10.0 新增模組
+    './js/usage-notify.js'
 ];
 
 // 需要網路優先的路徑模式
@@ -151,6 +153,10 @@ self.addEventListener('fetch', (event) => {
 
     // 跳過 Chrome 擴充功能請求
     if (url.protocol === 'chrome-extension:') return;
+
+    // 只攔截 GET：POST/PUT 等（Cloud Functions callable、Firestore 寫入…）一律放行給瀏覽器。
+    // 否則 cacheFirst 內 cache.put(POST) 會丟錯，請求被攔截成 503（會讓 callable 通知失敗）。
+    if (request.method !== 'GET') return;
 
     // 判斷是否需要網路優先
     const needsNetworkFirst = NETWORK_FIRST_PATTERNS.some(pattern =>

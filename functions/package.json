@@ -1,0 +1,12 @@
+{
+  "name": "functions",
+  "description": "班級小管家 — 使用情形 Google Chat 通知（Callable Cloud Function）",
+  "engines": {
+    "node": "20"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "firebase-functions": "^5.1.0"
+  },
+  "private": true
+}

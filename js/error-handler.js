@@ -258,6 +258,9 @@ const ErrorHandler = (function () {
             const errorObj = error instanceof Error ? error : new Error(String(error));
             const errorType = ErrorTypes[type.toUpperCase()] || type || ErrorTypes.UNKNOWN;
 
+            // 使用情形通知：系統錯誤（同訊息每場一次、每場上限；通知失敗不可影響錯誤處理）
+            try { if (window.UsageNotify) UsageNotify.error(errorObj.message, context); } catch (e) { /* ignore */ }
+
             const errorInfo = {
                 type: errorType,
                 message: errorObj.message,

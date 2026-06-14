@@ -671,6 +671,9 @@
 
             const id = await this.add(name);
 
+            // 使用情形通知：建立新班級（持久化佇列，reload 後仍會補送）
+            try { if (window.UsageNotify) UsageNotify.classCreate(name); } catch (e) { /* ignore */ }
+
             // 顯示切換 Overlay 並切換到新班級
             const ov = document.getElementById('cs-switch-overlay');
             const msg = document.getElementById('cs-switch-msg');

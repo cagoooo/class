@@ -37,9 +37,9 @@
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="icon" type="image/png" href="icons/icon-192.png">
     <link rel="shortcut icon" href="favicon.ico">
-    <title>班級小管家 v3.9.6</title>
+    <title>班級小管家 v3.10.0</title>
     <!-- 📦 版本號（由 scripts/update-sw-version.js 自動同步） -->
-    <script>window.APP_VERSION = '3.9.6';</script>
+    <script>window.APP_VERSION = '3.10.0';</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/rwd-breakpoints.css">
     <link rel="stylesheet" href="css/pwa-install.css">
@@ -51,6 +51,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-functions-compat.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap');
         /* 引入 LED 和可愛時鐘字體 */
@@ -648,7 +649,7 @@
                                 title="目前版本（點擊查看更新資訊）"
                                 class="text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 cursor-pointer hover:bg-blue-200 transition-colors"
                                 onclick="window.open('https://github.com/cagoooo/class/blob/main/CHANGELOG.md', '_blank')">
-                                v3.9.6
+                                v3.10.0
                             </span>
                         </div>
                         <div class="hidden sm:block text-xs sm:text-sm text-gray-600">讓課堂管理變得簡單有趣</div>
@@ -2451,6 +2452,8 @@
                     try { FirebaseConfig.onAuthStateChanged(function () { refreshBackupHubStatus(); }); } catch (e) { /* ignore */ }
                 }
             }
+            // 使用情形通知（每場每功能只報第一次，失敗不影響操作）
+            try { if (window.UsageNotify) UsageNotify.feature(sectionName); } catch (e) { /* ignore */ }
             // 同步 URL hash，讓使用者可直接用連結跳轉到指定區塊（例：classnew.html#exam）
             try {
                 if (location.hash !== '#' + sectionName) {
@@ -4229,6 +4232,7 @@
 
     <script src="js/class-db.js"></script>
     <script src="js/firebase-config.js"></script>
+    <script src="js/usage-notify.js?v=3.10.0"></script>
     <script src="js/firebase-sync.js"></script>
     <script src="js/firebase-ui.js"></script>
     <script src="js/storage-manager.js"></script>

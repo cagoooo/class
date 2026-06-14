@@ -88,6 +88,8 @@ async function signInWithGoogle() {
         localStorage.setItem('firebaseUserProfile', JSON.stringify(currentUserProfile));
 
         console.log('✅ Google 登入成功:', currentUserProfile.email);
+        // 使用情形通知：老師登入（失敗不影響登入流程）
+        try { if (window.UsageNotify) UsageNotify.login(currentUserProfile); } catch (e) { /* ignore */ }
         return currentUserProfile;
     } catch (error) {
         // 使用者關閉 Popup = 正常取消，不顯示錯誤
