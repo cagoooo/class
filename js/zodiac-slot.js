@@ -312,7 +312,9 @@
         .zf-actions{display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap;margin-top:1rem}
         .zf-actions button{border:none;border-radius:9999px;padding:.6rem 1.2rem;font-weight:800;cursor:pointer;font-size:.95rem;touch-action:manipulation}
         .zf-act-redraw{background:#fee2e2;color:#b91c1c}
-        .zf-act-copy{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;box-shadow:0 3px 0 #15803d}
+        .zf-act-copy{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;box-shadow:0 3px 0 #15803d;transition:background .15s}
+        .zf-act-copy.zf-copied{background:linear-gradient(135deg,#15803d,#166534);box-shadow:0 3px 0 #14532d;animation:zfCopied .45s cubic-bezier(.2,1.6,.4,1)}
+        @keyframes zfCopied{0%{transform:scale(1)}45%{transform:scale(1.14)}100%{transform:scale(1)}}
         .zf-credit{text-align:center;font-size:.72rem;color:#9ca3af;margin-top:.9rem}
 
         @media (max-width:480px){.zslot-lever{display:none}}
@@ -643,7 +645,7 @@
                 <div class="zf-teacher"><span class="zf-tag">老師說</span><p>${escapeHtml(f.desc)}</p></div>
                 <div class="zf-actions">
                     <button class="zf-act-redraw" onclick="zodiacDrawFortune()">🎋 再求一支</button>
-                    <button class="zf-act-copy" onclick="zodiacCopyFortune()">📋 複製分享</button>
+                    <button class="zf-act-copy" onclick="zodiacCopyFortune(this)">📋 複製分享</button>
                 </div>
             </div>`;
         result.classList.remove('hidden');
@@ -684,20 +686,29 @@
         }, 1000);
     };
 
-    window.zodiacCopyFortune = function () {
+    window.zodiacCopyFortune = function (btn) {
         if (!currentFortuneText) return;
-        const done = () => {
+        // 多重回饋：按鈕變「✅ 已複製！」+ 綠色彈跳 + 提示音 + 通知，1.6 秒後復原
+        const flash = () => {
+            try { tone(880, 0.08, 'sine', 0.16); tone(1320, 0.12, 'sine', 0.13, 0.08); } catch (e) { }
             if (typeof window.NotificationSystem !== 'undefined' && NotificationSystem.success) NotificationSystem.success('已複製開運籤，可貼給家人朋友分享！');
+            if (btn && !btn.__copyBusy) {
+                btn.__copyBusy = true;
+                const orig = btn.innerHTML;
+                btn.innerHTML = '✅ 已複製！';
+                btn.classList.add('zf-copied');
+                setTimeout(() => { btn.innerHTML = orig; btn.classList.remove('zf-copied'); btn.__copyBusy = false; }, 1600);
+            }
         };
         const fallback = () => {
             try {
                 const ta = document.createElement('textarea');
                 ta.value = currentFortuneText; ta.style.position = 'fixed'; ta.style.opacity = '0';
-                document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); done();
+                document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); flash();
             } catch (e) { /* ignore */ }
         };
         if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(currentFortuneText).then(done).catch(fallback);
+            navigator.clipboard.writeText(currentFortuneText).then(flash).catch(fallback);
         } else { fallback(); }
     };
 
