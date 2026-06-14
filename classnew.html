@@ -3,7 +3,7 @@
 
 <head>
     <!-- 🔒 多班級資料隔離：必須在所有模組之前載入，攔截 localStorage 自動依班級路由 -->
-    <script src="js/class-aware-storage.js?v=3.5.0"></script>
+    <script src="js/class-aware-storage.js?v=3.6.0"></script>
     <!-- 🌱 通用空狀態元件：各區塊沒資料時顯示友善引導 -->
     <script src="js/empty-state.js?v=3.1.0"></script>
 
@@ -37,9 +37,9 @@
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="icon" type="image/png" href="icons/icon-192.png">
     <link rel="shortcut icon" href="favicon.ico">
-    <title>班級小管家 v3.5.0</title>
+    <title>班級小管家 v3.6.0</title>
     <!-- 📦 版本號（由 scripts/update-sw-version.js 自動同步） -->
-    <script>window.APP_VERSION = '3.5.0';</script>
+    <script>window.APP_VERSION = '3.6.0';</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/rwd-breakpoints.css">
     <link rel="stylesheet" href="css/pwa-install.css">
@@ -648,7 +648,7 @@
                                 title="目前版本（點擊查看更新資訊）"
                                 class="text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 cursor-pointer hover:bg-blue-200 transition-colors"
                                 onclick="window.open('https://github.com/cagoooo/class/blob/main/CHANGELOG.md', '_blank')">
-                                v3.5.0
+                                v3.6.0
                             </span>
                         </div>
                         <div class="hidden sm:block text-xs sm:text-sm text-gray-600">讓課堂管理變得簡單有趣</div>
@@ -755,6 +755,11 @@
                 class="bg-gradient-to-br from-violet-50 to-sky-50 p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-violet-500 active:scale-95">
                 <div class="text-2xl sm:text-3xl mb-1 sm:mb-2">🎨</div>
                 <div class="font-semibold text-gray-700 text-sm sm:text-base">經營白板</div>
+            </button>
+            <button onclick="showSection('brush')"
+                class="bg-gradient-to-br from-cyan-50 to-teal-50 p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-cyan-500 active:scale-95">
+                <div class="text-2xl sm:text-3xl mb-1 sm:mb-2">🦷</div>
+                <div class="font-semibold text-gray-700 text-sm sm:text-base">潔牙勾選</div>
             </button>
         </div>
 
@@ -1414,6 +1419,31 @@
             <div class="cb-acts" id="cb-activities"><!-- 6 個狀態卡由 JS 產生 --></div>
             <button class="cb-fsbtn" style="margin-top:1rem;background:linear-gradient(135deg,#fbbf24,#f59e0b);box-shadow:0 4px 0 #b45309"
                 onclick="ClassBoard.fullscreenActivity()">🖥️ 全螢幕顯示目前狀態</button>
+        </div>
+    </div>
+
+    <!-- 🦷 潔牙勾選表 -->
+    <div id="brush-section" class="section bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6 hidden">
+        <div class="bc-wrap">
+            <h2 class="bc-title"><span class="tooth">🦷</span> 潔牙做得好，健康沒煩惱</h2>
+            <div class="bc-grid">
+                <!-- 左：提醒區 -->
+                <div class="bc-remind">
+                    <h3>🍱 吃完飯，記得做三件事</h3>
+                    <div class="bc-remind-item"><span class="e">🦷</span><div><div class="t">潔牙</div><div class="s">把牙齒刷得亮晶晶</div></div></div>
+                    <div class="bc-remind-item"><span class="e">🧽</span><div><div class="t">擦桌子</div><div class="s">桌面收乾淨</div></div></div>
+                    <div class="bc-remind-item"><span class="e">🚽</span><div><div class="t">上廁所</div><div class="s">記得洗手手</div></div></div>
+                </div>
+                <!-- 右：號碼牙齒區 -->
+                <div class="bc-teeth-area">
+                    <div class="bc-teeth-head">
+                        <span class="bc-count" id="bc-count">✨ 已潔牙 0 / 30</span>
+                        <button class="bc-reset" onclick="BrushCheck.reset()">🔄 全部重來</button>
+                    </div>
+                    <div class="bc-teeth" id="bc-teeth"><!-- 30 顆牙齒由 JS 產生 --></div>
+                    <div class="bc-done" id="bc-done">🎉 全班都潔牙完成囉！牙齒亮晶晶～</div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -2227,7 +2257,7 @@
         }
 
         // 有效的 section 名稱（供 URL hash 深連結使用）
-        const VALID_SECTIONS = ['students', 'points', 'grouping', 'lottery', 'timer', 'notebook', 'homework', 'exam', 'zodiac', 'board', 'announcement'];
+        const VALID_SECTIONS = ['students', 'points', 'grouping', 'lottery', 'timer', 'notebook', 'homework', 'exam', 'zodiac', 'board', 'brush', 'announcement'];
 
         function showSection(sectionName) {
             document.querySelectorAll('.section').forEach(section => section.classList.add('hidden'));
@@ -2240,6 +2270,9 @@
             }
             if (sectionName === 'board' && window.ClassBoard && typeof ClassBoard.init === 'function') {
                 ClassBoard.init();
+            }
+            if (sectionName === 'brush' && window.BrushCheck && typeof BrushCheck.init === 'function') {
+                BrushCheck.init();
             }
             // 同步 URL hash，讓使用者可直接用連結跳轉到指定區塊（例：classnew.html#exam）
             try {
@@ -4106,6 +4139,9 @@
 
     <!-- 🎨 班級經營白板（公告白板 + 班級秩序 + 號碼抽籤） -->
     <script src="./js/class-board.js?v=3.5.0"></script>
+
+    <!-- 🦷 潔牙勾選表 -->
+    <script src="./js/brush-check.js?v=3.6.0"></script>
 
     <!-- 學期封存模組（Q01：一鍵封存學期資料至 Firebase archives/） -->
     <script src="./js/semester-archive.js"></script>

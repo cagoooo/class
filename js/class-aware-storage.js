@@ -41,6 +41,7 @@
         'boardNoteStyle',           // 經營白板：字級/顏色/粗細
         'boardActivity',            // 經營白板：目前班級秩序狀態
         'boardLotteryCfg',          // 經營白板：號碼抽籤設定
+        'brushChecked',             // 潔牙勾選表：今日已潔牙號碼
     ]);
 
     // 取得原始 Storage 方法（避免被自己攔截）
