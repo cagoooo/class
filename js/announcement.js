@@ -899,12 +899,14 @@
     }
 
     function addNavButton() {
-        const navGrid = document.querySelector('.grid.grid-cols-2.sm\\:grid-cols-3.md\\:grid-cols-4.lg\\:grid-cols-7');
+        // 用固定 id 定位導覽列（穩健，不受欄數 class 變動影響）；舊版 class 選擇器作為後備
+        const navGrid = document.getElementById('feature-menu-grid')
+            || document.querySelector('.grid.grid-cols-2.sm\\:grid-cols-3.md\\:grid-cols-4');
         if (!navGrid || document.getElementById('annNavBtn')) return;
 
         const btn = document.createElement('button');
         btn.id = 'annNavBtn';
-        btn.className = 'bg-white p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 active:scale-95';
+        btn.className = 'bg-gradient-to-br from-indigo-50 to-purple-50 p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 active:scale-95';
         btn.style.borderLeftColor = '#6366f1';
         btn.style.position = 'relative';
         btn.innerHTML = `

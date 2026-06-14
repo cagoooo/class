@@ -37,9 +37,9 @@
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="icon" type="image/png" href="icons/icon-192.png">
     <link rel="shortcut icon" href="favicon.ico">
-    <title>班級小管家 v3.8.2</title>
+    <title>班級小管家 v3.8.3</title>
     <!-- 📦 版本號（由 scripts/update-sw-version.js 自動同步） -->
-    <script>window.APP_VERSION = '3.8.2';</script>
+    <script>window.APP_VERSION = '3.8.3';</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/rwd-breakpoints.css">
     <link rel="stylesheet" href="css/pwa-install.css">
@@ -648,7 +648,7 @@
                                 title="目前版本（點擊查看更新資訊）"
                                 class="text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 cursor-pointer hover:bg-blue-200 transition-colors"
                                 onclick="window.open('https://github.com/cagoooo/class/blob/main/CHANGELOG.md', '_blank')">
-                                v3.8.2
+                                v3.8.3
                             </span>
                         </div>
                         <div class="hidden sm:block text-xs sm:text-sm text-gray-600">讓課堂管理變得簡單有趣</div>
@@ -705,44 +705,44 @@
 
     <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
         <!-- 功能選單 -->
-        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 sm:gap-4 mb-6 sm:mb-8">
+        <div id="feature-menu-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4 mb-6 sm:mb-8">
             <button onclick="showSection('students')"
-                class="bg-white p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-blue-500 active:scale-95">
+                class="bg-gradient-to-br from-blue-50 to-sky-50 p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-blue-500 active:scale-95">
                 <div class="text-2xl sm:text-3xl mb-1 sm:mb-2">👥</div>
                 <div class="font-semibold text-gray-700 text-sm sm:text-base">學生管理</div>
             </button>
             <button onclick="showSection('points')"
-                class="bg-white p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-green-500 active:scale-95">
+                class="bg-gradient-to-br from-green-50 to-emerald-50 p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-green-500 active:scale-95">
                 <div class="text-2xl sm:text-3xl mb-1 sm:mb-2">⭐</div>
                 <div class="font-semibold text-gray-700 text-sm sm:text-base">加扣分</div>
             </button>
             <button onclick="showSection('grouping')"
-                class="bg-white p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-cyan-500 active:scale-95">
+                class="bg-gradient-to-br from-cyan-50 to-teal-50 p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-cyan-500 active:scale-95">
                 <div class="text-2xl sm:text-3xl mb-1 sm:mb-2">🧩</div>
                 <div class="font-semibold text-gray-700 text-sm sm:text-base">隨機分組</div>
             </button>
             <button onclick="showSection('lottery')"
-                class="bg-white p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-purple-500 active:scale-95">
+                class="bg-gradient-to-br from-purple-50 to-fuchsia-50 p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-purple-500 active:scale-95">
                 <div class="text-2xl sm:text-3xl mb-1 sm:mb-2">🎲</div>
                 <div class="font-semibold text-gray-700 text-sm sm:text-base">抽籤系統</div>
             </button>
             <button onclick="showSection('timer')"
-                class="bg-white p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-red-500 active:scale-95">
+                class="bg-gradient-to-br from-red-50 to-orange-50 p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-red-500 active:scale-95">
                 <div class="text-2xl sm:text-3xl mb-1 sm:mb-2">⏰</div>
                 <div class="font-semibold text-gray-700 text-sm sm:text-base">計時器</div> <!-- 修改：移除 "倒數" -->
             </button>
             <button onclick="showSection('notebook')"
-                class="bg-white p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-yellow-500 active:scale-95">
+                class="bg-gradient-to-br from-yellow-50 to-amber-50 p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-yellow-500 active:scale-95">
                 <div class="text-2xl sm:text-3xl mb-1 sm:mb-2">📝</div>
                 <div class="font-semibold text-gray-700 text-sm sm:text-base">聯絡簿</div>
             </button>
             <button onclick="showSection('homework')"
-                class="bg-white p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-indigo-500 active:scale-95">
+                class="bg-gradient-to-br from-indigo-50 to-blue-50 p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-indigo-500 active:scale-95">
                 <div class="text-2xl sm:text-3xl mb-1 sm:mb-2">📋</div>
                 <div class="font-semibold text-gray-700 text-sm sm:text-base">作業檢查</div>
             </button>
             <button onclick="showSection('exam')"
-                class="bg-white p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-teal-500 active:scale-95">
+                class="bg-gradient-to-br from-teal-50 to-cyan-50 p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-teal-500 active:scale-95">
                 <div class="text-2xl sm:text-3xl mb-1 sm:mb-2">🖥️</div>
                 <div class="font-semibold text-gray-700 text-sm sm:text-base">考試監考</div>
             </button>
@@ -4178,7 +4178,7 @@
     <script src="js/data-reports.js"></script>
     <script src="js/exam-proctor.js"></script>
     <script src="js/exam-sounds.js"></script>
-    <script src="js/announcement.js?v=3.1.0"></script>
+    <script src="js/announcement.js?v=3.8.3"></script>
 
     <!-- PWA 支援 -->
     <script src="js/pwa-install.js"></script>
