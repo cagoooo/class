@@ -1,7 +1,7 @@
 /**
  * comment-gen.js
  * ✍️ 成績單評語生成器
- * @version 3.9.5
+ * @version 3.9.6
  *
  * 需求：
  *   - 三大類特質點選：人際關係 / 學習表現 / 日常生活表現
@@ -141,10 +141,29 @@
         detailed: { max: 99, opening: true, extra: true }
     };
 
+    // 句首引導語與轉折詞（多樣化，避免每段都「在…方面，」「不過」重複；{L} 會替換成類別名）
+    const LEADS = ['在{L}方面，', '在{L}上，', '就{L}來說，'];
+    const TRANSITIONS = ['不過', '只是', '美中不足的是', '但'];
+
     const selected = new Set();
     let lastText = '';
 
     const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+    // 同一次生成內對同一語句池「不放回」抽樣（用完才重置）→ 句子不會重複
+    function uniquePicker() {
+        const used = new Map();
+        return function (arr) {
+            if (!arr || !arr.length) return '';
+            let set = used.get(arr);
+            if (!set) { set = new Set(); used.set(arr, set); }
+            if (set.size >= arr.length) set.clear();
+            const avail = [];
+            for (let i = 0; i < arr.length; i++) if (!set.has(i)) avail.push(i);
+            const idx = avail[Math.floor(Math.random() * avail.length)];
+            set.add(idx);
+            return arr[idx];
+        };
+    }
     function esc(s) {
         return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -258,20 +277,21 @@
         const L = LENGTHS[len] || LENGTHS.medium;
         const subj = name || (tone === 'formal' || tone === 'neutral' ? '該生' : '你');
 
+        const pu = uniquePicker();       // 本次生成的不放回抽樣器，避免句子重複
         const clauses = [];
-        let used = false, anyNeg = false;
+        let used = false;
         CATS.forEach(cat => {
             const P = [], N = [];
             cat.pos.forEach((t, i) => { if (selected.has(cat.key + '|p|' + i)) P.push(t.p); });
             cat.neg.forEach((t, i) => { if (selected.has(cat.key + '|n|' + i)) N.push(t.p); });
             if (!P.length && !N.length) return;
             const Pp = P.slice(0, L.max), Nn = N.slice(0, L.max);
-            if (Nn.length) anyNeg = true;
             const sj = used ? '' : subj;     // 主詞只放在第一句，其餘以省略主詞承接
+            const lead = pu(LEADS).replace('{L}', cat.label);
             let s;
-            if (Pp.length && Nn.length) s = `在${cat.label}方面，${sj}${Pp.join('、')}${pick(T.posTail)}；不過${Nn.join('、')}，${pick(T.negTail)}。`;
-            else if (Pp.length) s = `在${cat.label}方面，${sj}${Pp.join('、')}${pick(T.posTail)}。`;
-            else s = `在${cat.label}方面，${sj}${Nn.join('、')}，${pick(T.negTail)}。`;
+            if (Pp.length && Nn.length) s = `${lead}${sj}${Pp.join('、')}${pu(T.posTail)}；${pu(TRANSITIONS)}${Nn.join('、')}，${pu(T.negTail)}。`;
+            else if (Pp.length) s = `${lead}${sj}${Pp.join('、')}${pu(T.posTail)}。`;
+            else s = `${lead}${sj}${Nn.join('、')}，${pu(T.negTail)}。`;
             clauses.push(s);
             used = true;
         });
@@ -283,8 +303,8 @@
         const parts = [];
         if (L.opening) parts.push(T.open(name));
         parts.push(clauses.join(''));
-        if (L.extra) parts.push(pick(T.extra));
-        parts.push(pick(T.close));
+        if (L.extra) parts.push(pu(T.extra));
+        parts.push(pu(T.close));
         output(parts.join(''), false);
     }
 
