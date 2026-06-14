@@ -713,15 +713,18 @@
             const curProfile = this.currentProfile();
             if (!curProfile || curProfile.id === DEFAULT_ID) return;
 
-            // 使用 gauth-modal（若已載入）或 confirm
+            // 🛟 資料保險把關：刪除整個班級會清掉該班所有本地資料，先強制備份
             let confirmed = false;
-            if (typeof window.GoogleAuthUI !== 'undefined') {
-                // 使用 gauth showModal（需要存取 private function，改用 window.confirm 作備援）
+            if (window.DataSafetyGuard && DataSafetyGuard.guardClear) {
+                confirmed = await DataSafetyGuard.guardClear({
+                    title: `刪除「${curProfile.name}」前，先存好備份！`,
+                    message: `此操作會永久刪除「${curProfile.name}」這個班級的所有本地資料（學生、加扣分、聯絡簿、作業等）。`,
+                    dangerLabel: '確定刪除此班級'
+                });
+            } else {
                 confirmed = window.confirm(
                     `⚠️ 確定要刪除「${curProfile.name}」？\n\n這將清除該班級的所有本地資料，此操作無法復原。\n\n（雲端資料若已登入同步則需手動清除）`
                 );
-            } else {
-                confirmed = window.confirm(`確定要刪除「${curProfile.name}」？此操作無法復原。`);
             }
             if (!confirmed) return;
 
