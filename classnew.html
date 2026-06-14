@@ -37,9 +37,9 @@
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="icon" type="image/png" href="icons/icon-192.png">
     <link rel="shortcut icon" href="favicon.ico">
-    <title>班級小管家 v3.8.8</title>
+    <title>班級小管家 v3.8.9</title>
     <!-- 📦 版本號（由 scripts/update-sw-version.js 自動同步） -->
-    <script>window.APP_VERSION = '3.8.8';</script>
+    <script>window.APP_VERSION = '3.8.9';</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/rwd-breakpoints.css">
     <link rel="stylesheet" href="css/pwa-install.css">
@@ -648,7 +648,7 @@
                                 title="目前版本（點擊查看更新資訊）"
                                 class="text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 cursor-pointer hover:bg-blue-200 transition-colors"
                                 onclick="window.open('https://github.com/cagoooo/class/blob/main/CHANGELOG.md', '_blank')">
-                                v3.8.8
+                                v3.8.9
                             </span>
                         </div>
                         <div class="hidden sm:block text-xs sm:text-sm text-gray-600">讓課堂管理變得簡單有趣</div>
@@ -2861,39 +2861,47 @@
             const animationText = document.getElementById('lottery-animation-text');
             if (!animationText) return;
 
-            let rollCount = 0;
-            const totalRolls = 25;
-            const rollInterval = 100;
+            animationText.style.transition = 'transform .08s ease-out';
 
+            // 只隨機挑 N 個名字，不整個陣列排序（省效能、避免卡頓）
             const getRollingText = () => {
                 if (type === 'group') {
-                    const randomGroup = groups[Math.floor(Math.random() * groups.length)];
-                    return randomGroup.name;
-                } else {
-                    const randomStudents = [...students].sort(() => 0.5 - Math.random());
-                    let randomNames = [];
-                    for (let i = 0; i < finalResult.length; i++) {
-                        randomNames.push(randomStudents[i % randomStudents.length].name);
-                    }
-                    return randomNames.join('、');
+                    return groups[Math.floor(Math.random() * groups.length)].name;
                 }
+                const names = [];
+                for (let i = 0; i < finalResult.length; i++) {
+                    names.push(students[Math.floor(Math.random() * students.length)].name);
+                }
+                return names.join('、');
             };
 
-            const rollTimer = setInterval(() => {
-                animationText.innerHTML = `<span class="slot-item">${getRollingText()}</span>`;
+            // 遞減節奏：開頭快、結尾慢（像真拉霸機慢慢定格），總長約 1.4 秒，絲滑順暢
+            const delays = [];
+            let d = 45;
+            while (d < 190) { delays.push(Math.round(d)); d *= 1.2; }
+            delays.push(210, 250);   // 最後兩格更慢，營造定格感
+
+            const finish = () => {
+                displayLotteryResult(finalResult, type);   // 內含 winner-reveal 彈跳動畫
+                playLotteryWinSound();
+                triggerConfetti();
+                saveLotteryHistory(finalResult, type);      // 動畫結束後才存歷史
+                btn.disabled = false;
+                btn.classList.remove('bg-gray-400', 'hover:bg-gray-400');
+            };
+
+            let i = 0;
+            (function tick() {
+                animationText.textContent = getRollingText();   // 只改文字，不重建 DOM
+                animationText.style.transform = 'scale(1.06)';
+                requestAnimationFrame(() => { animationText.style.transform = 'scale(1)'; });
                 playLotteryTickSound();
-                rollCount++;
-                if (rollCount >= totalRolls) {
-                    clearInterval(rollTimer);
-                    displayLotteryResult(finalResult, type);
-                    playLotteryWinSound();
-                    triggerConfetti();
-                    // 動畫結束後才儲存歷史記錄
-                    saveLotteryHistory(finalResult, type);
-                    btn.disabled = false;
-                    btn.classList.remove('bg-gray-400', 'hover:bg-gray-400');
+                if (i < delays.length) {
+                    setTimeout(tick, delays[i++]);
+                } else {
+                    setTimeout(finish, 240);   // 最後定格稍停再揭曉
                 }
-            }, rollInterval);
+            })();
         }
         function displayLotteryResult(result, type) {
             const container = document.getElementById('lotteryResult');

@@ -8,10 +8,10 @@
 
     // 動畫配置
     const LOTTERY_CONFIG = {
-        totalRolls: 30,           // 滾動次數
-        initialSpeed: 50,         // 初始速度 (ms)
-        finalSpeed: 200,          // 最終速度 (ms)
-        suspenseDelay: 500,       // 結果揭曉前的暫停 (ms)
+        totalRolls: 14,           // 滾動次數（v3.8.9 縮短：原 30 太久）
+        initialSpeed: 40,         // 初始速度 (ms)
+        finalSpeed: 120,          // 最終速度 (ms)（原 200，5fps 太卡，調順）
+        suspenseDelay: 200,       // 結果揭曉前的暫停 (ms)（原 500）
         resultScale: 1.2,         // 結果放大倍數
         glowColors: ['#8B5CF6', '#EC4899', '#F59E0B', '#10B981'] // 光暈顏色
     };
@@ -299,16 +299,14 @@
         // 隨機名字產生器
         const getRollingText = () => {
             if (type === 'group') {
-                const randomGroup = groups[Math.floor(Math.random() * groups.length)];
-                return randomGroup.name;
-            } else {
-                const randomStudents = [...students].sort(() => 0.5 - Math.random());
-                let randomNames = [];
-                for (let i = 0; i < finalResult.length; i++) {
-                    randomNames.push(randomStudents[i % randomStudents.length].name);
-                }
-                return randomNames.join('、');
+                return groups[Math.floor(Math.random() * groups.length)].name;
             }
+            // 直接隨機挑 N 個名字，不整個陣列排序（省效能、避免卡頓）
+            const names = [];
+            for (let i = 0; i < finalResult.length; i++) {
+                names.push(students[Math.floor(Math.random() * students.length)].name);
+            }
+            return names.join('、');
         };
 
         // 遞迴動畫
