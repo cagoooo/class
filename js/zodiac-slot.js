@@ -115,6 +115,9 @@
         '豬': '豬事大吉 · 福氣滿滿！'
     };
 
+    // 中獎吶喊（頭獎連線成功時的大字橫幅，活潑搶眼）
+    const JACKPOT_SHOUTS = ['🎉 中獎啦！', '✨ 好運到！', '💰 財運滾滾來！', '🧧 大吉大利！', '🌈 旺到不行！', '🍀 福氣滿滿！', '🎊 事事順心！', '🔥 財運爆棚！'];
+
     // ───────────────────────── 狀態 ─────────────────────────
     let spinning = false;
     let playCount = 0;
@@ -218,6 +221,32 @@
             animation:zcoin linear forwards}
         @keyframes zcoin{0%{transform:translateY(0) rotate(0)}100%{transform:translateY(108vh) rotate(540deg)}}
 
+        /* === v3.7.1 視覺升級：圓體字、連線、煙火閃光、星星愛心金幣 === */
+        .zslot-bless,.zslot-combo{font-family:'Mochiyochi Pop One','Noto Sans TC',sans-serif}
+        .zslot-spin-btn,.zslot-pick-btn,.zslot-lever{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+        /* 中獎吶喊橫幅 */
+        .zslot-shout{font-family:'Mochiyochi Pop One','Noto Sans TC',sans-serif;font-weight:900;
+            font-size:clamp(1.6rem,6vw,2.6rem);letter-spacing:.06em;margin-bottom:.4rem;
+            background:linear-gradient(90deg,#dc2626,#f59e0b,#dc2626);-webkit-background-clip:text;background-clip:text;color:transparent;
+            animation:zshout .6s cubic-bezier(.2,1.7,.4,1)}
+        .zslot-shout.pair{font-size:clamp(1.3rem,5vw,2rem);background:linear-gradient(90deg,#f97316,#ea580c);
+            -webkit-background-clip:text;background-clip:text}
+        @keyframes zshout{0%{transform:scale(.3) rotate(-8deg);opacity:0}60%{transform:scale(1.15) rotate(3deg)}100%{transform:scale(1) rotate(0);opacity:1}}
+        /* 連線發光線（拉霸連線成功） */
+        .zslot-reels{position:relative}
+        .zslot-winline{position:absolute;top:50%;height:0;transform:translateY(-50%);pointer-events:none;z-index:5;
+            border-top:5px solid #fde047;border-radius:6px;box-shadow:0 0 12px 4px #fbbf24,0 0 26px 8px rgba(245,158,11,.6);
+            animation:zline .5s ease both}
+        @keyframes zline{0%{opacity:0;transform:translateY(-50%) scaleX(.1)}100%{opacity:1;transform:translateY(-50%) scaleX(1)}}
+        /* 機台中獎閃光 + 跑馬燈加速 */
+        .zslot-machine.flash{animation:zflash .6s ease}
+        @keyframes zflash{0%,100%{box-shadow:0 18px 40px rgba(127,29,29,.45),inset 0 2px 6px rgba(255,255,255,.25)}
+            40%{box-shadow:0 0 0 6px #fde047,0 0 44px 14px #fbbf24,inset 0 0 30px rgba(255,255,255,.6)}}
+        .zslot-bulbs.win span{animation-duration:.32s}
+        /* 星星 / 愛心 / 金幣 上飄 */
+        .zslot-spark{position:fixed;z-index:1002;pointer-events:none;font-size:1.6rem;animation:zspark 1.3s ease-out forwards}
+        @keyframes zspark{0%{opacity:0;transform:translateY(0) scale(.4) rotate(0)}20%{opacity:1}100%{opacity:0;transform:translateY(-130px) scale(1.3) rotate(25deg)}}
+
         @media (max-width:480px){.zslot-lever{display:none}}
         `;
         const style = document.createElement('style');
@@ -274,10 +303,49 @@
             setTimeout(() => c.remove(), 3500);
         }
     }
+    // 星星 / 愛心 / 金幣 從機台往上飄（療癒亮晶晶）
+    function sparkleFloat(count) {
+        const marks = ['✨', '💖', '🌟', '⭐', '🪙', '💛'];
+        const wrap = document.querySelector('.zslot-machine-wrap');
+        const r = wrap ? wrap.getBoundingClientRect() : { left: window.innerWidth / 2 - 100, top: window.innerHeight / 2, width: 200, height: 200 };
+        for (let i = 0; i < count; i++) {
+            const s = document.createElement('div');
+            s.className = 'zslot-spark';
+            s.textContent = marks[i % marks.length];
+            s.style.left = (r.left + Math.random() * r.width) + 'px';
+            s.style.top = (r.top + r.height * 0.25 + Math.random() * 50) + 'px';
+            s.style.animationDelay = (Math.random() * 0.4) + 's';
+            document.body.appendChild(s);
+            setTimeout(() => s.remove(), 1800);
+        }
+    }
+    // 機台閃光 + 跑馬燈加速
+    function flashMachine() {
+        const m = document.querySelector('.zslot-machine');
+        if (m) { m.classList.remove('flash'); void m.offsetWidth; m.classList.add('flash'); setTimeout(() => m.classList.remove('flash'), 700); }
+        const bulbs = document.querySelector('.zslot-bulbs');
+        if (bulbs) { bulbs.classList.add('win'); setTimeout(() => bulbs.classList.remove('win'), 1300); }
+    }
+    // 連線發光線：跨越中獎的轉輪（3 欄，第 i 顆中心約 (i+0.5)/3）
+    function showWinLine(indices) {
+        const reelsEl = document.querySelector('.zslot-reels');
+        if (!reelsEl || !indices || !indices.length) return;
+        reelsEl.querySelectorAll('.zslot-winline').forEach(e => e.remove());
+        const a = Math.min.apply(null, indices), b = Math.max.apply(null, indices);
+        const center = i => (i + 0.5) / 3 * 100;
+        const line = document.createElement('div');
+        line.className = 'zslot-winline';
+        line.style.left = center(a) + '%';
+        line.style.width = (center(b) - center(a)) + '%';
+        if (a === b) { line.style.width = '14%'; line.style.left = (center(a) - 7) + '%'; }
+        reelsEl.appendChild(line);
+    }
+
     function celebrate(level) {
         if (typeof window.triggerConfetti === 'function') window.triggerConfetti();
-        if (level === 'jackpot') coinRain(28);
-        else if (level === 'pair') coinRain(12);
+        if (level === 'jackpot') { coinRain(28); flashMachine(); sparkleFloat(16); }
+        else if (level === 'pair') { coinRain(12); flashMachine(); sparkleFloat(8); }
+        else { sparkleFloat(4); }   // 參加獎也來幾顆星星，療癒不冷場
     }
 
     // ───────────────────────── 工具 ─────────────────────────
@@ -324,6 +392,10 @@
         if (btn) { btn.disabled = true; btn.textContent = '🎰 轉動中…'; }
         if (lever) { lever.classList.add('pulled'); setTimeout(() => lever.classList.remove('pulled'), 600); }
         if (result) { result.classList.remove('show'); result.classList.add('hidden'); }
+        // 清掉上一輪的連線發光線與機台閃光
+        document.querySelectorAll('.zslot-winline').forEach(e => e.remove());
+        const machineEl = document.querySelector('.zslot-machine');
+        if (machineEl) machineEl.classList.remove('flash');
 
         const level = decideLevel();
         const targets = buildTargets(level);
@@ -361,11 +433,13 @@
     function revealResult(level, targets, reels) {
         // 祝福詞：頭獎用該生肖專屬吉祥話當主標，其餘隨機
         let blessWord, blessNote, blessEmoji;
+        let matchedIdx = [];        // 連線（相同生肖）的轉輪索引
         if (level === 'jackpot') {
             const z = targets[0];
             blessWord = ZODIACS && ZODIAC_BLESSING[z.name] ? ZODIAC_BLESSING[z.name].split(' · ')[0] : rand(BLESSINGS).word;
             blessNote = ZODIAC_BLESSING[z.name] || '';
             blessEmoji = z.emoji;
+            matchedIdx = [0, 1, 2];
             reels.forEach(r => r && r.classList.add('win-glow'));
         } else if (level === 'pair') {
             const b = rand(BLESSINGS);
@@ -374,12 +448,14 @@
             const counts = {};
             targets.forEach((t, i) => { (counts[t.name] = counts[t.name] || []).push(i); });
             Object.values(counts).forEach(idxs => {
-                if (idxs.length === 2) idxs.forEach(i => reels[i] && reels[i].classList.add('win-glow'));
+                if (idxs.length === 2) { matchedIdx = idxs.slice(); idxs.forEach(i => reels[i] && reels[i].classList.add('win-glow')); }
             });
         } else {
             const b = rand(BLESSINGS);
             blessWord = b.word; blessNote = b.note; blessEmoji = b.emoji;
         }
+        // 中獎吶喊橫幅
+        const shout = level === 'jackpot' ? rand(JACKPOT_SHOUTS) : (level === 'pair' ? '✨ 喜相逢！' : '');
 
         const prize = rand(PRIZES[level]);
         const meta = {
@@ -397,6 +473,7 @@
             result.innerHTML = `
                 <div class="zslot-card">
                     ${forWho}
+                    ${shout ? `<div class="zslot-shout ${level === 'pair' ? 'pair' : ''}">${shout}</div>` : ''}
                     <div class="zslot-badge ${meta.cls}">${meta.label}</div>
                     <div class="zslot-combo">${combo}</div>
                     <div class="zslot-bless">${blessEmoji} ${blessWord}</div>
@@ -408,6 +485,9 @@
             requestAnimationFrame(() => result.classList.add('show'));
             setTimeout(() => result.classList.add('show'), 30); // 隱藏分頁 rAF 不跑時的保險
         }
+
+        // 拉霸連線成功：畫出發光連線
+        showWinLine(matchedIdx);
 
         sndWin(level);
         celebrate(level);
