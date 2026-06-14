@@ -37,9 +37,9 @@
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="icon" type="image/png" href="icons/icon-192.png">
     <link rel="shortcut icon" href="favicon.ico">
-    <title>班級小管家 v3.3.1</title>
+    <title>班級小管家 v3.4.0</title>
     <!-- 📦 版本號（由 scripts/update-sw-version.js 自動同步） -->
-    <script>window.APP_VERSION = '3.3.1';</script>
+    <script>window.APP_VERSION = '3.4.0';</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/rwd-breakpoints.css">
     <link rel="stylesheet" href="css/pwa-install.css">
@@ -648,7 +648,7 @@
                                 title="目前版本（點擊查看更新資訊）"
                                 class="text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 cursor-pointer hover:bg-blue-200 transition-colors"
                                 onclick="window.open('https://github.com/cagoooo/class/blob/main/CHANGELOG.md', '_blank')">
-                                v3.3.1
+                                v3.4.0
                             </span>
                         </div>
                         <div class="hidden sm:block text-xs sm:text-sm text-gray-600">讓課堂管理變得簡單有趣</div>
@@ -869,10 +869,10 @@
                                 <div class="space-y-2">
                                     <button onclick="DataBackup.export()"
                                         class="w-full bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transition-colors text-sm active:scale-95">
-                                        📦 匯出完整備份 (JSON)
+                                        📊 匯出完整備份 (Excel)
                                     </button>
                                     <div class="relative">
-                                        <input type="file" id="backupFile" accept=".json" class="hidden"
+                                        <input type="file" id="backupFile" accept=".xlsx,.json" class="hidden"
                                             onchange="handleBackupImport(event)">
                                         <button onclick="document.getElementById('backupFile').click()"
                                             class="w-full bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 transition-colors text-sm active:scale-95">
@@ -881,7 +881,7 @@
                                     </div>
                                 </div>
                                 <div class="text-xs text-gray-600 bg-purple-50 p-2 rounded mt-2">
-                                    💡 備份包含所有學生、分數、分組、聯絡簿等完整資料
+                                    💡 匯出的 Excel 含「學生總表（可直接登記成績）、加扣分明細、作業繳交、聯絡簿、小組」等工作表，並保留可完整還原的備份資料；匯入支援 .xlsx 與舊版 .json
                                 </div>
                             </div>
                         </div>
@@ -1837,31 +1837,136 @@
                         homeworkChecks: homeworkChecks,
                         lotteryHistory: lotteryHistory
                     };
-
-                    const blob = new Blob([JSON.stringify(data, null, 2)], {
-                        type: 'application/json'
-                    });
-
-                    const url = URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = `班級小管家備份_${this.getDateString()}.json`;
-                    link.click();
-
-                    URL.revokeObjectURL(url);
-                    NotificationSystem.success('資料已成功匯出');
+                    // 老師備份後通常要登記成績，優先輸出 Excel；若 XLSX 未載入則退回 JSON
+                    if (typeof XLSX !== 'undefined') {
+                        this.exportExcel(data);
+                    } else {
+                        this.exportJSON(data);
+                    }
                 } catch (error) {
                     console.error('匯出失敗:', error);
-                    NotificationSystem.error('資料匯出失敗：' + error.message);
+                    if (typeof NotificationSystem !== 'undefined') NotificationSystem.error('資料匯出失敗：' + error.message);
                 }
+            }
+
+            // 退回方案：純 JSON 備份（與舊版相容）
+            static exportJSON(data) {
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `班級小管家備份_${this.getDateString()}.json`;
+                link.click();
+                URL.revokeObjectURL(url);
+                if (typeof NotificationSystem !== 'undefined') NotificationSystem.success('資料已匯出（JSON）');
+            }
+
+            // Excel 備份：老師可直接拿來登記成績，並夾帶可完整還原的備份資料
+            static exportExcel(data) {
+                const wb = XLSX.utils.book_new();
+                let className = '';
+                try { className = (window.ClassProfiles && ClassProfiles.currentProfile && (ClassProfiles.currentProfile() || {}).name) || ''; } catch (e) { }
+
+                const studs = (data.students || []).slice().sort((a, b) => (a.number || 9999) - (b.number || 9999));
+                const numById = {}; (data.students || []).forEach(s => { numById[s.id] = s.number; });
+
+                // 工作表 1：學生總表（成績登記用）
+                const s1 = [['座號', '姓名', '目前總分', '加分次數', '扣分次數', '加分小計', '扣分小計']];
+                studs.forEach(s => {
+                    let addN = 0, subN = 0, addSum = 0, subSum = 0;
+                    (s.records || []).forEach(r => {
+                        if (r.points > 0) { addN++; addSum += r.points; }
+                        else if (r.points < 0) { subN++; subSum += r.points; }
+                    });
+                    s1.push([s.number || '', s.name || '', s.points || 0, addN, subN, addSum, subSum]);
+                });
+                const ws1 = XLSX.utils.aoa_to_sheet(s1);
+                ws1['!cols'] = [{ wch: 6 }, { wch: 12 }, { wch: 10 }, { wch: 9 }, { wch: 9 }, { wch: 9 }, { wch: 9 }];
+                XLSX.utils.book_append_sheet(wb, ws1, '學生總表');
+
+                // 工作表 2：加扣分明細（依時間舊→新）
+                const ph = (data.pointsHistory || []).slice().reverse();
+                const s2 = [['時間', '座號', '姓名', '加/扣分', '原因']];
+                ph.forEach(r => s2.push([r.timestamp || r.date || '', (numById[r.studentId] != null ? numById[r.studentId] : ''), r.studentName || '', r.points, r.reason || '']));
+                const ws2 = XLSX.utils.aoa_to_sheet(s2);
+                ws2['!cols'] = [{ wch: 20 }, { wch: 6 }, { wch: 12 }, { wch: 8 }, { wch: 22 }];
+                XLSX.utils.book_append_sheet(wb, ws2, '加扣分明細');
+
+                // 工作表 3：作業繳交（學生 × 作業 矩陣）
+                const hw = data.homeworkList || [];
+                if (hw.length) {
+                    const STATUS = { submitted: '✅繳交', unsubmitted: '❌未交', late: '⏰遲交', absent: '🚫請假', unchecked: '—' };
+                    const s3 = [['座號', '姓名'].concat(hw.map(h => h.name || '作業'))];
+                    studs.forEach(s => {
+                        const row = [s.number || '', s.name || ''];
+                        hw.forEach(h => {
+                            const st = (data.homeworkChecks && data.homeworkChecks[h.id] && data.homeworkChecks[h.id][s.id]) || 'unchecked';
+                            row.push(STATUS[st] || st);
+                        });
+                        s3.push(row);
+                    });
+                    const ws3 = XLSX.utils.aoa_to_sheet(s3);
+                    ws3['!cols'] = [{ wch: 6 }, { wch: 12 }].concat(hw.map(() => ({ wch: 14 })));
+                    XLSX.utils.book_append_sheet(wb, ws3, '作業繳交');
+                }
+
+                // 工作表 4：聯絡簿
+                const nb = data.notebookEntries || [];
+                if (nb.length) {
+                    const s4 = [['日期', '類型', '內容', '建立時間']];
+                    nb.forEach(e => s4.push([e.date || '', e.type || '', e.content || '', e.timestamp || '']));
+                    const ws4 = XLSX.utils.aoa_to_sheet(s4);
+                    ws4['!cols'] = [{ wch: 14 }, { wch: 10 }, { wch: 44 }, { wch: 20 }];
+                    XLSX.utils.book_append_sheet(wb, ws4, '聯絡簿');
+                }
+
+                // 工作表 5：小組分組
+                const gp = data.groups || [];
+                if (gp.length) {
+                    const s5 = [['組別', '組員', '小組分數']];
+                    gp.forEach(g => s5.push([g.name || '', (g.members || []).map(m => m.name).join('、'), g.score || 0]));
+                    const ws5 = XLSX.utils.aoa_to_sheet(s5);
+                    ws5['!cols'] = [{ wch: 12 }, { wch: 44 }, { wch: 10 }];
+                    XLSX.utils.book_append_sheet(wb, ws5, '小組分組');
+                }
+
+                // 工作表 X：備份資料（請勿刪除）— 供「匯入備份」完整還原
+                // 注意：Excel 單格上限 32767 字，故將 JSON 分塊存多列
+                const json = JSON.stringify(data);
+                const CHUNK = 30000;
+                const rawRows = [['⚠️ 這是還原專用的備份資料，請勿修改或刪除此工作表'], ['CHUNKS', Math.ceil(json.length / CHUNK)]];
+                for (let i = 0; i < json.length; i += CHUNK) rawRows.push(['DATA', json.slice(i, i + CHUNK)]);
+                const wsRaw = XLSX.utils.aoa_to_sheet(rawRows);
+                XLSX.utils.book_append_sheet(wb, wsRaw, '備份資料(請勿刪除)');
+
+                XLSX.writeFile(wb, `班級小管家備份_${className ? className + '_' : ''}${this.getDateString()}.xlsx`);
+                if (typeof NotificationSystem !== 'undefined') NotificationSystem.success('Excel 備份已下載（含成績登記表）');
+            }
+
+            // 從 Excel 備份的「備份資料(請勿刪除)」工作表重組出 JSON 物件
+            static extractDataFromWorkbook(wb) {
+                const ws = wb.Sheets['備份資料(請勿刪除)'];
+                if (!ws) throw new Error('此 Excel 不是本系統的備份檔（缺少還原資料工作表）');
+                const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+                const chunks = rows.filter(r => r && r[0] === 'DATA').map(r => r[1] || '');
+                if (!chunks.length) throw new Error('備份資料工作表內容不完整，無法還原');
+                return JSON.parse(chunks.join(''));
             }
 
             static async import(file) {
                 try {
                     LoadingIndicator.show('正在讀取備份檔案...');
 
-                    const text = await file.text();
-                    const data = JSON.parse(text);
+                    let data;
+                    if (/\.xlsx$/i.test(file.name)) {
+                        if (typeof XLSX === 'undefined') throw new Error('無法讀取 Excel（XLSX 套件未載入）');
+                        const buf = await file.arrayBuffer();
+                        const wb = XLSX.read(buf, { type: 'array' });
+                        data = this.extractDataFromWorkbook(wb);
+                    } else {
+                        const text = await file.text();
+                        data = JSON.parse(text);
+                    }
 
                     // 驗證資料格式
                     if (!this.validateBackupData(data)) {
