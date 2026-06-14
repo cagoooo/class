@@ -484,6 +484,17 @@
             // 觸發進場動畫
             requestAnimationFrame(() => result.classList.add('show'));
             setTimeout(() => result.classList.add('show'), 30); // 隱藏分頁 rAF 不跑時的保險
+            // ✨ 自動捲動到結果卡，讓全班立刻看到中獎結果（只在結果未完整露出時才捲，避免已可見時亂跳）
+            setTimeout(() => {
+                try {
+                    const rect = result.getBoundingClientRect();
+                    const vh = window.innerHeight || document.documentElement.clientHeight;
+                    const fullyVisible = rect.top >= 0 && rect.bottom <= vh;
+                    if (!fullyVisible) result.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } catch (e) {
+                    try { result.scrollIntoView(); } catch (e2) { /* ignore */ }
+                }
+            }, 150);
         }
 
         // 拉霸連線成功：畫出發光連線
