@@ -44,8 +44,14 @@
         catch (e) { /* 配額滿時寫時間戳可能失敗，可忽略 */ }
     }
     function isLoggedInToCloud() {
-        try { return !!(window.FirebaseConfig && FirebaseConfig.isConnected && FirebaseConfig.isConnected()); }
-        catch (e) { return false; }
+        try {
+            if (window.FirebaseConfig) {
+                // 優先用「是否為 Google 登入（非匿名）」判斷，匿名連線不算真正登入
+                if (FirebaseConfig.isGoogleUser) return !!FirebaseConfig.isGoogleUser();
+                if (FirebaseConfig.isConnected) return !!FirebaseConfig.isConnected();
+            }
+        } catch (e) { /* ignore */ }
+        return false;
     }
     function lastBackupAt() { const v = rawGet(LS_LAST_BACKUP); return v ? parseInt(v, 10) : 0; }
     function daysSince(ts) { return ts ? (Date.now() - ts) / 86400000 : Infinity; }

@@ -37,9 +37,9 @@
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="icon" type="image/png" href="icons/icon-192.png">
     <link rel="shortcut icon" href="favicon.ico">
-    <title>班級小管家 v3.8.5</title>
+    <title>班級小管家 v3.8.6</title>
     <!-- 📦 版本號（由 scripts/update-sw-version.js 自動同步） -->
-    <script>window.APP_VERSION = '3.8.5';</script>
+    <script>window.APP_VERSION = '3.8.6';</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/rwd-breakpoints.css">
     <link rel="stylesheet" href="css/pwa-install.css">
@@ -648,7 +648,7 @@
                                 title="目前版本（點擊查看更新資訊）"
                                 class="text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 cursor-pointer hover:bg-blue-200 transition-colors"
                                 onclick="window.open('https://github.com/cagoooo/class/blob/main/CHANGELOG.md', '_blank')">
-                                v3.8.5
+                                v3.8.6
                             </span>
                         </div>
                         <div class="hidden sm:block text-xs sm:text-sm text-gray-600">讓課堂管理變得簡單有趣</div>
@@ -2372,6 +2372,19 @@
         // 有效的 section 名稱（供 URL hash 深連結使用）
         const VALID_SECTIONS = ['students', 'points', 'grouping', 'lottery', 'timer', 'notebook', 'homework', 'exam', 'zodiac', 'board', 'brush', 'comment', 'dialogue', 'backup', 'announcement'];
 
+        // 更新「資料備份」區塊的狀態列（最近備份時間 + 雲端登入狀態）
+        function refreshBackupHubStatus() {
+            try {
+                var info = (window.DataSafetyGuard && DataSafetyGuard.getBackupInfo) ? DataSafetyGuard.getBackupInfo() : {};
+                var l = document.getElementById('bk-last');
+                if (l) l.textContent = info.lastBackupAt ? new Date(info.lastBackupAt).toLocaleString('zh-TW') : '尚未備份過';
+                var c = document.getElementById('bk-cloud');
+                if (c) c.textContent = info.cloudLoggedIn ? '已登入（自動同步）' : '未登入';
+                var b = document.getElementById('bk-cloud-box');
+                if (b) b.style.display = info.cloudLoggedIn ? 'none' : '';
+            } catch (e) { /* ignore */ }
+        }
+
         function showSection(sectionName) {
             document.querySelectorAll('.section').forEach(section => section.classList.add('hidden'));
             document.getElementById(sectionName + '-section').classList.remove('hidden');
@@ -2394,15 +2407,12 @@
                 DialogueSchool.init();
             }
             if (sectionName === 'backup') {
-                try {
-                    var _info = (window.DataSafetyGuard && DataSafetyGuard.getBackupInfo) ? DataSafetyGuard.getBackupInfo() : {};
-                    var _l = document.getElementById('bk-last');
-                    if (_l) _l.textContent = _info.lastBackupAt ? new Date(_info.lastBackupAt).toLocaleString('zh-TW') : '尚未備份過';
-                    var _c = document.getElementById('bk-cloud');
-                    if (_c) _c.textContent = _info.cloudLoggedIn ? '已登入（自動同步）' : '未登入';
-                    var _b = document.getElementById('bk-cloud-box');
-                    if (_b) _b.style.display = _info.cloudLoggedIn ? 'none' : '';
-                } catch (e) { /* ignore */ }
+                refreshBackupHubStatus();
+                // 訂閱登入狀態變化：auth 還原比畫面晚就緒時，登入後即時把「未登入」更新為「已登入」（只掛一次）
+                if (!window.__bkAuthHooked && window.FirebaseConfig && FirebaseConfig.onAuthStateChanged) {
+                    window.__bkAuthHooked = true;
+                    try { FirebaseConfig.onAuthStateChanged(function () { refreshBackupHubStatus(); }); } catch (e) { /* ignore */ }
+                }
             }
             // 同步 URL hash，讓使用者可直接用連結跳轉到指定區塊（例：classnew.html#exam）
             try {
@@ -4265,7 +4275,7 @@
     <script src="./js/zodiac-slot.js?v=3.7.2"></script>
 
     <!-- 🛟 資料保險把關（清除前強制備份 + 儲存空間預警） -->
-    <script src="./js/data-safety-guard.js?v=3.3.0"></script>
+    <script src="./js/data-safety-guard.js?v=3.8.6"></script>
 
     <!-- 🎨 班級經營白板（公告白板 + 班級秩序 + 號碼抽籤） -->
     <script src="./js/class-board.js?v=3.5.0"></script>
