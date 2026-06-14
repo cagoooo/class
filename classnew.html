@@ -37,9 +37,9 @@
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="icon" type="image/png" href="icons/icon-192.png">
     <link rel="shortcut icon" href="favicon.ico">
-    <title>班級小管家 v3.9.4</title>
+    <title>班級小管家 v3.9.5</title>
     <!-- 📦 版本號（由 scripts/update-sw-version.js 自動同步） -->
-    <script>window.APP_VERSION = '3.9.4';</script>
+    <script>window.APP_VERSION = '3.9.5';</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/rwd-breakpoints.css">
     <link rel="stylesheet" href="css/pwa-install.css">
@@ -648,7 +648,7 @@
                                 title="目前版本（點擊查看更新資訊）"
                                 class="text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 cursor-pointer hover:bg-blue-200 transition-colors"
                                 onclick="window.open('https://github.com/cagoooo/class/blob/main/CHANGELOG.md', '_blank')">
-                                v3.9.4
+                                v3.9.5
                             </span>
                         </div>
                         <div class="hidden sm:block text-xs sm:text-sm text-gray-600">讓課堂管理變得簡單有趣</div>
@@ -1490,8 +1490,8 @@
         </h2>
         <p class="cg-sub text-sm sm:text-base mb-4">點選學生的特質，右側即時生成通順的成績單評語，一鍵複製貼上！✨</p>
 
-        <!-- 電腦端左右兩欄：左＝選特質、右＝即時評語；手機端自動上下堆疊 -->
-        <div class="grid gap-5 items-start lg:grid-cols-[1fr_minmax(340px,420px)]">
+        <!-- 電腦端左右各半：左＝選特質、右＝即時評語；手機端自動上下堆疊 -->
+        <div class="grid gap-5 items-start lg:grid-cols-2">
             <!-- 左欄：特質選擇 -->
             <div>
                 <div class="cg-name-row">
@@ -1506,7 +1506,7 @@
 
             <!-- 右欄：即時評語（電腦端置頂跟隨，免上下捲動） -->
             <div class="lg:sticky lg:top-4 space-y-3">
-                <!-- 口氣 & 字數 & 清除 -->
+                <!-- 口氣 & 字數（平分一列） -->
                 <div class="cg-controls">
                     <div class="fld">
                         <label for="cg-tone">口氣</label>
@@ -1525,7 +1525,12 @@
                             <option value="detailed">詳細</option>
                         </select>
                     </div>
+                </div>
+
+                <!-- 清除 & 生成評語 -->
+                <div class="cg-actions">
                     <button class="cg-btn cg-clear" onclick="CommentGen.clear()">🧹 清除選擇</button>
+                    <button class="cg-btn cg-gen" onclick="CommentGen.generate()">✨ 生成評語</button>
                 </div>
 
                 <!-- 即時輸出 -->
@@ -4335,7 +4340,7 @@
     <script src="./js/brush-check.js?v=3.8.8"></script>
 
     <!-- ✍️ 成績單評語生成器 -->
-    <script src="./js/comment-gen.js?v=3.9.4"></script>
+    <script src="./js/comment-gen.js?v=3.9.5"></script>
 
     <!-- 💬 生動對話小學堂（國語寫作互動教學） -->
     <script src="./js/dialogue-school.js?v=3.8.0"></script>

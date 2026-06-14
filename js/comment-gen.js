@@ -1,7 +1,7 @@
 /**
  * comment-gen.js
  * ✍️ 成績單評語生成器
- * @version 3.9.4
+ * @version 3.9.5
  *
  * 需求：
  *   - 三大類特質點選：人際關係 / 學習表現 / 日常生活表現
@@ -172,9 +172,13 @@
         .cg-chip.pos.on{background:linear-gradient(135deg,#34d399,#10b981);border-color:#10b981;color:#fff;box-shadow:0 4px 10px rgba(16,185,129,.35)}
         .cg-chip.neg.on{background:linear-gradient(135deg,#fbbf24,#f59e0b);border-color:#f59e0b;color:#fff;box-shadow:0 4px 10px rgba(245,158,11,.35)}
         .cg-controls{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.9rem;margin:0;padding:1rem;background:#faf5ff;border-radius:1rem}
-        .cg-controls .fld{display:flex;flex-direction:column;gap:.25rem}
+        .cg-controls .fld{display:flex;flex-direction:column;gap:.25rem;flex:1;min-width:130px}
         .cg-controls label{font-size:.82rem;font-weight:800;color:#6b21a8}
-        .cg-controls select{padding:.5rem .8rem;border:2px solid #ddd6fe;border-radius:.7rem;font-size:.95rem;font-weight:700;color:#4b5563;background:#fff}
+        .cg-controls select{width:100%;padding:.5rem .8rem;border:2px solid #ddd6fe;border-radius:.7rem;font-size:.95rem;font-weight:700;color:#4b5563;background:#fff}
+        .cg-actions{display:flex;gap:.7rem}
+        .cg-actions .cg-btn{padding:.7rem 1rem}
+        .cg-actions .cg-clear{flex:1}
+        .cg-actions .cg-gen{flex:2}
         .cg-btn{border:none;border-radius:.8rem;padding:.6rem 1.2rem;font-weight:800;cursor:pointer;font-size:.95rem;transition:transform .1s,box-shadow .1s}
         .cg-btn:active{transform:translateY(3px)}
         .cg-gen{background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:#fff;box-shadow:0 4px 0 #5b21b6;font-size:1.05rem}
