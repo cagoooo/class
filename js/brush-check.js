@@ -61,8 +61,9 @@
         .bc-count{font-size:24px;font-weight:900;color:#0891b2}
         .bc-reset{background:#e0f2fe;color:#0369a1;border:none;border-radius:9999px;padding:.45rem 1rem;font-weight:800;cursor:pointer;font-size:.9rem;transition:background .15s}
         .bc-reset:hover{background:#bae6fd}
-        .bc-teeth{display:grid;grid-template-columns:repeat(5,1fr);gap:.7rem}
+        .bc-teeth{display:grid;grid-template-columns:repeat(5,1fr);gap:.55rem}
         @media(min-width:640px){.bc-teeth{grid-template-columns:repeat(6,1fr)}}
+        @media(min-width:1024px){.bc-teeth{grid-template-columns:repeat(10,1fr);gap:.7rem}}
         .bc-tooth{position:relative;aspect-ratio:1/1.12;border:none;cursor:pointer;padding:0;background:transparent;
             display:flex;align-items:center;justify-content:center;transition:transform .12s}
         .bc-tooth:hover{transform:translateY(-3px) scale(1.04)}
