@@ -37,9 +37,9 @@
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="icon" type="image/png" href="icons/icon-192.png">
     <link rel="shortcut icon" href="favicon.ico">
-    <title>班級小管家 v3.8.9</title>
+    <title>班級小管家 v3.9.0</title>
     <!-- 📦 版本號（由 scripts/update-sw-version.js 自動同步） -->
-    <script>window.APP_VERSION = '3.8.9';</script>
+    <script>window.APP_VERSION = '3.9.0';</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/rwd-breakpoints.css">
     <link rel="stylesheet" href="css/pwa-install.css">
@@ -648,7 +648,7 @@
                                 title="目前版本（點擊查看更新資訊）"
                                 class="text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 cursor-pointer hover:bg-blue-200 transition-colors"
                                 onclick="window.open('https://github.com/cagoooo/class/blob/main/CHANGELOG.md', '_blank')">
-                                v3.8.9
+                                v3.9.0
                             </span>
                         </div>
                         <div class="hidden sm:block text-xs sm:text-sm text-gray-600">讓課堂管理變得簡單有趣</div>
@@ -749,7 +749,7 @@
             <button onclick="showSection('zodiac')"
                 class="bg-gradient-to-br from-rose-50 to-amber-50 p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-rose-500 active:scale-95">
                 <div class="text-2xl sm:text-3xl mb-1 sm:mb-2">🧧</div>
-                <div class="font-semibold text-gray-700 text-sm sm:text-base">新年拉霸</div>
+                <div class="font-semibold text-gray-700 text-sm sm:text-base">開運拉霸</div>
             </button>
             <button onclick="showSection('board')"
                 class="bg-gradient-to-br from-violet-50 to-sky-50 p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-violet-500 active:scale-95">
@@ -1352,13 +1352,13 @@
         </div>
     </div>
 
-    <!-- 🧧 十二生肖・新年拉霸機（開學破冰遊戲） -->
+    <!-- 🧧 十二生肖・開運拉霸機 + 開運籤（開學破冰遊戲） -->
     <div id="zodiac-section" class="section bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6 hidden">
         <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mb-1 flex items-center flex-wrap gap-2">
-            <span class="text-2xl sm:text-3xl mr-1">🧧</span>十二生肖・新年拉霸機
+            <span class="text-2xl sm:text-3xl mr-1">🧧</span>十二生肖・開運拉霸機
             <span class="text-xs sm:text-sm font-semibold text-white bg-gradient-to-r from-rose-500 to-amber-500 px-2 py-0.5 rounded-full">開學破冰</span>
         </h2>
-        <p class="zslot-subtitle text-sm sm:text-base mb-4">拉一把，試試新的一年好手氣！🎊 三連得頭獎，人人有獎，恭喜恭喜～</p>
+        <p class="zslot-subtitle text-sm sm:text-base mb-4">拉一把試手氣、再抽一支開運籤，看看今天的好運！🎊 人人有獎，恭喜恭喜～</p>
 
         <!-- 抽同學上台（破冰互動） -->
         <div class="zslot-stage">
@@ -1403,7 +1403,21 @@
         <div id="zslot-result" class="zslot-result hidden"></div>
 
         <!-- 統計列 -->
-        <div class="zslot-stats">🎁 今日已拉 <span id="zslot-count">0</span> 次 · 人人有獎，新年好彩頭！</div>
+        <div class="zslot-stats">🎁 今日已拉 <span id="zslot-count">0</span> 次 · 人人有獎，開運好彩頭！</div>
+
+        <!-- 🎋 開運籤（求籤） -->
+        <div class="zf-area">
+            <h3 class="zf-title">🎋 開運籤<span class="zf-sub">　搖一搖、抽一支，看看今天的好運！</span></h3>
+            <div class="zf-stage">
+                <div id="zf-tube" class="zf-tube" onclick="zodiacDrawFortune()" title="搖一搖求籤">
+                    <div class="zf-sticks"><i></i><i></i><i></i><i></i><i></i></div>
+                    <div class="zf-cup"><span>求籤</span></div>
+                </div>
+                <button id="zf-draw-btn" class="zf-draw-btn" onclick="zodiacDrawFortune()">🥠 求一支開運籤</button>
+            </div>
+            <div id="zf-result" class="zf-result hidden"></div>
+            <div class="zf-credit">籤詩參考日本淺草觀音寺一百籤改寫，給國小學生看的白話版</div>
+        </div>
     </div>
 
     <!-- 🎨 班級經營白板（公告白板 + 班級秩序 + 號碼抽籤） -->
@@ -4286,8 +4300,8 @@
     <!-- 手勢操作支援（觸控滑動切換功能區 | 長按快捷選單） -->
     <script src="./js/gesture-handler.js"></script>
 
-    <!-- 🧧 十二生肖・新年拉霸機（開學破冰遊戲） -->
-    <script src="./js/zodiac-slot.js?v=3.7.2"></script>
+    <!-- 🧧 十二生肖・開運拉霸機 + 開運籤（開學破冰遊戲） -->
+    <script src="./js/zodiac-slot.js?v=3.9.0"></script>
 
     <!-- 🛟 資料保險把關（清除前強制備份 + 儲存空間預警） -->
     <script src="./js/data-safety-guard.js?v=3.8.7"></script>
