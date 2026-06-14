@@ -1,12 +1,12 @@
 /**
  * 班級小管家 Service Worker
- * @version 3.1.6
+ * @version 3.2.0
  * @description PWA 離線支援與快取策略優化
  */
 
-const CACHE_NAME = 'class-manager-v3.1.6';
-const STATIC_CACHE = 'class-manager-static-v3.1.6';
-const DYNAMIC_CACHE = 'class-manager-dynamic-v3.1.6';
+const CACHE_NAME = 'class-manager-v3.2.0';
+const STATIC_CACHE = 'class-manager-static-v3.2.0';
+const DYNAMIC_CACHE = 'class-manager-dynamic-v3.2.0';
 
 
 // 靜態資源列表（安裝時預快取）
@@ -54,7 +54,9 @@ const STATIC_ASSETS = [
     './js/offline-detector.js',
     // v3.1.0 新增模組
     './js/sync-status-indicator.js',
-    './js/class-quick-switcher.js'
+    './js/class-quick-switcher.js',
+    // v3.2.0 新增模組
+    './js/zodiac-slot.js'
 ];
 
 // 需要網路優先的路徑模式

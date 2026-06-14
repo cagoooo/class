@@ -37,9 +37,9 @@
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="icon" type="image/png" href="icons/icon-192.png">
     <link rel="shortcut icon" href="favicon.ico">
-    <title>班級小管家 v3.1.6</title>
+    <title>班級小管家 v3.2.0</title>
     <!-- 📦 版本號（由 scripts/update-sw-version.js 自動同步） -->
-    <script>window.APP_VERSION = '3.1.6';</script>
+    <script>window.APP_VERSION = '3.2.0';</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/rwd-breakpoints.css">
     <link rel="stylesheet" href="css/pwa-install.css">
@@ -648,7 +648,7 @@
                                 title="目前版本（點擊查看更新資訊）"
                                 class="text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 cursor-pointer hover:bg-blue-200 transition-colors"
                                 onclick="window.open('https://github.com/cagoooo/class/blob/main/CHANGELOG.md', '_blank')">
-                                v3.1.6
+                                v3.2.0
                             </span>
                         </div>
                         <div class="hidden sm:block text-xs sm:text-sm text-gray-600">讓課堂管理變得簡單有趣</div>
@@ -745,6 +745,11 @@
                 class="bg-white p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-teal-500 active:scale-95">
                 <div class="text-2xl sm:text-3xl mb-1 sm:mb-2">🖥️</div>
                 <div class="font-semibold text-gray-700 text-sm sm:text-base">考試監考</div>
+            </button>
+            <button onclick="showSection('zodiac')"
+                class="bg-gradient-to-br from-rose-50 to-amber-50 p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-rose-500 active:scale-95">
+                <div class="text-2xl sm:text-3xl mb-1 sm:mb-2">🧧</div>
+                <div class="font-semibold text-gray-700 text-sm sm:text-base">新年拉霸</div>
             </button>
         </div>
 
@@ -1316,6 +1321,60 @@
                 🖥️ 啟動全螢幕監考模式
             </button>
         </div>
+    </div>
+
+    <!-- 🧧 十二生肖・新年拉霸機（開學破冰遊戲） -->
+    <div id="zodiac-section" class="section bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6 hidden">
+        <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mb-1 flex items-center flex-wrap gap-2">
+            <span class="text-2xl sm:text-3xl mr-1">🧧</span>十二生肖・新年拉霸機
+            <span class="text-xs sm:text-sm font-semibold text-white bg-gradient-to-r from-rose-500 to-amber-500 px-2 py-0.5 rounded-full">開學破冰</span>
+        </h2>
+        <p class="zslot-subtitle text-sm sm:text-base mb-4">拉一把，試試新的一年好手氣！🎊 三連得頭獎，人人有獎，恭喜恭喜～</p>
+
+        <!-- 抽同學上台（破冰互動） -->
+        <div class="zslot-stage">
+            <button class="zslot-pick-btn" onclick="zodiacPickStudent()">🎲 抽一位同學上台拉霸</button>
+            <div id="zslot-current-player" class="zslot-player">還沒抽人～老師也可以直接開拉！👇</div>
+        </div>
+
+        <!-- 拉霸機台 -->
+        <div class="zslot-machine-wrap">
+            <div class="zslot-machine">
+                <div class="zslot-marquee">
+                    <div class="zslot-bulbs">
+                        <span style="left:6%"></span><span style="left:20%;animation-delay:.15s"></span>
+                        <span style="left:34%;animation-delay:.3s"></span><span style="left:48%;animation-delay:.45s"></span>
+                        <span style="left:62%;animation-delay:.6s"></span><span style="left:76%;animation-delay:.75s"></span>
+                        <span style="left:90%;animation-delay:.9s"></span>
+                    </div>
+                    <span class="text-lg">🏮</span>
+                    <span class="ttl">招財進寶</span>
+                    <span class="text-lg">🏮</span>
+                </div>
+                <div class="zslot-screen">
+                    <div class="zslot-reels">
+                        <div id="zslot-reel-0" class="zslot-reel">🧧</div>
+                        <div id="zslot-reel-1" class="zslot-reel">🎴</div>
+                        <div id="zslot-reel-2" class="zslot-reel">🧧</div>
+                    </div>
+                </div>
+                <div class="zslot-base">
+                    <button id="zslot-spin-btn" class="zslot-spin-btn" onclick="zodiacSpin()">🧧 拉霸！</button>
+                </div>
+                <!-- 側邊拉桿 -->
+                <div id="zslot-lever" class="zslot-lever" onclick="zodiacSpin()" title="拉一把！">
+                    <div class="rod"></div>
+                    <div class="knob"></div>
+                </div>
+                <div class="zslot-lever-hint">用力拉 →</div>
+            </div>
+        </div>
+
+        <!-- 結果卡 -->
+        <div id="zslot-result" class="zslot-result hidden"></div>
+
+        <!-- 統計列 -->
+        <div class="zslot-stats">🎁 今日已拉 <span id="zslot-count">0</span> 次 · 人人有獎，新年好彩頭！</div>
     </div>
 
     <!-- 全螢幕考試監考 Modal -->
@@ -2023,13 +2082,16 @@
         }
 
         // 有效的 section 名稱（供 URL hash 深連結使用）
-        const VALID_SECTIONS = ['students', 'points', 'grouping', 'lottery', 'timer', 'notebook', 'homework', 'exam', 'announcement'];
+        const VALID_SECTIONS = ['students', 'points', 'grouping', 'lottery', 'timer', 'notebook', 'homework', 'exam', 'zodiac', 'announcement'];
 
         function showSection(sectionName) {
             document.querySelectorAll('.section').forEach(section => section.classList.add('hidden'));
             document.getElementById(sectionName + '-section').classList.remove('hidden');
             if (sectionName === 'points') {
                 renderPointsStudentList();
+            }
+            if (sectionName === 'zodiac' && typeof window.zodiacInit === 'function') {
+                window.zodiacInit();
             }
             // 同步 URL hash，讓使用者可直接用連結跳轉到指定區塊（例：classnew.html#exam）
             try {
@@ -3871,6 +3933,9 @@
 
     <!-- 手勢操作支援（觸控滑動切換功能區 | 長按快捷選單） -->
     <script src="./js/gesture-handler.js"></script>
+
+    <!-- 🧧 十二生肖・新年拉霸機（開學破冰遊戲） -->
+    <script src="./js/zodiac-slot.js?v=3.2.0"></script>
 
     <!-- 學期封存模組（Q01：一鍵封存學期資料至 Firebase archives/） -->
     <script src="./js/semester-archive.js"></script>
