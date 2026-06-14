@@ -37,9 +37,9 @@
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="icon" type="image/png" href="icons/icon-192.png">
     <link rel="shortcut icon" href="favicon.ico">
-    <title>班級小管家 v3.8.0</title>
+    <title>班級小管家 v3.8.1</title>
     <!-- 📦 版本號（由 scripts/update-sw-version.js 自動同步） -->
-    <script>window.APP_VERSION = '3.8.0';</script>
+    <script>window.APP_VERSION = '3.8.1';</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/rwd-breakpoints.css">
     <link rel="stylesheet" href="css/pwa-install.css">
@@ -648,7 +648,7 @@
                                 title="目前版本（點擊查看更新資訊）"
                                 class="text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 cursor-pointer hover:bg-blue-200 transition-colors"
                                 onclick="window.open('https://github.com/cagoooo/class/blob/main/CHANGELOG.md', '_blank')">
-                                v3.8.0
+                                v3.8.1
                             </span>
                         </div>
                         <div class="hidden sm:block text-xs sm:text-sm text-gray-600">讓課堂管理變得簡單有趣</div>
@@ -1960,19 +1960,30 @@
 
         // --- 5. 資料備份與恢復系統 ---
         class DataBackup {
+            // 全量收集「目前班級」所有資料：核心三鍵 + 所有 SHARED_KEYS
+            // （含考試/公告/座位/經營白板/潔牙等；日後新增區塊只要把 key 加進 SHARED_KEYS 就會自動納入備份）
+            static collectData() {
+                const data = {
+                    version: '1.1',
+                    exportDate: new Date().toISOString(),
+                    appVersion: window.APP_VERSION || '',
+                    students: window.students || [],
+                    pointsHistory: window.pointsHistory || [],
+                    groups: window.groups || []
+                };
+                const shared = (window.ClassAwareStorage && ClassAwareStorage.SHARED_KEYS) || [];
+                shared.forEach(k => {
+                    try {
+                        const raw = localStorage.getItem(k);   // 攔截器自動對應目前班級
+                        if (raw != null) { try { data[k] = JSON.parse(raw); } catch (e) { data[k] = raw; } }
+                    } catch (e) { /* ignore */ }
+                });
+                return data;
+            }
+
             static export() {
                 try {
-                    const data = {
-                        version: '1.0',
-                        exportDate: new Date().toISOString(),
-                        students: students,
-                        pointsHistory: pointsHistory,
-                        groups: groups,
-                        notebookEntries: notebookEntries,
-                        homeworkList: homeworkList,
-                        homeworkChecks: homeworkChecks,
-                        lotteryHistory: lotteryHistory
-                    };
+                    const data = this.collectData();
                     // 老師備份後通常要登記成績，優先輸出 Excel；若 XLSX 未載入則退回 JSON
                     if (typeof XLSX !== 'undefined') {
                         this.exportExcel(data);
@@ -2127,35 +2138,19 @@
 
                     LoadingIndicator.show('正在匯入資料...');
 
-                    // 匯入資料
-                    if (data.students) {
-                        students = data.students;
-                        localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
-                    }
-                    if (data.pointsHistory) {
-                        pointsHistory = data.pointsHistory;
-                        localStorage.setItem(window.POINTS_HISTORY_KEY || 'pointsHistory', JSON.stringify(pointsHistory));
-                    }
-                    if (data.groups) {
-                        groups = data.groups;
-                        localStorage.setItem(window.GROUPS_KEY || 'groups', JSON.stringify(groups));
-                    }
-                    if (data.notebookEntries) {
-                        notebookEntries = data.notebookEntries;
-                        localStorage.setItem('notebookEntries', JSON.stringify(notebookEntries));
-                    }
-                    if (data.homeworkList) {
-                        homeworkList = data.homeworkList;
-                        localStorage.setItem('homeworkList', JSON.stringify(homeworkList));
-                    }
-                    if (data.homeworkChecks) {
-                        homeworkChecks = data.homeworkChecks;
-                        localStorage.setItem('homeworkChecks', JSON.stringify(homeworkChecks));
-                    }
-                    if (data.lotteryHistory) {
-                        lotteryHistory = data.lotteryHistory;
-                        localStorage.setItem('lotteryHistory', JSON.stringify(lotteryHistory));
-                    }
+                    // 匯入資料：通用還原所有 key（核心三鍵寫入班級 key，其餘 SHARED_KEYS 經攔截器對應目前班級）
+                    // 向下相容舊備份（只含 7 個 key 的 v1.0 仍可還原）
+                    const SKIP = { version: 1, exportDate: 1, appVersion: 1, type: 1, app: 1 };
+                    Object.keys(data).forEach(k => {
+                        if (SKIP[k]) return;
+                        let val;
+                        // 純字串（如 boardNote/boardActivity）直接寫回，避免被再次 JSON 編碼多出引號；物件/陣列才序列化
+                        try { val = (typeof data[k] === 'string') ? data[k] : JSON.stringify(data[k]); } catch (e) { return; }
+                        if (k === 'students') { students = data[k] || []; localStorage.setItem(window.STUDENTS_KEY || 'students', val); }
+                        else if (k === 'groups') { groups = data[k] || []; localStorage.setItem(window.GROUPS_KEY || 'groups', val); }
+                        else if (k === 'pointsHistory') { pointsHistory = data[k] || []; localStorage.setItem(window.POINTS_HISTORY_KEY || 'pointsHistory', val); }
+                        else { localStorage.setItem(k, val); }
+                    });
 
                     LoadingIndicator.hide();
                     NotificationSystem.success('資料匯入成功，頁面即將重新載入');
