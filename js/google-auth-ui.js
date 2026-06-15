@@ -741,11 +741,10 @@
     // ────────────────────────────────────────────────────────
     // 登入提醒 Banner（首次使用者引導）
     // ────────────────────────────────────────────────────────
-    const LOGIN_REMINDER_KEY    = 'gauthLoginReminderDismissed'; // 永久不再提醒（按「不再提醒」才設）
-    const WELCOME_SEEN_KEY      = 'gauthWelcomeSeen';            // 已看過置中歡迎彈窗 → 之後改走底部 Banner
+    const LOGIN_REMINDER_KEY    = 'gauthLoginReminderDismissed'; // （保留備用）底部 Banner 永久關閉用
+    const WELCOME_SESSION_KEY   = 'gauthWelcomeShownSession';    // 本次開啟已顯示過歡迎彈窗（同一次使用內不重複；新分頁 / 重開 App 會重置 → 再次跳）
     const REMINDER_SESSION_KEY  = 'gauthReminderShownSession';   // 本次開啟已顯示過 Banner（避免重複跳）
 
-    function welcomeSeen() { return !!localStorage.getItem(WELCOME_SEEN_KEY); }
     function remindedOff() { return !!localStorage.getItem(LOGIN_REMINDER_KEY); }
 
     // 是否已用 Google 帳號登入（已登入者一律不顯示任何引導）
@@ -767,9 +766,11 @@
 
     // ───────── 兩段式第一段：訪客「歡迎彈窗」（史上第一次進入時隆重歡迎 + 列好處）─────────
     function showWelcomeModal() {
-        if (welcomeSeen() || remindedOff()) return;   // 看過 / 已永久關閉 → 不跳
-        if (isLoggedInGoogle()) return;               // 已登入 → 不跳
+        // 未登入老師：每次重新進入都跳（不提供永久關閉）。同一次使用內只跳一次，避免重整 / 切回時重複彈出。
+        if (isLoggedInGoogle()) return;                              // 已登入 → 不跳
+        if (sessionStorage.getItem(WELCOME_SESSION_KEY)) return;     // 本次開啟已跳過 → 不重複
         if (document.getElementById('gauth-welcome-overlay')) return;
+        try { sessionStorage.setItem(WELCOME_SESSION_KEY, '1'); } catch (e) { /* ignore */ }
 
         const overlay = document.createElement('div');
         overlay.id = 'gauth-welcome-overlay';
@@ -801,8 +802,8 @@
         overlay.classList.add('open');
     }
 
-    function closeWelcomeModal(markSeen) {
-        if (markSeen) localStorage.setItem(WELCOME_SEEN_KEY, 'true');
+    function closeWelcomeModal() {
+        // 不寫任何永久旗標：同一次使用內靠 WELCOME_SESSION_KEY 去重，下次重新進入（新分頁 / 重開 App）仍會再跳。
         const overlay = document.getElementById('gauth-welcome-overlay');
         if (overlay) {
             overlay.classList.remove('open');
@@ -810,14 +811,10 @@
         }
     }
 
-    // ───────── 兩段式總控：首次→歡迎彈窗；之後→底部 Banner（已登入 / 永久關閉皆不跳）─────────
+    // ───────── 訪客引導：未登入老師「每次重新進入」都跳歡迎彈窗（同一次使用內只跳一次）─────────
+    // 註：底部 Banner（showLoginReminder）相關程式碼保留備用，目前一律以歡迎彈窗引導登入。
     function maybeShowGuestPrompt() {
-        if (remindedOff()) return;
-        if (!welcomeSeen()) {
-            setTimeout(() => { if (!isLoggedInGoogle()) showWelcomeModal(); }, 1200);
-        } else {
-            setTimeout(() => { if (!isLoggedInGoogle()) showLoginReminder(); }, 3000);
-        }
+        setTimeout(() => { if (!isLoggedInGoogle()) showWelcomeModal(); }, 1200);
     }
 
     // 保底：Firebase auth 回呼有時因初始化時序（race）沒能觸發訪客分支，
@@ -961,15 +958,15 @@
             this.login();
         },
 
-        /** 歡迎彈窗點「登入」：記錄已看過、收起彈窗，再開登入流程 */
+        /** 歡迎彈窗點「登入」：收起彈窗，再開登入流程 */
         loginFromWelcome() {
-            closeWelcomeModal(true);
+            closeWelcomeModal();
             this.login();
         },
 
-        /** 關閉歡迎彈窗（先逛逛看看）：記錄已看過，下次進入改用底部 Banner 溫和提醒 */
+        /** 關閉歡迎彈窗（先逛逛看看）：只關這次；下次重新進入仍會再跳引導 */
         dismissWelcome() {
-            closeWelcomeModal(true);
+            closeWelcomeModal();
         },
 
         async syncUp() {
@@ -1105,10 +1102,10 @@
         if (window.FirebaseConfig && typeof window.FirebaseConfig.onAuthStateChanged === 'function') {
             window.FirebaseConfig.onAuthStateChanged((user, profile) => {
                 if (user && !user.isAnonymous && profile) {
-                    // 已用 Google 登入 → 顯示帳號、永久關閉提醒、收掉歡迎彈窗（若開著）
+                    // 已用 Google 登入 → 顯示帳號、收掉訪客引導（歡迎彈窗 / Banner）
                     showLoggedIn(profile);
                     dismissLoginReminder(true);
-                    closeWelcomeModal(false);
+                    closeWelcomeModal();
                 } else {
                     // 訪客（未登入 / 匿名）→ 兩段式引導：首次置中歡迎彈窗、之後底部 Banner
                     showLoggedOut();
