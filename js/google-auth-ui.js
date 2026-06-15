@@ -248,6 +248,63 @@
     .gauth-reminder-actions { flex-direction: column; }
     .gauth-reminder-login, .gauth-reminder-dismiss { width: 100%; justify-content: center; }
 }
+
+/* ───── 升級：底部 Banner 的好處小標籤 ───── */
+.gauth-reminder-perks {
+    list-style: none; margin: 4px 0 0; padding: 0;
+    display: flex; flex-wrap: wrap; gap: 3px 12px;
+}
+.gauth-reminder-perks li {
+    font-size: .74rem; color: #4b5563;
+    display: flex; align-items: center; gap: 3px; white-space: nowrap;
+}
+
+/* ───── 訪客歡迎彈窗（兩段式第一段：置中 Modal）───── */
+#gauth-welcome-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(15,23,42,.55); backdrop-filter: blur(4px);
+    z-index: 10001; align-items: center; justify-content: center;
+    padding: 16px; opacity: 0; transition: opacity .25s ease;
+}
+#gauth-welcome-overlay.open { display: flex; opacity: 1; }
+#gauth-welcome-card {
+    background: linear-gradient(160deg,#eff6ff 0%,#ffffff 45%,#f0fdf4 100%);
+    border-radius: 22px; padding: 26px 24px 22px;
+    max-width: 400px; width: 100%;
+    box-shadow: 0 24px 70px rgba(0,0,0,.3); position: relative;
+    transform: translateY(14px) scale(.97);
+    transition: transform .3s cubic-bezier(.34,1.56,.64,1);
+}
+#gauth-welcome-overlay.open #gauth-welcome-card { transform: translateY(0) scale(1); }
+.gauth-welcome-close {
+    position: absolute; top: 12px; right: 14px; background: none; border: none;
+    font-size: 1.15rem; color: #9ca3af; cursor: pointer; padding: 4px 6px;
+    border-radius: 8px; transition: all .2s; line-height: 1;
+}
+.gauth-welcome-close:hover { color: #6b7280; background: rgba(0,0,0,.05); }
+.gauth-welcome-icon { font-size: 2.6rem; text-align: center; line-height: 1; margin-bottom: 8px; }
+.gauth-welcome-title { font-size: 1.2rem; font-weight: 800; color: #1f2937; text-align: center; margin-bottom: 5px; }
+.gauth-welcome-sub { font-size: .85rem; color: #6b7280; text-align: center; line-height: 1.55; margin-bottom: 18px; }
+.gauth-welcome-perks { list-style: none; margin: 0 0 20px; padding: 0; display: flex; flex-direction: column; gap: 11px; }
+.gauth-welcome-perks li { display: flex; align-items: flex-start; gap: 11px; }
+.gauth-perk-ico { font-size: 1.3rem; flex-shrink: 0; line-height: 1.25; width: 26px; text-align: center; }
+.gauth-perk-txt { font-size: .86rem; color: #374151; line-height: 1.5; }
+.gauth-perk-txt b { color: #1f2937; font-weight: 700; }
+.gauth-welcome-actions { display: flex; flex-direction: column; gap: 9px; }
+.gauth-welcome-login {
+    display: flex; align-items: center; justify-content: center; gap: 9px;
+    padding: 12px; background: #4285f4; color: #fff; border: none; border-radius: 11px;
+    font-weight: 700; font-size: .95rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(66,133,244,.35); transition: background .2s, transform .1s;
+}
+.gauth-welcome-login:hover { background: #3367d6; }
+.gauth-welcome-login:active { transform: scale(.98); }
+.gauth-welcome-login img { width: 20px; height: 20px; background: #fff; border-radius: 50%; padding: 2px; box-sizing: border-box; }
+.gauth-welcome-later {
+    padding: 9px; background: none; border: none; color: #6b7280;
+    font-size: .85rem; cursor: pointer; border-radius: 8px; transition: background .2s;
+}
+.gauth-welcome-later:hover { background: rgba(0,0,0,.04); color: #374151; }
         `;
         document.head.appendChild(style);
     }
@@ -684,10 +741,17 @@
     // ────────────────────────────────────────────────────────
     // 登入提醒 Banner（首次使用者引導）
     // ────────────────────────────────────────────────────────
-    const LOGIN_REMINDER_KEY = 'gauthLoginReminderDismissed';
+    const LOGIN_REMINDER_KEY    = 'gauthLoginReminderDismissed'; // 永久不再提醒（按「不再提醒」才設）
+    const WELCOME_SEEN_KEY      = 'gauthWelcomeSeen';            // 已看過置中歡迎彈窗 → 之後改走底部 Banner
+    const REMINDER_SESSION_KEY  = 'gauthReminderShownSession';   // 本次開啟已顯示過 Banner（避免重複跳）
 
-    function shouldShowLoginReminder() {
-        return !localStorage.getItem(LOGIN_REMINDER_KEY);
+    function welcomeSeen() { return !!localStorage.getItem(WELCOME_SEEN_KEY); }
+    function remindedOff() { return !!localStorage.getItem(LOGIN_REMINDER_KEY); }
+
+    // 是否已用 Google 帳號登入（已登入者一律不顯示任何引導）
+    function isLoggedInGoogle() {
+        try { return !!(window.FirebaseConfig && window.FirebaseConfig.isGoogleUser && window.FirebaseConfig.isGoogleUser()); }
+        catch (e) { return false; }
     }
 
     function dismissLoginReminder(permanently) {
@@ -701,24 +765,99 @@
         }
     }
 
+    // ───────── 兩段式第一段：訪客「歡迎彈窗」（史上第一次進入時隆重歡迎 + 列好處）─────────
+    function showWelcomeModal() {
+        if (welcomeSeen() || remindedOff()) return;   // 看過 / 已永久關閉 → 不跳
+        if (isLoggedInGoogle()) return;               // 已登入 → 不跳
+        if (document.getElementById('gauth-welcome-overlay')) return;
+
+        const overlay = document.createElement('div');
+        overlay.id = 'gauth-welcome-overlay';
+        overlay.innerHTML = `
+            <div id="gauth-welcome-card">
+                <button class="gauth-welcome-close" onclick="GoogleAuthUI.dismissWelcome()" aria-label="關閉" title="先逛逛看看">✕</button>
+                <div class="gauth-welcome-icon">👋☁️</div>
+                <div class="gauth-welcome-title">歡迎使用班級小管家！</div>
+                <div class="gauth-welcome-sub">用 Google 帳號登入（免費、一鍵），<br>班級資料就不怕不見，還有這些好處 👇</div>
+                <ul class="gauth-welcome-perks">
+                    <li><span class="gauth-perk-ico">☁️</span><span class="gauth-perk-txt"><b>自動雲端備份</b>：換手機、重灌電腦都不怕，資料永遠都在。</span></li>
+                    <li><span class="gauth-perk-ico">🔄</span><span class="gauth-perk-txt"><b>多裝置同步</b>：在學校改一改，回到家打開就能接著用。</span></li>
+                    <li><span class="gauth-perk-ico">🗂️</span><span class="gauth-perk-txt"><b>多班級一鍵備份還原</b>：帶好幾個班也不怕弄亂。</span></li>
+                    <li><span class="gauth-perk-ico">🔒</span><span class="gauth-perk-txt"><b>安全又私密</b>：資料綁你的帳號，只有你自己看得到。</span></li>
+                </ul>
+                <div class="gauth-welcome-actions">
+                    <button class="gauth-welcome-login" onclick="GoogleAuthUI.loginFromWelcome()">
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G">
+                        使用 Google 帳號登入
+                    </button>
+                    <button class="gauth-welcome-later" onclick="GoogleAuthUI.dismissWelcome()">先逛逛看看，晚點再登入</button>
+                </div>
+            </div>
+        `;
+        // 點背景（卡片外）也視為「先逛逛」
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) GoogleAuthUI.dismissWelcome(); });
+        document.body.appendChild(overlay);
+        void overlay.offsetWidth;            // 強制 reflow，確保進場 transition 一定觸發（不依賴 rAF，背景分頁也可靠）
+        overlay.classList.add('open');
+    }
+
+    function closeWelcomeModal(markSeen) {
+        if (markSeen) localStorage.setItem(WELCOME_SEEN_KEY, 'true');
+        const overlay = document.getElementById('gauth-welcome-overlay');
+        if (overlay) {
+            overlay.classList.remove('open');
+            setTimeout(() => overlay.remove(), 280);
+        }
+    }
+
+    // ───────── 兩段式總控：首次→歡迎彈窗；之後→底部 Banner（已登入 / 永久關閉皆不跳）─────────
+    function maybeShowGuestPrompt() {
+        if (remindedOff()) return;
+        if (!welcomeSeen()) {
+            setTimeout(() => { if (!isLoggedInGoogle()) showWelcomeModal(); }, 1200);
+        } else {
+            setTimeout(() => { if (!isLoggedInGoogle()) showLoginReminder(); }, 3000);
+        }
+    }
+
+    // 保底：Firebase auth 回呼有時因初始化時序（race）沒能觸發訪客分支，
+    // 此處稍後再判斷一次。已登入、或「上次是 Google 登入、restore 中」則不打擾。
+    function guestPromptFallback() {
+        if (isLoggedInGoogle()) return;
+        try {
+            var p = JSON.parse(localStorage.getItem('firebaseUserProfile') || 'null');
+            if (p && p.isAnonymous === false) return;
+        } catch (e) { /* ignore */ }
+        maybeShowGuestPrompt();   // 內部有 isLoggedInGoogle 防護 + DOM 去重，重複呼叫安全
+    }
+
     function showLoginReminder() {
-        if (!shouldShowLoginReminder()) return;
-        if (document.getElementById('gauth-login-reminder')) return; // 已顯示
+        if (remindedOff()) return;                                    // 已永久不再提醒
+        if (isLoggedInGoogle()) return;                               // 已登入 → 不顯示
+        if (sessionStorage.getItem(REMINDER_SESSION_KEY)) return;     // 本次開啟已跳過一次
+        if (document.getElementById('gauth-login-reminder')) return;  // 已顯示
+        sessionStorage.setItem(REMINDER_SESSION_KEY, '1');
 
         const banner = document.createElement('div');
         banner.id = 'gauth-login-reminder';
         banner.innerHTML = `
             <div class="gauth-reminder-card">
-                <button class="gauth-reminder-close" onclick="GoogleAuthUI.dismissReminder(true)" title="不再提醒" aria-label="關閉">✕</button>
+                <button class="gauth-reminder-close" onclick="GoogleAuthUI.dismissReminder(false)" title="下次再說" aria-label="關閉">✕</button>
                 <div class="gauth-reminder-header">
                     <div class="gauth-reminder-icon">☁️</div>
                     <div>
-                        <div class="gauth-reminder-title">登入 Google 帳號，資料自動備份到雲端</div>
-                        <div class="gauth-reminder-desc">班級數據雲端備份，回到家也能繼續處理學生的互動成績內容。</div>
+                        <div class="gauth-reminder-title">登入 Google，班級資料自動雲端備份</div>
+                        <div class="gauth-reminder-desc">免費登入，換手機 / 重灌都不怕資料不見：</div>
+                        <ul class="gauth-reminder-perks">
+                            <li>☁️ 自動備份</li>
+                            <li>🔄 多裝置同步</li>
+                            <li>🗂️ 多班級還原</li>
+                            <li>🔒 安全私密</li>
+                        </ul>
                     </div>
                 </div>
                 <div class="gauth-reminder-actions">
-                    <button class="gauth-reminder-login" onclick="GoogleAuthUI.dismissReminder(true); GoogleAuthUI.login();">
+                    <button class="gauth-reminder-login" onclick="GoogleAuthUI.loginFromReminder()">
                         <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G" style="width:16px;height:16px;">
                         立即登入
                     </button>
@@ -728,10 +867,9 @@
         `;
         document.body.appendChild(banner);
 
-        // 延遲出現動畫
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => banner.classList.add('show'));
-        });
+        // 進場動畫：強制 reflow 後加 class，確保 transition 一定觸發（不依賴 rAF）
+        void banner.offsetWidth;
+        banner.classList.add('show');
     }
 
     // ────────────────────────────────────────────────────────
@@ -812,9 +950,26 @@
             if (dd) dd.style.display = (dd.style.display === 'block') ? 'none' : 'block';
         },
 
-        /** 關閉登入提醒 Banner（permanently=true 則永久不再顯示） */
+        /** 關閉登入提醒 Banner（permanently=true=永久不再顯示；false=只關這次，下次開啟再溫和提醒） */
         dismissReminder(permanently) {
             dismissLoginReminder(permanently);
+        },
+
+        /** 底部 Banner 點「立即登入」：先收起 Banner（不永久），再開登入流程 */
+        loginFromReminder() {
+            dismissLoginReminder(false);
+            this.login();
+        },
+
+        /** 歡迎彈窗點「登入」：記錄已看過、收起彈窗，再開登入流程 */
+        loginFromWelcome() {
+            closeWelcomeModal(true);
+            this.login();
+        },
+
+        /** 關閉歡迎彈窗（先逛逛看看）：記錄已看過，下次進入改用底部 Banner 溫和提醒 */
+        dismissWelcome() {
+            closeWelcomeModal(true);
         },
 
         async syncUp() {
@@ -950,18 +1105,21 @@
         if (window.FirebaseConfig && typeof window.FirebaseConfig.onAuthStateChanged === 'function') {
             window.FirebaseConfig.onAuthStateChanged((user, profile) => {
                 if (user && !user.isAnonymous && profile) {
+                    // 已用 Google 登入 → 顯示帳號、永久關閉提醒、收掉歡迎彈窗（若開著）
                     showLoggedIn(profile);
-                    // 已登入 → 永久關閉提醒（已經知道此功能）
                     dismissLoginReminder(true);
+                    closeWelcomeModal(false);
                 } else {
+                    // 訪客（未登入 / 匿名）→ 兩段式引導：首次置中歡迎彈窗、之後底部 Banner
                     showLoggedOut();
-                    // 未登入且未曾關閉提醒 → 延遲 3 秒後顯示登入提醒 Banner
-                    setTimeout(showLoginReminder, 3000);
+                    maybeShowGuestPrompt();
                 }
             });
+            // 保底：auth 回呼若因初始化時序沒觸發，稍後再判斷一次（內部有去登入/去重防護）
+            setTimeout(guestPromptFallback, 3500);
         } else {
-            // FirebaseConfig 未載入（離線等情況），也嘗試顯示提醒
-            setTimeout(showLoginReminder, 4000);
+            // FirebaseConfig 未載入（離線等情況），仍當訪客嘗試引導
+            maybeShowGuestPrompt();
         }
 
         // 每分鐘刷新「上次同步時間」
