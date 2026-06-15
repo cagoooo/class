@@ -86,6 +86,22 @@ html = html.replace(
 );
 if (html !== badgeBefore) { htmlChanged = true; htmlChanges.push(`版本徽章 → v${version}`); }
 
+// 4. 統一所有「本地 js/css」的 cache-bust 查詢字串（?v=）為當前版本。
+//    根治「改了 js/css 卻因瀏覽器 / SW cacheFirst 快取看到舊版、要手動補 ?v=」的長年痛點：
+//    發版時所有資源 URL 都會變 → 強制繞過所有快取層抓最新（外部 CDN / 絕對網址不受影響）。
+const assetBefore = html;
+// (a) 已有 ?v=x.x.x → 換成新版本
+html = html.replace(
+    /((?:\.\/)?(?:js|css)\/[\w.\-]+\.(?:js|css))\?v=[\d.]+/g,
+    `$1?v=${version}`
+);
+// (b) 還沒有 ?v= 的本地 js/css → 補上（副檔名後須緊接引號才匹配，避免對已帶 ?v 的重複加）
+html = html.replace(
+    /(src="|href=")((?:\.\/)?(?:js|css)\/[\w.\-]+\.(?:js|css))(")/g,
+    `$1$2?v=${version}$3`
+);
+if (html !== assetBefore) { htmlChanged = true; htmlChanges.push(`所有本地 js/css ?v= → ${version}`); }
+
 if (htmlChanged) {
     fs.writeFileSync(HTML_PATH, html, 'utf8');
     console.log(`✅ classnew.html 已更新：`);

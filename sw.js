@@ -1,12 +1,12 @@
 /**
  * 班級小管家 Service Worker
- * @version 3.11.4
+ * @version 3.11.5
  * @description PWA 離線支援與快取策略優化
  */
 
-const CACHE_NAME = 'class-manager-v3.11.4';
-const STATIC_CACHE = 'class-manager-static-v3.11.4';
-const DYNAMIC_CACHE = 'class-manager-dynamic-v3.11.4';
+const CACHE_NAME = 'class-manager-v3.11.5';
+const STATIC_CACHE = 'class-manager-static-v3.11.5';
+const DYNAMIC_CACHE = 'class-manager-dynamic-v3.11.5';
 
 
 // 靜態資源列表（安裝時預快取）
@@ -92,10 +92,14 @@ self.addEventListener('install', (event) => {
                 console.log('[SW] 預快取靜態資源');
                 // 逐個快取，避免單個失敗導致全部失敗
                 return Promise.allSettled(
+                    // 用 {cache: 'reload'} 強制繞過瀏覽器 HTTP 快取抓最新檔再存入，
+                    // 確保新版 SW 接管時 precache 內容一定是最新（而非瀏覽器舊快取）。
                     STATIC_ASSETS.map(asset =>
-                        cache.add(asset).catch(err => {
-                            console.warn(`[SW] 快取失敗: ${asset}`, err);
-                        })
+                        fetch(new Request(asset, { cache: 'reload' }))
+                            .then(resp => { if (resp && resp.ok) return cache.put(asset, resp); })
+                            .catch(err => {
+                                console.warn(`[SW] 快取失敗: ${asset}`, err);
+                            })
                     )
                 );
             })
