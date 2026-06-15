@@ -212,16 +212,18 @@ function getLocalStats() {
 // ─────────────────────────────────────────────────────
 // 同步所有本地資料到雲端
 // ─────────────────────────────────────────────────────
-async function syncToCloud() {
+async function syncToCloud(silent = false) {
     if (!window.FirebaseConfig.isConnected()) {
-        NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號');
+        if (!silent) NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號');
         return false;
     }
     if (syncStatus.isSyncing) { console.warn('同步進行中...'); return false; }
 
     syncStatus.isSyncing = true;
     try {
-        typeof LoadingIndicator !== 'undefined' && LoadingIndicator.show('正在同步至雲端...');
+        // silent=true（自動 / 背景同步）：不顯示全螢幕遮罩，避免每次切回頁面就擋住操作；
+        // 由 auto-sync.js 自己的右上角小圖示 + 底部靜默 Toast 提供低調回饋。
+        if (!silent) typeof LoadingIndicator !== 'undefined' && LoadingIndicator.show('正在同步至雲端...');
 
         const db = window.FirebaseConfig.getDb();
         const userId = window.FirebaseConfig.getCurrentUserId();
@@ -306,17 +308,17 @@ async function syncToCloud() {
         syncStatus.lastSyncTime = new Date();
         localStorage.setItem('lastSyncTime', syncStatus.lastSyncTime.toISOString());
 
-        typeof LoadingIndicator !== 'undefined' && LoadingIndicator.hide();
+        if (!silent) typeof LoadingIndicator !== 'undefined' && LoadingIndicator.hide();
         if (typeof window.GoogleAuthUI !== 'undefined') {
             window.GoogleAuthUI.refreshSyncTime && window.GoogleAuthUI.refreshSyncTime();
         }
-        NotificationSystem && NotificationSystem.success('資料已完整同步至雲端 ☁️');
+        if (!silent) NotificationSystem && NotificationSystem.success('資料已完整同步至雲端 ☁️');
         console.log('✅ 同步完成:', syncStatus.lastSyncTime);
         return true;
     } catch (error) {
         console.error('同步失敗:', error);
-        typeof LoadingIndicator !== 'undefined' && LoadingIndicator.hide();
-        NotificationSystem && NotificationSystem.error('同步失敗: ' + error.message);
+        if (!silent) typeof LoadingIndicator !== 'undefined' && LoadingIndicator.hide();
+        if (!silent) NotificationSystem && NotificationSystem.error('同步失敗: ' + error.message);
         return false;
     } finally {
         syncStatus.isSyncing = false;

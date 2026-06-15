@@ -100,7 +100,7 @@
         showSyncSpinner(true);
 
         try {
-            const ok = await window.FirebaseSync.syncToCloud();
+            const ok = await window.FirebaseSync.syncToCloud(true);   // 靜默：不顯示全螢幕遮罩（用本模組的小圖示 + Toast）
             if (ok && silent) {
                 showSilentToast('☁️ 已自動同步');
             }
