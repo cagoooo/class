@@ -1,14 +1,16 @@
 /**
  * usage-notify.js
  * 📡 使用情形通知（→ Cloud Function `notifyUsage` → Google Chat）
- * @version 3.10.0
+ * @version 3.10.3
  *
- * 目的：讓開發者（阿凱老師）即時掌握老師們的使用情形。
- *   - session_start：每場 session 報一次「有老師正在使用」
- *   - login：Google 帳號登入（每場每人一次）
- *   - class_create：建立新班級（重要動作，必報）
- *   - feature：使用功能（每場每功能只報第一次，避免洗版）
- *   - error：系統錯誤（同訊息每場一次、每場上限 5 則）
+ * 目的：讓開發者（阿凱老師）掌握老師們的使用情形，但避免手機被逐筆通知洗版。
+ *   通知策略＝「重要事件即時 + 一般事件降噪」：
+ *   - session_start：每位老師「每天」只報一次「有老師正在使用」（原本每場，已降頻）
+ *   - login：Google 帳號登入，每位老師「每天」一次（原本每場每人，已降頻）
+ *   - class_create：建立新班級（重要動作，即時必報）
+ *   - feature：使用功能 — 🔇 已停用逐筆通知（原本每切一個功能分頁就推一張卡片，
+ *       是手機狂震的主因；保留 API 簽名讓呼叫端免改）
+ *   - error：系統錯誤（重要，即時報；同訊息每場一次、每場上限 5 則）
  *
  * 設計原則：
  *   1. 純 fire-and-forget，任何失敗都「吞掉」，通知絕不影響 App 正常運作。
@@ -58,6 +60,18 @@
             sessionStorage.setItem(SS + key, '1');
             return true;
         } catch (e) { return true; }   // 儲存被擋時，寧可放行（不至於洗版，量本來就小）
+    }
+
+    // 「每天只放行一次」去重：用 localStorage 存當天日期（key 固定、值為日期，不會累積膨脹）。
+    // 跨「整天」而非「每場 session」降頻 → 同一位老師一天只報一次來訪 / 登入。
+    function dayOnce(key) {
+        try {
+            var today = new Date().toISOString().slice(0, 10);   // YYYY-MM-DD（足以做日界線）
+            var k = SS + 'day_' + key;
+            if (localStorage.getItem(k) === today) return false;
+            localStorage.setItem(k, today);
+            return true;
+        } catch (e) { return true; }   // 儲存被擋時放行（量本來就小）
     }
 
     function loadQ() {
@@ -115,8 +129,8 @@
             var fire = function () {
                 if (done) return;
                 done = true;
-                if (ssOnce('session')) enqueue('session_start', {});
-                else flush();   // 本場已報過，順手補送殘留佇列（如建立班級後 reload 的事件）
+                if (dayOnce('session')) enqueue('session_start', {});
+                else flush();   // 今天已報過，順手補送殘留佇列（如建立班級後 reload 的事件）
             };
             // 盡量等 Firebase Auth 就緒再送（callable 才帶得到身分）；逾時仍會送出。
             // 注意：firebase.auth() 在 initializeApp 前會丟錯，故輪詢等待。
@@ -139,7 +153,7 @@
         // Google 帳號登入：每場每人一次
         login: function (profile) {
             var email = (profile && profile.email) || '';
-            if (!ssOnce('login_' + (email || 'x'))) return;
+            if (!dayOnce('login_' + (email || 'x'))) return;   // 每位老師每天只報一次（原本每場）
             enqueue('login', { name: (profile && profile.displayName) || '', email: email });
         },
 
@@ -148,11 +162,11 @@
             enqueue('class_create', { className: className || '' });
         },
 
-        // 使用功能：每場每功能只報第一次
+        // 使用功能：🔇 已停用逐筆通知（每切一個功能分頁就推一張卡片，是手機狂震的主因）。
+        // 保留函式與簽名，呼叫端（classnew.html 切換分頁處）無需改動；FEATURE_LABELS 亦保留，
+        // 供日後若要改做「每日彙整摘要」時重用。如需臨時恢復逐筆通知，把下面 return 拿掉即可。
         feature: function (name) {
-            if (!name) return;
-            if (!ssOnce('feat_' + name)) return;
-            enqueue('feature', { feature: name, label: FEATURE_LABELS[name] || name });
+            return;
         },
 
         // 系統錯誤：同訊息每場一次、每場上限 5 則
