@@ -742,8 +742,12 @@
     // 登入提醒 Banner（首次使用者引導）
     // ────────────────────────────────────────────────────────
     const LOGIN_REMINDER_KEY    = 'gauthLoginReminderDismissed'; // （保留備用）底部 Banner 永久關閉用
-    const WELCOME_SESSION_KEY   = 'gauthWelcomeShownSession';    // 本次開啟已顯示過歡迎彈窗（同一次使用內不重複；新分頁 / 重開 App 會重置 → 再次跳）
     const REMINDER_SESSION_KEY  = 'gauthReminderShownSession';   // 本次開啟已顯示過 Banner（避免重複跳）
+
+    // 用「記憶體變數」而非 sessionStorage 做去重：每次頁面載入（含 F5 重新整理）都會重置 →
+    // 未登入就會再跳歡迎彈窗；同一次載入內（含使用者關閉後保底機制再觸發）則不重複彈出。
+    // （sessionStorage 在同分頁重新整理時不會清除，會誤擋掉「重整後再跳」，故改用記憶體變數。）
+    let welcomeShownThisLoad = false;
 
     function remindedOff() { return !!localStorage.getItem(LOGIN_REMINDER_KEY); }
 
@@ -766,11 +770,11 @@
 
     // ───────── 兩段式第一段：訪客「歡迎彈窗」（史上第一次進入時隆重歡迎 + 列好處）─────────
     function showWelcomeModal() {
-        // 未登入老師：每次重新進入都跳（不提供永久關閉）。同一次使用內只跳一次，避免重整 / 切回時重複彈出。
-        if (isLoggedInGoogle()) return;                              // 已登入 → 不跳
-        if (sessionStorage.getItem(WELCOME_SESSION_KEY)) return;     // 本次開啟已跳過 → 不重複
+        // 未登入老師：每次頁面載入（含 F5 重新整理）都跳（不提供永久關閉）。同一次載入內只跳一次，避免短時間重複彈出。
+        if (isLoggedInGoogle()) return;                  // 已登入 → 不跳
+        if (welcomeShownThisLoad) return;                // 本次載入已跳過（含關閉後）→ 不重複
         if (document.getElementById('gauth-welcome-overlay')) return;
-        try { sessionStorage.setItem(WELCOME_SESSION_KEY, '1'); } catch (e) { /* ignore */ }
+        welcomeShownThisLoad = true;
 
         const overlay = document.createElement('div');
         overlay.id = 'gauth-welcome-overlay';
@@ -803,7 +807,7 @@
     }
 
     function closeWelcomeModal() {
-        // 不寫任何永久旗標：同一次使用內靠 WELCOME_SESSION_KEY 去重，下次重新進入（新分頁 / 重開 App）仍會再跳。
+        // 不寫任何永久旗標：去重交給記憶體變數 welcomeShownThisLoad，下次頁面載入（含 F5 重新整理）會重置 → 仍會再跳。
         const overlay = document.getElementById('gauth-welcome-overlay');
         if (overlay) {
             overlay.classList.remove('open');
