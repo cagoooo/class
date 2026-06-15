@@ -37,9 +37,9 @@
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="icon" type="image/png" href="icons/icon-192.png">
     <link rel="shortcut icon" href="favicon.ico">
-    <title>班級小管家 v3.11.0</title>
+    <title>班級小管家 v3.11.1</title>
     <!-- 📦 版本號（由 scripts/update-sw-version.js 自動同步） -->
-    <script>window.APP_VERSION = '3.11.0';</script>
+    <script>window.APP_VERSION = '3.11.1';</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/rwd-breakpoints.css">
     <link rel="stylesheet" href="css/pwa-install.css">
@@ -649,7 +649,7 @@
                                 title="目前版本（點擊查看更新資訊）"
                                 class="text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 cursor-pointer hover:bg-blue-200 transition-colors"
                                 onclick="window.open('https://github.com/cagoooo/class/blob/main/CHANGELOG.md', '_blank')">
-                                v3.11.0
+                                v3.11.1
                             </span>
                         </div>
                         <div class="hidden sm:block text-xs sm:text-sm text-gray-600">讓課堂管理變得簡單有趣</div>
@@ -2315,12 +2315,20 @@
                 setTimeout(() => _autoScrollToSection(_initialHash), 500);
             } else {
                 showSection('students');
-                // announcement-section 由 announcement.js 動態注入，需等初始化完成
+                // announcement-section 由 announcement.js 動態注入，存在時間差。
+                // 改用輪詢等元素就緒再切換（原本固定 350ms 在慢裝置 / 慢網路會找不到元素而出錯），最多等約 5 秒。
                 if (_initialHash === 'announcement') {
-                    setTimeout(() => {
-                        if (typeof window.showSection === 'function') window.showSection('announcement');
-                        setTimeout(() => _autoScrollToSection('announcement'), 500);
-                    }, 350);
+                    let _annTries = 0;
+                    const _annPoll = setInterval(() => {
+                        _annTries++;
+                        if (document.getElementById('announcement-section')) {
+                            clearInterval(_annPoll);
+                            if (typeof window.showSection === 'function') window.showSection('announcement');
+                            setTimeout(() => _autoScrollToSection('announcement'), 300);
+                        } else if (_annTries >= 20) {
+                            clearInterval(_annPoll);   // 約 5 秒仍未注入，放棄（保持在 students）
+                        }
+                    }, 250);
                 }
             }
 
@@ -2424,8 +2432,12 @@
         }
 
         function showSection(sectionName) {
+            // 防護：目標區塊可能不存在（announcement 等由模組動態注入、尚未就緒，或無效的 URL hash）。
+            // 找不到就安全略過，避免對 null 取 .classList 拋出 Global Error，也避免「全部 section 先被隱藏但目標 show 失敗 → 畫面空白」。
+            const targetSection = document.getElementById(sectionName + '-section');
+            if (!targetSection) return;
             document.querySelectorAll('.section').forEach(section => section.classList.add('hidden'));
-            document.getElementById(sectionName + '-section').classList.remove('hidden');
+            targetSection.classList.remove('hidden');
             if (sectionName === 'points') {
                 renderPointsStudentList();
             }
