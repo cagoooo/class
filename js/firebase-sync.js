@@ -291,19 +291,8 @@ async function syncToCloud(silent = false) {
 
         // 同步班級清單（classProfiles）到雲端 meta 節點，確保多裝置可識別所有班級
         // 路徑：users/{uid}/_meta/classProfiles（不受多班級路徑影響，固定全域）
-        try {
-            const db = window.FirebaseConfig.getDb();
-            const userId = window.FirebaseConfig.getCurrentUserId();
-            const profiles = JSON.parse(localStorage.getItem('classProfiles') || '[]');
-            if (profiles.length > 0) {
-                await db.collection('users').doc(userId)
-                    .collection('_meta').doc('classProfiles')
-                    .set({ profiles, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-                console.log('[MultiClass] classProfiles 已同步至雲端');
-            }
-        } catch (e) {
-            console.warn('[MultiClass] classProfiles 同步失敗（非致命）:', e);
-        }
+        // ⚠️ 合併寫入（只增不減），避免空白裝置覆蓋洗掉雲端完整班級索引
+        await uploadClassProfilesMerged();
 
         syncStatus.lastSyncTime = new Date();
         localStorage.setItem('lastSyncTime', syncStatus.lastSyncTime.toISOString());
@@ -1052,15 +1041,8 @@ async function syncAllClassesToCloud(onProgress) {
             }
         }
 
-        // 同步班級清單 meta
-        try {
-            const profiles2 = JSON.parse(localStorage.getItem('classProfiles') || '[]');
-            if (profiles2.length > 0) {
-                await db.collection('users').doc(userId)
-                    .collection('_meta').doc('classProfiles')
-                    .set({ profiles: profiles2, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-            }
-        } catch (e) { /* 非致命 */ }
+        // 同步班級清單 meta（合併寫入，只增不減，避免洗掉雲端既有班級索引）
+        await uploadClassProfilesMerged();
 
         syncStatus.lastSyncTime = new Date();
         localStorage.setItem('lastSyncTime', syncStatus.lastSyncTime.toISOString());
@@ -1252,6 +1234,38 @@ async function syncClassProfilesFromCloud() {
         } catch (e) { console.warn('[MultiClass] 寫入合併後 classProfiles 失敗:', e); }
     }
     return merged;
+}
+
+/**
+ * 把本地班級清單「合併（只增不減）」寫回雲端 _meta/classProfiles。
+ * ⚠️ 絕對不能直接覆蓋：空白／新裝置本地只有 default，若覆蓋會把雲端完整班級索引洗掉
+ *    （實際發生過：手機首登後背景同步把雲端 601~606 名冊蓋成只剩預設班，班級資料還在卻「找不到」）。
+ * 合併規則：以雲端既有為底，本地同 id 者覆蓋（更新名稱/圖示），本地新增者附加；雙方聯集，不刪任何一邊。
+ */
+async function uploadClassProfilesMerged() {
+    try {
+        const db = window.FirebaseConfig.getDb();
+        const userId = window.FirebaseConfig.getCurrentUserId();
+        let localProfiles = [];
+        try { localProfiles = JSON.parse(localStorage.getItem('classProfiles') || '[]'); } catch { localProfiles = []; }
+
+        const cloudProfiles = await fetchCloudClassProfiles();
+
+        // 以 id 為鍵聯集：先放雲端，再用本地覆蓋/附加
+        const byId = new Map();
+        cloudProfiles.forEach(p => { if (p && p.id != null) byId.set(String(p.id), p); });
+        localProfiles.forEach(p => { if (p && p.id != null) byId.set(String(p.id), { ...byId.get(String(p.id)), ...p }); });
+
+        const merged = Array.from(byId.values());
+        if (merged.length === 0) return;
+
+        await db.collection('users').doc(userId)
+            .collection('_meta').doc('classProfiles')
+            .set({ profiles: merged, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+        console.log(`[MultiClass] classProfiles 已合併同步至雲端（${merged.length} 個班級，不洗掉雲端既有）`);
+    } catch (e) {
+        console.warn('[MultiClass] classProfiles 合併同步失敗（非致命）:', e);
+    }
 }
 
 // ─────────────────────────────────────────────────────
