@@ -1,8 +1,10 @@
 # 班級小管家 - 開發進度記錄
 
-## 📅 最後更新：2026-04-16
+## 📅 最後更新：2026-06-17
 
-## 🎯 當前版本：v3.1.6
+## 🎯 當前版本：v3.11.8
+
+> 詳細逐版紀錄見 [CHANGELOG.md](CHANGELOG.md)；最近一次（v3.11.6~v3.11.8）為「手機端體驗三修 + 雲端班級索引資料完整性修補」，並新增全域 skill `firebase-pwa-sync-forensics`。未來方向見 [FUTURE_DEVELOPMENT_SUGGESTIONS.md](FUTURE_DEVELOPMENT_SUGGESTIONS.md) 文末 2026-06-17 新增章節。
 
 ---
 
