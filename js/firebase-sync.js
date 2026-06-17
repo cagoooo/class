@@ -1201,6 +1201,60 @@ async function showAllClassSyncModal() {
 
 
 // ─────────────────────────────────────────────────────
+// 班級清單（classProfiles）雲端 → 本地 合併
+// ─────────────────────────────────────────────────────
+
+/**
+ * 從雲端 _meta/classProfiles 取得班級清單（不寫入本地）
+ * @returns {Promise<Array>} 雲端班級陣列（無則回傳 []）
+ */
+async function fetchCloudClassProfiles() {
+    try {
+        if (!window.FirebaseConfig.isConnected()) return [];
+        const db = window.FirebaseConfig.getDb();
+        const userId = window.FirebaseConfig.getCurrentUserId();
+        const metaDoc = await db.collection('users').doc(userId)
+            .collection('_meta').doc('classProfiles').get();
+        if (metaDoc.exists && Array.isArray(metaDoc.data().profiles)) {
+            return metaDoc.data().profiles;
+        }
+    } catch (e) {
+        console.warn('[MultiClass] 讀取雲端 classProfiles 失敗:', e);
+    }
+    return [];
+}
+
+/**
+ * 抓雲端班級清單並合併進本地 localStorage（雲端優先 + 保留本地獨有）
+ * 解決「新裝置首次登入只看得到預設班、還原所有班級也只還原預設班」的問題：
+ * 還原流程必須先知道雲端有哪些班級，不能只依賴本地（新裝置本地是空的）。
+ * @returns {Promise<Array>} 合併後的班級陣列（一定含 default）
+ */
+async function syncClassProfilesFromCloud() {
+    const cloudProfiles = await fetchCloudClassProfiles();
+    let localProfiles = [];
+    try { localProfiles = JSON.parse(localStorage.getItem('classProfiles') || '[]'); } catch { localProfiles = []; }
+
+    // 以雲端為主，補上本地獨有的班級
+    const cloudIds = new Set(cloudProfiles.map(p => String(p.id)));
+    const localOnly = localProfiles.filter(p => !cloudIds.has(String(p.id)));
+    let merged = [...cloudProfiles, ...localOnly];
+
+    // 確保一定有 default
+    if (!merged.find(p => String(p.id) === 'default')) {
+        merged.unshift({ id: 'default', name: '預設班級', isDefault: true, createdAt: new Date().toISOString() });
+    }
+
+    if (cloudProfiles.length > 0) {
+        try {
+            localStorage.setItem('classProfiles', JSON.stringify(merged));
+            console.log(`[MultiClass] 已從雲端合併班級清單（${merged.length} 個班級）`);
+        } catch (e) { console.warn('[MultiClass] 寫入合併後 classProfiles 失敗:', e); }
+    }
+    return merged;
+}
+
+// ─────────────────────────────────────────────────────
 // 一鍵從雲端還原所有班級到本地（科任老師回家用）
 // ─────────────────────────────────────────────────────
 
@@ -1218,10 +1272,13 @@ async function syncAllClassesFromCloud(onProgress) {
     const results = [];
 
     try {
-        const profiles = JSON.parse(localStorage.getItem('classProfiles') || '[]');
+        // ⚡ 先從雲端 _meta 取得完整班級清單並合併進本地，
+        //    否則新裝置本地只有 default，這個迴圈永遠只還原預設班（601~606 不會被發現）
+        const profiles = await syncClassProfilesFromCloud();
         const allClasses = [
             { id: 'default', name: '預設班級' },
-            ...profiles.map(p => ({ id: String(p.id), name: p.name || p.id }))
+            ...profiles.filter(p => String(p.id) !== 'default')
+                .map(p => ({ id: String(p.id), name: p.name || p.id }))
         ];
 
         for (let i = 0; i < allClasses.length; i++) {
@@ -1351,10 +1408,12 @@ async function showAllClassDownloadModal() {
     const existId = 'all-class-dl-modal';
     document.getElementById(existId)?.remove();
 
-    const profiles = JSON.parse(localStorage.getItem('classProfiles') || '[]');
+    // ⚡ 先從雲端抓班級清單，讓進度列表能列出所有班級（新裝置本地只有 default）
+    const profiles = await syncClassProfilesFromCloud();
     const allClasses = [
         { id: 'default', name: '預設班級' },
-        ...profiles.map(p => ({ id: String(p.id), name: p.name || p.id }))
+        ...profiles.filter(p => String(p.id) !== 'default')
+            .map(p => ({ id: String(p.id), name: p.name || p.id }))
     ];
     const total = allClasses.length;
 
@@ -1475,6 +1534,9 @@ window.FirebaseSync = {
     showSyncConfirmModal,
     showAllClassSyncModal,       // 一鍵同步所有班級（本地→雲端）
     showAllClassDownloadModal,   // 一鍵還原所有班級（雲端→本地）
+    fetchCloudClassProfiles,     // 讀取雲端班級清單（不寫本地）
+    syncClassProfilesFromCloud,  // 雲端班級清單合併進本地
+    syncAllClassesFromCloud,     // 還原所有班級（雲端→本地，無 Modal）
     init: initFirebaseAndSync,
     uploadItem,
     deleteItem,

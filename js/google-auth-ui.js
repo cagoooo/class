@@ -614,15 +614,24 @@
             cloudHasData = !snap.empty;
         } catch (e) { /* 無法取得則視為空 */ }
 
+        // 檢查雲端是否有「預設班以外」的班級（科任老師常見：資料全在 601~606，預設班反而是空的）
+        // 若只看預設班會誤判成「雲端沒資料」→ 整批班級不會還原，新裝置只看得到預設班
+        let cloudExtraClasses = [];
+        try {
+            const cloudProfiles = await window.FirebaseSync.fetchCloudClassProfiles?.() || [];
+            cloudExtraClasses = cloudProfiles.filter(p => String(p.id) !== 'default');
+        } catch (e) { /* 略過 */ }
+        const cloudHasAny = cloudHasData || cloudExtraClasses.length > 0;
+
         const localHasData = hasLocalData();
 
-        if (!cloudHasData && !localHasData) {
+        if (!cloudHasAny && !localHasData) {
             // 兩邊都沒有資料：直接進入
             NotificationSystem && NotificationSystem.success('歡迎！帳號已就緒 ☁️');
             return;
         }
 
-        if (!cloudHasData && localHasData) {
+        if (!cloudHasAny && localHasData) {
             // 只有本地資料：詢問是否上傳
             const choice = await showModal(
                 '🎉 首次登入成功！',
@@ -641,9 +650,17 @@
             return;
         }
 
-        if (cloudHasData && !localHasData) {
+        if (cloudHasAny && !localHasData) {
             // 只有雲端資料：自動下載
             setSyncing(true);
+            if (cloudExtraClasses.length > 0) {
+                // 多班級帳號：一次還原所有班級（含 601~606），而非只還原預設班
+                await window.FirebaseSync.syncAllClassesFromCloud();
+                setSyncing(false);
+                NotificationSystem && NotificationSystem.success(`已從雲端還原所有班級（共 ${cloudExtraClasses.length + 1} 個）📥`);
+                setTimeout(() => location.reload(), 900);
+                return;
+            }
             await window.FirebaseSync.loadFromCloud();
             setSyncing(false);
             refreshSyncTime();
@@ -662,7 +679,17 @@
             ]
         );
         setSyncing(true);
-        if (choice === 'cloud') await window.FirebaseSync.loadFromCloud();
+        if (choice === 'cloud') {
+            if (cloudExtraClasses.length > 0) {
+                // 多班級：還原全部班級後重新載入
+                await window.FirebaseSync.syncAllClassesFromCloud();
+                setSyncing(false);
+                NotificationSystem && NotificationSystem.success(`已從雲端還原所有班級（共 ${cloudExtraClasses.length + 1} 個）📥`);
+                setTimeout(() => location.reload(), 900);
+                return;
+            }
+            await window.FirebaseSync.loadFromCloud();
+        }
         else if (choice === 'local') await window.FirebaseSync.syncToCloud();
         else if (choice === 'merge') await window.FirebaseSync.mergeWithCloud();
         setSyncing(false);
@@ -1069,8 +1096,11 @@
             }
 
             // ── 確認 Modal ──
-            const profiles = JSON.parse(localStorage.getItem('classProfiles') || '[]');
-            const classCount = profiles.length + 1;
+            // 以雲端班級清單為準計算數量（新裝置本地只有 default，用本地會少算）
+            let mergedProfiles = [];
+            try { mergedProfiles = await window.FirebaseSync.syncClassProfilesFromCloud?.() || []; } catch { /* 略過 */ }
+            const extraCount = mergedProfiles.filter(p => String(p.id) !== 'default').length;
+            const classCount = extraCount + 1;
             const confirmed = await showAllClassConfirmDialog({
                 direction: 'download',
                 icon: '📥',
