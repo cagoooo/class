@@ -305,6 +305,53 @@
     font-size: .85rem; cursor: pointer; border-radius: 8px; transition: background .2s;
 }
 .gauth-welcome-later:hover { background: rgba(0,0,0,.04); color: #374151; }
+
+/* ─── 深色模式適配 ─── */
+.dark #gauth-modal {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-color);
+}
+.dark #gauth-modal h3 {
+    color: var(--text-primary) !important;
+}
+.dark #gauth-modal p {
+    color: var(--text-secondary) !important;
+}
+.dark .gauth-btn-secondary {
+    background: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+}
+.dark .gauth-btn-secondary:hover {
+    background: var(--bg-hover) !important;
+}
+
+.dark #gauth-welcome-card {
+    background: linear-gradient(160deg, #1e293b 0%, #0f172a 100%) !important;
+    border: 1px solid var(--border-color);
+}
+.dark .gauth-welcome-title {
+    color: var(--text-primary) !important;
+}
+.dark .gauth-welcome-sub {
+    color: var(--text-secondary) !important;
+}
+.dark .gauth-perk-txt {
+    color: var(--text-secondary) !important;
+}
+.dark .gauth-perk-txt b {
+    color: var(--text-primary) !important;
+}
+.dark .gauth-welcome-later {
+    color: var(--text-muted) !important;
+}
+.dark .gauth-welcome-later:hover {
+    background: rgba(255,255,255,.05) !important;
+    color: var(--text-primary) !important;
+}
+.dark .gauth-welcome-close:hover {
+    background: rgba(255,255,255,.05) !important;
+    color: var(--text-primary) !important;
+}
         `;
         document.head.appendChild(style);
     }
@@ -711,6 +758,19 @@
             const id = 'gauth-allsync-confirm';
             document.getElementById(id)?.remove();
 
+            const isDark = document.documentElement.classList.contains('dark');
+            const bgCard = isDark ? 'var(--bg-card)' : '#fff';
+            const bgWarning = isDark ? 'rgba(217,119,6,.15)' : '#fef3c7';
+            const borderWarning = isDark ? '#d97706' : '#f59e0b';
+            const textWarning = isDark ? '#f59e0b' : '#92400e';
+            const bgList = isDark ? 'var(--bg-secondary)' : '#f8fafc';
+            const textPrimary = isDark ? 'var(--text-primary)' : '#1e293b';
+            const textSecondary = isDark ? 'var(--text-secondary)' : '#64748b';
+            const textMuted = isDark ? 'var(--text-muted)' : '#6b7280';
+            const textItem = isDark ? 'var(--text-primary)' : '#374151';
+            const cancelBg = isDark ? 'var(--bg-tertiary)' : '#f1f5f9';
+            const cancelText = isDark ? 'var(--text-primary)' : '#374151';
+
             const overlay = document.createElement('div');
             overlay.id = id;
             overlay.style.cssText = `
@@ -721,36 +781,36 @@
 
             const dataItems = dataList.map(d =>
                 `<li style="display:flex;align-items:center;gap:6px;padding:4px 0;">
-                    <span style="color:#6b7280;font-size:.9rem;">•</span>
-                    <span style="color:#374151;font-size:.9rem;">${d}</span>
+                    <span style="color:${textMuted};font-size:.9rem;">•</span>
+                    <span style="color:${textItem};font-size:.9rem;">${d}</span>
                 </li>`
             ).join('');
 
             overlay.innerHTML = `
-                <div style="background:#fff; border-radius:20px; padding:28px 28px 24px; max-width:440px; width:100%;
-                     box-shadow:0 24px 80px rgba(0,0,0,.25);">
+                <div style="background:${bgCard}; border-radius:20px; padding:28px 28px 24px; max-width:440px; width:100%;
+                     box-shadow:0 24px 80px rgba(0,0,0,.25); border: ${isDark ? '1px solid var(--border-color)' : 'none'};">
                     <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;">
                         <span style="font-size:2rem;">${icon}</span>
                         <div>
-                            <div style="font-weight:800;font-size:1.15rem;color:#1e293b;">${title}</div>
-                            <div style="font-size:.85rem;color:#64748b;font-weight:600;">${subtitle}</div>
+                            <div style="font-weight:800;font-size:1.15rem;color:${textPrimary};">${title}</div>
+                            <div style="font-size:.85rem;color:${textSecondary};font-weight:600;">${subtitle}</div>
                         </div>
                     </div>
 
                     ${arrowHtml}
 
-                    <div style="background:#fef3c7;border-left:4px solid #f59e0b;border-radius:8px;padding:10px 14px;margin-bottom:14px;">
-                        <div style="font-size:.85rem;color:#92400e;line-height:1.6;">${warningText}</div>
+                    <div style="background:${bgWarning};border-left:4px solid ${borderWarning};border-radius:8px;padding:10px 14px;margin-bottom:14px;">
+                        <div style="font-size:.85rem;color:${textWarning};line-height:1.6;">${warningText}</div>
                     </div>
 
-                    <div style="font-size:.82rem;font-weight:700;color:#6b7280;margin-bottom:4px;">將同步以下資料：</div>
-                    <ul style="margin:0 0 18px 0;padding:0;list-style:none;background:#f8fafc;border-radius:10px;padding:8px 12px;">
+                    <div style="font-size:.82rem;font-weight:700;color:${textMuted};margin-bottom:4px;">將同步以下資料：</div>
+                    <ul style="margin:0 0 18px 0;padding:0;list-style:none;background:${bgList};border-radius:10px;padding:8px 12px;">
                         ${dataItems}
                     </ul>
 
                     <div style="display:flex;gap:10px;justify-content:flex-end;">
                         <button id="${id}-cancel"
-                            style="padding:10px 20px;background:#f1f5f9;color:#374151;border:none;border-radius:10px;
+                            style="padding:10px 20px;background:${cancelBg};color:${cancelText};border:none;border-radius:10px;
                                    cursor:pointer;font-weight:600;font-size:.9rem;">
                             取消
                         </button>

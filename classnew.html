@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-TW">
 
 <head>
@@ -682,11 +682,11 @@
                 <div class="flex flex-row items-center justify-between lg:justify-start">
                     <!-- 左側 Logo -->
                     <div class="flex flex-row items-center gap-2 sm:gap-3">
-                        <div class="text-xl sm:text-2xl font-bold text-blue-600 flex items-center gap-1.5">
+                        <div class="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-300 flex items-center gap-1.5">
                             📚 班級小管家
                             <span id="app-version-badge"
                                 title="目前版本（點擊查看更新資訊）"
-                                class="text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 cursor-pointer hover:bg-blue-200 transition-colors"
+                                class="text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-800/60 transition-colors"
                                 onclick="window.open('https://github.com/cagoooo/class/blob/main/CHANGELOG.md', '_blank')">
                                 v3.12.1
                             </span>
@@ -846,18 +846,18 @@
             </div>
 
             <!-- 從 Excel 匯入名單（常用功能，獨立展示在折疊區塊上方） -->
-            <div class="mb-4 bg-indigo-50 border border-indigo-100 p-3 sm:p-4 rounded-xl">
+            <div class="mb-4 bg-indigo-50 border border-indigo-100 dark:border-indigo-900/30 p-3 sm:p-4 rounded-xl">
                 <h3 class="text-base sm:text-lg font-semibold mb-3 flex items-center gap-2">
                     <span>📁</span> 從 Excel 匯入名單
                 </h3>
                 <p class="text-xs sm:text-sm text-gray-600 mb-3">
                     請選擇 Excel 檔案 (.xlsx, .xls, .csv)。<br>
-                    格式要求：A欄為<strong class="text-indigo-700">姓名</strong>，B欄為<strong
-                        class="text-indigo-700">座號</strong>，從第2行開始讀取。
+                    格式要求：A欄為<strong class="text-indigo-700 dark:text-indigo-300">姓名</strong>，B欄為<strong
+                        class="text-indigo-700 dark:text-indigo-300">座號</strong>，從第2行開始讀取。
                 </p>
                 <div class="flex flex-col sm:flex-row gap-2 items-center">
                     <input type="file" id="excelFile" accept=".xlsx, .xls, .csv"
-                        class="flex-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-100 file:text-indigo-700 hover:file:bg-indigo-200 cursor-pointer">
+                        class="flex-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-100 file:text-indigo-700 dark:file:bg-indigo-900/40 dark:file:text-indigo-300 hover:file:bg-indigo-200 dark:hover:file:bg-indigo-800/60 cursor-pointer">
                     <button onclick="handleExcelImport()"
                         class="w-full sm:w-auto bg-indigo-500 text-white px-5 py-2 rounded-lg hover:bg-indigo-600 transition-colors text-sm sm:text-base active:scale-95 whitespace-nowrap">📁
                         匯入並預覽</button>
@@ -1114,7 +1114,7 @@
                                 </button>
                             </div>
                             <div id="lotteryStats" class="text-xs text-gray-600">
-                                <span>剩餘：<span id="remainingCount" class="font-semibold text-purple-600">0</span>
+                                <span>剩餘：<span id="remainingCount" class="font-semibold text-purple-600 dark:text-purple-300">0</span>
                                     人</span>
                                 <span class="mx-2">|</span>
                                 <span>已抽：<span id="drawnCount" class="font-semibold text-gray-500">0</span> 人</span>
@@ -1382,8 +1382,8 @@
                         class="bg-gray-50 p-3 rounded-lg max-h-32 overflow-y-auto text-sm text-gray-600 space-y-1">
                     </div>
                 </div>
-                <div class="mt-4 bg-blue-50 p-3 rounded-lg">
-                    <div class="text-sm text-blue-700">💡 全螢幕會自動輪播提醒（每10秒），考試/休息時間顯示不同類別。</div>
+                <div class="mt-4 bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg">
+                    <div class="text-sm text-blue-700 dark:text-blue-300">💡 全螢幕會自動輪播提醒（每10秒），考試/休息時間顯示不同類別。</div>
                 </div>
             </div>
         </div>
@@ -2046,9 +2046,9 @@
                 overlay.className = 'confirm-dialog-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
 
                 const colors = {
-                    warning: { title: 'text-yellow-600', btn: 'bg-yellow-500 hover:bg-yellow-600' },
-                    danger: { title: 'text-red-600', btn: 'bg-red-500 hover:bg-red-600' },
-                    info: { title: 'text-blue-600', btn: 'bg-blue-500 hover:bg-blue-600' }
+                    warning: { title: 'text-yellow-600 dark:text-yellow-400', btn: 'bg-yellow-500 hover:bg-yellow-600 dark:bg-yellow-600 dark:hover:bg-yellow-500' },
+                    danger: { title: 'text-red-600 dark:text-red-400', btn: 'bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-500' },
+                    info: { title: 'text-blue-600 dark:text-blue-400', btn: 'bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500' }
                 };
 
                 const color = colors[type] || colors.warning;

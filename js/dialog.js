@@ -50,9 +50,9 @@ class ConfirmDialog {
         overlay.className = 'confirm-dialog-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
 
         const colors = {
-            warning: { title: 'text-yellow-600', btn: 'bg-yellow-500 hover:bg-yellow-600' },
-            danger: { title: 'text-red-600', btn: 'bg-red-500 hover:bg-red-600' },
-            info: { title: 'text-blue-600', btn: 'bg-blue-500 hover:bg-blue-600' }
+            warning: { title: 'text-yellow-600 dark:text-yellow-400', btn: 'bg-yellow-500 hover:bg-yellow-600 dark:bg-yellow-600 dark:hover:bg-yellow-500' },
+            danger: { title: 'text-red-600 dark:text-red-400', btn: 'bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-500' },
+            info: { title: 'text-blue-600 dark:text-blue-400', btn: 'bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500' }
         };
 
         const color = colors[type] || colors.warning;

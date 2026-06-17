@@ -46,27 +46,63 @@
         }
 
         .dark .bg-gray-50,
-        .dark .bg-gray-100 {
+        .dark .bg-gray-100,
+        .dark .bg-slate-50,
+        .dark .bg-slate-100,
+        .dark .bg-zinc-50,
+        .dark .bg-zinc-100,
+        .dark .bg-stone-50,
+        .dark .bg-stone-100,
+        .dark .bg-neutral-50,
+        .dark .bg-neutral-100 {
             background-color: var(--bg-secondary) !important;
         }
 
-        .dark .bg-gray-200 {
+        .dark .bg-gray-200,
+        .dark .bg-slate-200,
+        .dark .bg-zinc-200,
+        .dark .bg-stone-200,
+        .dark .bg-neutral-200 {
             background-color: var(--bg-tertiary) !important;
         }
 
         .dark .text-gray-800,
         .dark .text-gray-700,
-        .dark .text-gray-900 {
+        .dark .text-gray-900,
+        .dark .text-slate-800,
+        .dark .text-slate-700,
+        .dark .text-slate-900,
+        .dark .text-zinc-800,
+        .dark .text-zinc-700,
+        .dark .text-zinc-900,
+        .dark .text-stone-800,
+        .dark .text-stone-700,
+        .dark .text-stone-900,
+        .dark .text-neutral-800,
+        .dark .text-neutral-700,
+        .dark .text-neutral-900 {
             color: var(--text-primary) !important;
         }
 
         .dark .text-gray-600,
-        .dark .text-gray-500 {
+        .dark .text-gray-500,
+        .dark .text-slate-600,
+        .dark .text-slate-500,
+        .dark .text-zinc-600,
+        .dark .text-zinc-500,
+        .dark .text-stone-600,
+        .dark .text-stone-500,
+        .dark .text-neutral-600,
+        .dark .text-neutral-500 {
             color: var(--text-secondary) !important;
         }
 
         .dark .border-gray-200,
-        .dark .border-gray-300 {
+        .dark .border-gray-300,
+        .dark .border-slate-200,
+        .dark .border-slate-300,
+        .dark .border-zinc-200,
+        .dark .border-zinc-300 {
             border-color: var(--border-color) !important;
         }
 
@@ -74,6 +110,48 @@
         .dark .shadow-md,
         .dark .shadow {
             box-shadow: 0 4px 20px var(--shadow-color) !important;
+        }
+
+        /* 常用彩色文字在深色背景下的高對比度覆寫 */
+        .dark .text-blue-600,
+        .dark .text-blue-700,
+        .dark .text-blue-800 {
+            color: #93c5fd !important; /* text-blue-300 */
+        }
+        .dark .text-green-600,
+        .dark .text-green-700,
+        .dark .text-green-800 {
+            color: #86efac !important; /* text-green-300 */
+        }
+        .dark .text-indigo-600,
+        .dark .text-indigo-700,
+        .dark .text-indigo-800 {
+            color: #c7d2fe !important; /* text-indigo-300 */
+        }
+        .dark .text-purple-600,
+        .dark .text-purple-700,
+        .dark .text-purple-800 {
+            color: #e9d5ff !important; /* text-purple-300 */
+        }
+        .dark .text-pink-500,
+        .dark .text-pink-600,
+        .dark .text-pink-700,
+        .dark .text-pink-800 {
+            color: #fbcfe8 !important; /* text-pink-300 */
+        }
+        .dark .text-yellow-600,
+        .dark .text-yellow-700,
+        .dark .text-yellow-800 {
+            color: #fef08a !important; /* text-yellow-300 */
+        }
+        .dark .text-orange-700,
+        .dark .text-orange-800 {
+            color: #fed7aa !important; /* text-orange-300 */
+        }
+        .dark .text-teal-600,
+        .dark .text-teal-700,
+        .dark .text-teal-800 {
+            color: #5eead4 !important; /* text-teal-300 */
         }
 
         /* 導覽列深色 */
@@ -101,8 +179,14 @@
             color: var(--text-muted) !important;
         }
 
-        /* 按鈕調整 */
-        .dark .bg-gray-200:hover {
+        /* 按鈕調整與 Hover */
+        .dark .bg-gray-200:hover,
+        .dark .bg-slate-200:hover,
+        .dark .bg-zinc-200:hover,
+        .dark .bg-stone-200:hover,
+        .dark .bg-neutral-200:hover,
+        .dark .hover\:bg-gray-300:hover,
+        .dark .hover\:bg-slate-300:hover {
             background-color: var(--bg-hover) !important;
         }
 
@@ -123,6 +207,66 @@
         .dark .bg-cyan-50,
         .dark .bg-orange-50 {
             background-color: var(--bg-tertiary) !important;
+        }
+
+        /* 標籤元件背景深色化 (與 bg-*-100 類別保持一致) */
+        .dark .bg-blue-100 { background-color: rgba(59, 130, 246, 0.15) !important; }
+        .dark .bg-green-100 { background-color: rgba(16, 185, 129, 0.15) !important; }
+        .dark .bg-yellow-100 { background-color: rgba(251, 191, 36, 0.15) !important; }
+        .dark .bg-red-100 { background-color: rgba(239, 68, 68, 0.15) !important; }
+        .dark .bg-purple-100 { background-color: rgba(139, 92, 246, 0.15) !important; }
+        .dark .bg-indigo-100 { background-color: rgba(99, 102, 241, 0.15) !important; }
+        .dark .bg-pink-100 { background-color: rgba(236, 72, 153, 0.15) !important; }
+        .dark .bg-orange-100 { background-color: rgba(249, 115, 22, 0.15) !important; }
+
+        /* 搜尋關鍵字標記 (mark) 深色模式 */
+        .dark mark {
+            background-color: rgba(251, 191, 36, 0.3) !important;
+            color: #fef08a !important;
+        }
+
+        /* 排行榜深色模式適配 */
+        .dark .leaderboard-container {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important;
+            color: var(--text-primary) !important;
+            border: 1px solid var(--border-color);
+        }
+        .dark .leaderboard-item.rank-other {
+            background: #1e293b !important;
+            border-color: #334155 !important;
+        }
+        .dark .leaderboard-student-name {
+            color: var(--text-primary) !important;
+        }
+        .dark .leaderboard-rank-number {
+            color: var(--text-muted) !important;
+        }
+        .dark .leaderboard-score-bar-container {
+            background: #334155 !important;
+        }
+        .dark .leaderboard-footer {
+            background: #0f172a !important;
+        }
+        .dark .leaderboard-item.rank-1 {
+            background: linear-gradient(135deg, #78350f 0%, #451a03 100%) !important;
+            border-color: #f59e0b !important;
+        }
+        .dark .leaderboard-item.rank-2 {
+            background: linear-gradient(135deg, #334155 0%, #1e293b 100%) !important;
+            border-color: #94a3b8 !important;
+        }
+        .dark .leaderboard-item.rank-3 {
+            background: linear-gradient(135deg, #7c2d12 0%, #431407 100%) !important;
+            border-color: #ea580c !important;
+        }
+        .dark .leaderboard-score.positive {
+            color: #34d399 !important;
+        }
+        .dark .leaderboard-score.negative {
+            color: #f87171 !important;
+        }
+        .dark .leaderboard-empty {
+            color: var(--text-muted) !important;
         }
 
         /* 主題切換按鈕 */
