@@ -367,6 +367,9 @@
                     <button class="gauth-dd-item" onclick="GoogleAuthUI.syncAllDown()" style="color:#7c3aed;font-weight:700;">
                         📥 一鍵還原所有班級
                     </button>
+                    <button class="gauth-dd-item" onclick="GoogleAuthUI.repairClasses()" style="color:#059669;font-weight:700;">
+                        🩺 班級健檢與修復
+                    </button>
                     <div class="gauth-dd-divider"></div>
                     <button class="gauth-dd-item danger" onclick="GoogleAuthUI.logout()">
                         🚪 登出
@@ -428,6 +431,9 @@
                     </button>
                     <button class="gauth-dd-item" onclick="GoogleAuthUI.syncAllDown()" style="color:#7c3aed;font-weight:700;">
                         📥 一鍵還原所有班級
+                    </button>
+                    <button class="gauth-dd-item" onclick="GoogleAuthUI.repairClasses()" style="color:#059669;font-weight:700;">
+                        🩺 班級健檢與修復
                     </button>
                     <div class="gauth-dd-divider"></div>
                     <button class="gauth-dd-item danger" onclick="GoogleAuthUI.logout()">
@@ -1121,6 +1127,44 @@
 
             await window.FirebaseSync.showAllClassDownloadModal();
             refreshSyncTime();
+        },
+
+        // R-A4：班級健檢與修復——掃出「雲端有資料卻不在名冊」的班級補回
+        async repairClasses() {
+            const dd = document.getElementById('gauth-dropdown');
+            if (dd) dd.classList.remove('open');
+            const ddM = document.getElementById('gauth-dropdown-mobile');
+            if (ddM) ddM.style.display = 'none';
+
+            if (!window.FirebaseConfig.isConnected()) {
+                NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號');
+                return;
+            }
+            if (!window.FirebaseSync || typeof window.FirebaseSync.repairClassRegistry !== 'function') {
+                NotificationSystem && NotificationSystem.error('同步模組尚未載入，請稍後再試');
+                return;
+            }
+
+            setSyncing(true);
+            try {
+                const r = await window.FirebaseSync.repairClassRegistry();
+                if (!r) return;
+                if (r.recovered > 0) {
+                    NotificationSystem && NotificationSystem.success(
+                        `🩺 健檢完成：找回 ${r.recovered} 個班級（目前共 ${r.afterCount} 個）。班級選單已更新，可再「一鍵還原所有班級」把資料拉回本機。`
+                    );
+                } else {
+                    NotificationSystem && NotificationSystem.success(
+                        `🩺 健檢完成：班級名冊正常，雲端共 ${r.afterCount} 個班級，無孤兒班級需修復。`
+                    );
+                }
+            } catch (e) {
+                console.error('[GoogleAuthUI] 班級健檢失敗:', e);
+                NotificationSystem && NotificationSystem.error('班級健檢失敗：' + (e?.message || e));
+            } finally {
+                setSyncing(false);
+                refreshSyncTime();
+            }
         },
     };
 

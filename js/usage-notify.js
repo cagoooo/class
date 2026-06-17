@@ -43,6 +43,51 @@
     var callableFn = null;
 
     // ───────── 工具 ─────────
+    var STATS_KEY = 'un_feature_stats_v1';
+
+    function sendFeatureSummary(statsObj) {
+        if (!statsObj || !statsObj.stats || Object.keys(statsObj.stats).length === 0) return;
+        enqueue('feature_summary', {
+            date: statsObj.date,
+            stats: statsObj.stats
+        });
+    }
+
+    function checkAndSendOldStats() {
+        try {
+            var today = new Date().toISOString().slice(0, 10);
+            var raw = localStorage.getItem(STATS_KEY);
+            if (raw) {
+                var statsObj = JSON.parse(raw);
+                if (statsObj && statsObj.date && statsObj.date !== today) {
+                    sendFeatureSummary(statsObj);
+                    localStorage.removeItem(STATS_KEY);
+                }
+            }
+        } catch (e) { /* ignore */ }
+    }
+
+    function recordFeature(name) {
+        try {
+            var label = FEATURE_LABELS[name] || name;
+            if (!label) return;
+            var today = new Date().toISOString().slice(0, 10);
+            var raw = localStorage.getItem(STATS_KEY);
+            var statsObj = null;
+            try { statsObj = raw ? JSON.parse(raw) : null; } catch (e) {}
+
+            if (!statsObj || typeof statsObj.stats !== 'object') {
+                statsObj = { date: today, stats: {} };
+            } else if (statsObj.date !== today) {
+                sendFeatureSummary(statsObj);
+                statsObj = { date: today, stats: {} };
+            }
+
+            statsObj.stats[label] = (statsObj.stats[label] || 0) + 1;
+            localStorage.setItem(STATS_KEY, JSON.stringify(statsObj));
+        } catch (e) { /* ignore */ }
+    }
+
     function getCallable() {
         if (callableFn) return callableFn;
         try {
@@ -97,10 +142,14 @@
         var q = loadQ();
         if (!q.length) return;
         flushing = true;
-        var idx = 0;
+
         function next() {
-            if (idx >= q.length) { flushing = false; return; }
-            var ev = q[idx];
+            var currentQ = loadQ();
+            if (!currentQ.length) {
+                flushing = false;
+                return;
+            }
+            var ev = currentQ[0];
             var payload = {};
             for (var k in ev) { if (k !== '_id') payload[k] = ev[k]; }
             var p;
@@ -108,8 +157,14 @@
             p.then(function () {
                 var cur = loadQ().filter(function (x) { return x._id !== ev._id; });
                 saveQ(cur);
-            }).catch(function () { /* 保留於佇列，下次再試 */ })
-              .then(function () { idx++; next(); });
+            }).catch(function () {
+                // 失敗時停止發送，保留在佇列中
+                flushing = false;
+            }).then(function () {
+                if (flushing) {
+                    setTimeout(next, 0); // 讓出 thread 避免 stack overflow
+                }
+            });
         }
         next();
     }
@@ -129,6 +184,7 @@
             var fire = function () {
                 if (done) return;
                 done = true;
+                checkAndSendOldStats(); // 補送昨天的功能統計
                 if (dayOnce('session')) enqueue('session_start', {});
                 else flush();   // 今天已報過，順手補送殘留佇列（如建立班級後 reload 的事件）
             };
@@ -151,10 +207,16 @@
         },
 
         // Google 帳號登入：每場每人一次
-        login: function (profile) {
+        login: function (profile, isNewUser) {
             var email = (profile && profile.email) || '';
-            if (!dayOnce('login_' + (email || 'x'))) return;   // 每位老師每天只報一次（原本每場）
-            enqueue('login', { name: (profile && profile.displayName) || '', email: email });
+            var isNew = !!isNewUser;
+            // 新註冊帳號不受 dayOnce 限制，必須即時送出
+            if (!isNew && !dayOnce('login_' + (email || 'x'))) {
+                checkAndSendOldStats();
+                return;
+            }
+            checkAndSendOldStats();
+            enqueue('login', { name: (profile && profile.displayName) || '', email: email, isNewUser: isNew });
         },
 
         // 建立新班級：重要動作，必報（reload 也不漏，靠持久化佇列）
@@ -162,21 +224,47 @@
             enqueue('class_create', { className: className || '' });
         },
 
-        // 使用功能：🔇 已停用逐筆通知（每切一個功能分頁就推一張卡片，是手機狂震的主因）。
-        // 保留函式與簽名，呼叫端（classnew.html 切換分頁處）無需改動；FEATURE_LABELS 亦保留，
-        // 供日後若要改做「每日彙整摘要」時重用。如需臨時恢復逐筆通知，把下面 return 拿掉即可。
+        // 使用功能：寫入今日統計 (不即時發送，留待跨天時彙整補送)
         feature: function (name) {
-            return;
+            recordFeature(name);
         },
 
-        // 系統錯誤：同訊息每場一次、每場上限 5 則
-        error: function (message, context) {
+        // 系統錯誤：同訊息每場一次、每場上限 5 則；預設嚴重錯誤 (critical) 才發送通知
+        error: function (message, context, severity) {
             message = String(message == null ? '' : message).slice(0, 300);
             if (!message) return;
+            
+            var sev = String(severity || 'critical').toLowerCase();
+            if (sev !== 'critical') {
+                return; // 非嚴重錯誤不發送通知
+            }
+
             if (errCount >= MAX_ERRORS_PER_SESSION) return;
             if (!ssOnce('err_' + hash(message))) return;
             errCount++;
-            enqueue('error', { message: message, context: String(context == null ? '' : context).slice(0, 160) });
+
+            var url = '';
+            var ua = '';
+            try {
+                url = window.location.href;
+                ua = navigator.userAgent;
+            } catch (e) {}
+
+            enqueue('error', { 
+                message: message, 
+                context: String(context == null ? '' : context).slice(0, 160),
+                severity: sev,
+                url: url,
+                ua: ua
+            });
+        },
+
+        // 重大資料操作（如備份、還原、刪除班級）：即時發送
+        dataAction: function (action, details) {
+            enqueue('data_action', {
+                action: String(action || '').slice(0, 80),
+                details: String(details || '').slice(0, 300)
+            });
         }
     };
 

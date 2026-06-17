@@ -650,6 +650,13 @@
             profiles.splice(idx, 1);
             saveProfiles(profiles);
 
+            // R-A2：同步從雲端移除名冊項 + marker，否則「只增不減」的合併上傳會把它加回來（殭屍班）
+            try {
+                if (window.FirebaseConfig?.isConnected?.() && window.FirebaseSync?.deleteClassFromCloud) {
+                    await window.FirebaseSync.deleteClassFromCloud(id);
+                }
+            } catch (e) { console.warn('[ClassProfiles] 雲端移除班級失敗（本地已刪）:', e); }
+
             // 若刪的是目前班級，切換回 default
             if (getCurrentId() === id) {
                 setCurrentId(DEFAULT_ID);

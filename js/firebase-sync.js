@@ -189,6 +189,22 @@ function safeLS(key, fallback) {
 }
 
 // ─────────────────────────────────────────────────────
+// R-A3：判斷是否為「空白／從未同步」的裝置
+// 用來擋掉自動／背景同步從空白裝置上傳，避免把雲端完整資料覆蓋洗掉
+// （這次 601~606 名冊被洗掉的根因就是手機首登後背景自動上傳預設空班）
+// ─────────────────────────────────────────────────────
+function looksLikeBlankDevice() {
+    try {
+        const neverSynced = !localStorage.getItem('lastSyncTime');
+        const noStudents = !(window.students && window.students.length);
+        let profiles = [];
+        try { profiles = JSON.parse(localStorage.getItem('classProfiles') || '[]'); } catch { profiles = []; }
+        const onlyDefault = profiles.filter(p => String(p.id) !== 'default').length === 0;
+        return neverSynced && noStudents && onlyDefault;
+    } catch { return false; }
+}
+
+// ─────────────────────────────────────────────────────
 // 工具：取得本地所有資料統計
 // ─────────────────────────────────────────────────────
 function getLocalStats() {
@@ -215,6 +231,12 @@ function getLocalStats() {
 async function syncToCloud(silent = false) {
     if (!window.FirebaseConfig.isConnected()) {
         if (!silent) NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號');
+        return false;
+    }
+    // R-A3：背景／自動同步時，若這台是「空白且從未同步」的裝置，直接略過上傳，
+    //       避免在尚未下載雲端資料前就用空資料覆蓋、洗掉雲端（手動上傳不受此限，會走確認 modal）
+    if (silent && looksLikeBlankDevice()) {
+        console.warn('[Sync] R-A3：偵測到空白／未同步裝置，略過自動上傳以保護雲端資料');
         return false;
     }
     if (syncStatus.isSyncing) { console.warn('同步進行中...'); return false; }
@@ -293,6 +315,7 @@ async function syncToCloud(silent = false) {
         // 路徑：users/{uid}/_meta/classProfiles（不受多班級路徑影響，固定全域）
         // ⚠️ 合併寫入（只增不減），避免空白裝置覆蓋洗掉雲端完整班級索引
         await uploadClassProfilesMerged();
+        await writeCloudSyncInfo();  // R-A5：記錄本次上傳時間
 
         syncStatus.lastSyncTime = new Date();
         localStorage.setItem('lastSyncTime', syncStatus.lastSyncTime.toISOString());
@@ -611,7 +634,7 @@ async function mergeWithCloud() {
  * @param {Object} local  本地統計
  * @param {Object} cloud  雲端統計（null 表示讀取失敗）
  */
-function buildSyncPreviewHTML(direction, local, cloud) {
+function buildSyncPreviewHTML(direction, local, cloud, extraWarnHtml = '') {
     const isUpload = direction === 'upload';
     const icon = isUpload ? '📤' : '📥';
     // 取得目前班級名稱
@@ -715,6 +738,7 @@ function buildSyncPreviewHTML(direction, local, cloud) {
         <div style="margin:12px 20px;padding:10px 14px;background:#fff7ed;border-left:4px solid #f97316;border-radius:6px;font-size:.85rem;color:#92400e">
           ${warn}
         </div>
+        ${extraWarnHtml || ''}
 
         <!-- Buttons -->
         <div style="padding:12px 20px 20px;display:flex;gap:10px;justify-content:flex-end">
@@ -770,6 +794,36 @@ async function showSyncConfirmModal(direction) {
 
     // 靜默取得雲端資料作比對
     const cloudData = await syncFromCloud();
+
+    // R-A3 / R-A5：上傳前的額外風險提示（雲端有更多班 / 雲端較新）
+    let extraWarnHtml = '';
+    if (direction === 'upload') {
+        try {
+            const [cloudProfiles, discovered, cloudLastUploadMs] = await Promise.all([
+                fetchCloudClassProfiles(), discoverCloudClasses(), fetchCloudLastUploadMs()
+            ]);
+            const cloudClassIds = new Set([...cloudProfiles, ...discovered].map(p => String(p.id)));
+            cloudClassIds.delete('default');
+            let localProfiles = [];
+            try { localProfiles = JSON.parse(localStorage.getItem('classProfiles') || '[]'); } catch { localProfiles = []; }
+            const localClassCount = localProfiles.filter(p => String(p.id) !== 'default').length;
+            const localLastSyncMs = Date.parse(localStorage.getItem('lastSyncTime') || '') || 0;
+
+            const warns = [];
+            // R-A3：雲端班級數 > 本地（尤其本地只剩預設班）→ 可能洗掉雲端其他班的索引
+            if (cloudClassIds.size > localClassCount) {
+                warns.push(`☁️ 雲端目前有 <b>${cloudClassIds.size}</b> 個班，本機只有 <b>${localClassCount}</b> 個。上傳<b>只會合併不會刪除</b>雲端班級索引，但若本機資料較少請先確認，避免誤把空班蓋上去。`);
+            }
+            // R-A5：雲端最後上傳時間 > 本機上次同步時間 → 可能有其他裝置更新
+            if (cloudLastUploadMs && cloudLastUploadMs > localLastSyncMs + 60000) {
+                const t = new Date(cloudLastUploadMs).toLocaleString('zh-TW');
+                warns.push(`🕒 雲端在你上次同步後可能被<b>其他裝置</b>更新過（雲端最後上傳：${t}）。確定要用本機資料覆蓋嗎？`);
+            }
+            if (warns.length) {
+                extraWarnHtml = `<div style="margin:0 20px 4px;padding:10px 14px;background:#fef2f2;border-left:4px solid #ef4444;border-radius:6px;font-size:.82rem;color:#991b1b;line-height:1.6">${warns.join('<br>')}</div>`;
+            }
+        } catch (e) { /* 提示失敗不擋流程 */ }
+    }
     document.getElementById('sync-loading-tip')?.remove();
 
     const localStats = getLocalStats();
@@ -777,7 +831,7 @@ async function showSyncConfirmModal(direction) {
 
     // 注入 Modal
     const wrap = document.createElement('div');
-    wrap.innerHTML = buildSyncPreviewHTML(direction, localStats, cloudStats);
+    wrap.innerHTML = buildSyncPreviewHTML(direction, localStats, cloudStats, extraWarnHtml);
     document.body.appendChild(wrap.firstElementChild);
 
     return new Promise(resolve => {
@@ -1043,6 +1097,7 @@ async function syncAllClassesToCloud(onProgress) {
 
         // 同步班級清單 meta（合併寫入，只增不減，避免洗掉雲端既有班級索引）
         await uploadClassProfilesMerged();
+        await writeCloudSyncInfo();  // R-A5：記錄本次上傳時間
 
         syncStatus.lastSyncTime = new Date();
         localStorage.setItem('lastSyncTime', syncStatus.lastSyncTime.toISOString());
@@ -1207,30 +1262,97 @@ async function fetchCloudClassProfiles() {
 }
 
 /**
+ * R-A1：在 classes/{classId} 文件「本身」寫一筆 marker（含班名/圖示/顏色）。
+ * 原本班級資料都寫在 classes/{id} 的「子集合」，classes/{id} 文件本身是無欄位的 phantom，
+ * client 端 collection('classes').get() 看不到 → 一旦 _meta/classProfiles 名冊掉了就完全找不到班。
+ * 寫了 marker 後，前端可直接列舉 classes/ 發現所有班級，達成「名冊自我修復」。
+ */
+async function writeClassMarker(classId, profile) {
+    try {
+        if (!classId || String(classId) === 'default') return; // default 不走 classes/ 子路徑
+        const db = window.FirebaseConfig.getDb();
+        const userId = window.FirebaseConfig.getCurrentUserId();
+        if (!db || !userId) return;
+        await db.collection('users').doc(userId).collection('classes').doc(String(classId)).set({
+            isClassMarker: true,
+            name: profile?.name || String(classId),
+            icon: profile?.icon || null,
+            color: profile?.color || null,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+    } catch (e) {
+        console.warn(`[MultiClass] 寫入班級 marker ${classId} 失敗（非致命）:`, e);
+    }
+}
+
+/**
+ * R-A1：直接列舉雲端 classes/ 子集合中「帶 marker 的班級文件」。
+ * 只會回傳「有欄位的真實文件」（phantom 父文件 client 讀不到），所以回來的都是 marker。
+ * @returns {Promise<Array>} [{id,name,icon,color}]
+ */
+async function discoverCloudClasses() {
+    try {
+        if (!window.FirebaseConfig.isConnected()) return [];
+        const db = window.FirebaseConfig.getDb();
+        const userId = window.FirebaseConfig.getCurrentUserId();
+        const snap = await db.collection('users').doc(userId).collection('classes').get();
+        const arr = [];
+        snap.forEach(doc => {
+            const d = doc.data() || {};
+            arr.push({ id: doc.id, name: d.name || doc.id, icon: d.icon || undefined, color: d.color || undefined });
+        });
+        return arr;
+    } catch (e) {
+        console.warn('[MultiClass] 列舉雲端 classes/ marker 失敗:', e);
+        return [];
+    }
+}
+
+/**
  * 抓雲端班級清單並合併進本地 localStorage（雲端優先 + 保留本地獨有）
  * 解決「新裝置首次登入只看得到預設班、還原所有班級也只還原預設班」的問題：
  * 還原流程必須先知道雲端有哪些班級，不能只依賴本地（新裝置本地是空的）。
+ * R-A1：除了 _meta/classProfiles，也合併 classes/ 的 marker（名冊掉了也能自我修復找回班級）。
  * @returns {Promise<Array>} 合併後的班級陣列（一定含 default）
  */
 async function syncClassProfilesFromCloud() {
-    const cloudProfiles = await fetchCloudClassProfiles();
+    const [cloudProfiles, discovered] = await Promise.all([
+        fetchCloudClassProfiles(),
+        discoverCloudClasses(),
+    ]);
     let localProfiles = [];
     try { localProfiles = JSON.parse(localStorage.getItem('classProfiles') || '[]'); } catch { localProfiles = []; }
 
-    // 以雲端為主，補上本地獨有的班級
-    const cloudIds = new Set(cloudProfiles.map(p => String(p.id)));
-    const localOnly = localProfiles.filter(p => !cloudIds.has(String(p.id)));
-    let merged = [...cloudProfiles, ...localOnly];
+    // 以 id 為鍵合併三來源：_meta 名冊 → classes/ marker 補名稱 → 本地獨有附加
+    const byId = new Map();
+    cloudProfiles.forEach(p => { if (p && p.id != null) byId.set(String(p.id), { ...p }); });
+    // marker 補進「名冊裡沒有」的班；名冊裡已有的，只在缺名稱時用 marker 名稱補
+    discovered.forEach(m => {
+        const k = String(m.id);
+        if (!byId.has(k)) byId.set(k, { id: k, name: m.name, icon: m.icon, color: m.color });
+        else {
+            const ex = byId.get(k);
+            if (!ex.name || ex.name === k) ex.name = m.name;
+            if (!ex.icon && m.icon) ex.icon = m.icon;
+            if (!ex.color && m.color) ex.color = m.color;
+        }
+    });
+    // 本地獨有（雲端兩來源都沒有）附加
+    localProfiles.forEach(p => { if (p && p.id != null && !byId.has(String(p.id))) byId.set(String(p.id), p); });
+
+    let merged = Array.from(byId.values());
 
     // 確保一定有 default
     if (!merged.find(p => String(p.id) === 'default')) {
         merged.unshift({ id: 'default', name: '預設班級', isDefault: true, createdAt: new Date().toISOString() });
     }
 
-    if (cloudProfiles.length > 0) {
+    // 只要雲端任一來源有「非 default」班級，就把合併結果寫回本地名冊
+    const cloudHasReal = cloudProfiles.some(p => String(p.id) !== 'default') || discovered.length > 0;
+    if (cloudHasReal) {
         try {
             localStorage.setItem('classProfiles', JSON.stringify(merged));
-            console.log(`[MultiClass] 已從雲端合併班級清單（${merged.length} 個班級）`);
+            console.log(`[MultiClass] 已從雲端（_meta + classes marker）合併班級清單（${merged.length} 個班級）`);
         } catch (e) { console.warn('[MultiClass] 寫入合併後 classProfiles 失敗:', e); }
     }
     return merged;
@@ -1262,9 +1384,121 @@ async function uploadClassProfilesMerged() {
         await db.collection('users').doc(userId)
             .collection('_meta').doc('classProfiles')
             .set({ profiles: merged, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-        console.log(`[MultiClass] classProfiles 已合併同步至雲端（${merged.length} 個班級，不洗掉雲端既有）`);
+
+        // R-A1：同時為每個「本地有的」非 default 班級寫 classes/{id} marker，達成名冊自我修復
+        //   （只為本地 profile 寫，避免把雲端獨有的也亂寫；雲端獨有者其資料本就在、discover 也找得到）
+        await Promise.all(
+            localProfiles
+                .filter(p => p && p.id != null && String(p.id) !== 'default')
+                .map(p => writeClassMarker(p.id, p))
+        );
+
+        console.log(`[MultiClass] classProfiles 已合併同步至雲端（${merged.length} 個班級，不洗掉雲端既有）+ 寫入班級 marker`);
     } catch (e) {
         console.warn('[MultiClass] classProfiles 合併同步失敗（非致命）:', e);
+    }
+}
+
+/**
+ * R-A4：班級健檢與修復——掃描雲端（_meta 名冊 + classes/ marker），
+ * 把「有資料卻不在本地名冊」的班級補回本地與雲端名冊（孤兒班級自助修復）。
+ * @returns {Promise<{beforeCount:number, afterCount:number, recovered:number, names:string[]}|null>}
+ */
+async function repairClassRegistry() {
+    if (!window.FirebaseConfig.isConnected()) {
+        NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號');
+        return null;
+    }
+    let before = [];
+    try { before = JSON.parse(localStorage.getItem('classProfiles') || '[]'); } catch { before = []; }
+    const beforeCount = before.filter(p => String(p.id) !== 'default').length;
+
+    // 1) 合併雲端 _meta + classes/ marker 進本地名冊
+    const merged = await syncClassProfilesFromCloud();
+    // 2) 合併後再寫回雲端（補齊 _meta 與各班 marker），讓雲端也自我修復
+    await uploadClassProfilesMerged();
+    await writeCloudSyncInfo();
+
+    const afterList = merged.filter(p => String(p.id) !== 'default');
+    const afterCount = afterList.length;
+
+    // 重繪班級選擇器（若已載入）
+    try {
+        if (window.ClassProfiles && typeof window.ClassProfiles.list === 'function') {
+            const dd = document.getElementById('class-selector-dropdown');
+            const ddm = document.getElementById('class-selector-dropdown-mobile');
+            // 觸發重新 render（toggle 兩次或直接重載較保險）；這裡只清掉讓下次開啟重繪
+            if (dd) dd.classList.remove('open');
+            if (ddm) ddm.style.display = 'none';
+        }
+    } catch (e) { /* ignore */ }
+
+    return {
+        beforeCount, afterCount,
+        recovered: Math.max(0, afterCount - beforeCount),
+        names: afterList.map(p => p.name),
+    };
+}
+
+/**
+ * R-A5：把「本次上傳時間」寫到雲端 _meta/syncInfo，供其他裝置判斷雲端是否較新。
+ */
+async function writeCloudSyncInfo() {
+    try {
+        const db = window.FirebaseConfig.getDb();
+        const userId = window.FirebaseConfig.getCurrentUserId();
+        if (!db || !userId) return;
+        await db.collection('users').doc(userId).collection('_meta').doc('syncInfo').set({
+            lastUploadAt: firebase.firestore.FieldValue.serverTimestamp(),
+            device: (navigator.userAgent || '').slice(0, 80),
+        }, { merge: true });
+    } catch (e) { /* 非致命 */ }
+}
+
+/**
+ * R-A5：讀雲端最後上傳時間（毫秒）。讀不到回 0。
+ */
+async function fetchCloudLastUploadMs() {
+    try {
+        if (!window.FirebaseConfig.isConnected()) return 0;
+        const db = window.FirebaseConfig.getDb();
+        const userId = window.FirebaseConfig.getCurrentUserId();
+        const doc = await db.collection('users').doc(userId).collection('_meta').doc('syncInfo').get();
+        const v = doc.exists ? doc.data().lastUploadAt : null;
+        if (v && typeof v.toMillis === 'function') return v.toMillis();
+    } catch (e) { /* ignore */ }
+    return 0;
+}
+
+/**
+ * R-A2：刪除班級時，從雲端「明確移除」名冊項與 marker。
+ * 因為上傳名冊改成「只增不減」的合併，若刪班只刪本地，雲端仍留著該班 → 合併時又被加回（殭屍班）。
+ * 所以刪班必須主動把雲端 _meta/classProfiles 的該項移除，並刪掉 classes/{id} marker 文件。
+ * （該班的子集合資料留著不主動遞迴刪——client 無遞迴刪除；移除名冊+marker 後它不會再被列出/還原）
+ */
+async function deleteClassFromCloud(classId) {
+    try {
+        if (!classId || String(classId) === 'default') return false;
+        if (!window.FirebaseConfig.isConnected()) return false;
+        const db = window.FirebaseConfig.getDb();
+        const userId = window.FirebaseConfig.getCurrentUserId();
+
+        // 1) 從 _meta/classProfiles 移除該班
+        const cloud = await fetchCloudClassProfiles();
+        const filtered = cloud.filter(p => String(p.id) !== String(classId));
+        if (filtered.length !== cloud.length) {
+            await db.collection('users').doc(userId)
+                .collection('_meta').doc('classProfiles')
+                .set({ profiles: filtered, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+        }
+        // 2) 刪除 classes/{id} marker 文件（避免 discover 又把它找回來）
+        await db.collection('users').doc(userId).collection('classes').doc(String(classId)).delete();
+
+        console.log(`[MultiClass] R-A2：已從雲端移除班級 ${classId}（名冊 + marker）`);
+        return true;
+    } catch (e) {
+        console.warn(`[MultiClass] R-A2：雲端移除班級 ${classId} 失敗（非致命）:`, e);
+        return false;
     }
 }
 
@@ -1549,8 +1783,12 @@ window.FirebaseSync = {
     showAllClassSyncModal,       // 一鍵同步所有班級（本地→雲端）
     showAllClassDownloadModal,   // 一鍵還原所有班級（雲端→本地）
     fetchCloudClassProfiles,     // 讀取雲端班級清單（不寫本地）
-    syncClassProfilesFromCloud,  // 雲端班級清單合併進本地
+    discoverCloudClasses,        // R-A1：列舉 classes/ marker
+    syncClassProfilesFromCloud,  // 雲端班級清單合併進本地（含 marker）
     syncAllClassesFromCloud,     // 還原所有班級（雲端→本地，無 Modal）
+    deleteClassFromCloud,        // R-A2：刪班時從雲端移除名冊+marker
+    repairClassRegistry,         // R-A4：班級健檢與修復
+    looksLikeBlankDevice,        // R-A3：判斷空白裝置
     init: initFirebaseAndSync,
     uploadItem,
     deleteItem,

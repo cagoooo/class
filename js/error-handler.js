@@ -258,8 +258,13 @@ const ErrorHandler = (function () {
             const errorObj = error instanceof Error ? error : new Error(String(error));
             const errorType = ErrorTypes[type.toUpperCase()] || type || ErrorTypes.UNKNOWN;
 
+            let severity = options.severity || 'critical';
+            if (errorType === ErrorTypes.VALIDATION || errorType === ErrorTypes.NETWORK) {
+                severity = 'warning';
+            }
+
             // 使用情形通知：系統錯誤（同訊息每場一次、每場上限；通知失敗不可影響錯誤處理）
-            try { if (window.UsageNotify) UsageNotify.error(errorObj.message, context); } catch (e) { /* ignore */ }
+            try { if (window.UsageNotify) UsageNotify.error(errorObj.message, context, severity); } catch (e) { /* ignore */ }
 
             const errorInfo = {
                 type: errorType,
