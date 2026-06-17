@@ -2,13 +2,47 @@
 
 ## 📅 最後更新：2026-06-17
 
-## 🎯 當前版本：v3.12.2
+## 🎯 當前版本：v3.12.4
 
-> 詳細逐版紀錄見 [CHANGELOG.md](CHANGELOG.md)；最近一次為「全站深色模式對比度稽核與優化 (v3.12.2)」，解決了 11 項深色背景下的「淺底淺字」與「深底深字」問題。未來方向見 [FUTURE_DEVELOPMENT_SUGGESTIONS.md](FUTURE_DEVELOPMENT_SUGGESTIONS.md)。
+> 詳細逐版紀錄見 [CHANGELOG.md](CHANGELOG.md)；最近一次為「大時鐘多端適配、PWA 主動更新與系統維運後台 (v3.12.4)」，解決了時鐘排版、安全區遮擋、PWA 更新通知與雲端自動備份和維運統計功能。未來方向見 [FUTURE_DEVELOPMENT_SUGGESTIONS.md](FUTURE_DEVELOPMENT_SUGGESTIONS.md)。
 
 ---
 
-## ✅ 最新工作階段 (2026-06-17) v3.12.2 全站深色模式對比優化 (P0)
+## ✅ 最新工作階段 (2026-06-17) v3.12.4 大時鐘多端適配、PWA 主動更新與系統維運後台 (P1/P2)
+
+本次實作完成了大時鐘的跨裝置直橫屏響應式佈局、iPhone 安全區適配、PWA 更新主動 Banner 提示、雲端定期備份以及僅限管理員存取的系統維運後台。
+
+#### ✨ 優化與新增功能 5 項
+- [x] **R-B2 大時鐘多裝置適配**：
+  - 重寫翻轉時鐘（Flip Clock）渲染 DOM，直屏下自動折行（時分在第一行、秒針在第二行），橫屏維持一列。
+  - 優化數位、LED、可愛時鐘在直橫屏切換下的 `widthFactor` 和 `heightFactor` 縮放係數，徹底解決超寬或長窄螢幕的字體溢出。
+- [x] **R-B3 iPhone 安全區 (Safe Area) 適配**：
+  - 網頁 meta viewport 加入 `viewport-fit=cover`。
+  - 為頂部導覽列 `nav` 加上安全區頂部 padding (`env(safe-area-inset-top)`)，維持背景色一致性以防瀏海兩側露白。
+  - 為時鐘全螢幕控制列與懸浮按鈕（如 `#pwaManualUpdateBtn`、同步狀態指示器等）加上底部安全區間距，避開底部 Home 橫線。
+- [x] **R-C3 PWA 更新主動 Banner 提示**：
+  - 在 `js/pwa-install.js` 中新增偵測，當 service worker 發現有新版本 ready 時，自動於頁面頂部滑入毛玻璃效果的玻璃擬態「更新橫幅 (Update Banner)」。
+  - 提供「立即更新」按鈕以觸發 `postMessage({ action: 'skipWaiting' })` 並重載，提升無縫升級體驗。
+- [x] **R-D2 雲端自動定期備份**：
+  - 於 Functions 中實作 Cloud Scheduler 定時任務 `scheduledFirestoreExport`，每日清晨台北台北時間 04:00 自動呼叫 GCP API 將 Firestore 全部資料導出備份至 Cloud Storage (`gs://class-4719f-backups`)。
+- [x] **R-D1 系統維運後台**：
+  - **後端**：在 `functions/index.js` 實作 `getAdminStats` Callable Function，僅限 `ADMIN_EMAILS` 的管理員呼叫。使用 `admin.auth().listUsers()` 批量讀取用戶，並行統計各用戶的班級總數、最後同步時間與「孤兒班級」（已在雲端 database 存在，但不在 classProfiles 名冊中的班級）。
+  - **前端**：管理員登入後，下拉選單自動出現 `🔧 系統維運後台` 入口。點擊後開啟響應式玻璃擬態 Modal，支援即時搜尋與名單列出，並在頂部與底部顯眼位置提供「關閉並返回主頁」按鈕。
+  - **測試與安全**：建立 `scratch/test-admin-console.js` 通過完整的 Mock 權限與邏輯測試。
+
+---
+
+## ✅ 工作階段 (2026-06-17) v3.12.3 離線優先操作佇列 (Offline Action Queue)
+
+### ⚡ 離線變更追蹤與自動同步 (Offline Action Queue)
+- [x] **離線偵測與同步聯動**：實作 `js/offline-detector.js`，在網路斷開和恢復連線時，透過狀態指示器進行連動。
+- [x] **寫入攔截與暫存**：修改 `Storage.prototype.setItem` 攔截器，當在已登入但離線狀態寫入資料時，將被修改的 key 進行 base-key 轉換並加入 `pendingSyncKeys` 中。
+- [x] **同步指示器強化**：Hover 懸浮指示器會動態呈現中文待同步變更清單，離線點擊時會顯示 Toast 提示。
+- [x] **自動同步**：在雲端同步成功後，自動移除本地的 `pendingSyncKeys` 並更新指示器為 `synced` 綠燈狀態。
+
+---
+
+## ✅ 工作階段 (2026-06-17) v3.12.2 全站深色模式對比優化 (P0)
 
 本次稽核並全面修補了 11 項在深色模式下的「淺底淺字」與「深底深字」對比度缺陷，提升了全站主題的一致性與可讀性。
 
@@ -305,16 +339,6 @@
 
 ---
 
-## ✅ 工作階段 (2026-06-17) 離線優先操作佇列 (Offline Action Queue)
-
-### ⚡ 離線變更追蹤與自動同步 (`js/sync-status-indicator.js` & `js/firebase-sync.js` & `js/offline-detector.js`)
-- [x] **`js/offline-detector.js`** - 離線偵測模組，在網路斷開和恢復連線時，透過 `window.SyncStatusIndicator` 進行狀態聯動。
-- [x] **`js/sync-status-indicator.js`** - 修改 `Storage.prototype.setItem` 攔截器，當在已登入但離線狀態（`disconnected`）寫入資料時，將被修改的 key 進行 base-key 轉換（過濾班級字尾）並加入 `pendingSyncKeys` 中。
-- [x] **指示器 Hover / Click 提示** - 離線模式下 Hover 懸浮指示器會動態呈現中文待同步變更清單；離線點擊時會顯示 Toast 提示在恢復連線後會自動同步。
-- [x] **`js/firebase-sync.js`** - 在雲端同步成功後的 `try` 區塊中，自動移除本地的 `pendingSyncKeys`，並調用 `window.SyncStatusIndicator.updateStateBasedOnSync()` 使指示器重設為 `synced` 綠燈狀態。
-- [x] **自動化模擬測試** - 撰寫 Node.js 測試腳本 mock 瀏覽器環境，成功通過線上修改不記錄、離線修改記錄、同步後清空的三大核心情境測試。
-
----
 
 ## ✅ 工作階段 (2026-03-02) 骨架屏載入狀態統一化
 

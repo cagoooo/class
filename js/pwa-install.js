@@ -149,7 +149,6 @@
         },
 
         // v3.1.3：通知 sync-status-indicator「有新版本可套用」
-        // 不顯示攔路橫幅，使用者可在下次自然 reload 時自動套用，或主動點同步指示器套用
         notifyUpdateAvailable(registration) {
             window.__pwaUpdateAvailable = true;
             window.__pwaUpdateRegistration = registration;
@@ -159,6 +158,105 @@
             }
             // 事件廣播，讓其他模組也能監聽
             window.dispatchEvent(new CustomEvent('pwa-update-available', { detail: { registration } }));
+
+            // R-C3：主動彈出提示橫幅
+            this.showUpdateBanner();
+        },
+
+        // 彈出常駐更新提示橫幅（Update Banner）
+        showUpdateBanner() {
+            if (document.getElementById('pwa-update-banner')) return;
+
+            // 注入 Banner 專屬樣式
+            if (!document.getElementById('pwa-update-banner-style')) {
+                const s = document.createElement('style');
+                s.id = 'pwa-update-banner-style';
+                s.textContent = `
+                    #pwa-update-banner {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        z-index: 19998;
+                        background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+                        color: #ffffff;
+                        box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+                        padding: 10px 1.5rem;
+                        font-family: 'Noto Sans TC', sans-serif;
+                        font-size: 0.9rem;
+                        font-weight: 500;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 1rem;
+                        transform: translateY(-100%);
+                        transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+                        backdrop-filter: blur(8px);
+                        border-bottom: 2px solid rgba(255,255,255,0.2);
+                        padding-top: calc(10px + env(safe-area-inset-top, 0px));
+                    }
+                    #pwa-update-banner.show {
+                        transform: translateY(0);
+                    }
+                    .pwa-update-btn {
+                        background: #ffffff;
+                        color: #1d4ed8;
+                        border: none;
+                        padding: 4px 14px;
+                        border-radius: 999px;
+                        font-weight: 700;
+                        cursor: pointer;
+                        font-size: 0.82rem;
+                        transition: all 0.2s;
+                        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+                    }
+                    .pwa-update-btn:hover {
+                        background: #f3f4f6;
+                        transform: scale(1.05);
+                    }
+                    .pwa-update-btn:active {
+                        transform: scale(0.95);
+                    }
+                    .pwa-update-close {
+                        background: rgba(255,255,255,0.18);
+                        border: none;
+                        color: #ffffff;
+                        padding: 2px 8px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-size: 0.8rem;
+                        transition: background 0.2s;
+                    }
+                    .pwa-update-close:hover {
+                        background: rgba(255,255,255,0.3);
+                    }
+                `;
+                document.head.appendChild(s);
+            }
+
+            const banner = document.createElement('div');
+            banner.id = 'pwa-update-banner';
+            banner.innerHTML = `
+                <span style="font-size: 1.1rem;">✨</span>
+                <span>班級小管家已推出新版本，點擊立即享受更流暢的體驗！</span>
+                <button class="pwa-update-btn" id="pwa-update-btn-action">立即更新</button>
+                <button class="pwa-update-close" id="pwa-update-btn-close">稍後</button>
+            `;
+
+            document.body.appendChild(banner);
+
+            banner.querySelector('#pwa-update-btn-action').addEventListener('click', () => {
+                this.applyPendingUpdate();
+            });
+
+            banner.querySelector('#pwa-update-btn-close').addEventListener('click', () => {
+                banner.classList.remove('show');
+                setTimeout(() => banner.remove(), 400);
+            });
+
+            requestAnimationFrame(() => {
+                banner.classList.add('show');
+            });
         },
 
         // 主動套用等待中的新 SW（由使用者明確操作觸發）

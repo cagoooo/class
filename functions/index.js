@@ -16,9 +16,13 @@
  * 區域固定 asia-east1（台灣最近），前端呼叫端也要用同一區域。
  */
 
-const { onCall } = require('firebase-functions/v2/https');
+const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { defineSecret } = require('firebase-functions/params');
 const logger = require('firebase-functions/logger');
+const admin = require('firebase-admin');
+
+admin.initializeApp();
 
 const GOOGLE_CHAT_WEBHOOK = defineSecret('GOOGLE_CHAT_WEBHOOK');
 
@@ -273,6 +277,153 @@ exports.notifyUsage = onCall(
     } catch (err) {
       logger.error('推送 Google Chat 失敗', err);
       return { ok: false, reason: 'fetch-failed' };
+    }
+  }
+);
+
+/**
+ * 雲端定期備份 (R-D2)：排程 Firestore 匯出，每天清晨台北時間 04:00 執行。
+ *
+ * 備份會自動匯出至當前 Firebase 專案預設的 Storage Bucket 的 /firestore_backups 目錄。
+ *
+ * ⚠️ 必須在 GCP Console 中為 App Engine 預設服務帳號或 Cloud Functions 服務帳號
+ * 授予「Storage Object Admin」及「Cloud Datastore Import Export Admin」權限，此 Functions 才能成功運作。
+ */
+exports.scheduledFirestoreExport = onSchedule(
+  {
+    schedule: 'every day 04:00',
+    timeZone: 'Asia/Taipei',
+    region: REGION,
+    timeoutSeconds: 540, // 支援大檔案，設為 9 分鐘
+    memory: '256MiB'
+  },
+  async (event) => {
+    const firestore = require('@google-cloud/firestore');
+    const client = new firestore.v1.FirestoreAdminClient();
+    const projectId = process.env.GCLOUD_PROJECT || admin.instanceId().app.options.projectId;
+    const databaseName = client.databasePath(projectId, '(default)');
+
+    let bucketName = '';
+    try {
+      bucketName = admin.storage().bucket().name;
+    } catch (e) {
+      // 若未配置預設儲存桶，則 fallback 使用 projectId 拼接預設儲存桶名稱
+      bucketName = `${projectId}.appspot.com`;
+    }
+
+    const outputUriPrefix = `gs://${bucketName}/firestore_backups`;
+
+    try {
+      logger.info(`[Backup] 開始自動備份 Firestore，匯出至: ${outputUriPrefix}`);
+      const [operation] = await client.exportDocuments({
+        name: databaseName,
+        outputUriPrefix: outputUriPrefix,
+        collectionIds: [] // 留空代表匯出所有 collections
+      });
+      
+      logger.info(`[Backup] 備份作業已順利啟動，Operation Name: ${operation.name}`);
+      return { success: true, operation: operation.name };
+    } catch (error) {
+      logger.error('[Backup] Firestore 自動備份失敗:', error);
+      throw error;
+    }
+  }
+);
+
+/**
+ * 維運小後台 API (R-D1)：列出所有教師的統計數據（班級數、最後同步時間、孤兒資料）。
+ *
+ * 🔐 安全防護：僅允許 ADMIN_EMAILS 中所列出的管理員 Email 調用，其餘一律攔截。
+ */
+const ADMIN_EMAILS = ['cagoooo@gmail.com', 'ipad@mail2.smes.tyc.edu.tw'];
+
+exports.getAdminStats = onCall(
+  { region: REGION, cors: true, maxInstances: 5 },
+  async (request) => {
+    // 1. 身分與權限核驗
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', '必須先進行 Google 登入才能調用此介面');
+    }
+
+    const userEmail = (request.auth.token.email || '').toLowerCase().trim();
+    if (!ADMIN_EMAILS.includes(userEmail)) {
+      logger.warn(`未經授權的後台存取嘗試: ${userEmail}`);
+      throw new HttpsError('permission-denied', '您沒有存取系統維運後台的權限');
+    }
+
+    try {
+      logger.info(`管理員 ${userEmail} 正在存取系統維運後台數據`);
+
+      // 2. 獲取所有 Firebase 註冊帳號
+      const userMap = new Map();
+      let nextPageToken;
+      do {
+        const listUsersResult = await admin.auth().listUsers(1000, nextPageToken);
+        listUsersResult.users.forEach((userRecord) => {
+          userMap.set(userRecord.uid, {
+            email: userRecord.email || '',
+            name: userRecord.displayName || '未具名老師'
+          });
+        });
+        nextPageToken = listUsersResult.pageToken;
+      } while (nextPageToken);
+
+      // 3. 獲取所有在 Firestore 中有紀錄的 user document refs
+      const usersCol = admin.firestore().collection('users');
+      const userRefs = await usersCol.listDocuments();
+
+      // 4. 並行查詢每位教師的資料
+      const statsPromises = userRefs.map(async (userRef) => {
+        const uid = userRef.id;
+        const authUser = userMap.get(uid) || { email: '', name: '匿名/訪客帳號' };
+
+        // 讀取 classProfiles, syncInfo 以及 classes
+        const metaCol = userRef.collection('_meta');
+        
+        const [profilesDoc, syncInfoDoc, classesDocs] = await Promise.all([
+          metaCol.doc('classProfiles').get(),
+          metaCol.doc('syncInfo').get(),
+          userRef.collection('classes').listDocuments()
+        ]);
+
+        const classProfiles = profilesDoc.exists ? (profilesDoc.data().profiles || []) : [];
+        const syncInfo = syncInfoDoc.exists ? syncInfoDoc.data() : null;
+        
+        // 取得 classes 子集合中所有的班級 ID
+        const cloudClassIds = classesDocs.map(doc => doc.id);
+        
+        // 對照班級名冊與雲端 classes 集合，篩選出孤兒班級
+        const activeClassIds = new Set(classProfiles.map(p => p.id));
+        // 'default' 是預設班級，不列在 classProfiles 中但它是合法的，不算孤兒
+        activeClassIds.add('default'); 
+
+        const orphans = cloudClassIds.filter(id => !activeClassIds.has(id));
+
+        return {
+          uid,
+          email: authUser.email,
+          name: authUser.name,
+          classCount: classProfiles.length,
+          orphanCount: orphans.length,
+          orphans: orphans,
+          lastSync: syncInfo && syncInfo.lastUploadAt ? syncInfo.lastUploadAt.toDate().toISOString() : null,
+          device: syncInfo ? (syncInfo.device || '') : ''
+        };
+      });
+
+      const results = await Promise.all(statsPromises);
+      
+      // 根據最後同步時間排序（最近同步的排在前面）
+      results.sort((a, b) => {
+        if (!a.lastSync) return 1;
+        if (!b.lastSync) return -1;
+        return new Date(b.lastSync) - new Date(a.lastSync);
+      });
+
+      return { ok: true, data: results };
+    } catch (error) {
+      logger.error('讀取維運統計資料失敗:', error);
+      throw new HttpsError('internal', '讀取統計資料時發生系統內部錯誤');
     }
   }
 );

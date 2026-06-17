@@ -7,6 +7,10 @@
 #clock-modal {
     background: #ffffff;
     transition: opacity 0.3s ease;
+    padding-top: calc(16px + env(safe-area-inset-top, 0px)) !important;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-left: calc(16px + env(safe-area-inset-left, 0px)) !important;
+    padding-right: calc(16px + env(safe-area-inset-right, 0px)) !important;
 }
 
 #clock-modal.dark {
@@ -17,6 +21,7 @@
 /* 時鐘控制列 */
 #clock-controls {
     transition: opacity 0.3s ease, transform 0.3s ease;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
 }
 
 #clock-modal:not(:hover) #clock-controls:not(:focus-within) {
@@ -301,4 +306,27 @@
 #clock-modal.dark .clock-style-flip .date-display {
     color: #9ca3af;
     /* gray-400 */
+}
+
+/* === 翻轉時鐘直屏雙行響應式佈局 === */
+.clock-style-flip-container {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: nowrap;
+}
+
+.clock-style-flip-row1,
+.clock-style-flip-row2 {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@media (orientation: portrait) {
+    .clock-style-flip-container {
+        flex-direction: column;
+        gap: 2rem;
+    }
 }

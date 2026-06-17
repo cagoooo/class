@@ -417,6 +417,9 @@
                     <button class="gauth-dd-item" onclick="GoogleAuthUI.repairClasses()" style="color:#059669;font-weight:700;">
                         🩺 班級健檢與修復
                     </button>
+                    <button class="gauth-dd-item" id="gauth-dd-admin" onclick="showAdminConsole()" style="display:none;color:#d97706;font-weight:700;">
+                        🔧 系統維運後台
+                    </button>
                     <div class="gauth-dd-divider"></div>
                     <button class="gauth-dd-item danger" onclick="GoogleAuthUI.logout()">
                         🚪 登出
@@ -481,6 +484,9 @@
                     </button>
                     <button class="gauth-dd-item" onclick="GoogleAuthUI.repairClasses()" style="color:#059669;font-weight:700;">
                         🩺 班級健檢與修復
+                    </button>
+                    <button class="gauth-dd-item" id="gauth-dd-admin-mobile" onclick="showAdminConsole()" style="display:none;color:#d97706;font-weight:700;">
+                        🔧 系統維運後台
                     </button>
                     <div class="gauth-dd-divider"></div>
                     <button class="gauth-dd-item danger" onclick="GoogleAuthUI.logout()">
@@ -606,6 +612,14 @@
         const ddEmailM = document.getElementById('gauth-dd-email-mobile');
         if (ddNameM) ddNameM.textContent = profile.displayName || '老師';
         if (ddEmailM) ddEmailM.textContent = profile.email || '';
+
+        // 管理員維運後台按鈕顯示/隱藏
+        const ADMIN_EMAILS = ['cagoooo@gmail.com', 'ipad@mail2.smes.tyc.edu.tw'];
+        const isUserAdmin = profile.email && ADMIN_EMAILS.includes(profile.email.toLowerCase().trim());
+        const ddAdmin = document.getElementById('gauth-dd-admin');
+        const ddAdminMobile = document.getElementById('gauth-dd-admin-mobile');
+        if (ddAdmin) ddAdmin.style.display = isUserAdmin ? 'block' : 'none';
+        if (ddAdminMobile) ddAdminMobile.style.display = isUserAdmin ? 'block' : 'none';
 
         refreshSyncTime();
     }

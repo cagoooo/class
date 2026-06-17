@@ -37,3 +37,8 @@ body {
 .drag-handle {
     touch-action: none; /* 避免在觸控裝置上拖曳時觸發滾動 */
 }
+
+/* === iOS Safe Area 安全區適配 === */
+nav {
+    padding-top: env(safe-area-inset-top, 0px) !important;
+}

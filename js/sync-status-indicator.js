@@ -88,8 +88,8 @@
 /* 定位於「一鍵更新」按鈕（#pwaManualUpdateBtn，bottom:24px right:24px 寬約 130px）左側，避免重疊 */
 #sync-status-indicator {
     position: fixed;
-    bottom: 28px;
-    right: 172px;
+    bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+    right: calc(172px + env(safe-area-inset-right, 0px));
     width: 40px;
     height: 40px;
     border-radius: 50%;
@@ -135,8 +135,8 @@
 }
 #sync-status-tooltip {
     position: fixed;
-    bottom: 78px;
-    right: 152px;
+    bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+    right: calc(152px + env(safe-area-inset-right, 0px));
     background: #1f2937;
     color: #fff;
     padding: 0.6rem 0.9rem;
@@ -169,12 +169,12 @@
         width: 36px;
         height: 36px;
         font-size: 1rem;
-        bottom: 18px;
-        right: 140px;
+        bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+        right: calc(140px + env(safe-area-inset-right, 0px));
     }
     #sync-status-tooltip {
-        bottom: 62px;
-        right: 16px;
+        bottom: calc(62px + env(safe-area-inset-bottom, 0px));
+        right: calc(16px + env(safe-area-inset-right, 0px));
         font-size: 0.78rem;
         max-width: calc(100vw - 32px);
     }
