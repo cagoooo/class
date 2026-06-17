@@ -1,12 +1,13 @@
 /**
  * comment-gen.js
  * ✍️ 成績單評語生成器
- * @version 3.10.2
+ * @version 3.12.5
  *
  * 需求：
  *   - 三大類特質點選：人際關係 / 學習表現 / 日常生活表現
  *   - 每類都有「正向」與「待加強」特質，各 10 個（每類 20 個，共 60 個）
  *   - 可選「口氣」（溫暖鼓勵 / 客觀中性 / 嚴謹正式 / 活潑親切）與「字數」（簡短 / 適中 / 詳細）
+ *   - 可設「字數上限」：成績單欄位常有硬性字數限制，填上限後系統自動裁切到不超過
  *   - 自動組成通順的中文評語，可一鍵複製
  *
  * 純前端、零相依、自注入 CSS；無狀態（每位學生重新點選，不寫 localStorage）。
@@ -237,7 +238,8 @@
         .cg-controls{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.9rem;margin:0;padding:1rem;background:#faf5ff;border-radius:1rem}
         .cg-controls .fld{display:flex;flex-direction:column;gap:.25rem;flex:1;min-width:130px}
         .cg-controls label{font-size:.82rem;font-weight:800;color:#6b21a8}
-        .cg-controls select{width:100%;padding:.5rem .8rem;border:2px solid #ddd6fe;border-radius:.7rem;font-size:.95rem;font-weight:700;color:#4b5563;background:#fff}
+        .cg-controls select,.cg-controls input{width:100%;padding:.5rem .8rem;border:2px solid #ddd6fe;border-radius:.7rem;font-size:.95rem;font-weight:700;color:#4b5563;background:#fff}
+        .cg-controls input::placeholder{color:#a78bda;font-weight:600}
         .cg-actions{display:flex;gap:.7rem}
         .cg-actions .cg-btn{padding:.7rem 1rem}
         .cg-actions .cg-clear{flex:1}
@@ -302,14 +304,77 @@
     }
 
     // ───────────── 產生評語 ─────────────
+    const countChars = s => String(s || '').replace(/\s/g, '').length;
+
+    // 讀取「字數上限」輸入框；空白或不合理時回 0（代表不限）
+    function readCap() {
+        const el = document.getElementById('cg-cap');
+        if (!el) return 0;
+        const n = parseInt(el.value, 10);
+        return (Number.isFinite(n) && n > 0) ? n : 0;
+    }
+
     function output(text, isPlaceholder) {
         const el = document.getElementById('cg-output');
         if (!el) return;
         el.textContent = text;
         el.classList.toggle('placeholder', !!isPlaceholder);
         const cc = document.getElementById('cg-charcount');
-        if (cc) cc.textContent = isPlaceholder ? '' : ('字數：' + text.replace(/\s/g, '').length + ' 字');
+        if (cc) {
+            if (isPlaceholder) {
+                cc.textContent = '';
+            } else {
+                const cap = readCap();
+                cc.textContent = cap
+                    ? `字數：${countChars(text)} / 上限 ${cap} 字`
+                    : `字數：${countChars(text)} 字`;
+            }
+        }
         lastText = isPlaceholder ? '' : text;
+    }
+
+    // 在不超過 cap 字（不計空白）的前提下，盡量保留完整內容；逐步捨棄可選段落，
+    // 仍超過時整句捨去，最後才在標點處截斷，確保結尾是完整句號。
+    function fitToCap(opening, clauses, extra, close, cap) {
+        const assemble = (op, cl, ex, clo) => [op, cl.join(''), ex, clo].filter(Boolean).join('');
+        // 由豐富到精簡：先丟勉勵語(extra)、再丟開場白(opening)、最後丟結語(close)
+        const configs = [
+            [opening, clauses, extra, close],
+            [opening, clauses, '', close],
+            ['', clauses, '', close],
+            ['', clauses, '', '']
+        ];
+        for (const [op, cl, ex, clo] of configs) {
+            const t = assemble(op, cl, ex, clo);
+            if (countChars(t) <= cap) return t;
+        }
+        // 仍超過：從尾端整句捨去特質句，直到放得下（至少保留 1 句）
+        let cl = clauses.slice();
+        while (cl.length > 1) {
+            cl = cl.slice(0, -1);
+            if (countChars(cl.join('')) <= cap) return cl.join('');
+        }
+        // 只剩一句仍太長：在標點處截斷，補成完整句子
+        return truncateAtPunct(cl.join(''), cap);
+    }
+
+    function truncateAtPunct(s, cap) {
+        if (countChars(s) <= cap) return s;
+        let out = '', count = 0;
+        for (const ch of s) {
+            if (!/\s/.test(ch)) count++;
+            if (count > cap) break;
+            out += ch;
+        }
+        // 優先退到最後一個「。；！？」結尾
+        const m = out.match(/^[\s\S]*[。；！？]/);
+        if (m && countChars(m[0]) >= cap * 0.5) return m[0];
+        // 否則退到最後一個逗頓號，去尾標點再補句號
+        const m2 = out.match(/^[\s\S]*[，、]/);
+        if (m2) out = m2[0];
+        out = out.replace(/[，、；]+$/, '');
+        if (!/[。！？]$/.test(out)) out += '。';
+        return out;
     }
 
     function generate() {
@@ -344,12 +409,16 @@
             output('（在左側點選特質，這裡會即時生成評語 ✨）', true);
             return;
         }
-        const parts = [];
-        if (L.opening) parts.push(pick(T.opens)(name));
-        parts.push(clauses.join(''));
-        if (L.extra) parts.push(pu(T.extra));
-        parts.push(pu(T.close));
-        output(parts.join(''), false);
+        const opening = L.opening ? pick(T.opens)(name) : '';
+        const extra = L.extra ? pu(T.extra) : '';
+        const close = pu(T.close);
+
+        const cap = readCap();
+        const full = [opening, clauses.join(''), extra, close].filter(Boolean).join('');
+        const text = (cap && countChars(full) > cap)
+            ? fitToCap(opening, clauses, extra, close, cap)
+            : full;
+        output(text, false);
     }
 
     // ───────────── 複製 / 清除 ─────────────

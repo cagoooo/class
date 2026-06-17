@@ -1565,6 +1565,12 @@
                             <option value="detailed">詳細</option>
                         </select>
                     </div>
+                    <div class="fld">
+                        <label for="cg-cap">字數上限</label>
+                        <input id="cg-cap" type="number" min="20" max="500" step="10" placeholder="不限"
+                               inputmode="numeric" title="成績單欄位有字數限制時填上限，系統會自動裁切到不超過"
+                               oninput="CommentGen.generate()">
+                    </div>
                 </div>
 
                 <!-- 清除 & 生成評語 -->
@@ -4405,7 +4411,7 @@
     <script src="./js/brush-check.js?v=3.12.4"></script>
 
     <!-- ✍️ 成績單評語生成器 -->
-    <script src="./js/comment-gen.js?v=3.12.4"></script>
+    <script src="./js/comment-gen.js?v=3.12.5"></script>
 
     <!-- 💬 生動對話小學堂（國語寫作互動教學） -->
     <script src="./js/dialogue-school.js?v=3.12.4"></script>
