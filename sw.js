@@ -1,12 +1,12 @@
 /**
  * 班級小管家 Service Worker
- * @version 3.12.0
+ * @version 3.12.1
  * @description PWA 離線支援與快取策略優化
  */
 
-const CACHE_NAME = 'class-manager-v3.12.0';
-const STATIC_CACHE = 'class-manager-static-v3.12.0';
-const DYNAMIC_CACHE = 'class-manager-dynamic-v3.12.0';
+const CACHE_NAME = 'class-manager-v3.12.1';
+const STATIC_CACHE = 'class-manager-static-v3.12.1';
+const DYNAMIC_CACHE = 'class-manager-dynamic-v3.12.1';
 
 
 // 靜態資源列表（安裝時預快取）
@@ -68,7 +68,9 @@ const STATIC_ASSETS = [
     // v3.8.0 新增模組
     './js/dialogue-school.js',
     // v3.10.0 新增模組
-    './js/usage-notify.js'
+    './js/usage-notify.js',
+    // v3.12.1 新增模組
+    './js/health-panel.js'
 ];
 
 // 需要網路優先的路徑模式
