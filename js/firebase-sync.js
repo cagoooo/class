@@ -320,6 +320,12 @@ async function syncToCloud(silent = false) {
         syncStatus.lastSyncTime = new Date();
         localStorage.setItem('lastSyncTime', syncStatus.lastSyncTime.toISOString());
 
+        // 離線優先佇列：上傳成功後清空待同步 Key，並重整指示器狀態
+        localStorage.removeItem('pendingSyncKeys');
+        if (window.SyncStatusIndicator && window.SyncStatusIndicator.updateStateBasedOnSync) {
+            window.SyncStatusIndicator.updateStateBasedOnSync();
+        }
+
         if (!silent) typeof LoadingIndicator !== 'undefined' && LoadingIndicator.hide();
         if (typeof window.GoogleAuthUI !== 'undefined') {
             window.GoogleAuthUI.refreshSyncTime && window.GoogleAuthUI.refreshSyncTime();

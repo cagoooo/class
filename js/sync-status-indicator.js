@@ -25,11 +25,59 @@
         syncing: { color: '#3b82f6', icon: '☁️', label: '同步中', title: '正在上傳到雲端...' },
         error: { color: '#ef4444', icon: '⚠️', label: '同步失敗', title: '最近一次同步失敗，點擊重試' },
         offline: { color: '#9ca3af', icon: '☁️', label: '未登入', title: '登入 Google 帳號即可自動同步' },
+        disconnected: { color: '#f59e0b', icon: '📵', label: '離線模式', title: '目前無網路連線，資料將在恢復後自動同步' },
     };
 
     let currentState = 'offline';
     let lastChangedAt = null;  // 最後一次 setItem 時間（pending 計時用）
     let updateAvailable = false;  // v3.1.3：是否有新版本可套用
+
+    // ── 待同步變更 Key 與中文對照表 ──
+    const KEY_ZH_MAP = {
+        students: '學生資料',
+        pointsHistory: '加扣分歷史',
+        groups: '分組資料',
+        notebookEntries: '聯絡簿',
+        homeworkList: '作業項目',
+        homeworkChecks: '作業檢查紀錄',
+        lotteryHistory: '抽籤歷史記錄',
+        classAnnouncements: '班級公告',
+        examSubjects: '考試科目',
+        examReminders: '監考提醒',
+        examAttendance: '考試出缺勤',
+        examAbsenceRecords: '缺考詳細記錄',
+        seatingConfig: '座位表',
+        drawnStudentIds: '已抽學生名單'
+    };
+
+    function getPendingKeys() {
+        try {
+            const raw = localStorage.getItem('pendingSyncKeys');
+            return raw ? JSON.parse(raw) : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function addPendingKey(key) {
+        let baseKey = key;
+        if (key.includes('-')) {
+            const matched = [
+                'students', 'pointsHistory', 'groups',
+                'notebookEntries', 'homeworkList', 'homeworkChecks',
+                'lotteryHistory', 'classAnnouncements',
+                'examSubjects', 'examReminders', 'examAttendance', 'examAbsenceRecords',
+                'seatingConfig', 'drawnStudentIds'
+            ].find(uk => key.startsWith(uk + '-'));
+            if (matched) baseKey = matched;
+        }
+        
+        const keys = getPendingKeys();
+        if (!keys.includes(baseKey)) {
+            keys.push(baseKey);
+            localStorage.setItem('pendingSyncKeys', JSON.stringify(keys));
+        }
+    }
 
     // ── CSS 注入 ──
     function injectCSS() {
@@ -185,6 +233,25 @@
                 <div>點擊套用更新並重新整理</div>
                 <div class="sync-tooltip-detail">${lastSyncText}</div>
             `;
+        } else if (currentState === 'disconnected') {
+            const pendingKeys = getPendingKeys();
+            if (pendingKeys.length > 0) {
+                const listHtml = pendingKeys.map(k => `<li>• ${KEY_ZH_MAP[k] || k}</li>`).join('');
+                tt.innerHTML = `
+                    <div class="sync-tooltip-title">📵 離線暫存模式</div>
+                    <div>目前無網路連線，已暫存下列變更：</div>
+                    <ul style="margin:6px 0;padding:0 0 0 10px;list-style:none;font-size:0.78rem;color:#fed7aa;text-align:left;">
+                        ${listHtml}
+                    </ul>
+                    <div class="sync-tooltip-detail" style="margin-top:4px;">連上網路後將自動背景同步</div>
+                `;
+            } else {
+                tt.innerHTML = `
+                    <div class="sync-tooltip-title">📵 離線模式</div>
+                    <div>目前無網路連線</div>
+                    <div class="sync-tooltip-detail">所有資料皆已安全暫存於本機</div>
+                `;
+            }
         } else {
             tt.innerHTML = `
                 <div class="sync-tooltip-title">${state.label}</div>
@@ -238,8 +305,21 @@
             }
             return;
         }
+
+        if (currentState === 'disconnected') {
+            const isOffline = !navigator.onLine || (window.OfflineDetector && window.OfflineDetector.isOffline());
+            if (isOffline) {
+                if (typeof NotificationSystem !== 'undefined') {
+                    NotificationSystem.warning('📶 目前處於離線狀態，請在連上網路後再試');
+                } else {
+                    alert('目前處於離線狀態，請在連上網路後再試');
+                }
+                return;
+            }
+        }
+
         if (currentState === 'syncing') return;
-        // 其他狀態（synced/pending/error）都可觸發手動同步
+        // 其他狀態（synced/pending/error/disconnected(在線)）都可觸發手動同步
         if (window.FirebaseSync?.syncToCloud) {
             setState('syncing');
             try {
@@ -271,6 +351,12 @@
     }
 
     function updateStateBasedOnSync() {
+        const isOffline = !navigator.onLine || (window.OfflineDetector && window.OfflineDetector.isOffline());
+        if (isOffline) {
+            setState('disconnected');
+            return;
+        }
+
         const lastSync = localStorage.getItem('lastSyncTime');
         if (!lastSync) {
             setState('pending');  // 已登入但從未同步
@@ -305,9 +391,17 @@
         proto.setItem = function (key, value) {
             const result = orig.call(this, key, value);
             try {
-                if (isUserKey(key) && currentState !== 'offline' && currentState !== 'syncing') {
-                    lastChangedAt = Date.now();
-                    if (currentState === 'synced') setState('pending');
+                if (isUserKey(key) && currentState !== 'offline') {
+                    const isOffline = !navigator.onLine || (window.OfflineDetector && window.OfflineDetector.isOffline());
+                    if (isOffline) {
+                        addPendingKey(key);
+                        setState('disconnected');
+                    } else if (currentState !== 'syncing') {
+                        lastChangedAt = Date.now();
+                        if (currentState === 'synced' || currentState === 'disconnected') {
+                            setState('pending');
+                        }
+                    }
                 }
             } catch (e) { /* 不影響原有功能 */ }
             return result;

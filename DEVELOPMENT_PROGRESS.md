@@ -305,6 +305,17 @@
 
 ---
 
+## ✅ 工作階段 (2026-06-17) 離線優先操作佇列 (Offline Action Queue)
+
+### ⚡ 離線變更追蹤與自動同步 (`js/sync-status-indicator.js` & `js/firebase-sync.js` & `js/offline-detector.js`)
+- [x] **`js/offline-detector.js`** - 離線偵測模組，在網路斷開和恢復連線時，透過 `window.SyncStatusIndicator` 進行狀態聯動。
+- [x] **`js/sync-status-indicator.js`** - 修改 `Storage.prototype.setItem` 攔截器，當在已登入但離線狀態（`disconnected`）寫入資料時，將被修改的 key 進行 base-key 轉換（過濾班級字尾）並加入 `pendingSyncKeys` 中。
+- [x] **指示器 Hover / Click 提示** - 離線模式下 Hover 懸浮指示器會動態呈現中文待同步變更清單；離線點擊時會顯示 Toast 提示在恢復連線後會自動同步。
+- [x] **`js/firebase-sync.js`** - 在雲端同步成功後的 `try` 區塊中，自動移除本地的 `pendingSyncKeys`，並調用 `window.SyncStatusIndicator.updateStateBasedOnSync()` 使指示器重設為 `synced` 綠燈狀態。
+- [x] **自動化模擬測試** - 撰寫 Node.js 測試腳本 mock 瀏覽器環境，成功通過線上修改不記錄、離線修改記錄、同步後清空的三大核心情境測試。
+
+---
+
 ## ✅ 工作階段 (2026-03-02) 骨架屏載入狀態統一化
 
 ### 🖥️ 骨架屏（Skeleton Screen）模組 (`css/skeleton.css` & `js/skeleton.js`)
@@ -445,6 +456,7 @@
 ### 最新 Git Commits
 | Commit | 說明 |
 |--------|------|
+| `df22ae0` | ✅ 實作離線優先操作佇列以追蹤並同步離線變更 (v3.12.3) |
 | `0564d1b` | ✅ 優化全站深色模式對比度與主題一致性 (v3.12.2) |
 | `ef8783b` | ✨ 版本健康面板 + 登入帳號顯示 + 雲端定期備份 (v3.12.1) |
 | `abce5ca` | ✨ 多班級資料完整性強化 A 系列 (v3.12.0) |

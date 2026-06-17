@@ -149,6 +149,11 @@
         console.log('[OfflineDetector] 🌐 網路已恢復');
         hideBanner(false);
 
+        // 聯動同步狀態指示器
+        if (window.SyncStatusIndicator) {
+            window.SyncStatusIndicator.updateStateBasedOnSync();
+        }
+
         // 延遲一秒讓連線穩定後再觸發同步
         setTimeout(() => {
             if (window.AutoSync?.isRunning?.()) {
@@ -162,6 +167,11 @@
         state.offline = true;
         console.log('[OfflineDetector] 📵 裝置離線');
         showBanner();
+
+        // 聯動同步狀態指示器
+        if (window.SyncStatusIndicator) {
+            window.SyncStatusIndicator.setState('disconnected');
+        }
     }
 
     // ==================== 主題切換監聽 ====================
@@ -193,7 +203,12 @@
             if (!navigator.onLine) {
                 state.offline = true;
                 // 稍微延遲，確保 DOM 已完全載入
-                setTimeout(showBanner, 500);
+                setTimeout(() => {
+                    showBanner();
+                    if (window.SyncStatusIndicator) {
+                        window.SyncStatusIndicator.setState('disconnected');
+                    }
+                }, 500);
             }
 
             console.log(`✅ [OfflineDetector] 離線偵測已啟動（目前：${navigator.onLine ? '線上' : '離線'}）`);
