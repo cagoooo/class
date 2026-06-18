@@ -4284,7 +4284,8 @@
 
         // 視窗大小改變時重新計算
         window.addEventListener('resize', function () {
-            if (!document.getElementById('clock-modal').classList.contains('hidden')) {
+            const clockModal = document.getElementById('clock-modal');
+            if (clockModal && !clockModal.classList.contains('hidden')) {
                 fitClockToScreen();
             }
         });
