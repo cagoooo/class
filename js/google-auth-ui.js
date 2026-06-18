@@ -7,6 +7,30 @@
     'use strict';
 
     // ────────────────────────────────────────────────────────
+    // 🔐 管理員白名單（唯一真實來源）
+    //    「班級健檢與修復」與「系統維運後台」兩個功能僅限此名單帳號使用。
+    //    ⚠️ 前端只負責隱藏按鈕＋擋呼叫；維運後台的真正防線在 functions/index.js
+    //       的 getAdminStats（同一份白名單），請兩邊一起維護。
+    // ────────────────────────────────────────────────────────
+    const ADMIN_EMAILS = ['ipad@mail2.smes.tyc.edu.tw'];
+
+    function isAdminEmail(email) {
+        return !!email && ADMIN_EMAILS.includes(String(email).toLowerCase().trim());
+    }
+
+    /** 以目前實際登入的 Firebase 帳號判斷是否為管理員（不依賴 UI 狀態，較難繞過） */
+    function isCurrentUserAdmin() {
+        try {
+            const p = window.FirebaseConfig && window.FirebaseConfig.getCurrentProfile
+                ? window.FirebaseConfig.getCurrentProfile()
+                : null;
+            return !!(p && !p.isAnonymous && isAdminEmail(p.email));
+        } catch (e) {
+            return false;
+        }
+    }
+
+    // ────────────────────────────────────────────────────────
     // CSS 注入
     // ────────────────────────────────────────────────────────
     function injectCSS() {
@@ -414,7 +438,7 @@
                     <button class="gauth-dd-item" onclick="GoogleAuthUI.syncAllDown()" style="color:#7c3aed;font-weight:700;">
                         📥 一鍵還原所有班級
                     </button>
-                    <button class="gauth-dd-item" onclick="GoogleAuthUI.repairClasses()" style="color:#059669;font-weight:700;">
+                    <button class="gauth-dd-item" id="gauth-dd-repair" onclick="GoogleAuthUI.repairClasses()" style="display:none;color:#059669;font-weight:700;">
                         🩺 班級健檢與修復
                     </button>
                     <button class="gauth-dd-item" id="gauth-dd-admin" onclick="showAdminConsole()" style="display:none;color:#d97706;font-weight:700;">
@@ -482,7 +506,7 @@
                     <button class="gauth-dd-item" onclick="GoogleAuthUI.syncAllDown()" style="color:#7c3aed;font-weight:700;">
                         📥 一鍵還原所有班級
                     </button>
-                    <button class="gauth-dd-item" onclick="GoogleAuthUI.repairClasses()" style="color:#059669;font-weight:700;">
+                    <button class="gauth-dd-item" id="gauth-dd-repair-mobile" onclick="GoogleAuthUI.repairClasses()" style="display:none;color:#059669;font-weight:700;">
                         🩺 班級健檢與修復
                     </button>
                     <button class="gauth-dd-item" id="gauth-dd-admin-mobile" onclick="showAdminConsole()" style="display:none;color:#d97706;font-weight:700;">
@@ -613,13 +637,13 @@
         if (ddNameM) ddNameM.textContent = profile.displayName || '老師';
         if (ddEmailM) ddEmailM.textContent = profile.email || '';
 
-        // 管理員維運後台按鈕顯示/隱藏
-        const ADMIN_EMAILS = ['cagoooo@gmail.com', 'ipad@mail2.smes.tyc.edu.tw'];
-        const isUserAdmin = profile.email && ADMIN_EMAILS.includes(profile.email.toLowerCase().trim());
-        const ddAdmin = document.getElementById('gauth-dd-admin');
-        const ddAdminMobile = document.getElementById('gauth-dd-admin-mobile');
-        if (ddAdmin) ddAdmin.style.display = isUserAdmin ? 'block' : 'none';
-        if (ddAdminMobile) ddAdminMobile.style.display = isUserAdmin ? 'block' : 'none';
+        // 管理員專屬功能（班級健檢與修復 + 系統維運後台）按鈕顯示/隱藏
+        const isUserAdmin = isAdminEmail(profile.email);
+        const adminBtnIds = ['gauth-dd-repair', 'gauth-dd-repair-mobile', 'gauth-dd-admin', 'gauth-dd-admin-mobile'];
+        adminBtnIds.forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = isUserAdmin ? 'block' : 'none';
+        });
 
         refreshSyncTime();
     }
@@ -1212,6 +1236,11 @@
 
             if (!window.FirebaseConfig.isConnected()) {
                 NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號');
+                return;
+            }
+            // 🔐 僅限管理員：即使有人手動呼叫此函式也擋下
+            if (!isCurrentUserAdmin()) {
+                NotificationSystem && NotificationSystem.error('此功能僅限系統管理員使用');
                 return;
             }
             if (!window.FirebaseSync || typeof window.FirebaseSync.repairClassRegistry !== 'function') {

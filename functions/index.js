@@ -335,7 +335,8 @@ exports.scheduledFirestoreExport = onSchedule(
  *
  * 🔐 安全防護：僅允許 ADMIN_EMAILS 中所列出的管理員 Email 調用，其餘一律攔截。
  */
-const ADMIN_EMAILS = ['cagoooo@gmail.com', 'ipad@mail2.smes.tyc.edu.tw'];
+// 🔐 維運後台僅限此名單帳號（與前端 js/google-auth-ui.js 的 ADMIN_EMAILS 對齊）
+const ADMIN_EMAILS = ['ipad@mail2.smes.tyc.edu.tw'];
 
 exports.getAdminStats = onCall(
   { region: REGION, cors: true, maxInstances: 5 },
