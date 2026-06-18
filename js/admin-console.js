@@ -209,6 +209,36 @@
             .admin-btn-rescue:hover { background: #047857; }
             .admin-btn-rescue:disabled { opacity: 0.6; cursor: not-allowed; }
 
+            /* 孤兒檢視/勾選面板 */
+            .admin-btn-cancel {
+                background: #e2e8f0; color: #334155; border: none;
+                padding: 8px 20px; border-radius: 8px; font-weight: 600; cursor: pointer;
+            }
+            .admin-btn-cancel:hover { background: #cbd5e1; }
+            .dark .admin-btn-cancel { background: #334155; color: #e2e8f0; }
+            .orphan-list { display: flex; flex-direction: column; gap: 0.6rem; }
+            .orphan-item {
+                display: flex; align-items: flex-start; gap: 0.7rem;
+                padding: 0.75rem 0.85rem; border: 1px solid #e2e8f0; border-radius: 10px;
+                cursor: pointer; transition: background 0.15s, border-color 0.15s;
+            }
+            .orphan-item:hover { background: #f8fafc; border-color: #cbd5e1; }
+            .dark .orphan-item { border-color: #334155; }
+            .dark .orphan-item:hover { background: #1e293b; }
+            .orphan-item input.orphan-check { margin-top: 3px; width: 18px; height: 18px; cursor: pointer; flex-shrink: 0; }
+            .orphan-info { flex: 1; min-width: 0; }
+            .orphan-line1 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem; }
+            .orphan-name { font-weight: 700; color: #1e293b; }
+            .dark .orphan-name { color: #f1f5f9; }
+            .orphan-date { font-size: 0.78rem; color: #94a3b8; }
+            .orphan-line2 { margin-top: 0.35rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+            .orphan-sample { font-size: 0.82rem; color: #475569; }
+            .dark .orphan-sample { color: #cbd5e1; }
+            .orphan-empty { font-size: 0.82rem; color: #b45309; font-weight: 600; }
+            .dark .orphan-empty { color: #fbbf24; }
+            .orphan-id { margin-top: 0.3rem; font-size: 0.72rem; color: #cbd5e1; font-family: monospace; }
+            .dark .orphan-id { color: #64748b; }
+
             /* 手機版：縮邊距、搜尋框佔滿一行、標題略縮 */
             @media (max-width: 640px) {
                 .admin-modal-overlay { padding: 0.5rem; }
@@ -300,51 +330,130 @@
         });
     }
 
-    // ── 代指定老師一鍵救援孤兒班級 ──
+    // ── 步驟1：點救援 → 拉孤兒明細 → 開「先檢視再勾選」面板 ──
     async function rescueTeacher(btn) {
         const uid = btn.getAttribute('data-rescue-uid');
         const name = btn.getAttribute('data-rescue-name') || '這位老師';
-        const count = btn.getAttribute('data-rescue-count') || '';
         if (!uid) return;
-
-        const ok = window.confirm(
-            `確定要幫「${name}」救回 ${count} 個孤兒班級嗎？\n\n` +
-            `系統只會「把找不到的班級補回名冊」（只增不減，不會刪除任何既有班級）。\n` +
-            `救回的班級若無原始名稱，會先給暫名，該老師之後可自行改名。`
-        );
-        if (!ok) return;
 
         const original = btn.textContent;
         btn.disabled = true;
-        btn.textContent = '救援中…';
+        btn.textContent = '讀取中…';
 
         try {
-            const fn = firebase.app().functions('asia-east1').httpsCallable('repairTeacherRegistry');
+            const fn = firebase.app().functions('asia-east1').httpsCallable('getTeacherOrphanDetails');
             const resp = await fn({ uid });
             const r = (resp && resp.data) || {};
             if (!r.ok) throw new Error(r.reason || '回傳異常');
-
-            if (r.recovered > 0) {
-                if (typeof NotificationSystem !== 'undefined') {
-                    NotificationSystem.success(
-                        `🩺 已為「${name}」救回 ${r.recovered} 個班級：${(r.names || []).join('、')}。` +
-                        `該老師下次登入／還原即可看到。`
-                    );
-                }
-            } else {
-                if (typeof NotificationSystem !== 'undefined') {
-                    NotificationSystem.info(`「${name}」目前已無孤兒班級可救援。`);
-                }
+            const orphans = r.data || [];
+            if (orphans.length === 0) {
+                if (typeof NotificationSystem !== 'undefined') NotificationSystem.info(`「${name}」目前已無孤兒班級。`);
+                await loadStats();
+                return;
             }
-            // 重新載入統計，孤兒數歸零後按鈕會自動消失
+            openOrphanReview(uid, name, orphans);
+        } catch (error) {
+            console.error('[AdminConsole] 讀取孤兒明細失敗:', error);
+            if (typeof NotificationSystem !== 'undefined') {
+                NotificationSystem.error('讀取孤兒明細失敗：' + (error.message || '未知錯誤'));
+            }
+        } finally {
+            btn.disabled = false;
+            btn.textContent = original;
+        }
+    }
+
+    // ── 步驟2：渲染孤兒勾選面板 ──
+    function openOrphanReview(uid, teacherName, orphans) {
+        let modal = document.getElementById('orphan-review-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'orphan-review-modal';
+            modal.className = 'admin-modal-overlay';
+            modal.style.zIndex = '10001';
+            document.body.appendChild(modal);
+        }
+
+        const rows = orphans.map((o) => {
+            const hasStudents = o.studentCount > 0;
+            const sample = (o.sampleNames || []).join('、');
+            const meta = hasStudents
+                ? `<span class="badge-orange">👥 ${o.studentCount} 位學生</span>` +
+                  (sample ? `<span class="orphan-sample">${sample}${o.studentCount > o.sampleNames.length ? '…' : ''}</span>` : '')
+                : `<span class="orphan-empty">⚠️ 0 學生（空班，多半是可丟的殘留）</span>`;
+            return `
+                <label class="orphan-item">
+                    <input type="checkbox" class="orphan-check" value="${o.id}" ${hasStudents ? 'checked' : ''}>
+                    <div class="orphan-info">
+                        <div class="orphan-line1">
+                            <span class="orphan-name">${o.suggestedName || o.id}</span>
+                            ${o.createdLabel ? `<span class="orphan-date">建立於 ${o.createdLabel}</span>` : ''}
+                        </div>
+                        <div class="orphan-line2">${meta}</div>
+                        <div class="orphan-id">ID: ${o.id}</div>
+                    </div>
+                </label>`;
+        }).join('');
+
+        modal.innerHTML = `
+            <div class="admin-modal-content" style="max-width:min(620px,96vw);">
+                <div class="admin-modal-header">
+                    <div class="admin-modal-title">🩺 檢視並挑選要救援的班級</div>
+                </div>
+                <div class="admin-modal-body">
+                    <p style="font-size:0.9rem;color:#475569;margin-bottom:0.5rem;" class="dark:text-gray-300">
+                        老師「<strong>${teacherName}</strong>」有 ${orphans.length} 個孤兒班級。
+                        <strong>孤兒不一定是遺失的班</strong>，也可能是早期刪掉的殘留——請只勾選「確定要救回」的。
+                        有學生的已預設勾選、空班預設不勾。
+                    </p>
+                    <p style="font-size:0.82rem;color:#64748b;margin-bottom:1rem;">救回只會補進名冊（只增不減），不會刪任何資料；沒勾的維持原狀。</p>
+                    <div class="orphan-list">${rows}</div>
+                </div>
+                <div class="admin-modal-footer" style="justify-content:space-between;">
+                    <button class="admin-btn-cancel" id="orphan-cancel-btn">取消</button>
+                    <button class="admin-btn-close-large" id="orphan-confirm-btn" style="background:#059669;">救回勾選的班級</button>
+                </div>
+            </div>`;
+
+        requestAnimationFrame(() => modal.classList.add('open'));
+
+        const close = () => modal.classList.remove('open');
+        modal.querySelector('#orphan-cancel-btn').addEventListener('click', close);
+        modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+        modal.querySelector('#orphan-confirm-btn').addEventListener('click', () => {
+            const ids = Array.from(modal.querySelectorAll('.orphan-check:checked')).map(c => c.value);
+            confirmRescue(uid, teacherName, ids, modal);
+        });
+    }
+
+    // ── 步驟3：對勾選的 classIds 執行救援 ──
+    async function confirmRescue(uid, teacherName, classIds, modal) {
+        if (!classIds || classIds.length === 0) {
+            if (typeof NotificationSystem !== 'undefined') NotificationSystem.warning('請至少勾選一個要救援的班級');
+            return;
+        }
+        const confirmBtn = modal.querySelector('#orphan-confirm-btn');
+        if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = '救援中…'; }
+
+        try {
+            const fn = firebase.app().functions('asia-east1').httpsCallable('repairTeacherRegistry');
+            const resp = await fn({ uid, classIds });
+            const r = (resp && resp.data) || {};
+            if (!r.ok) throw new Error(r.reason || '回傳異常');
+
+            if (typeof NotificationSystem !== 'undefined') {
+                NotificationSystem.success(
+                    `🩺 已為「${teacherName}」救回 ${r.recovered} 個班級：${(r.names || []).join('、')}。該老師下次登入／還原即可看到。`
+                );
+            }
+            modal.classList.remove('open');
             await loadStats();
         } catch (error) {
             console.error('[AdminConsole] 救援失敗:', error);
             if (typeof NotificationSystem !== 'undefined') {
                 NotificationSystem.error('救援失敗：' + (error.message || '未知錯誤'));
             }
-            btn.disabled = false;
-            btn.textContent = original;
+            if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = '救回勾選的班級'; }
         }
     }
 
