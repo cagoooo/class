@@ -41,8 +41,8 @@
             .admin-modal-content {
                 background: #ffffff;
                 width: 100%;
-                max-width: 900px;
-                max-height: 85vh;
+                max-width: min(1040px, 96vw);
+                max-height: 88vh;
                 border-radius: 1.25rem;
                 box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
                 display: flex;
@@ -95,16 +95,18 @@
             }
             .admin-table {
                 width: 100%;
+                min-width: 760px; /* 欄位有足夠空間不被擠到跳行；不夠寬時容器橫向捲動 */
                 border-collapse: collapse;
                 text-align: left;
                 font-size: 0.875rem;
             }
             .admin-table th {
                 background: #f8fafc;
-                padding: 0.75rem 1rem;
+                padding: 0.7rem 0.85rem;
                 font-weight: 600;
                 color: #475569;
                 border-bottom: 1px solid #e2e8f0;
+                white-space: nowrap; /* 表頭一律不跳行 */
             }
             .dark .admin-table th {
                 background: #1e293b;
@@ -112,9 +114,17 @@
                 border-bottom: 1px solid #334155;
             }
             .admin-table td {
-                padding: 0.75rem 1rem;
+                padding: 0.7rem 0.85rem;
                 border-bottom: 1px solid #e2e8f0;
                 color: #334155;
+                vertical-align: middle;
+            }
+            /* 數字/狀態/時間/操作欄不跳行；只有姓名(第1欄)與裝置(第5欄)可換行或省略 */
+            .admin-table td:nth-child(2),
+            .admin-table td:nth-child(3),
+            .admin-table td:nth-child(4),
+            .admin-table td:nth-child(6) {
+                white-space: nowrap;
             }
             .dark .admin-table td {
                 border-bottom: 1px solid #334155;
@@ -126,14 +136,21 @@
             .dark .admin-table tr:hover {
                 background: #334155;
             }
+            .badge-green, .badge-orange {
+                display: inline-block;
+                white-space: nowrap;
+                padding: 2px 8px;
+                border-radius: 4px;
+                font-weight: 600;
+            }
             .badge-green {
-                background: #dcfce7; color: #15803d; padding: 2px 8px; border-radius: 4px; font-weight: 600;
+                background: #dcfce7; color: #15803d;
             }
             .dark .badge-green {
                 background: #14532d; color: #4ade80;
             }
             .badge-orange {
-                background: #ffedd5; color: #c2410c; padding: 2px 8px; border-radius: 4px; font-weight: 600;
+                background: #ffedd5; color: #c2410c;
             }
             .dark .badge-orange {
                 background: #7c2d12; color: #fb923c;
@@ -191,6 +208,17 @@
             }
             .admin-btn-rescue:hover { background: #047857; }
             .admin-btn-rescue:disabled { opacity: 0.6; cursor: not-allowed; }
+
+            /* 手機版：縮邊距、搜尋框佔滿一行、標題略縮 */
+            @media (max-width: 640px) {
+                .admin-modal-overlay { padding: 0.5rem; }
+                .admin-modal-content { max-width: 100vw; max-height: 92vh; border-radius: 1rem; }
+                .admin-modal-header { padding: 1rem; }
+                .admin-modal-title { font-size: 1.05rem; }
+                .admin-modal-body { padding: 1rem; }
+                #admin-search-input { width: 100% !important; }
+                .admin-table th, .admin-table td { padding: 0.6rem 0.7rem; font-size: 0.82rem; }
+            }
         `;
         document.head.appendChild(s);
     }
