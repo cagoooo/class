@@ -177,6 +177,20 @@
             .admin-btn-close-large:hover {
                 background: #2563eb;
             }
+            .admin-btn-rescue {
+                background: #059669;
+                color: #ffffff;
+                border: none;
+                padding: 5px 12px;
+                border-radius: 6px;
+                font-weight: 600;
+                font-size: 0.8rem;
+                cursor: pointer;
+                white-space: nowrap;
+                transition: background 0.2s, opacity 0.2s;
+            }
+            .admin-btn-rescue:hover { background: #047857; }
+            .admin-btn-rescue:disabled { opacity: 0.6; cursor: not-allowed; }
         `;
         document.head.appendChild(s);
     }
@@ -212,11 +226,12 @@
                                     <th>孤兒資料數</th>
                                     <th>最後同步時間</th>
                                     <th>同步裝置資訊</th>
+                                    <th>操作</th>
                                 </tr>
                             </thead>
                             <tbody id="admin-table-body">
                                 <tr>
-                                    <td colspan="5" style="text-align:center;padding:2rem;color:#94a3b8;">
+                                    <td colspan="6" style="text-align:center;padding:2rem;color:#94a3b8;">
                                         <div class="inline-block animate-spin border-2 border-blue-500 border-t-transparent rounded-full w-6 h-6 mr-2 vertical-middle"></div>
                                         正在讀取雲端統計...
                                     </td>
@@ -248,6 +263,61 @@
             const query = e.target.value.toLowerCase().trim();
             renderTable(query);
         });
+
+        // 一鍵救援（事件委派，按鈕每次 renderTable 都會重建）
+        overlay.querySelector('#admin-table-body').addEventListener('click', (e) => {
+            const btn = e.target.closest('.admin-btn-rescue');
+            if (!btn) return;
+            rescueTeacher(btn);
+        });
+    }
+
+    // ── 代指定老師一鍵救援孤兒班級 ──
+    async function rescueTeacher(btn) {
+        const uid = btn.getAttribute('data-rescue-uid');
+        const name = btn.getAttribute('data-rescue-name') || '這位老師';
+        const count = btn.getAttribute('data-rescue-count') || '';
+        if (!uid) return;
+
+        const ok = window.confirm(
+            `確定要幫「${name}」救回 ${count} 個孤兒班級嗎？\n\n` +
+            `系統只會「把找不到的班級補回名冊」（只增不減，不會刪除任何既有班級）。\n` +
+            `救回的班級若無原始名稱，會先給暫名，該老師之後可自行改名。`
+        );
+        if (!ok) return;
+
+        const original = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = '救援中…';
+
+        try {
+            const fn = firebase.app().functions('asia-east1').httpsCallable('repairTeacherRegistry');
+            const resp = await fn({ uid });
+            const r = (resp && resp.data) || {};
+            if (!r.ok) throw new Error(r.reason || '回傳異常');
+
+            if (r.recovered > 0) {
+                if (typeof NotificationSystem !== 'undefined') {
+                    NotificationSystem.success(
+                        `🩺 已為「${name}」救回 ${r.recovered} 個班級：${(r.names || []).join('、')}。` +
+                        `該老師下次登入／還原即可看到。`
+                    );
+                }
+            } else {
+                if (typeof NotificationSystem !== 'undefined') {
+                    NotificationSystem.info(`「${name}」目前已無孤兒班級可救援。`);
+                }
+            }
+            // 重新載入統計，孤兒數歸零後按鈕會自動消失
+            await loadStats();
+        } catch (error) {
+            console.error('[AdminConsole] 救援失敗:', error);
+            if (typeof NotificationSystem !== 'undefined') {
+                NotificationSystem.error('救援失敗：' + (error.message || '未知錯誤'));
+            }
+            btn.disabled = false;
+            btn.textContent = original;
+        }
     }
 
     // ── 渲染表格資料 ──
@@ -269,7 +339,7 @@
         if (filtered.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="5" style="text-align:center;padding:2rem;color:#94a3b8;">
+                    <td colspan="6" style="text-align:center;padding:2rem;color:#94a3b8;">
                         無符合條件的教師資料
                     </td>
                 </tr>
@@ -292,6 +362,11 @@
                 ? `<span class="badge-orange" title="孤兒班級 ID: ${item.orphans.join(', ')}">⚠️ ${item.orphanCount} 個孤兒</span>`
                 : `<span class="badge-green">無孤兒資料</span>`;
 
+            // 只有「有孤兒」的老師才出現救援按鈕；用 data-* 帶 uid 給事件委派
+            const rescueCell = item.orphanCount > 0
+                ? `<button class="admin-btn-rescue" data-rescue-uid="${item.uid}" data-rescue-name="${(item.name || '').replace(/"/g, '&quot;')}" data-rescue-count="${item.orphanCount}">🩺 一鍵救援</button>`
+                : `<span class="text-xs text-gray-400">—</span>`;
+
             return `
                 <tr>
                     <td>
@@ -302,6 +377,7 @@
                     <td>${orphanBadge}</td>
                     <td class="text-xs text-gray-600 dark:text-gray-400">${lastSyncText}</td>
                     <td class="text-xs text-gray-500 dark:text-gray-400" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.device || ''}">${item.device || '-'}</td>
+                    <td>${rescueCell}</td>
                 </tr>
             `;
         }).join('');
@@ -322,7 +398,7 @@
         if (tbody) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="5" style="text-align:center;padding:2rem;color:#94a3b8;">
+                    <td colspan="6" style="text-align:center;padding:2rem;color:#94a3b8;">
                         <div class="inline-block animate-spin border-2 border-blue-500 border-t-transparent rounded-full w-6 h-6 mr-2 vertical-middle"></div>
                         正在載入雲端統計中...
                     </td>
@@ -344,7 +420,7 @@
             if (tbody) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="5" style="text-align:center;padding:2rem;color:#ef4444;font-weight:600;">
+                        <td colspan="6" style="text-align:center;padding:2rem;color:#ef4444;font-weight:600;">
                             ❌ 載入失敗: ${error.message || '請確認您擁有管理員權限'}
                         </td>
                     </tr>

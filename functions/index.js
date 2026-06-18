@@ -338,6 +338,19 @@ exports.scheduledFirestoreExport = onSchedule(
 // 🔐 維運後台僅限此名單帳號（與前端 js/google-auth-ui.js 的 ADMIN_EMAILS 對齊）
 const ADMIN_EMAILS = ['ipad@mail2.smes.tyc.edu.tw'];
 
+/** 核驗呼叫者為已登入的管理員，否則丟出 HttpsError；通過則回傳其 email。 */
+function requireAdmin(request) {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', '必須先進行 Google 登入才能調用此介面');
+  }
+  const userEmail = (request.auth.token.email || '').toLowerCase().trim();
+  if (!ADMIN_EMAILS.includes(userEmail)) {
+    logger.warn(`未經授權的後台存取嘗試: ${userEmail}`);
+    throw new HttpsError('permission-denied', '您沒有存取系統維運後台的權限');
+  }
+  return userEmail;
+}
+
 exports.getAdminStats = onCall(
   { region: REGION, cors: true, maxInstances: 5 },
   async (request) => {
@@ -428,3 +441,118 @@ exports.getAdminStats = onCall(
     }
   }
 );
+
+/**
+ * 維運後台一鍵救援 (R-D3)：管理員代指定老師把「孤兒班級」補回名冊。
+ *
+ * 孤兒 = 雲端 users/{uid}/classes/{id} 下有資料（子集合），卻不在 _meta/classProfiles 名冊裡。
+ * 瀏覽器端列不到幽靈父文件，老師自己救不回；Admin SDK 的 listDocuments() 可列出，故由後台代救。
+ *
+ * 🔐 僅限 ADMIN_EMAILS。✅ 安全保證：只「增補」名冊（聯集），絕不刪除老師既有任何班級。
+ *    名稱優先序：classes/{id} marker 的 name → 由 classId(時間戳) 推算建立日的暫名 → classId 本身。
+ */
+exports.repairTeacherRegistry = onCall(
+  { region: REGION, cors: true, maxInstances: 5 },
+  async (request) => {
+    const adminEmail = requireAdmin(request);
+
+    const targetUid = String((request.data && request.data.uid) || '').trim();
+    if (!targetUid) {
+      throw new HttpsError('invalid-argument', '缺少必要參數 uid');
+    }
+
+    try {
+      const db = admin.firestore();
+      const userRef = db.collection('users').doc(targetUid);
+      const profilesRef = userRef.collection('_meta').doc('classProfiles');
+
+      // 1) 現有名冊 + 雲端所有班級（含幽靈父文件）
+      const [profilesDoc, classDocRefs] = await Promise.all([
+        profilesRef.get(),
+        userRef.collection('classes').listDocuments(),
+      ]);
+
+      const existingProfiles = (profilesDoc.exists && Array.isArray(profilesDoc.data().profiles))
+        ? profilesDoc.data().profiles.slice()
+        : [];
+      const knownIds = new Set(existingProfiles.map(p => String(p.id)));
+      knownIds.add('default'); // default 班合法、不算孤兒
+
+      const orphanRefs = classDocRefs.filter(ref => !knownIds.has(ref.id));
+      if (orphanRefs.length === 0) {
+        logger.info(`[Rescue] ${adminEmail} 對 ${targetUid} 執行救援：無孤兒`);
+        return { ok: true, recovered: 0, names: [], afterCount: existingProfiles.length };
+      }
+
+      // 2) 逐一嘗試讀 marker 取名稱，組出要補進名冊的 profile
+      const recoveredProfiles = await Promise.all(orphanRefs.map(async (ref) => {
+        let markerName = '';
+        let icon = null;
+        let color = null;
+        try {
+          const snap = await ref.get();
+          if (snap.exists) {
+            const d = snap.data() || {};
+            if (d.name && String(d.name) !== ref.id) markerName = String(d.name);
+            icon = d.icon || null;
+            color = d.color || null;
+          }
+        } catch (e) { /* 純幽靈父文件 get 不到，走暫名 */ }
+
+        const name = markerName || placeholderClassName(ref.id);
+        return {
+          id: ref.id,
+          name,
+          icon,
+          color,
+          recoveredByAdmin: true,
+          recoveredAt: new Date().toISOString(),
+        };
+      }));
+
+      // 3) 聯集寫回 _meta/classProfiles（只增不減）
+      const mergedProfiles = existingProfiles.concat(recoveredProfiles);
+      await profilesRef.set(
+        { profiles: mergedProfiles, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+        { merge: true }
+      );
+
+      // 4) 為每個救回的班級補寫 marker，讓老師自己的裝置之後也 discover 得到
+      const batch = db.batch();
+      recoveredProfiles.forEach((p) => {
+        batch.set(userRef.collection('classes').doc(p.id), {
+          isClassMarker: true,
+          name: p.name,
+          icon: p.icon,
+          color: p.color,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      });
+      await batch.commit();
+
+      logger.info(`[Rescue] ${adminEmail} 已為 ${targetUid} 救回 ${recoveredProfiles.length} 個孤兒班級`);
+      return {
+        ok: true,
+        recovered: recoveredProfiles.length,
+        names: recoveredProfiles.map(p => p.name),
+        afterCount: mergedProfiles.length,
+      };
+    } catch (error) {
+      if (error instanceof HttpsError) throw error;
+      logger.error('救援孤兒班級失敗:', error);
+      throw new HttpsError('internal', '救援孤兒班級時發生系統內部錯誤');
+    }
+  }
+);
+
+/** 由 classId（多半是 String(Date.now())）推算一個可讀暫名，救援後老師可自行改名。 */
+function placeholderClassName(classId) {
+  const n = Number(classId);
+  if (Number.isFinite(n) && n > 1000000000000) { // 約 2001 年後的毫秒時間戳
+    try {
+      const d = new Date(n).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' });
+      return `救回的班級（${d} 建立）`;
+    } catch (e) { /* fallthrough */ }
+  }
+  return `救回的班級（${classId}）`;
+}
