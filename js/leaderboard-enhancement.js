@@ -435,9 +435,21 @@
         document.head.appendChild(styleEl);
     }
 
+    function ensureLeaderboardModal() {
+        let modal = document.getElementById('leaderboardModal');
+        if (modal) return modal;
+
+        modal = document.createElement('div');
+        modal.id = 'leaderboardModal';
+        modal.setAttribute('onclick', 'hideLeaderboard()');
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden';
+        document.body.appendChild(modal);
+        return modal;
+    }
+
     // === 增強版 showLeaderboard 函數 ===
     function showLeaderboardEnhanced() {
-        const modal = document.getElementById('leaderboardModal');
+        const modal = ensureLeaderboardModal();
 
         // === 骨架屏：立刻顯示 Modal 並插入骨架 ===
         modal.className = 'fixed inset-0 bg-black bg-opacity-60 leaderboard-modal-enhanced flex items-center justify-center p-2 sm:p-4 z-50';
@@ -472,8 +484,18 @@
      * 排行榜真實內容渲染（內部函式）
      */
     function _renderLeaderboardContent(modal) {
+        if (!modal || !document.body.contains(modal)) {
+            return;
+        }
+
         // 直接從 localStorage 讀取學生資料
-        const students = JSON.parse(localStorage.getItem(window.STUDENTS_KEY || 'students')) || [];
+        let students = [];
+        try {
+            const storedStudents = JSON.parse(localStorage.getItem(window.STUDENTS_KEY || 'students')) || [];
+            students = Array.isArray(storedStudents) ? storedStudents : [];
+        } catch (error) {
+            console.warn('[Leaderboard] Failed to read students from localStorage', error);
+        }
 
         const sortedStudents = [...students].sort((a, b) => b.points - a.points);
         const maxPoints = Math.max(...sortedStudents.map(s => Math.abs(s.points)), 1);
