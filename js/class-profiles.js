@@ -234,6 +234,33 @@
 .cs-class-item.active { background: #eef2ff; color: #4338ca; font-weight: 700; }
 .cs-class-item .cs-check { font-size: 0.75rem; color: #6366f1; }
 .cs-class-item .cs-item-icon { font-size: 1rem; margin-right: 0.25rem; }
+.cs-class-row {
+    display: flex;
+    align-items: stretch;
+}
+.cs-class-row .cs-class-item {
+    flex: 1;
+}
+.cs-class-delete-btn {
+    width: 42px;
+    border: none;
+    border-left: 1px solid #f1f5f9;
+    background: #fff;
+    color: #dc2626;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: background 0.15s, color 0.15s;
+}
+.cs-class-delete-btn:hover {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+.cs-class-row:has(.cs-class-item.active) .cs-class-delete-btn {
+    background: #eef2ff;
+}
+.cs-class-row:has(.cs-class-item.active) .cs-class-delete-btn:hover {
+    background: #fee2e2;
+}
 .cs-divider { height: 1px; background: #f0f0f0; margin: 0; }
 .cs-action-btn {
     display: flex;
@@ -345,12 +372,20 @@
         const curId = getCurrentId();
 
         const items = profiles.map(p => `
-            <button class="cs-class-item ${p.id === curId ? 'active' : ''}"
-                    onclick="ClassProfiles.switchTo('${p.id}')"
-                    ${p.id === curId ? `style="border-left:4px solid ${p.color || '#6366f1'};"` : ''}>
-                <span><span class="cs-item-icon" style="color:${p.color || '#6366f1'};">${p.icon || '📚'}</span> ${_esc(p.name)}</span>
-                ${p.id === curId ? '<span class="cs-check">✓</span>' : ''}
-            </button>
+            <div class="cs-class-row">
+                <button class="cs-class-item ${p.id === curId ? 'active' : ''}"
+                        onclick="ClassProfiles.switchTo('${p.id}')"
+                        ${p.id === curId ? `style="border-left:4px solid ${p.color || '#6366f1'};"` : ''}>
+                    <span><span class="cs-item-icon" style="color:${p.color || '#6366f1'};">${p.icon || '📚'}</span> ${_esc(p.name)}</span>
+                    ${p.id === curId ? '<span class="cs-check">✓</span>' : ''}
+                </button>
+                ${p.id !== DEFAULT_ID ? `
+                    <button class="cs-class-delete-btn"
+                            title="刪除「${_esc(p.name)}」"
+                            aria-label="刪除「${_esc(p.name)}」"
+                            onclick="event.stopPropagation(); ClassProfiles._uiDelete('${p.id}')">🗑️</button>
+                ` : ''}
+            </div>
         `).join('');
 
         const curProfile = profiles.find(p => p.id === curId);
@@ -362,7 +397,7 @@
             <div class="cs-divider"></div>
             <button class="cs-action-btn" onclick="ClassProfiles._uiAdd()">➕ 新增班級</button>
             <button class="cs-action-btn" onclick="ClassProfiles._uiRename()">✏️ 重新命名目前班級</button>
-            ${canDelete ? `<button class="cs-action-btn danger" onclick="ClassProfiles._uiDelete()">🗑️ 刪除「${_esc(curProfile?.name || '')}」</button>` : ''}
+            ${canDelete ? `<button class="cs-action-btn danger" onclick="ClassProfiles._uiDelete('${curId}')">🗑️ 刪除「${_esc(curProfile?.name || '')}」</button>` : ''}
         `;
     }
 
@@ -716,36 +751,48 @@
             NotificationSystem?.success?.(`班級已重新命名為「${name}」`);
         },
 
-        async _uiDelete() {
+        async _uiDelete(id) {
             document.getElementById('class-selector-dropdown')?.classList.remove('open');
             const ddmD = document.getElementById('class-selector-dropdown-mobile');
             if (ddmD) ddmD.style.display = 'none';
-            const curProfile = this.currentProfile();
-            if (!curProfile || curProfile.id === DEFAULT_ID) return;
+            const targetId = id || getCurrentId();
+            const targetProfile = this.list().find(p => String(p.id) === String(targetId));
+            if (!targetProfile || targetProfile.id === DEFAULT_ID) return;
 
             // 🛟 資料保險把關：刪除整個班級會清掉該班所有本地資料，先強制備份
             let confirmed = false;
             if (window.DataSafetyGuard && DataSafetyGuard.guardClear) {
                 confirmed = await DataSafetyGuard.guardClear({
-                    title: `刪除「${curProfile.name}」前，先存好備份！`,
-                    message: `此操作會永久刪除「${curProfile.name}」這個班級的所有本地資料（學生、加扣分、聯絡簿、作業等）。`,
+                    title: `刪除「${targetProfile.name}」前，先存好備份！`,
+                    message: `此操作會永久刪除「${targetProfile.name}」這個班級的所有本地資料（學生、加扣分、聯絡簿、作業等）。`,
                     dangerLabel: '確定刪除此班級'
                 });
             } else {
                 confirmed = window.confirm(
-                    `⚠️ 確定要刪除「${curProfile.name}」？\n\n這將清除該班級的所有本地資料，此操作無法復原。\n\n（雲端資料若已登入同步則需手動清除）`
+                    `⚠️ 確定要刪除「${targetProfile.name}」？\n\n這將清除該班級的所有本地資料，此操作無法復原。`
                 );
             }
             if (!confirmed) return;
 
             const ov = document.getElementById('cs-switch-overlay');
             const msg = document.getElementById('cs-switch-msg');
-            if (msg) msg.textContent = `正在刪除「${curProfile.name}」並切回預設班級...`;
+            const deletingCurrent = String(targetProfile.id) === String(getCurrentId());
+            if (msg) msg.textContent = deletingCurrent
+                ? `正在刪除「${targetProfile.name}」並切回預設班級...`
+                : `正在刪除「${targetProfile.name}」...`;
             if (ov) ov.classList.add('show');
 
-            await this.delete(curProfile.id);
-            setCurrentId(DEFAULT_ID);
-            location.reload();
+            await this.delete(targetProfile.id);
+
+            if (deletingCurrent) {
+                setCurrentId(DEFAULT_ID);
+                location.reload();
+                return;
+            }
+
+            if (ov) ov.classList.remove('show');
+            injectUI();
+            NotificationSystem?.success?.(`已刪除「${targetProfile.name}」`);
         },
     };
 
