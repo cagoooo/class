@@ -62,6 +62,18 @@ const ClassDB = (() => {
     let ready = false;
     let readyCallbacks = [];
 
+    // ─── 交易佇列（序列化執行）─────────────────────────────────
+    // Safari（尤其 iPad）在同一時間並發開啟多個 IndexedDB transaction 時，
+    // 會有已知穩定性問題：某個 transaction 被提前判定為已結束，
+    // 之後對它的存取就會丟出「Attempt to get records from database
+    // without an in-progress transaction」。強制所有交易依序執行可完全避開。
+    let opQueue = Promise.resolve();
+    function enqueueOp(fn) {
+        const result = opQueue.then(fn, fn);
+        opQueue = result.catch(() => {}); // 佇列本身永遠不 reject，才不會卡住後續操作
+        return result;
+    }
+
     // ─── 初始化 ───────────────────────────────────────────────
     function init() {
         return new Promise((resolve, reject) => {
@@ -137,7 +149,7 @@ const ClassDB = (() => {
      * 取得 Array 資料表全部資料
      */
     function getAll(storeName) {
-        return new Promise((resolve, reject) => {
+        return enqueueOp(() => new Promise((resolve, reject) => {
             try {
                 const store = getStore(storeName, 'readonly');
                 const request = store.getAll();
@@ -146,7 +158,7 @@ const ClassDB = (() => {
             } catch (e) {
                 reject(e);
             }
-        });
+        }));
     }
 
     /**
@@ -154,7 +166,7 @@ const ClassDB = (() => {
      */
     function putAll(storeName, dataArray) {
         if (!Array.isArray(dataArray)) return Promise.resolve();
-        return new Promise((resolve, reject) => {
+        return enqueueOp(() => new Promise((resolve, reject) => {
             try {
                 const tx = db.transaction(storeName, 'readwrite');
                 const store = tx.objectStore(storeName);
@@ -174,14 +186,14 @@ const ClassDB = (() => {
             } catch (e) {
                 reject(e);
             }
-        });
+        }));
     }
 
     /**
      * 單筆插入/更新（upsert）
      */
     function put(storeName, item) {
-        return new Promise((resolve, reject) => {
+        return enqueueOp(() => new Promise((resolve, reject) => {
             try {
                 const store = getStore(storeName, 'readwrite');
                 const request = store.put(item);
@@ -190,14 +202,14 @@ const ClassDB = (() => {
             } catch (e) {
                 reject(e);
             }
-        });
+        }));
     }
 
     /**
      * 刪除單筆
      */
     function remove(storeName, id) {
-        return new Promise((resolve, reject) => {
+        return enqueueOp(() => new Promise((resolve, reject) => {
             try {
                 const store = getStore(storeName, 'readwrite');
                 const request = store.delete(id);
@@ -206,7 +218,7 @@ const ClassDB = (() => {
             } catch (e) {
                 reject(e);
             }
-        });
+        }));
     }
 
     // ─── Settings 讀寫 ────────────────────────────────────────
@@ -215,7 +227,7 @@ const ClassDB = (() => {
      * 讀取設定值
      */
     async function getSetting(key) {
-        return new Promise((resolve, reject) => {
+        return enqueueOp(() => new Promise((resolve, reject) => {
             try {
                 const store = getStore('settings', 'readonly');
                 const request = store.get(key);
@@ -224,14 +236,14 @@ const ClassDB = (() => {
             } catch (e) {
                 reject(e);
             }
-        });
+        }));
     }
 
     /**
      * 儲存設定值
      */
     async function setSetting(key, value) {
-        return new Promise((resolve, reject) => {
+        return enqueueOp(() => new Promise((resolve, reject) => {
             try {
                 const store = getStore('settings', 'readwrite');
                 const request = store.put({ key, value });
@@ -240,7 +252,7 @@ const ClassDB = (() => {
             } catch (e) {
                 reject(e);
             }
-        });
+        }));
     }
 
     // ─── 高階 API：JSON-safe 自動序列化 ──────────────────────

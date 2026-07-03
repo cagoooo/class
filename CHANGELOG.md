@@ -1,5 +1,10 @@
 # 班級小管家 Changelog
 
+## [v3.12.15] - 2026-07-03 🐛 修正 iPad Safari IndexedDB 交易併發錯誤
+
+- **真因**：`firebase-sync.js` 的 `loadFromCloudData()` 用 `Promise.all([...])` 同時對 6 個不同的 IndexedDB object store（students / pointsHistory / groups / notebookEntries / homeworkList / lotteryHistory）開啟交易寫入。Safari（尤其 iPad）對「同一時間並發開啟多個 transaction」有已知穩定性問題，會讓某個 transaction 被提前判定結束，之後存取就丟出未捕捉的 `Attempt to get records from database without an in-progress transaction` 錯誤（透過 Google Chat 使用情形通知回報，環境為 iPad / Safari，發生於 `classnew.html#zodiac`）。
+- **修法**：在 `js/class-db.js` 新增交易佇列 `enqueueOp()`，讓 `getAll` / `putAll` / `put` / `remove` / `getSetting` / `setSetting` 全部依序（序列化）執行，無論呼叫端是否用 `Promise.all` 同時觸發，永遠不會有兩個 IndexedDB transaction 同時開啟，徹底避開 Safari 這個併發 bug。
+
 ## [v3.12.1] - 2026-06-17 🩺 版本健康面板 + 登入帳號顯示 + 雲端定期備份（R-C1/R-C2/R-D2）
 
 - **R-C1 版本與健康狀態面板**（新檔 `js/health-panel.js`）：點左上角版本徽章即開，一眼看〔App 版本 · Service Worker 狀態 · 上次同步時間 · 登入帳號 · 本地/雲端班級數〕，並可「📋 複製診斷資訊」貼給開發者。老師回報問題時截圖即可秒判「是舊版快取還是真 bug」。有新版待更新時面板直接提供「⬆️ 立即更新」。
