@@ -258,6 +258,19 @@ const ErrorHandler = (function () {
             const errorObj = error instanceof Error ? error : new Error(String(error));
             const errorType = ErrorTypes[type.toUpperCase()] || type || ErrorTypes.UNKNOWN;
 
+            // 忽略特定的良性環境錯誤，避免造成警報噪音 (例如 IndexedDB 被外部/使用者請求刪除)
+            const ignorePatterns = [
+                /database deleted by request of the user/i,
+                /indexeddb database.*deleted by request/i
+            ];
+            const shouldIgnore = ignorePatterns.some(pattern => pattern.test(errorObj.message));
+            if (shouldIgnore) {
+                if (config.logToConsole) {
+                    console.warn(`[ErrorHandler] 忽略預期內的良性環境錯誤: ${errorObj.message}`);
+                }
+                return;
+            }
+
             let severity = options.severity || 'critical';
             if (errorType === ErrorTypes.VALIDATION || errorType === ErrorTypes.NETWORK) {
                 severity = 'warning';
