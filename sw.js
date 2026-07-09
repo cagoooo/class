@@ -16,6 +16,8 @@ const STATIC_ASSETS = [
     './classnew.html',
     './manifest.json',
     './favicon.ico',
+    './favicon.svg',
+    './apple-touch-icon.png',
     './icons/icon-192.png',
     './icons/icon-512.png',
     // CSS
