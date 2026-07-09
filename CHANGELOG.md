@@ -1,5 +1,11 @@
 # 班級小管家 Changelog
 
+## [v3.12.17] - 2026-07-09 🐛 修正更新橫幅「立即更新」按了沒反應
+
+- **真因**：更新橫幅的「立即更新」按鈕呼叫 `applyPendingUpdate()`，是個脆弱版——只有「快速路徑」：點擊當下若 `reg.waiting` 為 null，就只印一行 `console.warn` 便結束，**沒有任何備援、也沒有強制 reload**；且就算成功送出 `SKIP_WAITING`，也純靠 `controllerchange` 事件重載，該事件沒觸發就卡住。老師看到的就是「按了完全沒反應」。健康面板的 `manualUpdate()` 因為有完整備援才正常。
+- **加劇因**：SW 註冊時沒設 `updateViaCache:'none'`，GitHub Pages 會用 HTTP 快取供應 `sw.js`，使偵測到的 waiting worker 常是幻影／已被消耗，`reg.waiting` 在點擊當下更容易是 null。
+- **修法**：(A) `applyPendingUpdate()` 改為 async + 含備援——點擊當下才查 `reg.waiting`，有就 `SKIP_WAITING` 並加 1.5 秒 reload 備援；查不到就走「清所有快取 + `unregister` + 硬重載」強制抓最新版，**保證按下去一定有反應**。(B) 註冊補上 `updateViaCache:'none'` 可靠偵測新版。(C) 橫幅按鈕點擊後即時顯示「更新中…」回饋。
+
 ## [v3.12.16] - 2026-07-09 🛡️ App 內建瀏覽器（WebView）防護：自動逃脫到預設瀏覽器
 
 - **問題**：老師從 LINE / FB / IG 分享的連結點進來，會用 App 的內建瀏覽器（WebView）開啟。Google 基於防釣魚政策一律拒絕在 WebView 進行 OAuth 登入，跳「403: disallowed_useragent」——跟網域、帳號、手機廠牌都無關。

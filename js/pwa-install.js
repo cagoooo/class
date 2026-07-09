@@ -101,7 +101,8 @@
 
             try {
                 const registration = await navigator.serviceWorker.register('./sw.js', {
-                    scope: './'
+                    scope: './',
+                    updateViaCache: 'none' // 繞過瀏覽器對 sw.js 的 HTTP 快取，確保能可靠偵測新版
                 });
 
                 console.log('[PWA] Service Worker 註冊成功:', registration.scope);
@@ -245,7 +246,10 @@
 
             document.body.appendChild(banner);
 
-            banner.querySelector('#pwa-update-btn-action').addEventListener('click', () => {
+            banner.querySelector('#pwa-update-btn-action').addEventListener('click', (e) => {
+                const b = e.currentTarget;
+                b.disabled = true;
+                b.textContent = '更新中…';
                 this.applyPendingUpdate();
             });
 
@@ -260,15 +264,42 @@
         },
 
         // 主動套用等待中的新 SW（由使用者明確操作觸發）
-        applyPendingUpdate() {
-            const reg = window.__pwaUpdateRegistration || window.__pwaRegistration;
-            if (!reg || !reg.waiting) {
-                console.warn('[PWA] 沒有等待中的新版本');
+        // 鐵則：點擊「當下」才查 reg.waiting；查不到就走「清快取 + unregister + 硬重載」備援，
+        // 確保無論偵測源狀態如何，使用者按下去「一定有反應」，不再靜默失敗（僅 console.warn 就結束）。
+        async applyPendingUpdate() {
+            try {
+                let reg = window.__pwaUpdateRegistration || window.__pwaRegistration;
+                if (!reg && 'serviceWorker' in navigator) {
+                    reg = await navigator.serviceWorker.getRegistration();
+                }
+
+                // 快速路徑：有等待中的新 SW → 請它接管，controllerchange 會自動 reload
+                if (reg && reg.waiting) {
+                    console.log('[PWA] 快速更新路徑（SKIP_WAITING）');
+                    reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                    // 備援：controllerchange 若因故沒觸發，1.5 秒後仍強制 reload
+                    setTimeout(() => window.location.reload(), 1500);
+                    return true;
+                }
+
+                // 備援路徑：沒有 waiting（sw.js 被 HTTP 快取／waiting 已被消耗）
+                // → 清除所有快取 + 取消註冊 + 硬重載，強制抓最新版
+                console.warn('[PWA] 無 waiting SW，改走完整重置路徑（清快取 + unregister）');
+                if ('serviceWorker' in navigator) {
+                    const regs = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(regs.map(r => r.unregister()));
+                }
+                if ('caches' in window) {
+                    const names = await caches.keys();
+                    await Promise.all(names.map(n => caches.delete(n)));
+                }
+                setTimeout(() => window.location.reload(), 300);
+                return true;
+            } catch (err) {
+                console.error('[PWA] 套用更新失敗，強制重載', err);
+                window.location.reload();
                 return false;
             }
-            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-            // SW 接管後會觸發 controllerchange，然後重載頁面
-            return true;
         },
 
         // 顯示安裝按鈕（Header 中）
