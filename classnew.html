@@ -2,10 +2,40 @@
 <html lang="zh-TW">
 
 <head>
+    <!-- 🛡️ App 內建瀏覽器防護：Google OAuth 禁止在 WebView 登入（403 disallowed_useragent） -->
+    <!-- LINE → 自動帶 openExternalBrowser=1 跳系統預設瀏覽器；FB/IG/Messenger/微信/Kakao → 顯示引導提示 -->
+    <script>
+        (function () {
+            var ua = navigator.userAgent || "";
+            var isLine = /\bLine\//i.test(ua);
+            var isOtherInApp = /FBAN|FBAV|FB_IAB|Instagram|Messenger|MicroMessenger|KAKAOTALK/i.test(ua);
+
+            if (isLine && location.search.indexOf("openExternalBrowser=1") === -1) {
+                // LINE 官方參數：自動改用外部瀏覽器重開本頁（保留原有 query 與 hash）
+                var sep = location.search ? "&" : "?";
+                location.replace(location.href.split("#")[0] + sep + "openExternalBrowser=1" + location.hash);
+                return;
+            }
+            if (isOtherInApp || isLine) {
+                // 跳轉沒生效（極舊版 LINE）或其他 App 內建瀏覽器 → 顯示全版引導，避免使用者白撞 Google 封鎖
+                document.addEventListener("DOMContentLoaded", function () {
+                    var d = document.createElement("div");
+                    d.style.cssText = "position:fixed;inset:0;z-index:99999;background:#0f172a;color:#fff;display:flex;align-items:center;justify-content:center;padding:24px;font-family:system-ui,'Microsoft JhengHei',sans-serif;";
+                    d.innerHTML = '<div style="max-width:420px;text-align:center;background:#1e293b;border-radius:16px;padding:32px 26px;">'
+                        + '<div style="font-size:52px;">🌐</div>'
+                        + '<h4 style="font-weight:800;margin:14px 0 10px;">請改用瀏覽器開啟</h4>'
+                        + '<p style="font-size:15px;line-height:1.8;color:#cbd5e1;margin:0;">您目前在 <b style="color:#fbbf24;">App 內建瀏覽器</b>（LINE／FB 等）中開啟本頁，Google 基於安全政策<b>禁止在此環境登入</b>。<br><br>請點右上／右下角「<b>⋯</b>」→ 選「<b style="color:#4ade80;">用預設瀏覽器開啟</b>」。<br><br>💡 也可以把本站「加入主畫面」，之後從桌面圖示開啟最穩定。</p>'
+                        + '</div>';
+                    document.body.appendChild(d);
+                });
+            }
+        })();
+    </script>
+
     <!-- 🔒 多班級資料隔離：必須在所有模組之前載入，攔截 localStorage 自動依班級路由 -->
-    <script src="js/class-aware-storage.js?v=3.12.15"></script>
+    <script src="js/class-aware-storage.js?v=3.12.16"></script>
     <!-- 🌱 通用空狀態元件：各區塊沒資料時顯示友善引導 -->
-    <script src="js/empty-state.js?v=3.12.15"></script>
+    <script src="js/empty-state.js?v=3.12.16"></script>
 
     <!-- 🔧 開發環境：localhost 自動清除 Service Worker 快取，避免 404 攔截問題 -->
     <script>
@@ -37,16 +67,16 @@
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="icon" type="image/png" href="icons/icon-192.png">
     <link rel="shortcut icon" href="favicon.ico">
-    <title>班級小管家 v3.12.15</title>
+    <title>班級小管家 v3.12.16</title>
     <!-- 📦 版本號（由 scripts/update-sw-version.js 自動同步） -->
-    <script>window.APP_VERSION = '3.12.15';</script>
+    <script>window.APP_VERSION = '3.12.16';</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 深色模式統一由 .dark class 驅動（與 theme-toggle.js 一致），不再跟隨作業系統的 prefers-color-scheme，
          否則 OS 深色但 App 淺色（或反之）時，dark: 工具類與自訂 .dark CSS 不同步 → 深底配深字、按鈕文字看不到 -->
     <script>tailwind.config = { darkMode: 'class' };</script>
-    <link rel="stylesheet" href="css/rwd-breakpoints.css?v=3.12.15">
-    <link rel="stylesheet" href="css/pwa-install.css?v=3.12.15">
-    <link rel="stylesheet" href="css/skeleton.css?v=3.12.15">
+    <link rel="stylesheet" href="css/rwd-breakpoints.css?v=3.12.16">
+    <link rel="stylesheet" href="css/pwa-install.css?v=3.12.16">
+    <link rel="stylesheet" href="css/skeleton.css?v=3.12.16">
     <!-- 新增 Excel 讀取套件 -->
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -688,7 +718,7 @@
                                 title="目前版本（點擊查看更新資訊）"
                                 class="text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-800/60 transition-colors"
                                 onclick="window.open('https://github.com/cagoooo/class/blob/main/CHANGELOG.md', '_blank')">
-                                v3.12.15
+                                v3.12.16
                             </span>
                         </div>
                         <div class="hidden sm:block text-xs sm:text-sm text-gray-600">讓課堂管理變得簡單有趣</div>
@@ -4300,38 +4330,38 @@
         // --- 結束全螢幕時鐘功能 ---
     </script>
     <!-- 增強模組 -->
-    <script src="js/skeleton.js?v=3.12.15"></script>
-    <script src="js/event-bus.js?v=3.12.15"></script>
-    <script src="js/error-handler.js?v=3.12.15"></script>
+    <script src="js/skeleton.js?v=3.12.16"></script>
+    <script src="js/event-bus.js?v=3.12.16"></script>
+    <script src="js/error-handler.js?v=3.12.16"></script>
 
-    <script src="js/class-db.js?v=3.12.15"></script>
-    <script src="js/firebase-config.js?v=3.12.15"></script>
-    <script src="js/usage-notify.js?v=3.12.15"></script>
-    <script src="js/firebase-sync.js?v=3.12.15"></script>
-    <script src="js/firebase-ui.js?v=3.12.15"></script>
-    <script src="js/storage-manager.js?v=3.12.15"></script>
-    <script src="js/app-state.js?v=3.12.15"></script>
-    <script src="js/homework-enhancement.js?v=3.12.15"></script>
-    <script src="js/notebook-enhancement.js?v=3.12.15"></script>
-    <script src="js/leaderboard-enhancement.js?v=3.12.15"></script>
-    <script src="js/timer-enhancement.js?v=3.12.15"></script>
-    <script src="js/theme-toggle.js?v=3.12.15"></script>
-    <script src="js/lottery-enhancement.js?v=3.12.15"></script>
-    <script src="js/grouping-enhancement.js?v=3.12.15"></script>
-    <script src="js/student-enhancement.js?v=3.12.15"></script>
-    <script src="js/pomodoro.js?v=3.12.15"></script>
-    <script src="js/keyboard-shortcuts.js?v=3.12.15"></script>
-    <script src="js/ui-enhancement.js?v=3.12.15"></script>
-    <script src="js/navigation-enhancement.js?v=3.12.15"></script>
-    <script src="js/data-reports.js?v=3.12.15"></script>
-    <script src="js/exam-proctor.js?v=3.12.15"></script>
-    <script src="js/exam-sounds.js?v=3.12.15"></script>
-    <script src="js/announcement.js?v=3.12.15"></script>
+    <script src="js/class-db.js?v=3.12.16"></script>
+    <script src="js/firebase-config.js?v=3.12.16"></script>
+    <script src="js/usage-notify.js?v=3.12.16"></script>
+    <script src="js/firebase-sync.js?v=3.12.16"></script>
+    <script src="js/firebase-ui.js?v=3.12.16"></script>
+    <script src="js/storage-manager.js?v=3.12.16"></script>
+    <script src="js/app-state.js?v=3.12.16"></script>
+    <script src="js/homework-enhancement.js?v=3.12.16"></script>
+    <script src="js/notebook-enhancement.js?v=3.12.16"></script>
+    <script src="js/leaderboard-enhancement.js?v=3.12.16"></script>
+    <script src="js/timer-enhancement.js?v=3.12.16"></script>
+    <script src="js/theme-toggle.js?v=3.12.16"></script>
+    <script src="js/lottery-enhancement.js?v=3.12.16"></script>
+    <script src="js/grouping-enhancement.js?v=3.12.16"></script>
+    <script src="js/student-enhancement.js?v=3.12.16"></script>
+    <script src="js/pomodoro.js?v=3.12.16"></script>
+    <script src="js/keyboard-shortcuts.js?v=3.12.16"></script>
+    <script src="js/ui-enhancement.js?v=3.12.16"></script>
+    <script src="js/navigation-enhancement.js?v=3.12.16"></script>
+    <script src="js/data-reports.js?v=3.12.16"></script>
+    <script src="js/exam-proctor.js?v=3.12.16"></script>
+    <script src="js/exam-sounds.js?v=3.12.16"></script>
+    <script src="js/announcement.js?v=3.12.16"></script>
 
     <!-- PWA 支援 -->
-    <script src="js/pwa-install.js?v=3.12.15"></script>
-    <script src="js/clock-settings-toggle.js?v=3.12.15"></script>
-    <script src="js/admin-console.js?v=3.12.15"></script>
+    <script src="js/pwa-install.js?v=3.12.16"></script>
+    <script src="js/clock-settings-toggle.js?v=3.12.16"></script>
+    <script src="js/admin-console.js?v=3.12.16"></script>
 
     <!-- ===== 一鍵更新浮動按鈕 ===== -->
     <style>
@@ -4399,48 +4429,48 @@
     </button>
 
     <!-- 離線狀態偵測（P12：斷網時頂部 Banner 提示） -->
-    <script src="./js/offline-detector.js?v=3.12.15"></script>
+    <script src="./js/offline-detector.js?v=3.12.16"></script>
     <!-- 自動定時同步（P11：每 10 分鐘自動上傳至 Firebase） -->
-    <script src="./js/auto-sync.js?v=3.12.15"></script>
+    <script src="./js/auto-sync.js?v=3.12.16"></script>
 
     <!-- 手勢操作支援（觸控滑動切換功能區 | 長按快捷選單） -->
-    <script src="./js/gesture-handler.js?v=3.12.15"></script>
+    <script src="./js/gesture-handler.js?v=3.12.16"></script>
 
     <!-- 🧧 十二生肖・開運拉霸機 + 開運籤（開學破冰遊戲） -->
-    <script src="./js/zodiac-slot.js?v=3.12.15"></script>
+    <script src="./js/zodiac-slot.js?v=3.12.16"></script>
 
     <!-- 🛟 資料保險把關（清除前強制備份 + 儲存空間預警） -->
-    <script src="./js/data-safety-guard.js?v=3.12.15"></script>
+    <script src="./js/data-safety-guard.js?v=3.12.16"></script>
 
     <!-- 🎨 班級經營白板（公告白板 + 班級秩序 + 號碼抽籤） -->
-    <script src="./js/class-board.js?v=3.12.15"></script>
+    <script src="./js/class-board.js?v=3.12.16"></script>
 
     <!-- 🦷 潔牙勾選表 -->
-    <script src="./js/brush-check.js?v=3.12.15"></script>
+    <script src="./js/brush-check.js?v=3.12.16"></script>
 
     <!-- ✍️ 成績單評語生成器 -->
-    <script src="./js/comment-gen.js?v=3.12.15"></script>
+    <script src="./js/comment-gen.js?v=3.12.16"></script>
 
     <!-- 💬 生動對話小學堂（國語寫作互動教學） -->
-    <script src="./js/dialogue-school.js?v=3.12.15"></script>
+    <script src="./js/dialogue-school.js?v=3.12.16"></script>
 
     <!-- 學期封存模組（Q01：一鍵封存學期資料至 Firebase archives/） -->
-    <script src="./js/semester-archive.js?v=3.12.15"></script>
+    <script src="./js/semester-archive.js?v=3.12.16"></script>
 
     <!-- 多班級管理模組（在 google-auth-ui.js 之前載入，確保 nav slot 就緒） -->
-    <script src="./js/class-profiles.js?v=3.12.15"></script>
+    <script src="./js/class-profiles.js?v=3.12.16"></script>
     <!-- v3.1.0：Ctrl+K 班級快速切換器 -->
-    <script src="./js/class-quick-switcher.js?v=3.12.15"></script>
+    <script src="./js/class-quick-switcher.js?v=3.12.16"></script>
 
 
     <!-- Google 帳號登入 UI 模組（必須在所有 Firebase 模組之後載入） -->
-    <script src="./js/google-auth-ui.js?v=3.12.15"></script>
+    <script src="./js/google-auth-ui.js?v=3.12.16"></script>
 
     <!-- v3.1.0：同步狀態常駐指示器（位於一鍵更新按鈕左側） -->
-    <script src="./js/sync-status-indicator.js?v=3.12.15"></script>
+    <script src="./js/sync-status-indicator.js?v=3.12.16"></script>
 
     <!-- v3.12.1：版本與健康狀態面板（點版本徽章開啟，R-C1/R-C2） -->
-    <script src="./js/health-panel.js?v=3.12.15"></script>
+    <script src="./js/health-panel.js?v=3.12.16"></script>
 
 </body>
 

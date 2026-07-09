@@ -1,5 +1,13 @@
 # 班級小管家 Changelog
 
+## [v3.12.16] - 2026-07-09 🛡️ App 內建瀏覽器（WebView）防護：自動逃脫到預設瀏覽器
+
+- **問題**：老師從 LINE / FB / IG 分享的連結點進來，會用 App 的內建瀏覽器（WebView）開啟。Google 基於防釣魚政策一律拒絕在 WebView 進行 OAuth 登入，跳「403: disallowed_useragent」——跟網域、帳號、手機廠牌都無關。
+- **修法**：在 `classnew.html` 的 `<head>` 最前面（早於所有登入邏輯）加入偵測腳本：
+  - **LINE**：自動在網址加上官方參數 `?openExternalBrowser=1` 重開本頁，無感跳轉到系統預設瀏覽器（保留原有 query 與 hash，並防無限迴圈）。
+  - **FB / IG / Messenger / 微信 / KakaoTalk**（無通用逃脫參數）：顯示全版引導畫面，教使用者點「⋯ → 用預設瀏覽器開啟」，並建議「加入主畫面」一勞永逸。
+  - LINE 偵測用 `\bLine\//`（含斜線）避免誤判一般瀏覽器；Chrome / Safari 正常環境零影響。
+
 ## [v3.12.15] - 2026-07-03 🐛 修正 iPad Safari IndexedDB 交易併發錯誤
 
 - **真因**：`firebase-sync.js` 的 `loadFromCloudData()` 用 `Promise.all([...])` 同時對 6 個不同的 IndexedDB object store（students / pointsHistory / groups / notebookEntries / homeworkList / lotteryHistory）開啟交易寫入。Safari（尤其 iPad）對「同一時間並發開啟多個 transaction」有已知穩定性問題，會讓某個 transaction 被提前判定結束，之後存取就丟出未捕捉的 `Attempt to get records from database without an in-progress transaction` 錯誤（透過 Google Chat 使用情形通知回報，環境為 iPad / Safari，發生於 `classnew.html#zodiac`）。
