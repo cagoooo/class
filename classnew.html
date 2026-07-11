@@ -4256,8 +4256,15 @@
         function toggleClockFullScreen() {
             const modal = document.getElementById('clock-modal');
             if (!document.fullscreenElement) {
-                modal.requestFullscreen();
-            } else {
+                try {
+                    if (modal.requestFullscreen) {
+                        const p = modal.requestFullscreen();
+                        if (p && typeof p.catch === 'function') p.catch(() => { });
+                    }
+                    // 裝置不支援原生全螢幕 API（如部分 iPad Safari）時，靜默略過，
+                    // 由 CSS/modal 本身的滿版樣式提供視覺上的全螢幕效果。
+                } catch (e) { /* 全螢幕被拒或不支援，不影響時鐘本身顯示 */ }
+            } else if (document.exitFullscreen) {
                 document.exitFullscreen();
             }
         }
