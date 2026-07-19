@@ -1,5 +1,11 @@
 # 班級小管家 Changelog
 
+## [v3.12.18] - 2026-07-19 Safari 跨網域腳本誤報降噪與診斷改善
+
+- **修正**：全域錯誤監聽器會精準忽略 Safari 僅回傳 `Script error.`、空白來源、行列皆為 0 且無 `Error` 物件的跨網域不透明錯誤，避免無法定位的瀏覽器或擴充功能事件被誤報為重大系統故障。
+- **診斷改善**：可定位的全域錯誤通知補上欄號；SheetJS 與 Firebase CDN 腳本加入 `crossorigin="anonymous"`，讓支援 CORS 的瀏覽器能提供真正的檔名、行號與錯誤物件。
+- **保留 Tailwind CDN 原設定**：該服務未回傳允許跨網域錯誤揭露的 CORS 標頭，避免加入 `crossorigin` 後反而載入失敗。
+
 ## [v3.12.17] - 2026-07-09 🐛 修正更新橫幅「立即更新」按了沒反應
 
 - **真因**：更新橫幅的「立即更新」按鈕呼叫 `applyPendingUpdate()`，是個脆弱版——只有「快速路徑」：點擊當下若 `reg.waiting` 為 null，就只印一行 `console.warn` 便結束，**沒有任何備援、也沒有強制 reload**；且就算成功送出 `SKIP_WAITING`，也純靠 `controllerchange` 事件重載，該事件沒觸發就卡住。老師看到的就是「按了完全沒反應」。健康面板的 `manualUpdate()` 因為有完整備援才正常。

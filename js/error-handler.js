@@ -223,10 +223,27 @@ const ErrorHandler = (function () {
                 return;
             }
 
+            // Safari 對跨網域腳本或瀏覽器擴充功能的錯誤，可能只提供
+            //「Script error.」且隱藏來源與 Error 物件。這類事件無法定位，
+            // 不應視為應用程式重大故障並送出 Webhook 警報。
+            const isOpaqueCrossOriginError =
+                event.message === 'Script error.' &&
+                !event.filename &&
+                event.lineno === 0 &&
+                event.colno === 0 &&
+                !event.error;
+
+            if (isOpaqueCrossOriginError) {
+                if (config.logToConsole) {
+                    console.warn('[ErrorHandler] 忽略無法定位的跨網域腳本錯誤');
+                }
+                return;
+            }
+
             ErrorHandler.handle(
                 event.error || new Error(event.message),
                 ErrorTypes.UNKNOWN,
-                `Global Error at ${event.filename}:${event.lineno}`
+                `Global Error at ${event.filename || 'unknown'}:${event.lineno || 0}:${event.colno || 0}`
             );
         });
     }
