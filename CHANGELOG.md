@@ -1,5 +1,11 @@
 # 班級小管家 Changelog
 
+## [v3.12.19] - 2026-07-22 🛡️ 降低 Safari IndexedDB 內部錯誤誤報
+
+- **問題**：收到 Google Chat 使用情形通知回報一則 critical 錯誤——`An internal error was encountered in the Indexed Database server`，發生位置 `Unhandled Promise Rejection`，環境 Mac / Safari，網址 `classnew.html#homework`。
+- **真因**：這是 Safari/WebKit 引擎層級**已知的暫時性 IndexedDB 內部錯誤**，最可能由 Firebase SDK（Auth / Firestore 離線持久化）自己內部使用 IDB 時丟出，並以 `unhandledrejection` 形式浮上全域錯誤監聽器。與作業（homework）功能無關，`#homework` 只是老師當下所在分頁。應用程式端無法（也不需）修復此瀏覽器 bug，且本 App 資料層 `ClassDB.load/save` 皆有 localStorage 保底（先寫 localStorage 再寫 IDB），**資料與功能完全不受影響**。
+- **修法**：在 `js/error-handler.js` 的良性錯誤忽略清單新增兩個樣式（`internal error was encountered in the indexed database`、`connection to indexed database server lost`），這類引擎層暫時故障不再送出 Webhook 警報、也不彈紅色錯誤通知。延續 v3.12.15（IDB 交易併發）、v3.12.18（跨網域 Script error）的降噪脈絡。
+
 ## [v3.12.18] - 2026-07-19 Safari 跨網域腳本誤報降噪與診斷改善
 
 - **修正**：全域錯誤監聽器會精準忽略 Safari 僅回傳 `Script error.`、空白來源、行列皆為 0 且無 `Error` 物件的跨網域不透明錯誤，避免無法定位的瀏覽器或擴充功能事件被誤報為重大系統故障。

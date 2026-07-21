@@ -276,9 +276,19 @@ const ErrorHandler = (function () {
             const errorType = ErrorTypes[type.toUpperCase()] || type || ErrorTypes.UNKNOWN;
 
             // 忽略特定的良性環境錯誤，避免造成警報噪音 (例如 IndexedDB 被外部/使用者請求刪除)
+            //
+            // Safari/WebKit 的 IndexedDB 有已知的暫時性內部錯誤，常由 Firebase SDK
+            // （Auth / Firestore 離線持久化）自己內部使用 IDB 時丟出，並以
+            // unhandledrejection 形式浮上來。這類錯誤：
+            //   ① 屬瀏覽器引擎層級的暫時故障，應用程式端無法（也不需）修復；
+            //   ② 本 App 的資料層 (ClassDB.load/save) 皆有 localStorage 保底，
+            //      資料與功能不受影響；
+            // 因此視為良性噪音，不送出 Webhook 警報、也不彈紅色錯誤通知。
             const ignorePatterns = [
                 /database deleted by request of the user/i,
-                /indexeddb database.*deleted by request/i
+                /indexeddb database.*deleted by request/i,
+                /internal error was encountered in the indexed database/i,
+                /connection to indexed database server lost/i
             ];
             const shouldIgnore = ignorePatterns.some(pattern => pattern.test(errorObj.message));
             if (shouldIgnore) {
