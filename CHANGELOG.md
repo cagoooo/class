@@ -1,5 +1,11 @@
 # 班級小管家 Changelog
 
+## [v3.12.20] - 2026-08-03 🛡️ 補充 Safari IndexedDB 交易中斷良性錯誤過濾
+
+- **問題**：收到 Google Chat 使用情形通知回報 critical 錯誤——`Attempt to get records from database without an in-progress transaction`，發生位置 `Unhandled Promise Rejection`，環境 Mac / Safari，網址 `classnew.html#homework`。
+- **真因**：Mac / Safari (WebKit 引擎) 在背景化或分頁切換時，有機率提前判定 IndexedDB 交易中斷，引發未捕捉的 Promise Rejection。資料層有 localStorage 保底，功能與資料不受影響。
+- **修法**：在 `js/error-handler.js` 忽略清單新增 `/without an in-progress transaction/i` 與 `/attempt to get records from database/i` 樣式，防止良性過渡錯誤觸發警報推播。
+
 ## [v3.12.19] - 2026-07-22 🛡️ 降低 Safari IndexedDB 內部錯誤誤報
 
 - **問題**：收到 Google Chat 使用情形通知回報一則 critical 錯誤——`An internal error was encountered in the Indexed Database server`，發生位置 `Unhandled Promise Rejection`，環境 Mac / Safari，網址 `classnew.html#homework`。

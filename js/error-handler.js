@@ -288,7 +288,9 @@ const ErrorHandler = (function () {
                 /database deleted by request of the user/i,
                 /indexeddb database.*deleted by request/i,
                 /internal error was encountered in the indexed database/i,
-                /connection to indexed database server lost/i
+                /connection to indexed database server lost/i,
+                /without an in-progress transaction/i,
+                /attempt to get records from database/i
             ];
             const shouldIgnore = ignorePatterns.some(pattern => pattern.test(errorObj.message));
             if (shouldIgnore) {
