@@ -90,8 +90,9 @@
         absentNote: ''
     };
 
-    // 缺考學生詳細記錄
+    // 缺考學生詳細記錄（防禦：localStorage / 雲端資料若非陣列，.find 會整段崩潰）
     let absenceRecords = JSON.parse(localStorage.getItem('examAbsenceRecords')) || [];
+    if (!Array.isArray(absenceRecords)) absenceRecords = [];
 
     // 缺考原因類型
     const AbsenceTypes = {

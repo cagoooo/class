@@ -1,5 +1,11 @@
 # 班級小管家 Changelog
 
+## [v3.12.21] - 2026-08-19 🐛 修正缺考記錄非陣列導致監考頁全域崩潰
+
+- **問題**：收到 Google Chat 使用情形通知回報錯誤——`absenceRecords.find is not a function`，發生位置 `js/exam-proctor.js:2976`（`getTodayAbsenceRecord`），環境 Windows / Chrome，網址 `classnew.html#exam`。
+- **真因**：`examAbsenceRecords` 從 localStorage 讀出後未驗證型別。若雲端同步寫入的資料是物件而非陣列（如舊版寫入格式 `{...}`），`JSON.parse(...) || []` 的 `|| []` 只擋 null，擋不住 truthy 的非陣列值，呼叫 `.find()` 即拋錯，且因位於全域初始化路徑會連帶影響整個考試監考頁。
+- **修法**：`js/exam-proctor.js` 初始化 `absenceRecords` 後加 `Array.isArray` 防禦檢查，非陣列一律重置為空陣列，避免單一壞資料讓整頁崩潰。
+
 ## [v3.12.20] - 2026-08-03 🛡️ 補充 Safari IndexedDB 交易中斷良性錯誤過濾
 
 - **問題**：收到 Google Chat 使用情形通知回報 critical 錯誤——`Attempt to get records from database without an in-progress transaction`，發生位置 `Unhandled Promise Rejection`，環境 Mac / Safari，網址 `classnew.html#homework`。
