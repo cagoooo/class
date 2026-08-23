@@ -96,7 +96,7 @@
     <!-- 深色模式統一由 .dark class 驅動（與 theme-toggle.js 一致），不再跟隨作業系統的 prefers-color-scheme，
          否則 OS 深色但 App 淺色（或反之）時，dark: 工具類與自訂 .dark CSS 不同步 → 深底配深字、按鈕文字看不到 -->
     <script>tailwind.config = { darkMode: 'class' };</script>
-    <link rel="stylesheet" href="css/rwd-breakpoints.css?v=3.12.21">
+    <link rel="stylesheet" href="css/rwd-breakpoints.css?v=3.12.22">
     <link rel="stylesheet" href="css/pwa-install.css?v=3.12.21">
     <link rel="stylesheet" href="css/skeleton.css?v=3.12.21">
     <!-- 新增 Excel 讀取套件 -->
@@ -1692,6 +1692,21 @@
             <span class="text-amber-700 font-semibold">⚠️ 提醒：清除瀏覽器資料前，請務必先下載備份！</span>
         </div>
     </div>
+
+    <footer class="site-footer" aria-label="網站頁尾">
+        <div class="site-footer__inner">
+            <span class="site-footer__product">班級小管家 · 教師班級管理工具</span>
+            <span class="site-footer__credit">
+                Made with <span class="site-footer__heart" aria-label="愛心">❤️</span> by
+                <a
+                    href="https://www.smes.tyc.edu.tw/modules/school/index.php?department_id=2&zone_id=0&page_id=2&content_id=11&type=news&from_op=all_news#a5"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="site-footer__author"
+                >阿凱老師</a>
+            </span>
+        </div>
+    </footer>
 
     <!-- 全螢幕考試監考 Modal -->
     <div id="examFullscreenModal" class="exam-fullscreen-modal">
