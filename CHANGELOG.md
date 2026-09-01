@@ -1,5 +1,12 @@
 # 班級小管家 Changelog
 
+## [v3.12.22] - 2026-09-01 🛡️ PWA 更新與錯誤通知穩定化
+
+- **修正 Service Worker 誤報**：Safari／Chrome 在離線、私密模式或短暫網路中斷時，`sw.js load failed` 與更新檢查失敗不再被當成重大錯誤送出 Google Chat Webhook；仍保留主控台診斷資訊。
+- **修正更新流程**：背景 `registration.update()` 補上 rejection 處理；手動更新統一走 waiting worker 的 `SKIP_WAITING` 與 `controllerchange`，移除清空所有 Cache／取消所有 Service Worker 的高風險備援。
+- **補強 DOM 防護**：計時器、抽籤、分組、排行榜與全螢幕時鐘遇到舊版快取或元件尚未就緒時安全略過，不再因對 `null` 取 `classList` 連帶中斷頁面。
+- **改善錯誤定位**：未處理 Promise rejection 的通知位置會附上第一個堆疊呼叫位置，後續 Webhook 可直接定位檔案與行號。
+
 ## [v3.12.21] - 2026-08-19 🐛 修正缺考記錄非陣列導致監考頁全域崩潰
 
 - **問題**：收到 Google Chat 使用情形通知回報錯誤——`absenceRecords.find is not a function`，發生位置 `js/exam-proctor.js:2976`（`getTodayAbsenceRecord`），環境 Windows / Chrome，網址 `classnew.html#exam`。

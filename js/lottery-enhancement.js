@@ -256,6 +256,10 @@
     function runEnhancedLotteryAnimation(finalResult, type) {
         const container = document.getElementById('lotteryResult');
         const btn = document.getElementById('startLotteryBtn');
+        if (!container || !btn) {
+            console.warn('[Lottery] 抽籤元件尚未就緒，略過動畫');
+            return;
+        }
 
         btn.disabled = true;
         btn.classList.add('bg-gray-400', 'hover:bg-gray-400');
@@ -282,7 +286,11 @@
         const rollingText = document.getElementById('lottery-rolling-text');
         const progressBar = document.getElementById('lottery-progress');
 
-        if (!rollingText) return;
+        if (!rollingText || !progressBar) {
+            btn.disabled = false;
+            btn.classList.remove('bg-gray-400', 'hover:bg-gray-400');
+            return;
+        }
 
         let rollCount = 0;
         const totalRolls = LOTTERY_CONFIG.totalRolls;
@@ -368,6 +376,10 @@
     // 增強版結果顯示
     function displayEnhancedLotteryResult(result, type) {
         const container = document.getElementById('lotteryResult');
+        if (!container) {
+            console.warn('[Lottery] 找不到結果容器，略過結果顯示');
+            return;
+        }
 
         let emoji, title, names, subtitle = '';
 

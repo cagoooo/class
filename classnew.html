@@ -33,9 +33,9 @@
     </script>
 
     <!-- 🔒 多班級資料隔離：必須在所有模組之前載入，攔截 localStorage 自動依班級路由 -->
-    <script src="js/class-aware-storage.js?v=3.12.21"></script>
+    <script src="js/class-aware-storage.js?v=3.12.22"></script>
     <!-- 🌱 通用空狀態元件：各區塊沒資料時顯示友善引導 -->
-    <script src="js/empty-state.js?v=3.12.21"></script>
+    <script src="js/empty-state.js?v=3.12.22"></script>
 
     <!-- 🔧 開發環境：localhost 自動清除 Service Worker 快取，避免 404 攔截問題 -->
     <script>
@@ -68,7 +68,7 @@
     <link rel="icon" href="favicon.ico" sizes="any">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="shortcut icon" href="favicon.ico">
-    <title>班級小管家 v3.12.21</title>
+    <title>班級小管家 v3.12.22</title>
     <meta name="description" content="教師班級管理的貼心小幫手 — 學生管理、作業檢查、計時器、抽籤、考試監考，一站搞定。">
 
     <!-- Open Graph / Facebook / LINE -->
@@ -91,14 +91,14 @@
     <meta name="twitter:description" content="教師班級管理的貼心小幫手 — 學生管理、作業檢查、計時器、抽籤、考試監考，一站搞定。">
     <meta name="twitter:image" content="https://cagoooo.github.io/class/og-preview.png?v=3.12.17">
     <!-- 📦 版本號（由 scripts/update-sw-version.js 自動同步） -->
-    <script>window.APP_VERSION = '3.12.21';</script>
+    <script>window.APP_VERSION = '3.12.22';</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 深色模式統一由 .dark class 驅動（與 theme-toggle.js 一致），不再跟隨作業系統的 prefers-color-scheme，
          否則 OS 深色但 App 淺色（或反之）時，dark: 工具類與自訂 .dark CSS 不同步 → 深底配深字、按鈕文字看不到 -->
     <script>tailwind.config = { darkMode: 'class' };</script>
     <link rel="stylesheet" href="css/rwd-breakpoints.css?v=3.12.22">
-    <link rel="stylesheet" href="css/pwa-install.css?v=3.12.21">
-    <link rel="stylesheet" href="css/skeleton.css?v=3.12.21">
+    <link rel="stylesheet" href="css/pwa-install.css?v=3.12.22">
+    <link rel="stylesheet" href="css/skeleton.css?v=3.12.22">
     <!-- 新增 Excel 讀取套件 -->
 
     <script crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -740,7 +740,7 @@
                                 title="目前版本（點擊查看更新資訊）"
                                 class="text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-800/60 transition-colors"
                                 onclick="window.open('https://github.com/cagoooo/class/blob/main/CHANGELOG.md', '_blank')">
-                                v3.12.21
+                                v3.12.22
                             </span>
                         </div>
                         <div class="hidden sm:block text-xs sm:text-sm text-gray-600">讓課堂管理變得簡單有趣</div>
@@ -2478,6 +2478,7 @@
 
             document.getElementById('lotteryType').addEventListener('change', function () {
                 const multipleCount = document.getElementById('multipleCount');
+                if (!multipleCount) return;
                 if (this.value === 'multiple') {
                     multipleCount.classList.remove('hidden');
                 } else {
@@ -2488,6 +2489,7 @@
             document.getElementById('groupingMethod').addEventListener('change', function () {
                 const label = document.getElementById('groupingLabel');
                 const valueInput = document.getElementById('groupingValue');
+                if (!label || !valueInput) return;
                 if (this.value === 'byGroupCount') {
                     label.textContent = '要分成幾組？';
                     valueInput.value = '2';
@@ -2814,6 +2816,10 @@
         }
         function renderPointsStudentList() {
             const container = document.getElementById('pointsStudentList');
+            if (!container) {
+                console.warn('[Points] 找不到 pointsStudentList，略過本次渲染');
+                return;
+            }
             container.innerHTML = '';
             if (students.length === 0) {
                 container.innerHTML = `<p class="w-full text-center text-gray-500">請先到「學生管理」新增學生</p>`;
@@ -3025,6 +3031,10 @@
         function runLotteryAnimation(finalResult, type) {
             const container = document.getElementById('lotteryResult');
             const btn = document.getElementById('startLotteryBtn');
+            if (!container || !btn) {
+                console.warn('[Lottery] 抽籤元件尚未就緒，略過動畫');
+                return;
+            }
             btn.disabled = true;
             btn.classList.add('bg-gray-400', 'hover:bg-gray-400');
             container.innerHTML = `<div id="lottery-animation-text" class="text-3xl font-bold text-gray-800"></div>`;
@@ -3090,6 +3100,10 @@
         }
         function renderLotteryHistory() {
             const container = document.getElementById('lotteryHistory');
+            if (!container) {
+                console.warn('[Lottery] 找不到 lotteryHistory，略過本次渲染');
+                return;
+            }
             container.innerHTML = '';
             if (lotteryHistory.length === 0) { container.innerHTML = '<div class="text-gray-500 text-center">尚無抽籤記錄</div>'; return; }
             lotteryHistory.slice(0, 5).forEach(record => {
@@ -3103,15 +3117,24 @@
 
         // --- 倒數計時器 (已更新為完整計時器) ---
         function setTimerMode(mode) {
-            timerMode = mode;
-            stopTimer(); // 切換模式時停止計時器
-
             const modeCountdown = document.getElementById('modeCountdown');
             const modeStopwatch = document.getElementById('modeStopwatch');
             const countdownSettings = document.getElementById('countdownSettings');
             const countdownQuickTimers = document.getElementById('countdownQuickTimers');
             const timerProgress = document.getElementById('timerProgress');
             const timerBtn = document.getElementById('timerBtn');
+            const timerTitleDisplay = document.getElementById('timerTitleDisplay');
+            const timerMinutes = document.getElementById('timerMinutes');
+            const timerSeconds = document.getElementById('timerSeconds');
+
+            if ([modeCountdown, modeStopwatch, countdownSettings, countdownQuickTimers,
+                timerProgress, timerBtn, timerTitleDisplay, timerMinutes, timerSeconds].some(el => !el)) {
+                console.warn('[Timer] 計時器控制項尚未就緒，略過本次模式切換');
+                return;
+            }
+
+            timerMode = mode;
+            stopTimer(); // 切換模式時停止計時器
 
             const activeClass = 'bg-red-500 text-white';
             const inactiveClass = 'bg-gray-200 text-gray-700 hover:bg-gray-300';
@@ -3124,8 +3147,8 @@
                 timerProgress.classList.remove('hidden');
 
                 // 重設為預設倒數時間
-                document.getElementById('timerMinutes').value = 5;
-                document.getElementById('timerSeconds').value = 0;
+                timerMinutes.value = 5;
+                timerSeconds.value = 0;
                 totalSeconds = 300;
                 originalSeconds = 300;
 
@@ -3144,7 +3167,7 @@
             updateTimerDisplay();
             timerBtn.textContent = '開始';
             timerBtn.className = 'w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition-colors text-sm active:scale-95';
-            document.getElementById('timerTitleDisplay').textContent = '準備開始';
+            timerTitleDisplay.textContent = '準備開始';
         }
 
         function setQuickTimer(seconds) {
@@ -3238,17 +3261,24 @@
             clearInterval(timerInterval);
             timerRunning = false;
             const timerBtn = document.getElementById('timerBtn');
+            const timerTitleDisplay = document.getElementById('timerTitleDisplay');
+            const timerDisplay = document.getElementById('timerDisplay');
+
+            if (!timerBtn || !timerTitleDisplay || !timerDisplay) {
+                console.warn('[Timer] 計時器顯示元件尚未就緒，略過停止畫面更新');
+                return;
+            }
 
             if (timerMode === 'countdown') {
                 timerBtn.textContent = '開始';
                 timerBtn.className = 'w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition-colors text-sm active:scale-95';
-                document.getElementById('timerTitleDisplay').textContent = '已停止';
+                timerTitleDisplay.textContent = '已停止';
             } else if (timerMode === 'stopwatch') {
                 timerBtn.textContent = '繼續';
                 timerBtn.className = 'w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition-colors text-sm active:scale-95';
-                document.getElementById('timerTitleDisplay').textContent = '已暫停';
+                timerTitleDisplay.textContent = '已暫停';
             }
-            document.getElementById('timerDisplay').classList.remove('animate-pulse');
+            timerDisplay.classList.remove('animate-pulse');
         }
 
         function updateTimerDisplay() {
@@ -3953,6 +3983,10 @@
         function showLeaderboard() {
             const modal = document.getElementById('leaderboardModal');
             const content = document.getElementById('leaderboardContent');
+            if (!modal || !content) {
+                console.warn('[Leaderboard] 排行榜元件尚未就緒，略過開啟');
+                return;
+            }
 
             const sortedStudents = [...students].sort((a, b) => b.points - a.points);
 
@@ -4014,6 +4048,10 @@
 
         async function openBigClock() {
             const modal = document.getElementById('clock-modal');
+            if (!modal) {
+                console.warn('[Clock] 找不到時鐘視窗，略過開啟');
+                return;
+            }
             modal.classList.remove('hidden');
             modal.classList.add('flex');
 
@@ -4030,8 +4068,10 @@
 
         function closeBigClock() {
             const modal = document.getElementById('clock-modal');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
 
             if (bigClockInterval) clearInterval(bigClockInterval);
             bigClockInterval = null;
@@ -4125,6 +4165,7 @@
 
         function updateFlipClockDOM(hours, minutes, seconds, dateString) {
             const displayEl = document.getElementById('big-clock-display');
+            if (!displayEl) return;
             const newFlipTime = hours + minutes + seconds;
 
             // 首次渲染
@@ -4176,13 +4217,16 @@
         }
 
         function checkFlipDigit(flipperEl, prevDigit, newDigit) {
-            if (prevDigit === newDigit) {
+            if (!flipperEl || prevDigit === newDigit) {
                 return; // 數字未變
             }
 
             // 1. 設定新數字
-            flipperEl.querySelector('.flipper-face-back').dataset.digit = newDigit;
-            flipperEl.querySelector('.flipper-face-bottom').dataset.digitNew = newDigit;
+            const back = flipperEl.querySelector('.flipper-face-back');
+            const bottom = flipperEl.querySelector('.flipper-face-bottom');
+            if (!back || !bottom) return;
+            back.dataset.digit = newDigit;
+            bottom.dataset.digitNew = newDigit;
 
             // 2. 觸發翻轉
             flipperEl.classList.add('flip');
@@ -4197,8 +4241,10 @@
                 flipperEl.classList.remove('flip');
 
                 // 5. 將新數字更新到所有卡片上，為下一次翻轉做準備
-                flipperEl.querySelector('.flipper-static-bottom').dataset.digit = newDigit;
-                flipperEl.querySelector('.flipper-face-front').dataset.digit = newDigit;
+                const staticBottom = flipperEl.querySelector('.flipper-static-bottom');
+                const front = flipperEl.querySelector('.flipper-face-front');
+                if (staticBottom) staticBottom.dataset.digit = newDigit;
+                if (front) front.dataset.digit = newDigit;
             });
         }
 
@@ -4223,10 +4269,11 @@
         function applyClockSettings() {
             const modal = document.getElementById('clock-modal');
             const displayEl = document.getElementById('big-clock-display');
+            if (!modal || !displayEl) return;
 
             // 1. 深色模式
             modal.classList.toggle('dark', clockSettings.isDarkMode);
-            document.getElementById('clock-toggle-dark').classList.toggle('active', clockSettings.isDarkMode);
+            document.getElementById('clock-toggle-dark')?.classList.toggle('active', clockSettings.isDarkMode);
 
             // 2. 樣式
             displayEl.className = `clock-style-${clockSettings.style} w-full`;
@@ -4235,15 +4282,16 @@
             });
 
             // 3. 顯示日期
-            document.getElementById('clock-toggle-date').classList.toggle('active', clockSettings.showDate);
+            document.getElementById('clock-toggle-date')?.classList.toggle('active', clockSettings.showDate);
             if (!clockSettings.showDate) {
                 const dateEl = displayEl.querySelector('.date-display');
                 if (dateEl) dateEl.innerHTML = '';
             }
 
             // 4. 12/24 小時制
-            document.getElementById('clock-toggle-24h').classList.toggle('active', clockSettings.is24Hour);
-            document.getElementById('clock-toggle-24h-label').textContent = clockSettings.is24Hour ? '24 小時制' : '12 小時制';
+            document.getElementById('clock-toggle-24h')?.classList.toggle('active', clockSettings.is24Hour);
+            const hourModeLabel = document.getElementById('clock-toggle-24h-label');
+            if (hourModeLabel) hourModeLabel.textContent = clockSettings.is24Hour ? '24 小時制' : '12 小時制';
         }
 
         async function requestWakeLock() {
@@ -4374,38 +4422,38 @@
         // --- 結束全螢幕時鐘功能 ---
     </script>
     <!-- 增強模組 -->
-    <script src="js/skeleton.js?v=3.12.21"></script>
-    <script src="js/event-bus.js?v=3.12.21"></script>
-    <script src="js/error-handler.js?v=3.12.21"></script>
+    <script src="js/skeleton.js?v=3.12.22"></script>
+    <script src="js/event-bus.js?v=3.12.22"></script>
+    <script src="js/error-handler.js?v=3.12.22"></script>
 
-    <script src="js/class-db.js?v=3.12.21"></script>
-    <script src="js/firebase-config.js?v=3.12.21"></script>
-    <script src="js/usage-notify.js?v=3.12.21"></script>
-    <script src="js/firebase-sync.js?v=3.12.21"></script>
-    <script src="js/firebase-ui.js?v=3.12.21"></script>
-    <script src="js/storage-manager.js?v=3.12.21"></script>
-    <script src="js/app-state.js?v=3.12.21"></script>
-    <script src="js/homework-enhancement.js?v=3.12.21"></script>
-    <script src="js/notebook-enhancement.js?v=3.12.21"></script>
-    <script src="js/leaderboard-enhancement.js?v=3.12.21"></script>
-    <script src="js/timer-enhancement.js?v=3.12.21"></script>
-    <script src="js/theme-toggle.js?v=3.12.21"></script>
-    <script src="js/lottery-enhancement.js?v=3.12.21"></script>
-    <script src="js/grouping-enhancement.js?v=3.12.21"></script>
-    <script src="js/student-enhancement.js?v=3.12.21"></script>
-    <script src="js/pomodoro.js?v=3.12.21"></script>
-    <script src="js/keyboard-shortcuts.js?v=3.12.21"></script>
-    <script src="js/ui-enhancement.js?v=3.12.21"></script>
-    <script src="js/navigation-enhancement.js?v=3.12.21"></script>
-    <script src="js/data-reports.js?v=3.12.21"></script>
-    <script src="js/exam-proctor.js?v=3.12.21"></script>
-    <script src="js/exam-sounds.js?v=3.12.21"></script>
-    <script src="js/announcement.js?v=3.12.21"></script>
+    <script src="js/class-db.js?v=3.12.22"></script>
+    <script src="js/firebase-config.js?v=3.12.22"></script>
+    <script src="js/usage-notify.js?v=3.12.22"></script>
+    <script src="js/firebase-sync.js?v=3.12.22"></script>
+    <script src="js/firebase-ui.js?v=3.12.22"></script>
+    <script src="js/storage-manager.js?v=3.12.22"></script>
+    <script src="js/app-state.js?v=3.12.22"></script>
+    <script src="js/homework-enhancement.js?v=3.12.22"></script>
+    <script src="js/notebook-enhancement.js?v=3.12.22"></script>
+    <script src="js/leaderboard-enhancement.js?v=3.12.22"></script>
+    <script src="js/timer-enhancement.js?v=3.12.22"></script>
+    <script src="js/theme-toggle.js?v=3.12.22"></script>
+    <script src="js/lottery-enhancement.js?v=3.12.22"></script>
+    <script src="js/grouping-enhancement.js?v=3.12.22"></script>
+    <script src="js/student-enhancement.js?v=3.12.22"></script>
+    <script src="js/pomodoro.js?v=3.12.22"></script>
+    <script src="js/keyboard-shortcuts.js?v=3.12.22"></script>
+    <script src="js/ui-enhancement.js?v=3.12.22"></script>
+    <script src="js/navigation-enhancement.js?v=3.12.22"></script>
+    <script src="js/data-reports.js?v=3.12.22"></script>
+    <script src="js/exam-proctor.js?v=3.12.22"></script>
+    <script src="js/exam-sounds.js?v=3.12.22"></script>
+    <script src="js/announcement.js?v=3.12.22"></script>
 
     <!-- PWA 支援 -->
-    <script src="js/pwa-install.js?v=3.12.21"></script>
-    <script src="js/clock-settings-toggle.js?v=3.12.21"></script>
-    <script src="js/admin-console.js?v=3.12.21"></script>
+    <script src="js/pwa-install.js?v=3.12.22"></script>
+    <script src="js/clock-settings-toggle.js?v=3.12.22"></script>
+    <script src="js/admin-console.js?v=3.12.22"></script>
 
     <!-- ===== 一鍵更新浮動按鈕 ===== -->
     <style>
@@ -4473,48 +4521,48 @@
     </button>
 
     <!-- 離線狀態偵測（P12：斷網時頂部 Banner 提示） -->
-    <script src="./js/offline-detector.js?v=3.12.21"></script>
+    <script src="./js/offline-detector.js?v=3.12.22"></script>
     <!-- 自動定時同步（P11：每 10 分鐘自動上傳至 Firebase） -->
-    <script src="./js/auto-sync.js?v=3.12.21"></script>
+    <script src="./js/auto-sync.js?v=3.12.22"></script>
 
     <!-- 手勢操作支援（觸控滑動切換功能區 | 長按快捷選單） -->
-    <script src="./js/gesture-handler.js?v=3.12.21"></script>
+    <script src="./js/gesture-handler.js?v=3.12.22"></script>
 
     <!-- 🧧 十二生肖・開運拉霸機 + 開運籤（開學破冰遊戲） -->
-    <script src="./js/zodiac-slot.js?v=3.12.21"></script>
+    <script src="./js/zodiac-slot.js?v=3.12.22"></script>
 
     <!-- 🛟 資料保險把關（清除前強制備份 + 儲存空間預警） -->
-    <script src="./js/data-safety-guard.js?v=3.12.21"></script>
+    <script src="./js/data-safety-guard.js?v=3.12.22"></script>
 
     <!-- 🎨 班級經營白板（公告白板 + 班級秩序 + 號碼抽籤） -->
-    <script src="./js/class-board.js?v=3.12.21"></script>
+    <script src="./js/class-board.js?v=3.12.22"></script>
 
     <!-- 🦷 潔牙勾選表 -->
-    <script src="./js/brush-check.js?v=3.12.21"></script>
+    <script src="./js/brush-check.js?v=3.12.22"></script>
 
     <!-- ✍️ 成績單評語生成器 -->
-    <script src="./js/comment-gen.js?v=3.12.21"></script>
+    <script src="./js/comment-gen.js?v=3.12.22"></script>
 
     <!-- 💬 生動對話小學堂（國語寫作互動教學） -->
-    <script src="./js/dialogue-school.js?v=3.12.21"></script>
+    <script src="./js/dialogue-school.js?v=3.12.22"></script>
 
     <!-- 學期封存模組（Q01：一鍵封存學期資料至 Firebase archives/） -->
-    <script src="./js/semester-archive.js?v=3.12.21"></script>
+    <script src="./js/semester-archive.js?v=3.12.22"></script>
 
     <!-- 多班級管理模組（在 google-auth-ui.js 之前載入，確保 nav slot 就緒） -->
-    <script src="./js/class-profiles.js?v=3.12.21"></script>
+    <script src="./js/class-profiles.js?v=3.12.22"></script>
     <!-- v3.1.0：Ctrl+K 班級快速切換器 -->
-    <script src="./js/class-quick-switcher.js?v=3.12.21"></script>
+    <script src="./js/class-quick-switcher.js?v=3.12.22"></script>
 
 
     <!-- Google 帳號登入 UI 模組（必須在所有 Firebase 模組之後載入） -->
-    <script src="./js/google-auth-ui.js?v=3.12.21"></script>
+    <script src="./js/google-auth-ui.js?v=3.12.22"></script>
 
     <!-- v3.1.0：同步狀態常駐指示器（位於一鍵更新按鈕左側） -->
-    <script src="./js/sync-status-indicator.js?v=3.12.21"></script>
+    <script src="./js/sync-status-indicator.js?v=3.12.22"></script>
 
     <!-- v3.12.1：版本與健康狀態面板（點版本徽章開啟，R-C1/R-C2） -->
-    <script src="./js/health-panel.js?v=3.12.21"></script>
+    <script src="./js/health-panel.js?v=3.12.22"></script>
 
 </body>
 

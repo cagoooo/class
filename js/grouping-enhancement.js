@@ -139,6 +139,10 @@
         const button = document.querySelector('button[onclick="startGroupingWithAnimation()"]') ||
             document.querySelector('#grouping-section button.bg-cyan-500');
         const container = document.getElementById('groupingResult');
+        if (!container) {
+            console.warn('[Grouping] 找不到分組結果容器，略過動畫');
+            return;
+        }
 
         // 禁用按鈕
         if (button) {

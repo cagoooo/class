@@ -169,6 +169,23 @@ const ErrorHandler = (function () {
             .join('\n');
     }
 
+    // Service Worker 是可選的離線能力；瀏覽器在離線、私密模式或短暫網路
+    // 中斷時可能只回報 sw.js load failed，不應把它誤判成 App 重大故障。
+    function isServiceWorkerUpdateError(error, context = '') {
+        const text = `${error?.name || ''} ${error?.message || ''} ${context}`;
+        const mentionsServiceWorker = /service\s*worker|(?:^|[/\s])sw\.js\b/i.test(text);
+        const isFetchFailure = /load failed|failed to update|fetch(?:ing)? the script|unknown error.*fetch|networkerror|network error/i.test(text);
+        return mentionsServiceWorker && isFetchFailure;
+    }
+
+    function promiseRejectionContext(error) {
+        const stack = formatStack(error);
+        const frame = stack.split('\n').slice(1).find(line => /^\s*at\s/.test(line));
+        return frame
+            ? `Unhandled Promise Rejection @ ${frame.trim()}`
+            : 'Unhandled Promise Rejection';
+    }
+
     // 注入 CSS 樣式
     function injectStyles() {
         if (document.getElementById('error-handler-styles')) return;
@@ -209,10 +226,21 @@ const ErrorHandler = (function () {
     function setupGlobalErrorHandlers() {
         // 捕獲未處理的 Promise 錯誤
         window.addEventListener('unhandledrejection', (event) => {
+            const reason = event.reason instanceof Error
+                ? event.reason
+                : new Error(String(event.reason || '未提供 Promise rejection 原因'));
+            const context = promiseRejectionContext(reason);
+            if (isServiceWorkerUpdateError(reason, context)) {
+                event.preventDefault();
+                if (config.logToConsole) {
+                    console.warn('[ErrorHandler] 忽略 Service Worker 更新載入失敗（不影響網站使用）');
+                }
+                return;
+            }
             ErrorHandler.handle(
-                event.reason,
+                reason,
                 ErrorTypes.UNKNOWN,
-                'Unhandled Promise Rejection'
+                context
             );
         });
 
@@ -296,6 +324,13 @@ const ErrorHandler = (function () {
             if (shouldIgnore) {
                 if (config.logToConsole) {
                     console.warn(`[ErrorHandler] 忽略預期內的良性環境錯誤: ${errorObj.message}`);
+                }
+                return;
+            }
+
+            if (isServiceWorkerUpdateError(errorObj, context)) {
+                if (config.logToConsole) {
+                    console.warn(`[ErrorHandler] 忽略 Service Worker 更新載入失敗: ${errorObj.message}`);
                 }
                 return;
             }

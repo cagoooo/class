@@ -396,33 +396,35 @@
 
         if (display) {
             const fsDisplay = document.getElementById('timerFullscreenDisplay');
-            fsDisplay.textContent = display.textContent;
+            if (fsDisplay) fsDisplay.textContent = display.textContent;
 
             // 根據時間設置警告狀態
             const timeText = display.textContent;
             const [mins, secs] = timeText.split(':').map(Number);
             const totalSecs = mins * 60 + secs;
 
-            fsDisplay.classList.remove('warning', 'danger');
             const fsProgressBar = document.getElementById('timerFullscreenProgressBar');
-            fsProgressBar.classList.remove('warning', 'danger');
+            if (fsDisplay) fsDisplay.classList.remove('warning', 'danger');
+            if (fsProgressBar) fsProgressBar.classList.remove('warning', 'danger');
 
             if (totalSecs <= 10 && totalSecs > 0) {
-                fsDisplay.classList.add('danger');
-                fsProgressBar.classList.add('danger');
+                if (fsDisplay) fsDisplay.classList.add('danger');
+                if (fsProgressBar) fsProgressBar.classList.add('danger');
             } else if (totalSecs <= 30) {
-                fsDisplay.classList.add('warning');
-                fsProgressBar.classList.add('warning');
+                if (fsDisplay) fsDisplay.classList.add('warning');
+                if (fsProgressBar) fsProgressBar.classList.add('warning');
             }
         }
 
         if (titleDisplay) {
-            document.getElementById('timerFullscreenStatus').textContent = titleDisplay.textContent;
+            const status = document.getElementById('timerFullscreenStatus');
+            if (status) status.textContent = titleDisplay.textContent;
         }
 
         if (progressBar) {
             const width = progressBar.style.width;
-            document.getElementById('timerFullscreenProgressBar').style.width = width;
+            const fsProgressBar = document.getElementById('timerFullscreenProgressBar');
+            if (fsProgressBar) fsProgressBar.style.width = width;
         }
 
         // 更新按鈕狀態
