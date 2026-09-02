@@ -238,6 +238,35 @@ function buildCard(type, data, who) {
   };
 }
 
+// 🛡️ error 事件節流：前端 usage-notify.js 的「每場上限 5 則 / 去重」只在前端生效，
+// 若有人繞過前端直接呼叫這支 callable function，那些節流形同虛設。這裡在伺服端
+// 用 Firestore 對「每個身分（uid，無驗證則歸類 no-auth）每日」再把關一次，
+// 確保不管用什麼方式呼叫，都不可能把 Google Chat 灌爆。
+const MAX_ERROR_PER_DAY = 5;
+
+/**
+ * 檢查並累加當日 error 配額。配額用盡回傳 false（呼叫端仍回應成功、只是不轉發到
+ * Chat，避免前端佇列誤判失敗而無限重試）。配額檢查本身出錯則 fail-open 放行，
+ * 避免限流機制的 bug 反而吞掉真正需要被看到的錯誤通報。
+ */
+async function checkAndBumpErrorQuota(uid) {
+  const key = uid || 'no-auth';
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' }); // YYYY-MM-DD
+  const ref = admin.firestore().collection('_usageRateLimits').doc(`${key}_${today}`);
+  try {
+    return await admin.firestore().runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const count = snap.exists ? (snap.data().count || 0) : 0;
+      if (count >= MAX_ERROR_PER_DAY) return false;
+      tx.set(ref, { count: count + 1, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      return true;
+    });
+  } catch (e) {
+    logger.error('[RateLimit] 配額檢查失敗，預設放行', e);
+    return true;
+  }
+}
+
 exports.notifyUsage = onCall(
   { region: REGION, secrets: [GOOGLE_CHAT_WEBHOOK], cors: true, maxInstances: 5 },
   async (request) => {
@@ -249,7 +278,7 @@ exports.notifyUsage = onCall(
 
     const data = request.data || {};
     const type = String(data.type || '').trim();
-    
+
     let eventType = type;
     if (type === 'login' && data.isNewUser) {
       eventType = 'login_new';
@@ -257,6 +286,15 @@ exports.notifyUsage = onCall(
 
     if (!EVENT_META[eventType]) {
       return { ok: false, reason: 'unknown-type' };
+    }
+
+    if (eventType === 'error') {
+      const uid = request.auth && request.auth.uid;
+      const allowed = await checkAndBumpErrorQuota(uid);
+      if (!allowed) {
+        logger.warn('[RateLimit] 今日 error 配額已用盡，略過轉發', { uid: uid || 'no-auth' });
+        return { ok: true, throttled: true };
+      }
     }
 
     const who = identityOf(request.auth);
