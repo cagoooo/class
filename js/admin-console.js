@@ -139,6 +139,21 @@
             .dark .admin-table tr:hover {
                 background: #334155;
             }
+            .badge-neutral {
+                display: inline-block;
+                padding: 0.2rem 0.6rem;
+                border-radius: 999px;
+                font-size: 0.78rem;
+                font-weight: 600;
+                background: #f1f5f9;
+                color: #64748b;
+                border: 1px solid #e2e8f0;
+            }
+            .dark .badge-neutral {
+                background: rgba(51, 65, 85, 0.5);
+                color: #cbd5e1;
+                border-color: #475569;
+            }
             .badge-green, .badge-orange {
                 display: inline-block;
                 white-space: nowrap;
@@ -384,7 +399,7 @@
                                 <tr>
                                     <th class="sortable" data-sort="name" tabindex="0">教師姓名 / 帳號<span class="sort-ind">⇅</span></th>
                                     <th class="sortable" data-sort="classCount" tabindex="0">有效班級數<span class="sort-ind">⇅</span></th>
-                                    <th class="sortable" data-sort="orphanCount" tabindex="0">孤兒資料數<span class="sort-ind">⇅</span></th>
+                                    <th class="sortable" data-sort="orphanCount" tabindex="0" title="老師刪除班級後留在雲端的學生資料。屬正常現象，不是故障。">已刪除殘留<span class="sort-ind">⇅</span></th>
                                     <th class="sortable" data-sort="lastSync" tabindex="0">最後同步時間<span class="sort-ind">⇅</span></th>
                                     <th class="sortable" data-sort="device" tabindex="0">同步裝置資訊<span class="sort-ind">⇅</span></th>
                                     <th>操作</th>
@@ -507,13 +522,18 @@
         const rows = orphans.map((o) => {
             const hasStudents = o.studentCount > 0;
             const sample = (o.sampleNames || []).join('、');
-            const meta = hasStudents
-                ? `<span class="badge-orange">👥 ${o.studentCount} 位學生</span>` +
+            // marker 是判斷來源的關鍵：刪除班級會連 marker 一起刪，名冊被洗掉則不會。
+            // 有 marker ⇒ 多半只是名冊掉了，老師做一次「從雲端還原」就會自癒，不必動用救援。
+            const origin = o.markerName
+                ? `<span class="badge-green" title="marker 還在，代表班級沒被刪除、只是名冊掉了">marker 尚存「${o.markerName}」</span>`
+                : `<span class="badge-neutral" title="marker 已被刪除，代表老師按過刪除班級">老師刪除後的殘留</span>`;
+            const meta = origin + (hasStudents
+                ? `<span class="badge-neutral">👥 ${o.studentCount} 位學生</span>` +
                   (sample ? `<span class="orphan-sample">${sample}${o.studentCount > o.sampleNames.length ? '…' : ''}</span>` : '')
-                : `<span class="orphan-empty">⚠️ 0 學生（空班，多半是可丟的殘留）</span>`;
+                : `<span class="orphan-empty">0 學生（空殼）</span>`);
             return `
                 <label class="orphan-item">
-                    <input type="checkbox" class="orphan-check" value="${o.id}" ${hasStudents ? 'checked' : ''}>
+                    <input type="checkbox" class="orphan-check" value="${o.id}">
                     <div class="orphan-info">
                         <div class="orphan-line1">
                             <span class="orphan-name">${o.suggestedName || o.id}</span>
@@ -528,15 +548,21 @@
         modal.innerHTML = `
             <div class="admin-modal-content" style="max-width:min(620px,96vw);">
                 <div class="admin-modal-header">
-                    <div class="admin-modal-title">🩺 檢視並挑選要救援的班級</div>
+                    <div class="admin-modal-title">🩺 救回誤刪的班級</div>
                 </div>
                 <div class="admin-modal-body">
                     <p style="font-size:0.9rem;color:#475569;margin-bottom:0.5rem;" class="dark:text-gray-300">
-                        老師「<strong>${teacherName}</strong>」有 ${orphans.length} 個孤兒班級。
-                        <strong>孤兒不一定是遺失的班</strong>，也可能是早期刪掉的殘留——請只勾選「確定要救回」的。
-                        有學生的已預設勾選、空班預設不勾。
+                        老師「<strong>${teacherName}</strong>」有 ${orphans.length} 筆已刪除班級的殘留資料。
+                        <strong>這些多半是老師自己刪掉的，不是遺失的班</strong>——按下去是把它們「復活」到老師的班級清單，不是清理。
+                        所以<strong>預設全部不勾</strong>，只在老師明確回報「誤刪」時勾選對應的那一個。
                     </p>
-                    <p style="font-size:0.82rem;color:#64748b;margin-bottom:1rem;">救回只會補進名冊（只增不減），不會刪任何資料；沒勾的維持原狀。</p>
+                    <p style="font-size:0.82rem;color:#64748b;margin-bottom:0.6rem;">
+                        ⚠️ 光看建立日期分不出來，<strong>請先比對學生名單</strong>再勾——同一份名冊的重複班級，日期看起來會很合理。
+                    </p>
+                    <p style="font-size:0.82rem;color:#64748b;margin-bottom:1rem;">
+                        若某筆標示「marker 尚存」，代表班級沒被刪除、只是名冊掉了，請先請老師做一次「從雲端還原」，系統會自己找回來，不需要動用這裡。
+                        救回只會補進名冊（只增不減），不會刪任何資料；沒勾的維持原狀。
+                    </p>
                     <div class="orphan-list">${rows}</div>
                 </div>
                 <div class="admin-modal-footer" style="justify-content:space-between;">
@@ -688,13 +714,16 @@
                 }
             }
 
+            // 殘留＝老師刪掉班級後留在雲端的資料，是正常現象而非故障，
+            // 所以用中性灰而不是橘色警告；否則每次開後台都像有一堆問題待處理。
             const orphanBadge = item.orphanCount > 0
-                ? `<span class="badge-orange" title="孤兒班級 ID: ${item.orphans.join(', ')}">⚠️ ${item.orphanCount} 個孤兒</span>`
-                : `<span class="badge-green">無孤兒資料</span>`;
+                ? `<span class="badge-neutral" title="已刪除班級的殘留資料
+班級 ID: ${item.orphans.join(', ')}">${item.orphanCount} 筆</span>`
+                : `<span class="badge-neutral" style="opacity:.5;">—</span>`;
 
             // 只有「有孤兒」的老師才出現救援按鈕；用 data-* 帶 uid 給事件委派
             const rescueCell = item.orphanCount > 0
-                ? `<button class="admin-btn-rescue" data-rescue-uid="${item.uid}" data-rescue-name="${(item.name || '').replace(/"/g, '&quot;')}" data-rescue-count="${item.orphanCount}">🩺 一鍵救援</button>`
+                ? `<button class="admin-btn-rescue" title="僅在老師回報「班級誤刪」時使用。按下去是把刪掉的班復活，不是清理殘留。" data-rescue-uid="${item.uid}" data-rescue-name="${(item.name || '').replace(/"/g, '&quot;')}" data-rescue-count="${item.orphanCount}">🩺 救回誤刪</button>`
                 : `<span class="text-xs text-gray-400">—</span>`;
 
             return `
