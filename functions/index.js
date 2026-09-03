@@ -508,8 +508,24 @@ function summarizeEvents(events) {
   };
 }
 
+/**
+ * 把備份狀態變成戰報裡的一行。
+ *
+ * 備份平常靜默不推播（成功不吵人），所以戰報這一行是唯一的「它還活著」訊號。
+ * 沒有紀錄也要明講，不能靜靜略過——那正是備份壞掉時最可能的樣子。
+ */
+function backupLine(backup) {
+  if (!backup || !backup.day) return '🗄️ 備份：今日尚無紀錄 ⚠️';
+  const mb = backup.bytes ? (backup.bytes / 1048576).toFixed(1) + ' MB' : '';
+  const size = mb ? `${mb}／${backup.fileCount || 0} 檔` : '';
+  if (backup.status === 'ok') return `🗄️ 備份 ${size} ✅`;
+  if (backup.status === 'running') return '🗄️ 備份：仍在進行中 ⏳';
+  if (backup.status === 'incomplete') return `🗄️ 備份：${size}，缺少完成標記 ⚠️`;
+  return `🗄️ 備份失敗 ⚠️ ${clip(backup.error, 60)}`;
+}
+
 /** 由彙整結果組出 Google Chat 卡片（含手機推播用的純文字摘要）。 */
-function buildDigestPayload(day, dateLabel, sum) {
+function buildDigestPayload(day, dateLabel, sum, backup) {
   const overviewLines = [`👥 活躍老師 ${sum.activeTeachers} 位`];
   if (sum.newTeachers.length) {
     overviewLines.push(`🎉 新加入 ${sum.newTeachers.length} 位：${sum.newTeachers.slice(0, 5).join('、')}`);
@@ -562,16 +578,16 @@ function buildDigestPayload(day, dateLabel, sum) {
     });
   }
 
+  const healthLines = [
+    sum.errors.length
+      ? `🐞 錯誤 ${sum.errors.length} 則：` + sum.errors.slice(0, 3).map((e) => clip(e.message, 60)).join('；')
+      : '🐞 錯誤 0 則，一切正常 ✅',
+    backupLine(backup),
+  ];
   sections.push({
     header: '🐞 系統健康',
     widgets: [{
-      decoratedText: {
-        topLabel: '錯誤回報',
-        text: sum.errors.length
-          ? `${sum.errors.length} 則\n` + sum.errors.slice(0, 3).map((e) => `• ${clip(e.message, 80)}`).join('\n')
-          : '0 則，一切正常 ✅',
-        wrapText: true,
-      },
+      decoratedText: { topLabel: '今日狀態', text: healthLines.join('\n'), wrapText: true },
     }],
   });
 
@@ -594,6 +610,33 @@ function buildDigestPayload(day, dateLabel, sum) {
       },
     }],
   };
+}
+
+// 備份狀態存放處。每日備份寫入、每日戰報讀出，讓戰報能報「備份還活著」。
+const BACKUP_STATUS_PATH = { col: '_systemStatus', doc: 'lastBackup' };
+
+/**
+ * 推一則系統警報到 Google Chat。
+ *
+ * ⚠️ 只在「真的出事」時呼叫。日常成功一律靜默——每天報一次「備份成功」
+ * 正是 v3.13.0 花力氣消滅掉的那種噪音；沒消息就是好消息，狀態改由
+ * 每日戰報帶一行出來。
+ */
+async function pushSystemAlert(webhook, title, lines) {
+  if (!webhook) return false;
+  const text = '⚠️ ' + title + '\n' + lines.join('\n');
+  return postToChat(webhook, {
+    text,
+    cardsV2: [{
+      cardId: 'alert-' + Date.now(),
+      card: {
+        header: { title: '⚠️ ' + title, subtitle: '班級小管家 · 系統警報' },
+        sections: [{
+          widgets: [{ decoratedText: { topLabel: '詳細', text: lines.join('\n'), wrapText: true } }],
+        }],
+      },
+    }],
+  });
 }
 
 /**
@@ -633,13 +676,24 @@ exports.dailyUsageDigest = onSchedule(
       return;
     }
 
+    // 備份狀態：只有今天的才算數，隔夜的舊紀錄不能當成「今天備份成功」
+    let backup = null;
+    try {
+      const bs = await admin.firestore()
+        .collection(BACKUP_STATUS_PATH.col).doc(BACKUP_STATUS_PATH.doc).get();
+      const bd = bs.exists ? bs.data() : null;
+      if (bd && bd.day === day) backup = bd;
+    } catch (e) {
+      logger.warn('[Digest] 讀取備份狀態失敗', e);
+    }
+
     const events = snap.docs.map((doc) => doc.data() || {});
     const sum = summarizeEvents(events);
     const dateLabel = new Date().toLocaleDateString('zh-TW', {
       timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit', weekday: 'short',
     });
 
-    const ok = await postToChat(webhook, buildDigestPayload(day, dateLabel, sum));
+    const ok = await postToChat(webhook, buildDigestPayload(day, dateLabel, sum, backup));
     logger.info(`[Digest] ${day} 戰報${ok ? '已送出' : '送出失敗'}`, {
       events: snap.size, activeTeachers: sum.activeTeachers, errors: sum.errors.length,
     });
@@ -668,6 +722,7 @@ exports.scheduledFirestoreExport = onSchedule(
     schedule: 'every day 04:00',
     timeZone: 'Asia/Taipei',
     region: REGION,
+    secrets: [GOOGLE_CHAT_WEBHOOK],
     timeoutSeconds: 540, // 支援大檔案，設為 9 分鐘
     memory: '256MiB'
   },
@@ -680,28 +735,120 @@ exports.scheduledFirestoreExport = onSchedule(
     // 專用備份桶（與 Firestore 同區域）。刻意不用 admin.storage() 的預設桶，
     // 本專案沒有啟用 Firebase Storage，拿到的會是不存在的桶名。
     const bucketName = process.env.BACKUP_BUCKET || `${projectId}-firestore-backups`;
+    const day = taipeiDay();
+    const prefix = `firestore_backups/${day}`;
+    const outputUriPrefix = `gs://${bucketName}/${prefix}`;
 
-    // 依日期分資料夾，方便一眼看出哪天的備份，也讓生命週期規則好清
-    const stamp = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
-    const outputUriPrefix = `gs://${bucketName}/firestore_backups/${stamp}`;
+    const webhook = (GOOGLE_CHAT_WEBHOOK.value() || '').trim();
+    const statusRef = admin.firestore()
+      .collection(BACKUP_STATUS_PATH.col).doc(BACKUP_STATUS_PATH.doc);
+    const startedAt = new Date().toISOString();
+
+    const bucket = admin.storage().bucket(bucketName);
 
     try {
+      // ⚠️ 冪等檢查：Firestore 匯出不允許寫進已存在的路徑，同一天重跑會噴
+      //    INVALID_ARGUMENT: Path already exists。排程失敗會自動重試，若不先擋掉，
+      //    一次失敗就會變成連續假警報轟炸。今天已備份完成就直接視為成功。
+      const [existing] = await bucket.getFiles({ prefix });
+      if (existing.some((f) => f.name.endsWith('overall_export_metadata'))) {
+        const bytes0 = existing.reduce((n, f) => n + Number((f.metadata && f.metadata.size) || 0), 0);
+        logger.info(`[Backup] ${day} 已有完整備份，略過重複匯出`);
+        await statusRef.set({
+          day, startedAt, finishedAt: new Date().toISOString(), status: 'ok',
+          bytes: bytes0, fileCount: existing.length, outputUriPrefix,
+          note: 'already-exists', expireAt: expiryTimestamp(),
+        });
+        return { success: true, skipped: true };
+      }
+
       logger.info(`[Backup] 開始自動備份 Firestore，匯出至: ${outputUriPrefix}`);
       const [operation] = await client.exportDocuments({
         name: databaseName,
         outputUriPrefix: outputUriPrefix,
         collectionIds: [] // 留空代表匯出所有 collections
       });
-      
-      logger.info(`[Backup] 備份作業已順利啟動，Operation Name: ${operation.name}`);
-      return { success: true, operation: operation.name };
+      logger.info(`[Backup] 匯出作業已啟動: ${operation.name}`);
+
+      // ⚠️ exportDocuments 只是「啟動」長時間作業，回傳當下什麼都還沒寫出去。
+      //    舊版到這裡就 return，所以匯出中途失敗永遠不會被發現。這裡等它真的跑完。
+      const TIMEOUT_MS = 420000; // 留 2 分鐘給後續統計與警報，不要吃掉整個 540s
+      let timer;
+      try {
+        await Promise.race([
+          operation.promise(),
+          new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error('__still_running__')), TIMEOUT_MS);
+          }),
+        ]);
+      } finally {
+        clearTimeout(timer);
+      }
+
+      // 統計實際產出。有 overall_export_metadata 才代表匯出完整跑完，
+      // 只有一堆 output-* 檔可能是中途失敗的半成品。
+      const [files] = await bucket.getFiles({ prefix });
+      const bytes = files.reduce((n, f) => n + Number((f.metadata && f.metadata.size) || 0), 0);
+      const complete = files.some((f) => f.name.endsWith('overall_export_metadata'));
+
+      await statusRef.set({
+        day, startedAt, finishedAt: new Date().toISOString(),
+        status: complete ? 'ok' : 'incomplete',
+        bytes, fileCount: files.length, outputUriPrefix,
+        expireAt: expiryTimestamp(),
+      });
+
+      if (!complete) {
+        logger.error('[Backup] 匯出結束但缺少完成標記，可能是半成品', { files: files.length });
+        await pushSystemAlert(webhook, '每日備份可能不完整', [
+          `日期：${day}`,
+          `產出 ${files.length} 個檔案，但缺少 overall_export_metadata 完成標記`,
+          `位置：${outputUriPrefix}`,
+        ]);
+        return;
+      }
+
+      logger.info(`[Backup] 備份完成：${files.length} 個檔案 / ${(bytes / 1048576).toFixed(2)} MiB`);
+      return { success: true, files: files.length, bytes };
     } catch (error) {
+      const msg = String((error && error.message) || error);
+
+      // 競態下仍可能撞到（前面檢查完、匯出啟動前剛好有另一次跑完），一樣不算失敗
+      if (msg.includes('Path already exists')) {
+        logger.info(`[Backup] ${day} 已存在備份，視為完成`);
+        await statusRef.set({
+          day, startedAt, finishedAt: new Date().toISOString(), status: 'ok',
+          outputUriPrefix, note: 'already-exists', expireAt: expiryTimestamp(),
+        }, { merge: true });
+        return;
+      }
+
+      const stillRunning = error && error.message === '__still_running__';
+      await statusRef.set({
+        day, startedAt, finishedAt: new Date().toISOString(),
+        status: stillRunning ? 'running' : 'failed',
+        error: stillRunning ? '' : String((error && error.message) || error).slice(0, 300),
+        outputUriPrefix, expireAt: expiryTimestamp(),
+      }, { merge: true });
+
+      if (stillRunning) {
+        // 還在跑不算失敗，不吵人；當天戰報會顯示狀態，隔天仍未完成才會被看見。
+        logger.warn('[Backup] 匯出仍在進行中，本次不再等待');
+        return;
+      }
+
       logger.error('[Backup] Firestore 自動備份失敗:', error);
-      throw error;
+      await pushSystemAlert(webhook, '每日備份失敗', [
+        `日期：${day}`,
+        `錯誤：${msg.slice(0, 200)}`,
+        '請檢查備份桶權限與 Cloud Functions log。',
+      ]);
+      // 刻意不 throw：拋出會讓排程重試，而重試多半以同樣原因再失敗一次，
+      // 變成同一個問題連發好幾則警報。狀態已寫進 Firestore、警報也發了，
+      // 當晚的戰報還會再帶一行，訊號足夠。
     }
   }
 );
-
 /**
  * 維運小後台 API (R-D1)：列出所有教師的統計數據（班級數、最後同步時間、孤兒資料）。
  *
