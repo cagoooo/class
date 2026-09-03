@@ -925,6 +925,37 @@ function updateCloudStatusUI(connected) {
 
 // ─────────────────────────────────────────────────────
 // 一鍵同步所有班級（科任老師功能）
+/**
+ * 由班級名冊組出「所有班級」清單（一鍵同步／一鍵還原的來源）。
+ *
+ * ⚠️ 這裡有兩個踩過的雷，改動前先看清楚：
+ *   1. `default` **本來就在 `classProfiles` 裡**。舊寫法是先硬塞一筆
+ *      `{id:'default', name:'預設班級'}` 再把整份名冊攤開，於是 default
+ *      出現兩次——UI 會列出「預設班級」和「601」兩列（其實同一個班），
+ *      而且同一份資料會被上傳兩遍。所以一定要以 id 去重。
+ *   2. default 的名稱要用名冊裡的，不能寫死「預設班級」。老師可以改名
+ *      （阿凱把它改成「601」），寫死會讓 UI 顯示成他不認得的名字。
+ */
+function buildAllClassList(profiles) {
+    const list = [];
+    const seen = new Set();
+    const arr = Array.isArray(profiles) ? profiles : [];
+
+    // default 固定排第一個，名稱優先取名冊裡的
+    const def = arr.find(p => p && String(p.id) === 'default');
+    list.push({ id: 'default', name: (def && def.name) || '預設班級' });
+    seen.add('default');
+
+    arr.forEach((p) => {
+        if (!p || p.id == null) return;
+        const id = String(p.id);
+        if (seen.has(id)) return;
+        seen.add(id);
+        list.push({ id, name: p.name || id });
+    });
+    return list;
+}
+
 // ─────────────────────────────────────────────────────
 
 /**
@@ -999,11 +1030,7 @@ async function syncAllClassesToCloud(onProgress) {
 
     try {
         const profiles = JSON.parse(localStorage.getItem('classProfiles') || '[]');
-        // 包含預設班（空陣列時也要同步）
-        const allClasses = [
-            { id: 'default', name: '預設班級' },
-            ...profiles.map(p => ({ id: String(p.id), name: p.name || p.id }))
-        ];
+        const allClasses = buildAllClassList(profiles);   // 含 default、已去重
 
         const db = window.FirebaseConfig.getDb();
         const userId = window.FirebaseConfig.getCurrentUserId();
@@ -1130,10 +1157,7 @@ async function showAllClassSyncModal() {
     document.getElementById(existId)?.remove();
 
     const profiles = JSON.parse(localStorage.getItem('classProfiles') || '[]');
-    const allClasses = [
-        { id: 'default', name: '預設班級' },
-        ...profiles.map(p => ({ id: String(p.id), name: p.name || p.id }))
-    ];
+    const allClasses = buildAllClassList(profiles);   // 含 default、已去重
     const total = allClasses.length;
 
     // 建立 Modal
@@ -1544,11 +1568,7 @@ async function syncAllClassesFromCloud(onProgress) {
         // ⚡ 先從雲端 _meta 取得完整班級清單並合併進本地，
         //    否則新裝置本地只有 default，這個迴圈永遠只還原預設班（601~606 不會被發現）
         const profiles = await syncClassProfilesFromCloud();
-        const allClasses = [
-            { id: 'default', name: '預設班級' },
-            ...profiles.filter(p => String(p.id) !== 'default')
-                .map(p => ({ id: String(p.id), name: p.name || p.id }))
-        ];
+        const allClasses = buildAllClassList(profiles);   // 含 default、已去重
 
         for (let i = 0; i < allClasses.length; i++) {
             const cls = allClasses[i];
@@ -1679,11 +1699,7 @@ async function showAllClassDownloadModal() {
 
     // ⚡ 先從雲端抓班級清單，讓進度列表能列出所有班級（新裝置本地只有 default）
     const profiles = await syncClassProfilesFromCloud();
-    const allClasses = [
-        { id: 'default', name: '預設班級' },
-        ...profiles.filter(p => String(p.id) !== 'default')
-            .map(p => ({ id: String(p.id), name: p.name || p.id }))
-    ];
+    const allClasses = buildAllClassList(profiles);   // 含 default、已去重
     const total = allClasses.length;
 
     const wrap = document.createElement('div');
