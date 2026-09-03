@@ -1023,30 +1023,57 @@ const COUNTY_BY_CODE = {
   phc: '澎湖縣', matsu: '連江縣',
 };
 
-// 是 .edu.tw 但不代表縣市的特例（教育雲共用帳號、大學等）
-const NON_COUNTY_EDU = {
-  go: '教育雲帳號（跨縣市）',
-  nttu: '國立臺東大學',
+// 大專院校等「自有 .edu.tw 網域」的學校：不走 <校名>.<縣市碼>.edu.tw 規則，
+// 網域第三段是學校代碼而不是縣市碼。這裡直接對應到學校實際所在縣市，
+// 讓這些老師也能正確計入縣市分佈。
+//
+// ⚠️ 千萬別把這些代碼塞進 COUNTY_BY_CODE —— 那是縣市碼表，混進學校碼會讓
+//    後人（和我自己）誤以為 ctcn、nttu 是某個縣市的代碼。
+const INSTITUTION_BY_CODE = {
+  ctcn: { county: '新北市', name: '耕莘健康管理專科學校' },
+  nttu: { county: '臺東縣', name: '國立臺東大學' },
 };
 
-/** 由 email 推出 { county, code, domain }。判不出縣市時 county 為 null。 */
+// 是 .edu.tw 但本質上跨縣市、無從歸屬的帳號（教育部教育雲共用帳號）。
+// 這類**不可以**進縣市分佈，否則圖上會出現一根不是縣市的假長條。
+const CROSS_COUNTY_EDU = {
+  go: '教育雲帳號（跨縣市）',
+};
+
+/**
+ * 由 email 判斷歸屬。回傳：
+ *   county      縣市名，判不出為 null（只有真正的縣市會有值）
+ *   school      學校名，僅自有網域的大專院校才有
+ *   crossCounty 跨縣市帳號的標籤（如教育雲），否則為空字串
+ *   code        .edu.tw 網域的第三段（非教育網域為空字串）
+ *   domain      完整網域
+ */
 function classifyEmail(email) {
   const e = String(email || '').toLowerCase().trim();
   const at = e.indexOf('@');
-  if (at < 0) return { county: null, code: '', domain: '' };
+  const empty = { county: null, school: '', crossCounty: '', code: '', domain: '' };
+  if (at < 0) return empty;
   const domain = e.slice(at + 1);
   const parts = domain.split('.');
 
   // 非教育網域（gmail / hotmail / 自架網域…）
   if (parts.length < 3 || parts[parts.length - 2] !== 'edu' || parts[parts.length - 1] !== 'tw') {
-    return { county: null, code: '', domain };
+    return { county: null, school: '', crossCounty: '', code: '', domain };
   }
 
   const code = parts[parts.length - 3];
-  if (COUNTY_BY_CODE[code]) return { county: COUNTY_BY_CODE[code], code, domain };
-  if (NON_COUNTY_EDU[code]) return { county: NON_COUNTY_EDU[code], code, domain };
-  // 是 .edu.tw 卻對不上代碼 → 讓它浮出來，不要默默歸成「其他」
-  return { county: null, code, domain };
+  if (COUNTY_BY_CODE[code]) {
+    return { county: COUNTY_BY_CODE[code], school: '', crossCounty: '', code, domain };
+  }
+  if (INSTITUTION_BY_CODE[code]) {
+    const inst = INSTITUTION_BY_CODE[code];
+    return { county: inst.county, school: inst.name, crossCounty: '', code, domain };
+  }
+  if (CROSS_COUNTY_EDU[code]) {
+    return { county: null, school: '', crossCounty: CROSS_COUNTY_EDU[code], code, domain };
+  }
+  // 是 .edu.tw 卻對不上任何表 → 讓它浮出來，不要默默歸成「其他」
+  return { county: null, school: '', crossCounty: '', code, domain };
 }
 
 /** 兩個日期相差幾天（以台北日界線計）。 */
@@ -1106,6 +1133,8 @@ exports.getUsageAnalytics = onCall(
       const schoolMap = {};
       const unmapped = {};
       const personalMap = {};   // 個人信箱網域（gmail.com 等）另外統計
+      const crossCounty = {};   // 教育雲等跨縣市帳號，不歸任何縣市
+      const schoolNames = {};   // 網域 → 學校全名（僅大專院校自有網域有）
       let personalEmail = 0;
 
       teachers.forEach((t) => {
@@ -1127,10 +1156,13 @@ exports.getUsageAnalytics = onCall(
           if (c.county || c.code) schoolMap[c.domain] = (schoolMap[c.domain] || 0) + 1;
           else personalMap[c.domain] = (personalMap[c.domain] || 0) + 1;
         }
+        if (c.school) schoolNames[c.domain] = c.school;
         if (c.county) {
           if (!countyMap[c.county]) countyMap[c.county] = { name: c.county, teachers: 0, schools: {} };
           countyMap[c.county].teachers++;
           countyMap[c.county].schools[c.domain] = true;
+        } else if (c.crossCounty) {
+          crossCounty[c.crossCounty] = (crossCounty[c.crossCounty] || 0) + 1;  // 教育雲等跨縣市帳號
         } else if (c.code) {
           unmapped[c.domain] = (unmapped[c.domain] || 0) + 1;   // 是 .edu.tw 但代碼不認得
         } else {
@@ -1153,7 +1185,12 @@ exports.getUsageAnalytics = onCall(
         .sort((a, b) => b.teachers - a.teachers);
 
       const schools = Object.keys(schoolMap)
-        .map((d) => ({ domain: d, teachers: schoolMap[d], county: classifyEmail('x@' + d).county || '' }))
+        .map((d) => ({
+          domain: d,
+          teachers: schoolMap[d],
+          county: classifyEmail('x@' + d).county || '',
+          name: schoolNames[d] || '',
+        }))
         .sort((a, b) => b.teachers - a.teachers)
         .slice(0, 20);
 
@@ -1204,6 +1241,9 @@ exports.getUsageAnalytics = onCall(
           schools,
           unmappedDomains: Object.keys(unmapped)
             .map((d) => ({ domain: d, teachers: unmapped[d] }))
+            .sort((a, b) => b.teachers - a.teachers),
+          crossCountyAccounts: Object.keys(crossCounty)
+            .map((k) => ({ label: k, teachers: crossCounty[k] }))
             .sort((a, b) => b.teachers - a.teachers),
           personalDomains: Object.keys(personalMap)
             .map((d) => ({ domain: d, teachers: personalMap[d] }))

@@ -690,7 +690,8 @@
         const coverage = a.teachers ? Math.round(countyTeachers / a.teachers * 100) : 0;
         html += section('🗺️ 縣市分佈',
             '依學校 email 網域判斷，涵蓋 ' + countyTeachers + ' / ' + (a.teachers || 0)
-                + ' 位老師（' + coverage + '%）。其餘是個人信箱登入，網域無從得知縣市，另見下方統計。',
+                + ' 位老師（' + coverage + '%）。其餘是個人信箱或教育雲跨縣市帳號，'
+                + '網域無從得知縣市，另見下方統計。',
             barChart(counties.map(function (c) { return { label: c.name, value: c.teachers }; }), { unit: ' 位' }));
 
         html += section('📈 老師成長',
@@ -718,8 +719,18 @@
         html += section('🏫 學校排行',
             '只含教育網域（.edu.tw）；個人信箱不是學校，不列入。',
             barChart((d.schools || []).map(function (s) {
-                return { label: (s.county ? s.county + ' · ' : '') + s.domain, value: s.teachers };
+                const who = s.name || s.domain;
+                return { label: (s.county ? s.county + ' · ' : '') + who, value: s.teachers };
             }), { unit: ' 位' }));
+
+        const cc = d.crossCountyAccounts || [];
+        if (cc.length) {
+            html += section('☁️ 跨縣市帳號',
+                '教育部教育雲共用帳號，網域本身不隸屬任何縣市，因此不列入縣市分佈。',
+                barChart(cc.map(function (c) {
+                    return { label: c.label, value: c.teachers };
+                }), { unit: ' 位' }));
+        }
 
         const pd = d.personalDomains || [];
         if (pd.length) {
