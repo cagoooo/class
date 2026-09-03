@@ -690,7 +690,7 @@
         const coverage = a.teachers ? Math.round(countyTeachers / a.teachers * 100) : 0;
         html += section('🗺️ 縣市分佈',
             '依學校 email 網域判斷，涵蓋 ' + countyTeachers + ' / ' + (a.teachers || 0)
-                + ' 位老師（' + coverage + '%）。其餘用個人信箱登入，網域看不出縣市，只能略過。',
+                + ' 位老師（' + coverage + '%）。其餘是個人信箱登入，網域無從得知縣市，另見下方統計。',
             barChart(counties.map(function (c) { return { label: c.name, value: c.teachers }; }), { unit: ' 位' }));
 
         html += section('📈 老師成長',
@@ -724,8 +724,9 @@
         const pd = d.personalDomains || [];
         if (pd.length) {
             html += section('📮 個人信箱登入',
-                '這些老師有被算進總人數、成長曲線與活躍度，但網域看不出學校與縣市，'
-                    + '是縣市分析唯一的盲區。',
+                '用個人信箱登入是正常且被支持的用法，不必也不會要求老師改用學校信箱。'
+                    + '這些老師一樣計入總人數、成長曲線與活躍度，只是網域看不出縣市，'
+                    + '所以縣市分佈那張圖不含他們。',
                 barChart(pd.map(function (u) {
                     return { label: u.domain, value: u.teachers };
                 }), { unit: ' 位' }));
