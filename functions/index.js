@@ -779,9 +779,16 @@ exports.getAdminStats = onCall(
         const cloudClassIds = classesDocs.map(doc => doc.id);
         
         // 對照班級名冊與雲端 classes 集合，篩選出孤兒班級
-        const activeClassIds = new Set(classProfiles.map(p => p.id));
-        // 'default' 是預設班級，不列在 classProfiles 中但它是合法的，不算孤兒
-        activeClassIds.add('default'); 
+        //
+        // ⚠️ 更正一個長期寫錯的註解：`default` **是會列在 classProfiles 裡的**。
+        //    前端 class-profiles.js 的 loadProfiles() 會在名冊缺 default 時自動補上，
+        //    實測 134 位有名冊的老師裡 133 位（99%）名冊中都有它。
+        //    先前註解寫成「不列在 classProfiles 中」，正是 v3.16.2 那個
+        //    「一鍵同步把預設班列兩次」bug 的思路來源——有人照這句話去硬塞一筆
+        //    default，結果同一個班出現兩次、資料被上傳兩遍。
+        //    這裡改用 Set 併入，名冊有沒有 default 兩種情況都正確。
+        const activeClassIds = new Set(classProfiles.map(p => String(p.id)));
+        activeClassIds.add('default');
 
         const orphans = cloudClassIds.filter(id => !activeClassIds.has(id));
 
@@ -789,7 +796,9 @@ exports.getAdminStats = onCall(
           uid,
           email: authUser.email,
           name: authUser.name,
-          classCount: classProfiles.length,
+          // 用去重後的集合計數：名冊本來就含 default 時不會多算，
+          // 極少數舊帳號名冊缺 default 時也不會少算那個班。
+          classCount: activeClassIds.size,
           orphanCount: orphans.length,
           orphans: orphans,
           lastSync: syncInfo && syncInfo.lastUploadAt ? syncInfo.lastUploadAt.toDate().toISOString() : null,
