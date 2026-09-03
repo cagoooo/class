@@ -1105,6 +1105,7 @@ exports.getUsageAnalytics = onCall(
       const countyMap = {};
       const schoolMap = {};
       const unmapped = {};
+      const personalMap = {};   // 個人信箱網域（gmail.com 等）另外統計
       let personalEmail = 0;
 
       teachers.forEach((t) => {
@@ -1120,7 +1121,12 @@ exports.getUsageAnalytics = onCall(
         else activity.older++;
 
         const c = classifyEmail(t.email);
-        if (c.domain) schoolMap[c.domain] = (schoolMap[c.domain] || 0) + 1;
+        // 學校排行只能收教育網域：gmail.com 不是學校，
+        // 混進去會以 34 位霸佔第一名，把真正的學校擠下去。
+        if (c.domain) {
+          if (c.county || c.code) schoolMap[c.domain] = (schoolMap[c.domain] || 0) + 1;
+          else personalMap[c.domain] = (personalMap[c.domain] || 0) + 1;
+        }
         if (c.county) {
           if (!countyMap[c.county]) countyMap[c.county] = { name: c.county, teachers: 0, schools: {} };
           countyMap[c.county].teachers++;
@@ -1198,6 +1204,9 @@ exports.getUsageAnalytics = onCall(
           schools,
           unmappedDomains: Object.keys(unmapped)
             .map((d) => ({ domain: d, teachers: unmapped[d] }))
+            .sort((a, b) => b.teachers - a.teachers),
+          personalDomains: Object.keys(personalMap)
+            .map((d) => ({ domain: d, teachers: personalMap[d] }))
             .sort((a, b) => b.teachers - a.teachers),
           events: { days, features, totalEvents: snap.size },
         },

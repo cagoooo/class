@@ -682,11 +682,15 @@
             + kpi('近 7 天活躍', active7, '位')
             + kpi('近 30 天活躍', active30, '位')
             + kpi('涵蓋縣市', counties.length, '個')
+            + kpi('個人信箱登入', a.personalEmail || 0, '位')
             + kpi('匿名訪客帳號', a.anonymous || 0, '')
             + '</div>';
 
+        const countyTeachers = counties.reduce(function (n, c) { return n + c.teachers; }, 0);
+        const coverage = a.teachers ? Math.round(countyTeachers / a.teachers * 100) : 0;
         html += section('🗺️ 縣市分佈',
-            '依學校 email 網域判斷。用個人信箱（如 Gmail）的 ' + (a.personalEmail || 0) + ' 位老師無法判斷縣市，未列入。',
+            '依學校 email 網域判斷，涵蓋 ' + countyTeachers + ' / ' + (a.teachers || 0)
+                + ' 位老師（' + coverage + '%）。其餘用個人信箱登入，網域看不出縣市，只能略過。',
             barChart(counties.map(function (c) { return { label: c.name, value: c.teachers }; }), { unit: ' 位' }));
 
         html += section('📈 老師成長',
@@ -712,10 +716,20 @@
             }), { warm: true, unit: ' 次' }));
 
         html += section('🏫 學校排行',
-            '老師人數最多的前 ' + (d.schools || []).length + ' 個網域。',
+            '只含教育網域（.edu.tw）；個人信箱不是學校，不列入。',
             barChart((d.schools || []).map(function (s) {
                 return { label: (s.county ? s.county + ' · ' : '') + s.domain, value: s.teachers };
             }), { unit: ' 位' }));
+
+        const pd = d.personalDomains || [];
+        if (pd.length) {
+            html += section('📮 個人信箱登入',
+                '這些老師有被算進總人數、成長曲線與活躍度，但網域看不出學校與縣市，'
+                    + '是縣市分析唯一的盲區。',
+                barChart(pd.map(function (u) {
+                    return { label: u.domain, value: u.teachers };
+                }), { unit: ' 位' }));
+        }
 
         const un = d.unmappedDomains || [];
         if (un.length) {
