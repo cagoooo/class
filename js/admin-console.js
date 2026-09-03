@@ -267,6 +267,54 @@
                 #admin-search-input { width: 100% !important; }
                 .admin-table th, .admin-table td { padding: 0.6rem 0.7rem; font-size: 0.82rem; }
             }
+            /* ── 清理殘留（破壞性操作，視覺刻意與救援完全不同）── */
+            .admin-btn-purge {
+                background: #fff;
+                color: #b91c1c;
+                border: 1px solid #fca5a5;
+                padding: 0.35rem 0.7rem;
+                border-radius: 0.5rem;
+                font-size: 0.78rem;
+                font-weight: 700;
+                cursor: pointer;
+                white-space: nowrap;
+            }
+            .admin-btn-purge:hover { background: #fef2f2; border-color: #ef4444; }
+            .dark .admin-btn-purge { background: transparent; color: #fca5a5; border-color: #7f1d1d; }
+            .purge-modal .admin-modal-header { background: linear-gradient(135deg, #991b1b, #dc2626); }
+            .purge-warn {
+                background: #fef2f2;
+                border: 1px solid #fecaca;
+                border-radius: 0.75rem;
+                padding: 0.8rem 0.9rem;
+                font-size: 0.85rem;
+                color: #991b1b;
+                margin-bottom: 0.9rem;
+                line-height: 1.6;
+            }
+            .dark .purge-warn { background: rgba(127,29,29,.25); border-color: #7f1d1d; color: #fca5a5; }
+            .purge-confirm-input {
+                width: 100%;
+                padding: 0.55rem 0.7rem;
+                border: 2px solid #fca5a5;
+                border-radius: 0.55rem;
+                font-size: 0.9rem;
+                margin-top: 0.5rem;
+                outline: none;
+            }
+            .dark .purge-confirm-input { background: #1e293b; color: #f1f5f9; border-color: #7f1d1d; }
+            .btn-danger {
+                background: #dc2626; color: #fff; border: none;
+                padding: 0.6rem 1.2rem; border-radius: 0.6rem;
+                font-weight: 700; cursor: pointer; font-size: 0.9rem;
+            }
+            .btn-danger:disabled { opacity: .45; cursor: not-allowed; }
+            .btn-danger:not(:disabled):hover { background: #b91c1c; }
+            .purge-meta { font-size: 0.78rem; color: #64748b; }
+            .dark .purge-meta { color: #94a3b8; }
+            .purge-stale { color: #059669; font-weight: 600; }
+            .purge-recent { color: #b45309; font-weight: 700; }
+
             /* ── 可排序表頭 ── */
             .admin-table th.sortable {
                 cursor: pointer;
@@ -469,9 +517,10 @@
 
         // 一鍵救援（事件委派，按鈕每次 renderTable 都會重建）
         overlay.querySelector('#admin-table-body').addEventListener('click', (e) => {
-            const btn = e.target.closest('.admin-btn-rescue');
-            if (!btn) return;
-            rescueTeacher(btn);
+            const rescueBtn = e.target.closest('.admin-btn-rescue');
+            if (rescueBtn) { rescueTeacher(rescueBtn); return; }
+            const purgeBtn = e.target.closest('.admin-btn-purge');
+            if (purgeBtn) { purgeTeacher(purgeBtn); }
         });
     }
 
@@ -671,6 +720,187 @@
         renderTable();
     }
 
+
+    // ── 清理殘留 ──────────────────────────────────────────
+    // 與救援共用「先看明細再勾選」的流程，但視覺與確認機制刻意做得更重：
+    // 救援按錯只是多一個班（可再刪），清理按錯是資料永久消失。
+
+    /** 距今幾天。 */
+    function daysAgo(iso) {
+        if (!iso) return null;
+        const t = new Date(iso).getTime();
+        if (!isFinite(t)) return null;
+        return Math.floor((Date.now() - t) / 86400000);
+    }
+
+    /**
+     * 目前這個學期是什麼時候開始的。
+     * 台灣學制：上學期約 8 月底開學、下學期約 2 月開學，所以用 8/1 與 2/1 當界線。
+     *
+     * ⚠️ 不要改用「幾天前」當門檻：上學期末（6 月底）到新學年開學（9 月初）
+     * 只隔約 68 天，用 90 天判斷會把「明明是上學期的資料」標成「不算舊」，
+     * 剛好把最該清的那批標錯。學期界線才對得上老師的認知。
+     */
+    function currentSemesterStart() {
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = now.getMonth() + 1;
+        if (m >= 8) return new Date(y, 7, 1);        // 8-12 月：本學期自 8/1 起
+        if (m <= 1) return new Date(y - 1, 7, 1);    // 1 月：仍屬去年 8/1 開始的上學期
+        return new Date(y, 1, 1);                    // 2-7 月：本學期自 2/1 起
+    }
+
+    /** 這份殘留是「本學期還動過」還是「上學期以前的」。 */
+    function ageClass(iso) {
+        if (!iso) return { cls: 'purge-meta', text: '無異動紀錄' };
+        const t = new Date(iso).getTime();
+        if (!isFinite(t)) return { cls: 'purge-meta', text: '無異動紀錄' };
+        const d = daysAgo(iso);
+        const label = new Date(t).toLocaleDateString('zh-TW');
+        return t < currentSemesterStart().getTime()
+            ? { cls: 'purge-stale', text: '上學期以前（最後異動 ' + label + '，' + d + ' 天前）' }
+            : { cls: 'purge-recent', text: '本學期還動過（' + label + '，' + d + ' 天前）請確認' };
+    }
+
+    async function purgeTeacher(btn) {
+        const uid = btn.getAttribute('data-purge-uid');
+        const name = btn.getAttribute('data-purge-name') || '該老師';
+        btn.disabled = true;
+        const orig = btn.textContent;
+        btn.textContent = '讀取中…';
+        try {
+            const fn = firebase.app().functions('asia-east1').httpsCallable('getTeacherOrphanDetails');
+            const resp = await fn({ uid: uid });
+            const list = (resp && resp.data && resp.data.data) || [];
+            if (!list.length) {
+                if (typeof NotificationSystem !== 'undefined') NotificationSystem.info('這位老師目前沒有殘留資料');
+                return;
+            }
+            openPurgeReview(uid, name, list);
+        } catch (e) {
+            console.error('[AdminConsole] 讀取殘留明細失敗:', e);
+            if (typeof NotificationSystem !== 'undefined') {
+                NotificationSystem.error('讀取殘留明細失敗：' + (e.message || ''));
+            }
+        } finally {
+            btn.disabled = false;
+            btn.textContent = orig;
+        }
+    }
+
+    function openPurgeReview(uid, teacherName, items) {
+        let modal = document.getElementById('purge-review-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'purge-review-modal';
+            modal.className = 'admin-modal-overlay purge-modal';
+            modal.style.zIndex = '10002';
+            document.body.appendChild(modal);
+        }
+
+        const rows = items.map(function (o) {
+            const a = ageClass(o.lastWrite);
+            const age = '<span class="' + a.cls + '">' + a.text + '</span>';
+            const sample = (o.sampleNames || []).join('、');
+            const marker = o.markerName
+                ? '<span class="badge-green">marker 尚存「' + esc(o.markerName) + '」</span>'
+                : '';
+            return '<label class="orphan-item">'
+                + '<input type="checkbox" class="purge-check" value="' + esc(o.id) + '"'
+                + ' data-students="' + (o.studentCount || 0) + '" data-records="' + (o.totalRecords || 0) + '">'
+                + '<div class="orphan-info">'
+                + '<div class="orphan-line1"><span class="orphan-name">' + esc(o.suggestedName || o.id) + '</span>'
+                + (o.createdLabel ? '<span class="orphan-date">建立於 ' + esc(o.createdLabel) + '</span>' : '')
+                + '</div>'
+                + '<div class="orphan-line2">' + marker
+                + '<span class="badge-neutral">學生 ' + (o.studentCount || 0) + ' 位</span>'
+                + '<span class="badge-neutral">紀錄 ' + (o.totalRecords || 0) + ' 筆</span>'
+                + age + '</div>'
+                + (sample ? '<div class="orphan-sample">' + esc(sample) + '…</div>' : '')
+                + '<div class="orphan-id">ID: ' + esc(o.id) + '</div>'
+                + '</div></label>';
+        }).join('');
+
+        modal.innerHTML = '<div class="admin-modal-content" style="max-width:min(660px,96vw);">'
+            + '<div class="admin-modal-header"><div class="admin-modal-title">🧹 永久清理已刪除班級的殘留</div></div>'
+            + '<div class="admin-modal-body">'
+            + '<div class="purge-warn"><strong>這是不可逆的刪除，而且動的是「' + esc(teacherName) + '」的資料。</strong><br>'
+            + '刪除前系統會自動把整個班的內容匯出成 JSON 存進備份桶（備份失敗就不會刪），'
+            + '每日 Firestore 全量備份也保留 30 天，所以真的刪錯還救得回來——但要人工還原，不會自動復原。</div>'
+            + '<p style="font-size:0.86rem;color:#475569;margin-bottom:0.6rem;">'
+            + '請<strong>逐筆確認學生名單與最後異動時間</strong>再勾選。'
+            + '綠色代表最後異動在<strong>上學期以前</strong>（通常就是可以清的）；'
+            + '橘色代表<strong>本學期還被動過</strong>，很可能是老師還在用或剛建錯的，不要順手勾掉。</p>'
+            + '<div class="orphan-list">' + rows + '</div>'
+            + '<div style="margin-top:1rem;">'
+            + '<div id="purge-summary" style="font-size:0.88rem;font-weight:700;color:#991b1b;">尚未勾選任何項目</div>'
+            + '<label style="font-size:0.82rem;color:#64748b;display:block;margin-top:0.6rem;">確認請輸入「刪除」兩個字：'
+            + '<input type="text" class="purge-confirm-input" id="purge-confirm-text" autocomplete="off"></label>'
+            + '</div></div>'
+            + '<div class="admin-modal-footer" style="justify-content:space-between;">'
+            + '<button class="admin-btn-cancel" id="purge-cancel-btn">取消</button>'
+            + '<button class="btn-danger" id="purge-confirm-btn" disabled>永久刪除勾選的殘留</button>'
+            + '</div></div>';
+
+        requestAnimationFrame(function () { modal.classList.add('open'); });
+
+        const confirmBtn = modal.querySelector('#purge-confirm-btn');
+        const textInput = modal.querySelector('#purge-confirm-text');
+        const summary = modal.querySelector('#purge-summary');
+
+        // 兩個條件同時成立才解鎖：有勾選 + 輸入「刪除」。
+        // 只靠勾選太容易誤觸；只靠打字又不知道自己要刪什麼。
+        const refresh = function () {
+            const checked = Array.prototype.slice.call(modal.querySelectorAll('.purge-check:checked'));
+            const stu = checked.reduce(function (n, c) { return n + Number(c.getAttribute('data-students') || 0); }, 0);
+            const rec = checked.reduce(function (n, c) { return n + Number(c.getAttribute('data-records') || 0); }, 0);
+            summary.textContent = checked.length
+                ? '將永久刪除 ' + checked.length + ' 個班級：' + stu + ' 位學生名單、' + rec + ' 筆教學紀錄'
+                : '尚未勾選任何項目';
+            confirmBtn.disabled = !(checked.length && textInput.value.trim() === '刪除');
+        };
+        modal.querySelectorAll('.purge-check').forEach(function (c) { c.addEventListener('change', refresh); });
+        textInput.addEventListener('input', refresh);
+
+        const close = function () { modal.classList.remove('open'); };
+        modal.querySelector('#purge-cancel-btn').addEventListener('click', close);
+        modal.addEventListener('click', function (e) { if (e.target === modal) close(); });
+        confirmBtn.addEventListener('click', function () {
+            const ids = Array.prototype.slice.call(modal.querySelectorAll('.purge-check:checked'))
+                .map(function (c) { return c.value; });
+            confirmPurge(uid, teacherName, ids, modal);
+        });
+    }
+
+    async function confirmPurge(uid, teacherName, classIds, modal) {
+        if (!classIds || classIds.length === 0) return;
+        const btn = modal.querySelector('#purge-confirm-btn');
+        if (btn) { btn.disabled = true; btn.textContent = '清理中…'; }
+        try {
+            const fn = firebase.app().functions('asia-east1').httpsCallable('purgeDeletedClassLeftovers');
+            const resp = await fn({ uid: uid, classIds: classIds });
+            const r = (resp && resp.data) || {};
+            if (!r.ok) throw new Error(r.reason || '回傳異常');
+
+            if (typeof NotificationSystem !== 'undefined') {
+                let msg = '已清理「' + teacherName + '」的 ' + r.purged + ' 個殘留班級（共 '
+                    + r.docCount + ' 筆文件），刪除前已備份。';
+                if ((r.rejected || []).length) {
+                    msg += ' 有 ' + r.rejected.length + ' 筆因不符合殘留條件被擋下。';
+                }
+                NotificationSystem.success(msg);
+            }
+            modal.classList.remove('open');
+            loadStats();
+        } catch (e) {
+            console.error('[AdminConsole] 清理失敗:', e);
+            if (typeof NotificationSystem !== 'undefined') {
+                NotificationSystem.error('清理失敗：' + (e.message || ''));
+            }
+            if (btn) { btn.disabled = false; btn.textContent = '永久刪除勾選的殘留'; }
+        }
+    }
+
     // ── 渲染表格資料 ──
     function renderTable(searchQuery) {
         if (typeof searchQuery === 'string') currentQuery = searchQuery;
@@ -722,8 +952,12 @@
                 : `<span class="badge-neutral" style="opacity:.5;">—</span>`;
 
             // 只有「有孤兒」的老師才出現救援按鈕；用 data-* 帶 uid 給事件委派
+            const safeName = (item.name || '').replace(/"/g, '&quot;');
             const rescueCell = item.orphanCount > 0
-                ? `<button class="admin-btn-rescue" title="僅在老師回報「班級誤刪」時使用。按下去是把刪掉的班復活，不是清理殘留。" data-rescue-uid="${item.uid}" data-rescue-name="${(item.name || '').replace(/"/g, '&quot;')}" data-rescue-count="${item.orphanCount}">🩺 救回誤刪</button>`
+                ? `<div style="display:flex;gap:0.35rem;flex-wrap:wrap;">`
+                  + `<button class="admin-btn-rescue" title="僅在老師回報「班級誤刪」時使用。按下去是把刪掉的班復活，不是清理殘留。" data-rescue-uid="${item.uid}" data-rescue-name="${safeName}" data-rescue-count="${item.orphanCount}">🩺 救回誤刪</button>`
+                  + `<button class="admin-btn-purge" title="永久刪除已刪除班級的殘留資料。刪除前會自動備份，但不會自動復原。" data-purge-uid="${item.uid}" data-purge-name="${safeName}">🧹 清理</button>`
+                  + `</div>`
                 : `<span class="text-xs text-gray-400">—</span>`;
 
             return `

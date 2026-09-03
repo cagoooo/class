@@ -814,6 +814,14 @@ exports.getAdminStats = onCall(
   }
 );
 
+// 一個班級底下會有的資料子集合。明細統計與清理備份都走這份清單，
+// 兩邊共用才不會出現「明細說有 3 筆、備份卻少一種」的落差。
+const RECORD_COLLECTIONS = [
+  'students', 'pointsHistory', 'groups', 'notebookEntries', 'homeworks',
+  'homeworkChecks', 'lotteryHistory', 'announcements', 'examData',
+  'appSettings', 'archives',
+];
+
 /** 找出某老師的孤兒班級 ref（雲端有 classes/{id} 卻不在 _meta/classProfiles 名冊裡）。 */
 async function findOrphanRefs(userRef) {
   const [profilesDoc, classDocRefs] = await Promise.all([
@@ -870,6 +878,22 @@ exports.getTeacherOrphanDetails = onCall(
             .filter(Boolean);
         } catch (e) { /* 無 students 子集合 */ }
 
+        // 教學紀錄量與最後異動時間 —— 判斷「這份殘留還有沒有價值、是不是真的舊」
+        // 的關鍵。只看建立日期會誤判（重複建立的班日期也很合理），
+        // 最後異動時間才看得出老師是用到學期末還是建完就沒碰。
+        const counts = {};
+        let lastWriteMs = 0;
+        await Promise.all(RECORD_COLLECTIONS.map(async (name) => {
+          try {
+            const snap = await ref.collection(name).get();
+            counts[name] = snap.size;
+            snap.docs.forEach((d) => {
+              const t = d.updateTime ? d.updateTime.toMillis() : 0;
+              if (t > lastWriteMs) lastWriteMs = t;
+            });
+          } catch (e) { counts[name] = 0; }
+        }));
+
         return {
           id: ref.id,
           markerName,
@@ -877,6 +901,9 @@ exports.getTeacherOrphanDetails = onCall(
           createdLabel: classCreatedLabel(ref.id),
           studentCount,
           sampleNames,
+          counts,
+          totalRecords: Object.keys(counts).reduce((n, k) => n + (counts[k] || 0), 0),
+          lastWrite: lastWriteMs ? new Date(lastWriteMs).toISOString() : null,
         };
       }));
 
@@ -1256,5 +1283,128 @@ exports.getUsageAnalytics = onCall(
       logger.error('讀取使用活動分析失敗:', error);
       throw new HttpsError('internal', '讀取使用活動分析時發生系統內部錯誤');
     }
+  }
+);
+
+/**
+ * 從「使用者勾選的 id」篩出真正可以刪的目標。整個清理功能的安全核心，
+ * 抽成純函式是為了能單獨測——這行寫錯就是刪掉老師正在用的班。
+ *
+ * 規則：只有「現在確實是殘留」的 id 能過；`default` 永不可刪；
+ * 重複的 id 只算一次；其餘一律拒絕並回報，讓呼叫端看得到被擋掉什麼。
+ */
+function selectPurgeTargets(wantIds, orphanIdList) {
+  const orphanIds = new Set(orphanIdList.map(String));
+  const seen = new Set();
+  const targets = [];
+  const rejected = [];
+  wantIds.map(String).forEach((id) => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    if (id !== 'default' && orphanIds.has(id)) targets.push(id);
+    else rejected.push(id);
+  });
+  return { targets, rejected };
+}
+
+/**
+ * 🧹 清理「已刪除班級」的殘留資料 (v3.16.0)。
+ *
+ * 背景：`deleteClassFromCloud`（前端）刪班時只移除名冊與 marker，子集合資料
+ * 留在雲端——瀏覽器端無法遞迴刪除子集合。所以每刪一個班就固定留下一份殘留，
+ * 只增不減。這支用 Admin SDK 的 recursiveDelete 真正清掉。
+ *
+ * 🔴 這是**不可逆刪除**，而且動的是別人的資料。三道安全機制：
+ *   1. 一定要傳 classIds，沒有「清除全部」的入口。
+ *   2. 每個 id 都會重新驗證「它現在真的是殘留」（不在 _meta/classProfiles 裡）。
+ *      傳進來的 id 只要出現在名冊中，或是 default，一律拒絕——避免打錯字或
+ *      前端傳錯就刪掉老師正在用的班。
+ *   3. 刪除前先把整個班的資料匯出成 JSON 存到備份桶，救得回來。
+ *      備份失敗就中止該班的刪除（寧可不刪，也不要刪了沒得救）。
+ *
+ * 🔐 僅限 ADMIN_EMAILS。
+ */
+exports.purgeDeletedClassLeftovers = onCall(
+  { region: REGION, cors: true, maxInstances: 3, timeoutSeconds: 300, memory: '512MiB' },
+  async (request) => {
+    const adminEmail = requireAdmin(request);
+
+    const targetUid = String((request.data && request.data.uid) || '').trim();
+    if (!targetUid) throw new HttpsError('invalid-argument', '缺少必要參數 uid');
+
+    const wantIds = Array.isArray(request.data && request.data.classIds)
+      ? request.data.classIds.map(String).filter(Boolean)
+      : [];
+    if (wantIds.length === 0) {
+      throw new HttpsError('invalid-argument', '請至少勾選一個要清理的班級（classIds）');
+    }
+
+    const db = admin.firestore();
+    const userRef = db.collection('users').doc(targetUid);
+
+    // ── 安全機制 2：只允許「現在確實是殘留」的 id ──
+    const { orphanRefs } = await findOrphanRefs(userRef);
+    const { targets, rejected } = selectPurgeTargets(wantIds, orphanRefs.map((r) => r.id));
+    if (rejected.length) {
+      logger.warn('[Purge] 拒絕清理非殘留 id', { uid: targetUid, rejected });
+    }
+    if (targets.length === 0) {
+      throw new HttpsError('failed-precondition',
+        '勾選的班級都不是殘留資料（可能已被清理，或它其實還在老師的班級名冊中），為安全起見未執行任何刪除');
+    }
+
+    const bucketName = process.env.BACKUP_BUCKET
+      || `${process.env.GCLOUD_PROJECT || 'class-4719f'}-firestore-backups`;
+    const bucket = admin.storage().bucket(bucketName);
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+    const results = [];
+    for (const classId of targets) {
+      const classRef = userRef.collection('classes').doc(classId);
+
+      // ── 安全機制 3：先備份 ──
+      const dump = { uid: targetUid, classId, purgedAt: new Date().toISOString(), purgedBy: adminEmail, data: {} };
+      let docCount = 0;
+      try {
+        const marker = await classRef.get();
+        dump.marker = marker.exists ? marker.data() : null;
+        for (const name of RECORD_COLLECTIONS) {
+          const snap = await classRef.collection(name).get();
+          if (snap.empty) continue;
+          dump.data[name] = snap.docs.map((d) => ({ id: d.id, data: d.data() }));
+          docCount += snap.size;
+        }
+        const path = `deleted_leftovers/${targetUid}/${classId}-${stamp}.json`;
+        await bucket.file(path).save(JSON.stringify(dump, null, 2), {
+          contentType: 'application/json; charset=utf-8',
+        });
+        dump.backupPath = `gs://${bucketName}/${path}`;
+        logger.info(`[Purge] 已備份 ${classId}（${docCount} 筆）→ ${dump.backupPath}`);
+      } catch (err) {
+        // 備份失敗就不刪。寧可留著殘留，也不要刪了救不回來。
+        logger.error(`[Purge] 備份 ${classId} 失敗，跳過刪除`, err);
+        results.push({ classId, status: 'backup-failed', error: String(err && err.message || err) });
+        continue;
+      }
+
+      // ── 真正刪除（含所有子集合）──
+      try {
+        await db.recursiveDelete(classRef);
+        logger.info(`[Purge] ${adminEmail} 已清理 ${targetUid}/${classId}（${docCount} 筆文件）`);
+        results.push({ classId, status: 'purged', docCount, backupPath: dump.backupPath });
+      } catch (err) {
+        logger.error(`[Purge] 刪除 ${classId} 失敗`, err);
+        results.push({ classId, status: 'delete-failed', error: String(err && err.message || err) });
+      }
+    }
+
+    const purged = results.filter((r) => r.status === 'purged');
+    return {
+      ok: true,
+      purged: purged.length,
+      docCount: purged.reduce((n, r) => n + (r.docCount || 0), 0),
+      rejected,
+      results,
+    };
   }
 );
