@@ -510,7 +510,7 @@ function summarizeEvents(events) {
 
 /** 由彙整結果組出 Google Chat 卡片（含手機推播用的純文字摘要）。 */
 function buildDigestPayload(day, dateLabel, sum) {
-  const overviewLines = [`👩‍🏫 活躍老師 ${sum.activeTeachers} 位`];
+  const overviewLines = [`👥 活躍老師 ${sum.activeTeachers} 位`];
   if (sum.newTeachers.length) {
     overviewLines.push(`🎉 新加入 ${sum.newTeachers.length} 位：${sum.newTeachers.slice(0, 5).join('、')}`);
   }
@@ -527,7 +527,7 @@ function buildDigestPayload(day, dateLabel, sum) {
       widgets: [{
         decoratedText: {
           topLabel: '功能點擊次數',
-          text: sum.hotFeatures.map((f) => `• ${f.label}　${f.count} 次`).join('\n'),
+          text: sum.hotFeatures.map((f) => `• ${f.label} ${f.count} 次`).join('\n'),
           wrapText: true,
         },
       }],
@@ -576,7 +576,7 @@ function buildDigestPayload(day, dateLabel, sum) {
   });
 
   // 手機推播摘要（沒有這段，Chat 只會顯示「傳送了一個附件檔案給你」）
-  let text = `📈 今日戰報 ${dateLabel}\n👩‍🏫 活躍老師 ${sum.activeTeachers} 位`;
+  let text = `📈 今日戰報 ${dateLabel}\n👥 活躍老師 ${sum.activeTeachers} 位`;
   if (sum.newTeachers.length) text += ` · 🎉 新加入 ${sum.newTeachers.length} 位`;
   if (sum.classesCreated.length) text += ` · 🏫 新班級 ${sum.classesCreated.length} 個`;
   if (sum.hotFeatures.length) {
