@@ -734,12 +734,17 @@
     }
 
     /**
-     * 目前這個學期是什麼時候開始的。
-     * 台灣學制：上學期約 8 月底開學、下學期約 2 月開學，所以用 8/1 與 2/1 當界線。
+     * 目前這個學期的「起算日」。用教育部學年度的正式起點 8/1 與 2/1。
      *
-     * ⚠️ 不要改用「幾天前」當門檻：上學期末（6 月底）到新學年開學（9 月初）
-     * 只隔約 68 天，用 90 天判斷會把「明明是上學期的資料」標成「不算舊」，
-     * 剛好把最該清的那批標錯。學期界線才對得上老師的認知。
+     * ⚠️ 刻意用 8/1 而不是實際開學日（例如 115 學年度是 8/31 開學）：
+     * 老師 8 月就會建新班、匯名冊做開學準備，那些屬於新學期的東西。
+     * 界線抓在 8/1，這段備課期的資料會落在「開學後」側被標成橘色請確認；
+     * 若改用 8/31，8/1～8/30 建的班會被標成「上學期以前」而看起來可以刪——
+     * 那正是最容易誤刪的一批（我 2026-09-03 誤救的那個班就是 8/28 建的）。
+     * 寧可多標幾筆橘色請人確認，也不要把新學期的東西標成可刪。
+     *
+     * ⚠️ 也不要改用「幾天前」當門檻：上學期末（6 月初）到新學年開學
+     * 只隔約 90 天，用天數判斷會把最該清的那批標成「不算舊」，剛好標反。
      */
     function currentSemesterStart() {
         const now = new Date();
@@ -757,9 +762,11 @@
         if (!isFinite(t)) return { cls: 'purge-meta', text: '無異動紀錄' };
         const d = daysAgo(iso);
         const label = new Date(t).toLocaleDateString('zh-TW');
-        return t < currentSemesterStart().getTime()
+        const start = currentSemesterStart();
+        const startLabel = (start.getMonth() + 1) + '/' + start.getDate();
+        return t < start.getTime()
             ? { cls: 'purge-stale', text: '上學期以前（最後異動 ' + label + '，' + d + ' 天前）' }
-            : { cls: 'purge-recent', text: '本學期還動過（' + label + '，' + d + ' 天前）請確認' };
+            : { cls: 'purge-recent', text: startLabel + ' 之後動過（' + label + '，' + d + ' 天前）請確認' };
     }
 
     async function purgeTeacher(btn) {
@@ -830,7 +837,8 @@
             + '<p style="font-size:0.86rem;color:#475569;margin-bottom:0.6rem;">'
             + '請<strong>逐筆確認學生名單與最後異動時間</strong>再勾選。'
             + '綠色代表最後異動在<strong>上學期以前</strong>（通常就是可以清的）；'
-            + '橘色代表<strong>本學期還被動過</strong>，很可能是老師還在用或剛建錯的，不要順手勾掉。</p>'
+            + '橘色代表<strong>本學年度起算日（8/1）之後還被動過</strong>——含開學前的備課期，'
+            + '很可能是老師還在用或剛建錯的，不要順手勾掉。</p>'
             + '<div class="orphan-list">' + rows + '</div>'
             + '<div style="margin-top:1rem;">'
             + '<div id="purge-summary" style="font-size:0.88rem;font-weight:700;color:#991b1b;">尚未勾選任何項目</div>'
