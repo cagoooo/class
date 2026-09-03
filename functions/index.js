@@ -998,3 +998,214 @@ function placeholderClassName(classId) {
   const label = classCreatedLabel(classId);
   return label ? `救回的班級（${label} 建立）` : `救回的班級（${classId}）`;
 }
+
+// ─────────────────────────────────────────────────────────────
+// 🗺️ C：縣市維度 —— 由學校 email 網域推算縣市
+//
+// 台灣教育網域規則：`<校名>.<縣市碼>.edu.tw`，縣市碼是 `edu.tw` 前面那一段。
+// 例：mail2.smes.tyc.edu.tw → tyc；ms.ypps.tp.edu.tw → tp；
+//     mymail.df.kh.edu.tw → kh；apps.ntpc.edu.tw → ntpc。
+//
+// ⚠️ 下表分兩類，混用會出事，改的時候看清楚：
+//   [已驗證] = 2026-09-03 從本專案真實帳號資料中實際觀察到的代碼。
+//   [未驗證] = 依同一命名規則推測、但目前使用者裡還沒出現過的縣市。
+// 任何對不上的網域都會落進 unmappedDomains 一覽（不會被默默吞掉），
+// 看到有人落在那裡就把代碼補進來。
+// ─────────────────────────────────────────────────────────────
+const COUNTY_BY_CODE = {
+  // ── [已驗證] 真實資料中出現過 ──
+  tp: '臺北市', ntpc: '新北市', kl: '基隆市', tyc: '桃園市',
+  hcc: '新竹縣', tc: '臺中市', chc: '彰化縣', kh: '高雄市',
+  ilc: '宜蘭縣', hlc: '花蓮縣', ttct: '臺東縣', km: '金門縣',
+  // ── [未驗證] 依命名規則推測，目前尚無使用者 ──
+  hc: '新竹市', mlc: '苗栗縣', ntct: '南投縣', ylc: '雲林縣',
+  cyc: '嘉義縣', cy: '嘉義市', tn: '臺南市', ptc: '屏東縣',
+  phc: '澎湖縣', matsu: '連江縣',
+};
+
+// 是 .edu.tw 但不代表縣市的特例（教育雲共用帳號、大學等）
+const NON_COUNTY_EDU = {
+  go: '教育雲帳號（跨縣市）',
+  nttu: '國立臺東大學',
+};
+
+/** 由 email 推出 { county, code, domain }。判不出縣市時 county 為 null。 */
+function classifyEmail(email) {
+  const e = String(email || '').toLowerCase().trim();
+  const at = e.indexOf('@');
+  if (at < 0) return { county: null, code: '', domain: '' };
+  const domain = e.slice(at + 1);
+  const parts = domain.split('.');
+
+  // 非教育網域（gmail / hotmail / 自架網域…）
+  if (parts.length < 3 || parts[parts.length - 2] !== 'edu' || parts[parts.length - 1] !== 'tw') {
+    return { county: null, code: '', domain };
+  }
+
+  const code = parts[parts.length - 3];
+  if (COUNTY_BY_CODE[code]) return { county: COUNTY_BY_CODE[code], code, domain };
+  if (NON_COUNTY_EDU[code]) return { county: NON_COUNTY_EDU[code], code, domain };
+  // 是 .edu.tw 卻對不上代碼 → 讓它浮出來，不要默默歸成「其他」
+  return { county: null, code, domain };
+}
+
+/** 兩個日期相差幾天（以台北日界線計）。 */
+function daysSince(iso) {
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return null;
+  return Math.floor((Date.now() - t) / 86400000);
+}
+
+/**
+ * 📊 D：維運後台「使用活動」資料來源。
+ *
+ * 資料有兩個來源，各補各的缺口：
+ *   ① Firebase Auth 的 creationTime / lastSignInTime —— 這是**歷史資料**。
+ *      v3.13.0 之前沒有任何事件留底，但 Auth 一直都記著每個帳號何時註冊、
+ *      最後何時登入，足以重建老師成長曲線、活躍度與縣市分佈。
+ *   ② Firestore `_usageEvents` —— 2026-09-03 起才有，提供每日活躍趨勢與
+ *      功能熱度這類 Auth 給不了的細節。
+ *
+ * 🔐 僅限 ADMIN_EMAILS（唯讀，不寫入）。
+ */
+exports.getUsageAnalytics = onCall(
+  { region: REGION, cors: true, maxInstances: 5, timeoutSeconds: 120, memory: '512MiB' },
+  async (request) => {
+    const adminEmail = requireAdmin(request);
+    logger.info(`管理員 ${adminEmail} 正在讀取使用活動分析`);
+
+    try {
+      // ── ① Auth：走訪所有帳號 ──
+      let total = 0;
+      let anonymous = 0;
+      const teachers = [];
+      let pageToken;
+      do {
+        const res = await admin.auth().listUsers(1000, pageToken);
+        res.users.forEach((u) => {
+          total++;
+          const email = (u.email || '').toLowerCase().trim();
+          if (!email) { anonymous++; return; }
+          teachers.push({
+            email,
+            name: u.displayName || '',
+            created: (u.metadata && u.metadata.creationTime) || null,
+            lastSignIn: (u.metadata && u.metadata.lastSignInTime) || null,
+          });
+        });
+        pageToken = res.pageToken;
+      } while (pageToken);
+
+      // 成長曲線（依註冊月份）
+      const byMonth = {};
+      // 活躍度（依最後登入距今天數）
+      const activity = { today: 0, last7: 0, last30: 0, last90: 0, older: 0, never: 0 };
+      // 縣市與學校
+      const countyMap = {};
+      const schoolMap = {};
+      const unmapped = {};
+      let personalEmail = 0;
+
+      teachers.forEach((t) => {
+        const m = t.created ? new Date(t.created).toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' }).slice(0, 7) : '';
+        if (m) byMonth[m] = (byMonth[m] || 0) + 1;
+
+        const d = daysSince(t.lastSignIn);
+        if (d === null) activity.never++;
+        else if (d < 1) activity.today++;
+        else if (d < 7) activity.last7++;
+        else if (d < 30) activity.last30++;
+        else if (d < 90) activity.last90++;
+        else activity.older++;
+
+        const c = classifyEmail(t.email);
+        if (c.domain) schoolMap[c.domain] = (schoolMap[c.domain] || 0) + 1;
+        if (c.county) {
+          if (!countyMap[c.county]) countyMap[c.county] = { name: c.county, teachers: 0, schools: {} };
+          countyMap[c.county].teachers++;
+          countyMap[c.county].schools[c.domain] = true;
+        } else if (c.code) {
+          unmapped[c.domain] = (unmapped[c.domain] || 0) + 1;   // 是 .edu.tw 但代碼不認得
+        } else {
+          personalEmail++;                                       // gmail 等個人信箱
+        }
+      });
+
+      const growth = Object.keys(byMonth).sort().reduce((acc, m) => {
+        const prev = acc.length ? acc[acc.length - 1].cumulative : 0;
+        acc.push({ month: m, count: byMonth[m], cumulative: prev + byMonth[m] });
+        return acc;
+      }, []);
+
+      const counties = Object.keys(countyMap)
+        .map((k) => ({
+          name: countyMap[k].name,
+          teachers: countyMap[k].teachers,
+          schools: Object.keys(countyMap[k].schools).length,
+        }))
+        .sort((a, b) => b.teachers - a.teachers);
+
+      const schools = Object.keys(schoolMap)
+        .map((d) => ({ domain: d, teachers: schoolMap[d], county: classifyEmail('x@' + d).county || '' }))
+        .sort((a, b) => b.teachers - a.teachers)
+        .slice(0, 20);
+
+      // ── ② _usageEvents：近 30 天趨勢與功能熱度 ──
+      const since = new Date(Date.now() - 30 * 86400000)
+        .toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
+      const snap = await admin.firestore()
+        .collection(EVENT_LOG_COLLECTION)
+        .where('day', '>=', since)
+        .limit(20000)
+        .get();
+
+      const dayMap = {};
+      const featureTotals = {};
+      snap.forEach((doc) => {
+        const d = doc.data() || {};
+        const day = d.day || '';
+        if (!day) return;
+        if (!dayMap[day]) dayMap[day] = { day, events: 0, uids: {} };
+        dayMap[day].events++;
+        if (d.uid) dayMap[day].uids[d.uid] = true;
+        if (d.type === 'feature_summary') {
+          Object.keys(d.stats || {}).forEach((k) => {
+            featureTotals[k] = (featureTotals[k] || 0) + (Number(d.stats[k]) || 0);
+          });
+        }
+      });
+
+      const days = Object.keys(dayMap).sort().map((k) => ({
+        day: k,
+        events: dayMap[k].events,
+        activeTeachers: Object.keys(dayMap[k].uids).length,
+      }));
+
+      const features = Object.keys(featureTotals)
+        .map((k) => ({ label: k, count: featureTotals[k] }))
+        .sort((a, b) => b.count - a.count);
+
+      return {
+        ok: true,
+        data: {
+          generatedAt: new Date().toISOString(),
+          eventsSince: since,
+          accounts: { total, teachers: teachers.length, anonymous, personalEmail },
+          growth,
+          activity,
+          counties,
+          schools,
+          unmappedDomains: Object.keys(unmapped)
+            .map((d) => ({ domain: d, teachers: unmapped[d] }))
+            .sort((a, b) => b.teachers - a.teachers),
+          events: { days, features, totalEvents: snap.size },
+        },
+      };
+    } catch (error) {
+      if (error instanceof HttpsError) throw error;
+      logger.error('讀取使用活動分析失敗:', error);
+      throw new HttpsError('internal', '讀取使用活動分析時發生系統內部錯誤');
+    }
+  }
+);
