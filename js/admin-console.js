@@ -13,6 +13,9 @@
     'use strict';
 
     let statsData = [];
+    let currentQuery = '';
+    // 預設與後端回傳順序一致（最近同步的排前面），使用者一進來看到的就是他習慣的排法
+    let sortState = { key: 'lastSync', dir: 'desc' };
 
     // ── 建立與注入 CSS ──
     function injectCSS() {
@@ -249,6 +252,29 @@
                 #admin-search-input { width: 100% !important; }
                 .admin-table th, .admin-table td { padding: 0.6rem 0.7rem; font-size: 0.82rem; }
             }
+            /* ── 可排序表頭 ── */
+            .admin-table th.sortable {
+                cursor: pointer;
+                user-select: none;
+                white-space: nowrap;
+                transition: background-color .12s;
+            }
+            .admin-table th.sortable:hover { background-color: rgba(59, 130, 246, 0.08); }
+            .admin-table th.sortable:focus-visible {
+                outline: 2px solid #3b82f6;
+                outline-offset: -2px;
+            }
+            .admin-table th.sortable .sort-ind {
+                display: inline-block;
+                margin-left: 0.25rem;
+                font-size: 0.7em;
+                color: #cbd5e1;
+            }
+            .dark .admin-table th.sortable .sort-ind { color: #475569; }
+            .admin-table th.sortable.sorted { color: #2563eb; }
+            .dark .admin-table th.sortable.sorted { color: #60a5fa; }
+            .admin-table th.sortable.sorted .sort-ind { color: currentColor; }
+
             /* ── 分頁列（教師帳號 / 使用活動）── */
             .admin-tabs { display: flex; gap: 0.4rem; margin-bottom: 1rem; border-bottom: 2px solid #e2e8f0; }
             .dark .admin-tabs { border-bottom-color: #334155; }
@@ -356,11 +382,11 @@
                         <table class="admin-table">
                             <thead>
                                 <tr>
-                                    <th>教師姓名 / 帳號</th>
-                                    <th>有效班級數</th>
-                                    <th>孤兒資料數</th>
-                                    <th>最後同步時間</th>
-                                    <th>同步裝置資訊</th>
+                                    <th class="sortable" data-sort="name" tabindex="0">教師姓名 / 帳號<span class="sort-ind">⇅</span></th>
+                                    <th class="sortable" data-sort="classCount" tabindex="0">有效班級數<span class="sort-ind">⇅</span></th>
+                                    <th class="sortable" data-sort="orphanCount" tabindex="0">孤兒資料數<span class="sort-ind">⇅</span></th>
+                                    <th class="sortable" data-sort="lastSync" tabindex="0">最後同步時間<span class="sort-ind">⇅</span></th>
+                                    <th class="sortable" data-sort="device" tabindex="0">同步裝置資訊<span class="sort-ind">⇅</span></th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
@@ -400,6 +426,22 @@
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) closeBtn();
         });
+
+        // 表頭排序（事件委派；表頭是靜態的，但一併處理鍵盤操作）
+        const thead = overlay.querySelector('.admin-table thead');
+        if (thead) {
+            thead.addEventListener('click', (e) => {
+                const th = e.target.closest('th.sortable');
+                if (th) applySort(th.getAttribute('data-sort'));
+            });
+            thead.addEventListener('keydown', (e) => {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                const th = e.target.closest('th.sortable');
+                if (!th) return;
+                e.preventDefault();
+                applySort(th.getAttribute('data-sort'));
+            });
+        }
 
         // 分頁切換
         bindTabs(overlay);
@@ -545,8 +587,68 @@
         }
     }
 
+    // ── 排序 ─────────────────────────────────────────────
+    // 每欄的取值方式與型別。數字/日期預設由大到小（想看的是「最多」「最新」），
+    // 文字預設由小到大（照筆劃/字母順序找人）。
+    const SORT_COLUMNS = {
+        name:       { type: 'text', firstDir: 'asc',  get: (r) => (r.name || '') + ' ' + (r.email || '') },
+        classCount: { type: 'num',  firstDir: 'desc', get: (r) => r.classCount || 0 },
+        orphanCount:{ type: 'num',  firstDir: 'desc', get: (r) => r.orphanCount || 0 },
+        lastSync:   { type: 'date', firstDir: 'desc', get: (r) => r.lastSync || null },
+        device:     { type: 'text', firstDir: 'asc',  get: (r) => r.device || '' },
+    };
+
+    function sortRows(rows) {
+        const col = SORT_COLUMNS[sortState.key];
+        if (!col) return rows;
+        const sign = sortState.dir === 'asc' ? 1 : -1;
+
+        return rows.slice().sort(function (a, b) {
+            const va = col.get(a);
+            const vb = col.get(b);
+
+            // 「從未同步」「無裝置資訊」這類空值一律沉底，不隨升降序跑到最上面礙眼
+            const ea = (va === null || va === undefined || va === '');
+            const eb = (vb === null || vb === undefined || vb === '');
+            if (ea && eb) return 0;
+            if (ea) return 1;
+            if (eb) return -1;
+
+            if (col.type === 'num') return (va - vb) * sign;
+            if (col.type === 'date') return (new Date(va) - new Date(vb)) * sign;
+            // 中文用 localeCompare 才會照筆劃排，直接比字串會變成 UTF-16 碼位順序
+            return String(va).localeCompare(String(vb), 'zh-Hant') * sign;
+        });
+    }
+
+    /** 更新表頭的排序指示箭頭。 */
+    function updateSortIndicators() {
+        const overlay = document.getElementById('admin-console-modal');
+        if (!overlay) return;
+        overlay.querySelectorAll('.admin-table th.sortable').forEach(function (th) {
+            const key = th.getAttribute('data-sort');
+            const ind = th.querySelector('.sort-ind');
+            const active = key === sortState.key;
+            th.classList.toggle('sorted', active);
+            if (ind) ind.textContent = active ? (sortState.dir === 'asc' ? '▲' : '▼') : '⇅';
+            th.setAttribute('aria-sort', active ? (sortState.dir === 'asc' ? 'ascending' : 'descending') : 'none');
+        });
+    }
+
+    function applySort(key) {
+        if (!SORT_COLUMNS[key]) return;
+        if (sortState.key === key) {
+            sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+        } else {
+            sortState = { key: key, dir: SORT_COLUMNS[key].firstDir };
+        }
+        renderTable();
+    }
+
     // ── 渲染表格資料 ──
-    function renderTable(searchQuery = '') {
+    function renderTable(searchQuery) {
+        if (typeof searchQuery === 'string') currentQuery = searchQuery;
+        searchQuery = currentQuery;
         const tbody = document.getElementById('admin-table-body');
         const summary = document.getElementById('admin-stats-summary');
         if (!tbody) return;
@@ -561,6 +663,9 @@
             summary.textContent = `共 ${statsData.length} 位教師，已篩選出 ${filtered.length} 位`;
         }
 
+        const sorted = sortRows(filtered);
+        updateSortIndicators();
+
         if (filtered.length === 0) {
             tbody.innerHTML = `
                 <tr>
@@ -572,7 +677,7 @@
             return;
         }
 
-        tbody.innerHTML = filtered.map(item => {
+        tbody.innerHTML = sorted.map(item => {
             let lastSyncText = '從未同步';
             if (item.lastSync) {
                 try {
