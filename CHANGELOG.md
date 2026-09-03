@@ -1,5 +1,19 @@
 # 班級小管家 Changelog
 
+## [v3.13.0] - 2026-09-03 📈 通知降噪：事件留底與每日戰報
+
+老師人數變多後，「有老師來了 / 有老師登入了」這類日常通知會隨人數線性成長把手機洗版，但它們的價值在趨勢而不是單筆。這版把「留底」和「打擾」拆開。
+
+- **所有事件一律留底**：`notifyUsage` 除了推播，會把每一筆事件寫進 Firestore `_usageEvents`（含 `expireAt`，保留 180 天），做為後台查歷史與每日戰報的資料來源。過去事件送出即消失，Google Chat 聊天室是唯一的「資料庫」。
+- **只有重要事件才即時推播**：`login_new`（新老師註冊）、`class_create`（建立班級）、`data_action`（重大資料操作）、`error`（系統錯誤）維持即時通知；`session_start`、`login`、`feature_summary` 改為只留底、不打擾。
+- **新增每日戰報 `dailyUsageDigest`**：每天 21:00（台北）把當天事件彙整成**一則**卡片——活躍老師數、新加入老師、新建班級、熱門功能排行、重大操作、錯誤則數。當天完全沒有事件（假日／寒暑假）則靜默不送，不製造「今天沒人使用」的噪音。
+- **修正 `dataAction` 從未被呼叫的死碼**：`UsageNotify.dataAction` 定義了卻沒有任何呼叫點，代表刪除班級、雲端還原覆蓋、學期封存這些**不可逆**操作從來沒有通報過。現已接上四個位置：`deleteClassFromCloud`、`loadFromCloudData`（js/firebase-sync.js）、`restoreBackup`（js/data-reports.js）、學期封存（js/semester-archive.js）。
+- **修正功能統計的時區分桶錯誤**：前端用 `toISOString()`（UTC）當日期鍵，但台灣是 UTC+8，UTC 要到台北時間早上 8 點才換日——老師 07:30 到校那段時間的使用會被歸進「前一天」。前端改用 `Asia/Taipei` 的日期鍵，與伺服端 `taipeiDay()` 對齊。
+- **功能統計不再等到隔天才回報**：原本只在跨天時補送，導致學期末的統計要等老師下次開機才會到，換裝置或清快取則直接遺失。改為當天內定期回報（節流 2 分鐘 + 離開頁面時補送），送的是「當日累計值」，伺服端以「日期＋使用者＋裝置」覆寫而非累加，重複回報不會把數字灌大；內容沒變動則不重送。
+- **配額整併**：原本只有 `error` 有伺服端每日上限，其餘型別無上限。改為單一交易同時管「每日事件留底 300 筆」與「error 推播 5 則」，配額檢查失敗時 fail-open 放行，避免限流的 bug 反而吞掉真正需要被看到的錯誤。
+
+> ⚠️ 部署後需在 Firebase Console → Firestore → TTL 為 `_usageEvents` 與 `_usageRateLimits` 的 `expireAt` 欄位各建立一條 TTL 政策，舊資料才會自動清除（沒建也不會壞，只是不會自動消失）。
+
 ## [v3.12.22] - 2026-09-01 🛡️ PWA 更新與錯誤通知穩定化
 
 - **修正 Service Worker 誤報**：Safari／Chrome 在離線、私密模式或短暫網路中斷時，`sw.js load failed` 與更新檢查失敗不再被當成重大錯誤送出 Google Chat Webhook；仍保留主控台診斷資訊。

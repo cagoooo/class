@@ -238,44 +238,174 @@ function buildCard(type, data, who) {
   };
 }
 
-// 🛡️ error 事件節流：前端 usage-notify.js 的「每場上限 5 則 / 去重」只在前端生效，
-// 若有人繞過前端直接呼叫這支 callable function，那些節流形同虛設。這裡在伺服端
-// 用 Firestore 對「每個身分（uid，無驗證則歸類 no-auth）每日」再把關一次，
-// 確保不管用什麼方式呼叫，都不可能把 Google Chat 灌爆。
-const MAX_ERROR_PER_DAY = 5;
+// ─────────────────────────────────────────────────────────────
+// 📥 事件留底（_usageEvents）與 🔕 通知分流
+//
+// v3.13.0 起，notifyUsage 的職責拆成兩件事：
+//   ① 留底：所有事件一律寫進 Firestore `_usageEvents`，供維運後台查歷史、
+//      算趨勢，也是每日戰報（dailyUsageDigest）的資料來源。
+//   ② 打擾：只有「值得馬上看一眼」的事件才即時推 Google Chat。
+//
+// 這麼拆是因為老師越來越多之後，「有老師來了 / 有老師登入了」這類日常事件
+// 會隨老師數線性成長把手機洗版，但它們的價值是「趨勢」而不是「單筆」——
+// 適合被彙整進每天一則的戰報，而不是逐筆震動。
+//
+// ⏳ TTL：每筆事件都寫 `expireAt`，需在 Firebase Console →
+//    Firestore → TTL 為 `_usageEvents` 與 `_usageRateLimits` 兩個 collection
+//    的 `expireAt` 欄位各建立一條 TTL 政策，過期文件才會自動清掉。
+//    （沒建政策也不會壞，只是舊資料不會自動消失。）
+// ─────────────────────────────────────────────────────────────
+
+const EVENT_LOG_COLLECTION = '_usageEvents';
+const EVENT_RETENTION_DAYS = 180;
+
+// 值得即時推 Google Chat 的事件；其餘只留底，交給每日戰報彙整。
+const INSTANT_PUSH_TYPES = new Set(['login_new', 'class_create', 'data_action', 'error']);
+
+// 每個身分每日上限：error 推播 5 則（沿用舊規則）、事件留底 200 筆（防呆用）。
+const MAX_ERROR_PUSH_PER_DAY = 5;
+const MAX_EVENTS_PER_DAY = 300;
+
+/** 取台北時區的 YYYY-MM-DD（做為事件的日期分桶鍵）。 */
+function taipeiDay(d) {
+  return (d || new Date()).toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
+}
+
+/** 依保留天數算出 TTL 到期時間。 */
+function expiryTimestamp() {
+  return admin.firestore.Timestamp.fromMillis(
+    Date.now() + EVENT_RETENTION_DAYS * 24 * 60 * 60 * 1000
+  );
+}
 
 /**
- * 檢查並累加當日 error 配額。配額用盡回傳 false（呼叫端仍回應成功、只是不轉發到
- * Chat，避免前端佇列誤判失敗而無限重試）。配額檢查本身出錯則 fail-open 放行，
- * 避免限流機制的 bug 反而吞掉真正需要被看到的錯誤通報。
+ * 單一交易同時處理兩種配額，避免每次呼叫多開一次交易：
+ *   - log ：今日事件留底是否還有額度（所有型別共用 MAX_EVENTS_PER_DAY）
+ *   - push：error 事件今日是否還能推 Chat（MAX_ERROR_PUSH_PER_DAY）
+ *
+ * 前端 usage-notify.js 的節流只在前端生效，若有人繞過前端直接呼叫這支
+ * callable，那些節流形同虛設；這裡在伺服端再把關一次。
+ * 配額檢查本身出錯則 fail-open 全部放行，避免限流機制的 bug 反而吞掉
+ * 真正需要被看到的錯誤通報。
  */
-async function checkAndBumpErrorQuota(uid) {
+async function checkQuota(uid, isError) {
   const key = uid || 'no-auth';
-  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' }); // YYYY-MM-DD
-  const ref = admin.firestore().collection('_usageRateLimits').doc(`${key}_${today}`);
+  const day = taipeiDay();
+  const ref = admin.firestore().collection('_usageRateLimits').doc(`${key}_${day}`);
   try {
     return await admin.firestore().runTransaction(async (tx) => {
       const snap = await tx.get(ref);
-      const count = snap.exists ? (snap.data().count || 0) : 0;
-      if (count >= MAX_ERROR_PER_DAY) return false;
-      tx.set(ref, { count: count + 1, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
-      return true;
+      const d = snap.exists ? (snap.data() || {}) : {};
+      const total = d.total || 0;
+      // 舊版欄位叫 count（只算 error），保留相容避免升級當天配額被重置
+      const errors = (d.errors != null ? d.errors : d.count) || 0;
+
+      const canLog = total < MAX_EVENTS_PER_DAY;
+      const canPush = !isError || errors < MAX_ERROR_PUSH_PER_DAY;
+
+      const patch = {
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        expireAt: expiryTimestamp(),
+      };
+      if (canLog) patch.total = total + 1;
+      if (isError && canPush) patch.errors = errors + 1;
+      tx.set(ref, patch, { merge: true });
+
+      return { log: canLog, push: canPush };
     });
   } catch (e) {
-    logger.error('[RateLimit] 配額檢查失敗，預設放行', e);
+    logger.error('[Quota] 配額檢查失敗，預設放行', e);
+    return { log: true, push: true };
+  }
+}
+
+/**
+ * 把事件寫進 `_usageEvents` 留底。
+ *
+ * feature_summary 用「日期 + 使用者 + 裝置」組成固定 doc id，讓同一台裝置
+ * 同一天的多次回報是「覆寫」而不是「累加」——前端送的是當日累計值，
+ * 覆寫才不會把數字重複灌大。其餘事件用自動 id。
+ *
+ * 留底失敗絕不影響推播（整支包在 try/catch 裡）。
+ */
+async function logUsageEvent(eventType, data, who, uid) {
+  try {
+    const db = admin.firestore();
+    const day = eventType === 'feature_summary' && data.date
+      ? String(data.date).slice(0, 10)
+      : taipeiDay();
+
+    const doc = {
+      type: eventType,
+      day,
+      uid: uid || '',
+      email: who.email || '',
+      name: who.name || '',
+      label: who.label || '',
+      anonymous: !!who.anonymous,
+      ts: data.ts ? String(data.ts).slice(0, 40) : new Date().toISOString(),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      expireAt: expiryTimestamp(),
+    };
+
+    if (eventType === 'class_create') doc.className = clip(data.className, 80);
+    if (eventType === 'data_action') {
+      doc.action = clip(data.action, 80);
+      doc.details = clip(data.details, 300);
+    }
+    if (eventType === 'error') {
+      doc.message = clip(data.message, 300);
+      doc.context = clip(data.context, 160);
+      doc.url = clip(data.url, 250);
+      doc.ua = clip(data.ua, 250);
+    }
+    if (eventType === 'feature_summary') {
+      const stats = {};
+      const raw = data.stats || {};
+      // 只收「字串 → 正整數」，擋掉惡意 payload 把統計汙染成怪東西
+      Object.keys(raw).slice(0, 40).forEach((k) => {
+        const n = Number(raw[k]);
+        if (Number.isFinite(n) && n > 0) stats[clip(k, 40)] = Math.min(Math.round(n), 99999);
+      });
+      doc.stats = stats;
+      doc.deviceId = clip(data.deviceId, 40);
+    }
+
+    if (eventType === 'feature_summary') {
+      const device = doc.deviceId || 'unknown';
+      const id = `feat_${day}_${uid || 'anon'}_${device}`;
+      await db.collection(EVENT_LOG_COLLECTION).doc(id).set(doc, { merge: true });
+    } else {
+      await db.collection(EVENT_LOG_COLLECTION).add(doc);
+    }
+  } catch (e) {
+    logger.error('[EventLog] 事件留底失敗（不影響通知）', e);
+  }
+}
+
+/** 送一則訊息到 Google Chat webhook；回傳是否成功。 */
+async function postToChat(webhook, payload) {
+  try {
+    const resp = await fetch(webhook, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => '');
+      logger.error('Google Chat 回應非 200', { status: resp.status, body: body.slice(0, 200) });
+      return false;
+    }
     return true;
+  } catch (err) {
+    logger.error('推送 Google Chat 失敗', err);
+    return false;
   }
 }
 
 exports.notifyUsage = onCall(
   { region: REGION, secrets: [GOOGLE_CHAT_WEBHOOK], cors: true, maxInstances: 5 },
   async (request) => {
-    const webhook = (GOOGLE_CHAT_WEBHOOK.value() || '').trim();
-    if (!webhook) {
-      logger.warn('GOOGLE_CHAT_WEBHOOK 尚未設定');
-      return { ok: false, reason: 'no-webhook' };
-    }
-
     const data = request.data || {};
     const type = String(data.type || '').trim();
 
@@ -288,34 +418,231 @@ exports.notifyUsage = onCall(
       return { ok: false, reason: 'unknown-type' };
     }
 
-    if (eventType === 'error') {
-      const uid = request.auth && request.auth.uid;
-      const allowed = await checkAndBumpErrorQuota(uid);
-      if (!allowed) {
-        logger.warn('[RateLimit] 今日 error 配額已用盡，略過轉發', { uid: uid || 'no-auth' });
-        return { ok: true, throttled: true };
-      }
-    }
-
+    const uid = (request.auth && request.auth.uid) || '';
     const who = identityOf(request.auth);
-    const payload = buildCard(eventType, data, who);
+    const isError = eventType === 'error';
 
-    try {
-      const resp = await fetch(webhook, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json; charset=UTF-8' },
-        body: JSON.stringify(payload),
-      });
-      if (!resp.ok) {
-        const body = await resp.text().catch(() => '');
-        logger.error('Google Chat 回應非 200', { status: resp.status, body: body.slice(0, 200) });
-        return { ok: false, status: resp.status };
-      }
-      return { ok: true };
-    } catch (err) {
-      logger.error('推送 Google Chat 失敗', err);
-      return { ok: false, reason: 'fetch-failed' };
+    // 配額：決定這筆能不能留底、error 能不能推播
+    const quota = await checkQuota(uid, isError);
+
+    // ① 留底（所有型別，含不推播的日常事件）
+    if (quota.log) {
+      await logUsageEvent(eventType, data, who, uid);
+    } else {
+      logger.warn('[Quota] 今日事件留底配額已用盡，略過', { uid: uid || 'no-auth', type: eventType });
     }
+
+    // ② 打擾：只有重要事件才即時推 Chat；日常事件交給每日戰報
+    if (!INSTANT_PUSH_TYPES.has(eventType)) {
+      return { ok: true, logged: quota.log, pushed: false, reason: 'digest-only' };
+    }
+    if (isError && !quota.push) {
+      logger.warn('[Quota] 今日 error 推播配額已用盡，只留底不推播', { uid: uid || 'no-auth' });
+      return { ok: true, logged: quota.log, pushed: false, throttled: true };
+    }
+
+    const webhook = (GOOGLE_CHAT_WEBHOOK.value() || '').trim();
+    if (!webhook) {
+      logger.warn('GOOGLE_CHAT_WEBHOOK 尚未設定');
+      return { ok: true, logged: quota.log, pushed: false, reason: 'no-webhook' };
+    }
+
+    const pushed = await postToChat(webhook, buildCard(eventType, data, who));
+    return { ok: true, logged: quota.log, pushed };
+  }
+);
+
+/**
+ * 把當日事件陣列彙整成戰報所需的數字。抽成純函式（不碰 Firestore / 網路）
+ * 是為了能單獨驗證統計邏輯 —— 戰報一天只跑一次，算錯很難察覺。
+ */
+function summarizeEvents(events) {
+  const activeUids = new Set();
+  const newTeachers = [];
+  const classesCreated = [];
+  const dataActions = [];
+  const errors = [];
+  const featureTotals = {};
+  let guestEvents = 0;
+
+  events.forEach((d) => {
+    if (d.uid) activeUids.add(d.uid);
+    else if (d.type === 'session_start') guestEvents++;
+
+    switch (d.type) {
+      case 'login_new':
+        newTeachers.push(d.label || d.email || '未具名老師');
+        break;
+      case 'class_create':
+        classesCreated.push({ name: d.className || '(未命名)', who: d.name || d.email || '' });
+        break;
+      case 'data_action':
+        dataActions.push({ action: d.action || '', details: d.details || '', who: d.name || d.email || '' });
+        break;
+      case 'error':
+        errors.push({ message: d.message || '', context: d.context || '', who: d.name || d.email || '' });
+        break;
+      case 'feature_summary':
+        Object.keys(d.stats || {}).forEach((k) => {
+          featureTotals[k] = (featureTotals[k] || 0) + (Number(d.stats[k]) || 0);
+        });
+        break;
+      default:
+        break;
+    }
+  });
+
+  const hotFeatures = Object.keys(featureTotals)
+    .map((k) => ({ label: k, count: featureTotals[k] }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6);
+
+  return {
+    activeTeachers: activeUids.size,
+    guestEvents,
+    newTeachers,
+    classesCreated,
+    dataActions,
+    errors,
+    hotFeatures,
+  };
+}
+
+/** 由彙整結果組出 Google Chat 卡片（含手機推播用的純文字摘要）。 */
+function buildDigestPayload(day, dateLabel, sum) {
+  const overviewLines = [`👩‍🏫 活躍老師 ${sum.activeTeachers} 位`];
+  if (sum.newTeachers.length) {
+    overviewLines.push(`🎉 新加入 ${sum.newTeachers.length} 位：${sum.newTeachers.slice(0, 5).join('、')}`);
+  }
+  if (sum.guestEvents) overviewLines.push(`👤 訪客造訪 ${sum.guestEvents} 人次`);
+  overviewLines.push(`🏫 新建班級 ${sum.classesCreated.length} 個`);
+
+  const sections = [{
+    widgets: [{ decoratedText: { topLabel: '今日總覽', text: overviewLines.join('\n'), wrapText: true } }],
+  }];
+
+  if (sum.hotFeatures.length) {
+    sections.push({
+      header: '🔥 熱門功能',
+      widgets: [{
+        decoratedText: {
+          topLabel: '功能點擊次數',
+          text: sum.hotFeatures.map((f) => `• ${f.label}　${f.count} 次`).join('\n'),
+          wrapText: true,
+        },
+      }],
+    });
+  }
+
+  if (sum.classesCreated.length) {
+    sections.push({
+      header: '🏫 新建班級',
+      widgets: [{
+        decoratedText: {
+          topLabel: `共 ${sum.classesCreated.length} 個`,
+          text: sum.classesCreated.slice(0, 8)
+            .map((c) => `• ${c.name}${c.who ? `（${c.who}）` : ''}`).join('\n'),
+          wrapText: true,
+        },
+      }],
+    });
+  }
+
+  if (sum.dataActions.length) {
+    sections.push({
+      header: '⚙️ 重大資料操作',
+      widgets: [{
+        decoratedText: {
+          topLabel: `共 ${sum.dataActions.length} 次`,
+          text: sum.dataActions.slice(0, 8)
+            .map((a) => `• ${a.action}${a.who ? `（${a.who}）` : ''}`).join('\n'),
+          wrapText: true,
+        },
+      }],
+    });
+  }
+
+  sections.push({
+    header: '🐞 系統健康',
+    widgets: [{
+      decoratedText: {
+        topLabel: '錯誤回報',
+        text: sum.errors.length
+          ? `${sum.errors.length} 則\n` + sum.errors.slice(0, 3).map((e) => `• ${clip(e.message, 80)}`).join('\n')
+          : '0 則，一切正常 ✅',
+        wrapText: true,
+      },
+    }],
+  });
+
+  // 手機推播摘要（沒有這段，Chat 只會顯示「傳送了一個附件檔案給你」）
+  let text = `📈 今日戰報 ${dateLabel}\n👩‍🏫 活躍老師 ${sum.activeTeachers} 位`;
+  if (sum.newTeachers.length) text += ` · 🎉 新加入 ${sum.newTeachers.length} 位`;
+  if (sum.classesCreated.length) text += ` · 🏫 新班級 ${sum.classesCreated.length} 個`;
+  if (sum.hotFeatures.length) {
+    text += `\n🔥 ${sum.hotFeatures.slice(0, 3).map((f) => `${f.label} ${f.count}`).join(' · ')}`;
+  }
+  text += `\n🐞 錯誤 ${sum.errors.length} 則`;
+
+  return {
+    text,
+    cardsV2: [{
+      cardId: 'digest-' + day,
+      card: {
+        header: { title: `📈 今日戰報 ${dateLabel}`, subtitle: '班級小管家 · 使用情形彙整' },
+        sections,
+      },
+    }],
+  };
+}
+
+/**
+ * 📈 每日戰報 (dailyUsageDigest)：每天 21:00（台北）把當天累積的 `_usageEvents`
+ * 彙整成「一則」Google Chat 卡片，取代原本每位老師每天好幾則的零碎通知。
+ *
+ * 設計取捨：
+ *   - 當天完全沒有任何事件（寒暑假、假日）就靜靜不送，不製造「今天沒人使用」的噪音。
+ *   - 昨天的 feature 統計若今天才補送到，會落在昨天的日期桶裡，不會混進今天的戰報；
+ *     代價是那份補送統計不會再被戰報播報一次（後台歷史仍查得到）。
+ */
+exports.dailyUsageDigest = onSchedule(
+  {
+    schedule: 'every day 21:00',
+    timeZone: 'Asia/Taipei',
+    region: REGION,
+    secrets: [GOOGLE_CHAT_WEBHOOK],
+    memory: '256MiB',
+    timeoutSeconds: 120,
+  },
+  async () => {
+    const webhook = (GOOGLE_CHAT_WEBHOOK.value() || '').trim();
+    if (!webhook) {
+      logger.warn('[Digest] GOOGLE_CHAT_WEBHOOK 尚未設定，略過每日戰報');
+      return;
+    }
+
+    const day = taipeiDay();
+    const snap = await admin.firestore()
+      .collection(EVENT_LOG_COLLECTION)
+      .where('day', '==', day)
+      .limit(3000)
+      .get();
+
+    if (snap.empty) {
+      logger.info(`[Digest] ${day} 無任何使用事件，靜默略過`);
+      return;
+    }
+
+    const events = snap.docs.map((doc) => doc.data() || {});
+    const sum = summarizeEvents(events);
+    const dateLabel = new Date().toLocaleDateString('zh-TW', {
+      timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit', weekday: 'short',
+    });
+
+    const ok = await postToChat(webhook, buildDigestPayload(day, dateLabel, sum));
+    logger.info(`[Digest] ${day} 戰報${ok ? '已送出' : '送出失敗'}`, {
+      events: snap.size, activeTeachers: sum.activeTeachers, errors: sum.errors.length,
+    });
   }
 );
 

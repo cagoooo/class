@@ -442,6 +442,16 @@ const SemesterArchive = (() => {
                     NotificationSystem.success(
                         `🎉 學期封存成功！已封存 ${result.studentCount} 位學生的完整資料。`
                     );
+
+                // 重大資料操作：封存可能一併清空分數 / 作業，不可逆
+                try {
+                    if (window.UsageNotify) {
+                        const cleared = [clearScores ? '清空分數' : '', clearHomework ? '清空作業' : '']
+                            .filter(Boolean).join('、') || '未清空任何資料';
+                        UsageNotify.dataAction('學期封存',
+                            `封存「${key}」共 ${result.studentCount} 位學生，${cleared}`);
+                    }
+                } catch (e) { /* ignore */ }
             } catch (err) {
                 btn.disabled = false;
                 btn.textContent = '📦 確認封存';

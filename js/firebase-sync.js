@@ -542,6 +542,13 @@ async function loadFromCloudData(cloudData) {
         if (typeof updateHomeworkSelect === 'function') updateHomeworkSelect();
 
         NotificationSystem && NotificationSystem.success('已從雲端完整還原資料 ✅');
+        // 重大資料操作：本地資料被雲端覆蓋，不可逆
+        try {
+            if (window.UsageNotify) {
+                const n = (cloudData.students && cloudData.students.length) || 0;
+                UsageNotify.dataAction('從雲端還原（覆蓋本地）', `已用雲端資料覆蓋本機，還原 ${n} 位學生`);
+            }
+        } catch (e) { /* ignore */ }
         return true;
     } finally {
         syncStatus.isSyncing = false;
@@ -1491,6 +1498,7 @@ async function deleteClassFromCloud(classId) {
 
         // 1) 從 _meta/classProfiles 移除該班
         const cloud = await fetchCloudClassProfiles();
+        const removed = cloud.find(p => String(p.id) === String(classId));
         const filtered = cloud.filter(p => String(p.id) !== String(classId));
         if (filtered.length !== cloud.length) {
             await db.collection('users').doc(userId)
@@ -1501,6 +1509,13 @@ async function deleteClassFromCloud(classId) {
         await db.collection('users').doc(userId).collection('classes').doc(String(classId)).delete();
 
         console.log(`[MultiClass] R-A2：已從雲端移除班級 ${classId}（名冊 + marker）`);
+        // 重大資料操作：不可逆，即時通知開發者
+        try {
+            if (window.UsageNotify) {
+                UsageNotify.dataAction('刪除班級',
+                    `班級「${(removed && removed.name) || classId}」已自雲端移除（名冊 + marker），剩餘 ${filtered.length} 班`);
+            }
+        } catch (e) { /* ignore */ }
         return true;
     } catch (e) {
         console.warn(`[MultiClass] R-A2：雲端移除班級 ${classId} 失敗（非致命）:`, e);

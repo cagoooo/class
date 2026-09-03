@@ -1,22 +1,32 @@
 /**
  * usage-notify.js
  * 📡 使用情形通知（→ Cloud Function `notifyUsage` → Google Chat）
- * @version 3.10.3
+ * @version 3.13.0
  *
  * 目的：讓開發者（阿凱老師）掌握老師們的使用情形，但避免手機被逐筆通知洗版。
- *   通知策略＝「重要事件即時 + 一般事件降噪」：
- *   - session_start：每位老師「每天」只報一次「有老師正在使用」（原本每場，已降頻）
- *   - login：Google 帳號登入，每位老師「每天」一次（原本每場每人，已降頻）
- *   - class_create：建立新班級（重要動作，即時必報）
- *   - feature：使用功能 — 🔇 已停用逐筆通知（原本每切一個功能分頁就推一張卡片，
- *       是手機狂震的主因；保留 API 簽名讓呼叫端免改）
- *   - error：系統錯誤（重要，即時報；同訊息每場一次、每場上限 5 則）
+ *
+ * v3.13.0 通知策略改為「留底與打擾分離」：
+ *   所有事件一律送到 Cloud Function 留底（寫入 Firestore `_usageEvents`），
+ *   但只有「值得馬上看一眼」的事件會即時推 Google Chat，其餘交由伺服端
+ *   每天 21:00 的「今日戰報」彙整成一則。分流規則在 functions/index.js 的
+ *   INSTANT_PUSH_TYPES，前端不需要（也不該）自己決定要不要吵人。
+ *
+ *   - session_start：每台裝置每天一次（只留底，進戰報）
+ *   - login        ：Google 帳號登入，每台裝置每天一次（只留底，進戰報）
+ *   - login_new    ：新老師首次註冊 —— 即時推播，且刻意不節流
+ *   - class_create ：建立新班級 —— 即時推播
+ *   - data_action  ：刪班 / 還原覆蓋 / 學期封存等不可逆操作 —— 即時推播
+ *   - feature      ：功能點擊，累積在本機並「當天內」定期回報（不再等到隔天），
+ *                    伺服端以「日期＋使用者＋裝置」覆寫，戰報再跨裝置加總
+ *   - error        ：系統錯誤 —— 即時推播（同訊息每場一次、每場上限 5 則）
  *
  * 設計原則：
  *   1. 純 fire-and-forget，任何失敗都「吞掉」，通知絕不影響 App 正常運作。
  *   2. webhook 秘密只存在 Cloud Function 端，前端零金鑰、零 URL、零 CORS 問題。
  *   3. 持久化佇列（localStorage）：建立班級後會 reload，事件先入列、
  *      下次載入再補送，確保不漏。Function 尚未部署時也只是留在佇列等之後補送。
+ *   4. 功能統計是「當日累計值」而非增量，重複回報會被伺服端覆寫而不是累加，
+ *      所以多送幾次不會把數字灌大；佇列裡也只保留同一天的最後一份。
  *
  * 對外：window.UsageNotify.{ init, login, classCreate, feature, error }
  */
@@ -29,6 +39,36 @@
     var SS = 'un_';                       // sessionStorage 去重前綴
     var MAX_QUEUE = 50;
     var MAX_ERRORS_PER_SESSION = 5;
+    var DEVICE_KEY = 'un_device_v1';      // 穩定的裝置識別（讓伺服端能「覆寫」而非累加同裝置統計）
+    var STATS_FLUSH_MS = 2 * 60 * 1000;   // 功能統計最快每 2 分鐘回報一次
+
+    var statsFlushTimer = null;
+    var lastStatsSig = '';          // 上次已回報的統計內容指紋（內容沒變就不重送）
+
+    /** 取得（必要時建立）本機裝置識別碼；純用於統計去重，不含任何個資。 */
+    function deviceId() {
+        try {
+            var id = localStorage.getItem(DEVICE_KEY);
+            if (!id) {
+                id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+                localStorage.setItem(DEVICE_KEY, id);
+            }
+            return id;
+        } catch (e) { return 'nostorage'; }
+    }
+
+    // 取台北時區的 YYYY-MM-DD。
+    // ⚠️ 一定要用台北時區，不能用 toISOString()（那是 UTC）：台灣是 UTC+8，
+    //    UTC 日期在台北時間早上 8 點才換日，老師 07:30 到校用的那半小時會被
+    //    歸到「前一天」，導致當日統計掉進昨天的桶子、今晚的戰報看不到。
+    //    伺服端 taipeiDay() 也是同一套算法，兩邊必須一致。
+    function todayKey() {
+        try {
+            return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
+        } catch (e) {
+            return new Date().toISOString().slice(0, 10);   // 極舊瀏覽器保底
+        }
+    }
 
     var FEATURE_LABELS = {
         students: '學生管理', points: '加扣分', grouping: '隨機分組', lottery: '號碼抽籤',
@@ -45,17 +85,60 @@
     // ───────── 工具 ─────────
     var STATS_KEY = 'un_feature_stats_v1';
 
+    // 送出某一天的功能統計。送的是「當日累計值」，伺服端以
+    // （日期＋使用者＋裝置）為 key 覆寫，所以同一天送幾次都不會把數字灌大。
     function sendFeatureSummary(statsObj) {
         if (!statsObj || !statsObj.stats || Object.keys(statsObj.stats).length === 0) return;
-        enqueue('feature_summary', {
+        enqueueReplace('feature_summary', {
             date: statsObj.date,
-            stats: statsObj.stats
-        });
+            stats: statsObj.stats,
+            deviceId: deviceId()
+        }, 'featsum_' + statsObj.date);
+    }
+
+    // 把「今天」的累計統計即時回報一次（不再等到隔天才補送）。
+    // 原本只在跨天時才送，導致老師學期末的統計要等他下次開機才會到，
+    // 換裝置或清快取則直接遺失；改成當天就回報，戰報才拿得到當日資料。
+    function flushTodayStats() {
+        try {
+            var today = todayKey();
+            var raw = localStorage.getItem(STATS_KEY);
+            if (!raw) return;
+            var statsObj = JSON.parse(raw);
+            if (!statsObj || statsObj.date !== today) return;
+
+            // 內容與上次回報完全相同就別再送一次：老師整天掛著 App 時，
+            // 每 2 分鐘一次的節流最多會打出 200 多通，會撞到伺服端的
+            // 每日事件上限，反而讓當天後段的統計進不了戰報。
+            var sig = statsSignature(statsObj.stats);
+            if (sig === lastStatsSig) return;
+            lastStatsSig = sig;
+
+            sendFeatureSummary(statsObj);
+        } catch (e) { /* ignore */ }
+    }
+
+    /** 統計內容指紋：key 排序後序列化，避免因物件鍵順序不同而誤判為「有變動」。 */
+    function statsSignature(stats) {
+        try {
+            return Object.keys(stats || {}).sort().map(function (k) {
+                return k + ':' + stats[k];
+            }).join('|');
+        } catch (e) { return String(Math.random()); }
+    }
+
+    // 節流排程：功能點擊後最快 STATS_FLUSH_MS 才回報一次，避免連點洗佇列。
+    function scheduleStatsFlush() {
+        if (statsFlushTimer) return;
+        statsFlushTimer = setTimeout(function () {
+            statsFlushTimer = null;
+            flushTodayStats();
+        }, STATS_FLUSH_MS);
     }
 
     function checkAndSendOldStats() {
         try {
-            var today = new Date().toISOString().slice(0, 10);
+            var today = todayKey();
             var raw = localStorage.getItem(STATS_KEY);
             if (raw) {
                 var statsObj = JSON.parse(raw);
@@ -71,7 +154,7 @@
         try {
             var label = FEATURE_LABELS[name] || name;
             if (!label) return;
-            var today = new Date().toISOString().slice(0, 10);
+            var today = todayKey();
             var raw = localStorage.getItem(STATS_KEY);
             var statsObj = null;
             try { statsObj = raw ? JSON.parse(raw) : null; } catch (e) {}
@@ -85,6 +168,7 @@
 
             statsObj.stats[label] = (statsObj.stats[label] || 0) + 1;
             localStorage.setItem(STATS_KEY, JSON.stringify(statsObj));
+            scheduleStatsFlush();
         } catch (e) { /* ignore */ }
     }
 
@@ -111,7 +195,7 @@
     // 跨「整天」而非「每場 session」降頻 → 同一位老師一天只報一次來訪 / 登入。
     function dayOnce(key) {
         try {
-            var today = new Date().toISOString().slice(0, 10);   // YYYY-MM-DD（足以做日界線）
+            var today = todayKey();   // 台北時區 YYYY-MM-DD（與伺服端同一套日界線）
             var k = SS + 'day_' + key;
             if (localStorage.getItem(k) === today) return false;
             localStorage.setItem(k, today);
@@ -135,6 +219,19 @@
         flush();
     }
 
+    // 與 enqueue 相同，但會先把佇列裡同一個 dedupe key 的舊事件移除。
+    // 用於「當日累計值」這種後蓋前的事件（功能統計），避免離線時佇列
+    // 塞滿同一天的十幾份中途快照。
+    function enqueueReplace(type, data, dedupeKey) {
+        var ev = Object.assign({ type: type, ts: new Date().toISOString() }, data || {});
+        ev._id = Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+        ev._dedupe = dedupeKey;
+        var q = loadQ().filter(function (x) { return x._dedupe !== dedupeKey; });
+        q.push(ev);
+        saveQ(q);
+        flush();
+    }
+
     // 逐筆補送：成功才從佇列移除；失敗（含 Function 未部署）保留待下次
     function flush() {
         var fn = getCallable();
@@ -151,7 +248,7 @@
             }
             var ev = currentQ[0];
             var payload = {};
-            for (var k in ev) { if (k !== '_id') payload[k] = ev[k]; }
+            for (var k in ev) { if (k !== '_id' && k !== '_dedupe') payload[k] = ev[k]; }
             var p;
             try { p = fn(payload); } catch (e) { flushing = false; return; }
             p.then(function () {
@@ -224,7 +321,7 @@
             enqueue('class_create', { className: className || '' });
         },
 
-        // 使用功能：寫入今日統計 (不即時發送，留待跨天時彙整補送)
+        // 使用功能：累積今日統計，並在節流後回報當日累計值（不逐筆通知，只進戰報）
         feature: function (name) {
             recordFeature(name);
         },
@@ -259,7 +356,8 @@
             });
         },
 
-        // 重大資料操作（如備份、還原、刪除班級）：即時發送
+        // 重大資料操作（刪除班級 / 雲端還原覆蓋 / 還原本機備份 / 學期封存）：
+        // 不可逆且影響老師的資料，屬於「值得馬上看一眼」，伺服端會即時推播。
         dataAction: function (action, details) {
             enqueue('data_action', {
                 action: String(action || '').slice(0, 80),
@@ -269,6 +367,15 @@
     };
 
     window.UsageNotify = API;
+
+    // 老師切走 / 關閉分頁時，把當日累計統計補送一次，避免整節課的使用量
+    // 卡在節流計時器裡沒送出（回報是覆寫語意，多送一次不會重複計算）。
+    try {
+        document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'hidden') flushTodayStats();
+        });
+        window.addEventListener('pagehide', function () { flushTodayStats(); });
+    } catch (e) { /* ignore */ }
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function () { API.init(); });

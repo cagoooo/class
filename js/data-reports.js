@@ -612,6 +612,14 @@
                 NotificationSystem.success('已恢復備份，重新載入頁面...');
             }
 
+            // 重大資料操作：目前資料被舊快照覆蓋，不可逆
+            try {
+                if (window.UsageNotify) {
+                    UsageNotify.dataAction('還原本機備份',
+                        `已還原 ${new Date(backup.timestamp).toLocaleString('zh-TW')} 的快照（${(backup.students || []).length} 位學生），覆蓋目前資料`);
+                }
+            } catch (e) { /* ignore */ }
+
             setTimeout(() => location.reload(), 1500);
         }
     };
