@@ -649,10 +649,19 @@ exports.dailyUsageDigest = onSchedule(
 /**
  * 雲端定期備份 (R-D2)：排程 Firestore 匯出，每天清晨台北時間 04:00 執行。
  *
- * 備份會自動匯出至當前 Firebase 專案預設的 Storage Bucket 的 /firestore_backups 目錄。
+ * 匯出目的地：`gs://<projectId>-firestore-backups/firestore_backups/<日期>`。
  *
- * ⚠️ 必須在 GCP Console 中為 App Engine 預設服務帳號或 Cloud Functions 服務帳號
- * 授予「Storage Object Admin」及「Cloud Datastore Import Export Admin」權限，此 Functions 才能成功運作。
+ * ⚠️ 不能用 `admin.storage().bucket()` 拿預設桶：這個專案**沒有**啟用
+ *    Firebase Storage，預設桶根本不存在，舊寫法會每天默默失敗。
+ *    另外 Firestore 匯出要求備份桶與資料庫**同區域**（本專案都是 asia-east1）。
+ *
+ * 前置作業（已於 2026-09-03 完成，重建專案時要重做）：
+ *   1. 建桶：gcloud storage buckets create gs://class-4719f-firestore-backups
+ *              --location=asia-east1 --uniform-bucket-level-access
+ *   2. 生命週期：舊備份 30 天自動刪除（避免儲存費無限累積）
+ *   3. 授權服務帳號 528903484088-compute@developer.gserviceaccount.com：
+ *      - 專案層：roles/datastore.importExportAdmin
+ *      - 備份桶：roles/storage.objectAdmin
  */
 exports.scheduledFirestoreExport = onSchedule(
   {
@@ -668,15 +677,13 @@ exports.scheduledFirestoreExport = onSchedule(
     const projectId = process.env.GCLOUD_PROJECT || admin.instanceId().app.options.projectId;
     const databaseName = client.databasePath(projectId, '(default)');
 
-    let bucketName = '';
-    try {
-      bucketName = admin.storage().bucket().name;
-    } catch (e) {
-      // 若未配置預設儲存桶，則 fallback 使用 projectId 拼接預設儲存桶名稱
-      bucketName = `${projectId}.appspot.com`;
-    }
+    // 專用備份桶（與 Firestore 同區域）。刻意不用 admin.storage() 的預設桶，
+    // 本專案沒有啟用 Firebase Storage，拿到的會是不存在的桶名。
+    const bucketName = process.env.BACKUP_BUCKET || `${projectId}-firestore-backups`;
 
-    const outputUriPrefix = `gs://${bucketName}/firestore_backups`;
+    // 依日期分資料夾，方便一眼看出哪天的備份，也讓生命週期規則好清
+    const stamp = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
+    const outputUriPrefix = `gs://${bucketName}/firestore_backups/${stamp}`;
 
     try {
       logger.info(`[Backup] 開始自動備份 Firestore，匯出至: ${outputUriPrefix}`);
