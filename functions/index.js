@@ -372,14 +372,36 @@ async function logUsageEvent(eventType, data, who, uid) {
     }
 
     if (eventType === 'feature_summary') {
+      // 當日累計值，同裝置重送要覆寫而不是累加
       const device = doc.deviceId || 'unknown';
       const id = `feat_${day}_${uid || 'anon'}_${device}`;
       await db.collection(EVENT_LOG_COLLECTION).doc(id).set(doc, { merge: true });
-    } else {
-      await db.collection(EVENT_LOG_COLLECTION).add(doc);
+      return 'ok';
     }
+
+    // 冪等：前端佇列是「送出成功才移除」，若在回應回來前頁面就 reload
+    // （建立班級後一定會 reload），事件會留在佇列並於重載後再送一次。
+    // 用前端產生的 eventId 當文件鍵，重送那筆 create() 會撞到 ALREADY_EXISTS，
+    // 據此判定重複——不重複留底，呼叫端也據此不重複推播。
+    const eventId = String(data.eventId || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 60);
+    if (eventId) {
+      try {
+        await db.collection(EVENT_LOG_COLLECTION).doc(`evt_${eventId}`).create(doc);
+        return 'ok';
+      } catch (e) {
+        if (e && (e.code === 6 || /ALREADY_EXISTS/i.test(String(e.message || '')))) {
+          logger.info('[EventLog] 重複事件，略過', { eventId, type: eventType });
+          return 'duplicate';
+        }
+        throw e;
+      }
+    }
+
+    await db.collection(EVENT_LOG_COLLECTION).add(doc);
+    return 'ok';
   } catch (e) {
     logger.error('[EventLog] 事件留底失敗（不影響通知）', e);
+    return 'error';
   }
 }
 
@@ -426,10 +448,16 @@ exports.notifyUsage = onCall(
     const quota = await checkQuota(uid, isError);
 
     // ① 留底（所有型別，含不推播的日常事件）
+    let logStatus = 'skipped';
     if (quota.log) {
-      await logUsageEvent(eventType, data, who, uid);
+      logStatus = await logUsageEvent(eventType, data, who, uid);
     } else {
       logger.warn('[Quota] 今日事件留底配額已用盡，略過', { uid: uid || 'no-auth', type: eventType });
+    }
+
+    // 同一筆事件重送：已經留底也推播過了，這次什麼都不做
+    if (logStatus === 'duplicate') {
+      return { ok: true, duplicate: true, pushed: false };
     }
 
     // ② 打擾：只有重要事件才即時推 Chat；日常事件交給每日戰報

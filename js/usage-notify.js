@@ -249,6 +249,13 @@
             var ev = currentQ[0];
             var payload = {};
             for (var k in ev) { if (k !== '_id' && k !== '_dedupe') payload[k] = ev[k]; }
+            // 帶上事件唯一 ID 讓伺服端做冪等。
+            // ⚠️ 這條佇列是「送出成功才移除」，但建立班級後會 location.reload()——
+            //    若在回應回來前就重載，移除那步不會執行，事件仍留在佇列，
+            //    重載後又送一次 → 同一件事推播兩則（2026-09-04 實際發生，
+            //    602~606 每個班的通知都重複，兩筆 ts 一模一樣到毫秒）。
+            //    伺服端用這個 ID 當文件鍵，重送的那筆會被判定為重複而不推播。
+            payload.eventId = ev._id;
             var p;
             try { p = fn(payload); } catch (e) { flushing = false; return; }
             p.then(function () {
