@@ -1160,7 +1160,14 @@
 
             // ── 確認 Modal ──
             const profiles = JSON.parse(localStorage.getItem('classProfiles') || '[]');
-            const classCount = profiles.length + 1; // 含預設班
+            // ⚠️ 不可寫成 profiles.length + 1。`default` **本來就在 classProfiles 裡**
+            //    （class-profiles.js 的 loadProfiles() 會在缺少時自動補上），多 +1
+            //    會讓 6 個班顯示成 7 個。用 id 去重才是對的：名冊有 default 就不多算，
+            //    極少數舊帳號名冊缺 default 也不會少算。
+            //    這與 v3.16.2（一鍵同步列兩次預設班）、v3.16.3（後端註解寫錯）同源。
+            const classIds = new Set(profiles.filter(p => p && p.id != null).map(p => String(p.id)));
+            classIds.add('default');
+            const classCount = classIds.size;
             const confirmed = await showAllClassConfirmDialog({
                 direction: 'upload',
                 icon: '🌐',
@@ -1203,8 +1210,10 @@
             // 以雲端班級清單為準計算數量（新裝置本地只有 default，用本地會少算）
             let mergedProfiles = [];
             try { mergedProfiles = await window.FirebaseSync.syncClassProfilesFromCloud?.() || []; } catch { /* 略過 */ }
-            const extraCount = mergedProfiles.filter(p => String(p.id) !== 'default').length;
-            const classCount = extraCount + 1;
+            // 同上：以 id 去重計數，不要用「非 default 筆數 + 1」
+            const cloudIds = new Set(mergedProfiles.filter(p => p && p.id != null).map(p => String(p.id)));
+            cloudIds.add('default');
+            const classCount = cloudIds.size;
             const confirmed = await showAllClassConfirmDialog({
                 direction: 'download',
                 icon: '📥',
