@@ -923,7 +923,13 @@ exports.getAdminStats = onCall(
         listUsersResult.users.forEach((userRecord) => {
           userMap.set(userRecord.uid, {
             email: userRecord.email || '',
-            name: userRecord.displayName || '未具名老師'
+            name: userRecord.displayName || '未具名老師',
+            // 最後登入時間。⚠️ 這與 syncInfo.lastUploadAt（最後同步）是兩件事：
+            //    同步要老師主動按，很多人只在本機用、從不上傳。實測 89 位有 email
+            //    的老師中，17 位「從未同步但近 30 天有登入」——只看同步時間會把
+            //    這些人誤判成沒在用。兩個欄位要並列，才看得出真實活躍度。
+            lastSignIn: (userRecord.metadata && userRecord.metadata.lastSignInTime)
+              ? new Date(userRecord.metadata.lastSignInTime).toISOString() : null,
           });
         });
         nextPageToken = listUsersResult.pageToken;
@@ -936,7 +942,7 @@ exports.getAdminStats = onCall(
       // 4. 並行查詢每位教師的資料
       const statsPromises = userRefs.map(async (userRef) => {
         const uid = userRef.id;
-        const authUser = userMap.get(uid) || { email: '', name: '匿名/訪客帳號' };
+        const authUser = userMap.get(uid) || { email: '', name: '匿名/訪客帳號', lastSignIn: null };
 
         // 讀取 classProfiles, syncInfo 以及 classes
         const metaCol = userRef.collection('_meta');
@@ -971,6 +977,7 @@ exports.getAdminStats = onCall(
           uid,
           email: authUser.email,
           name: authUser.name,
+          lastSignIn: authUser.lastSignIn || null,
           // 用去重後的集合計數：名冊本來就含 default 時不會多算，
           // 極少數舊帳號名冊缺 default 時也不會少算那個班。
           classCount: activeClassIds.size,

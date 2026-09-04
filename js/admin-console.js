@@ -14,8 +14,9 @@
 
     let statsData = [];
     let currentQuery = '';
-    // 預設與後端回傳順序一致（最近同步的排前面），使用者一進來看到的就是他習慣的排法
-    let sortState = { key: 'lastSync', dir: 'desc' };
+    // 預設依「最後登入」排序：那才是真實活躍度。用「最後同步」當預設會把
+    // 「從未同步但天天在用」的老師（實測 89 位中有 17 位）沉到最底下。
+    let sortState = { key: 'lastSignIn', dir: 'desc' };
 
     // ── 建立與注入 CSS ──
     function injectCSS() {
@@ -448,14 +449,15 @@
                                     <th class="sortable" data-sort="name" tabindex="0">教師姓名 / 帳號<span class="sort-ind">⇅</span></th>
                                     <th class="sortable" data-sort="classCount" tabindex="0">有效班級數<span class="sort-ind">⇅</span></th>
                                     <th class="sortable" data-sort="orphanCount" tabindex="0" title="老師刪除班級後留在雲端的學生資料。屬正常現象，不是故障。">已刪除殘留<span class="sort-ind">⇅</span></th>
-                                    <th class="sortable" data-sort="lastSync" tabindex="0">最後同步時間<span class="sort-ind">⇅</span></th>
+                                    <th class="sortable" data-sort="lastSignIn" tabindex="0" title="Firebase 帳號的最後登入時間。這才是「有沒有在用」的指標——同步要老師主動按，很多人只在本機用。">最後登入<span class="sort-ind">⇅</span></th>
+                                    <th class="sortable" data-sort="lastSync" tabindex="0" title="最後一次把資料上傳到雲端的時間。「從未同步」不代表沒在用。">最後同步時間<span class="sort-ind">⇅</span></th>
                                     <th class="sortable" data-sort="device" tabindex="0">同步裝置資訊<span class="sort-ind">⇅</span></th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
                             <tbody id="admin-table-body">
                                 <tr>
-                                    <td colspan="6" style="text-align:center;padding:2rem;color:#94a3b8;">
+                                    <td colspan="7" style="text-align:center;padding:2rem;color:#94a3b8;">
                                         <div class="inline-block animate-spin border-2 border-blue-500 border-t-transparent rounded-full w-6 h-6 mr-2 vertical-middle"></div>
                                         正在讀取雲端統計...
                                     </td>
@@ -669,6 +671,7 @@
         name:       { type: 'text', firstDir: 'asc',  get: (r) => (r.name || '') + ' ' + (r.email || '') },
         classCount: { type: 'num',  firstDir: 'desc', get: (r) => r.classCount || 0 },
         orphanCount:{ type: 'num',  firstDir: 'desc', get: (r) => r.orphanCount || 0 },
+        lastSignIn: { type: 'date', firstDir: 'desc', get: (r) => r.lastSignIn || null },
         lastSync:   { type: 'date', firstDir: 'desc', get: (r) => r.lastSync || null },
         device:     { type: 'text', firstDir: 'asc',  get: (r) => r.device || '' },
     };
@@ -909,6 +912,26 @@
         }
     }
 
+    /** 把時間轉成「今天／N 天前」。判斷活躍度時，相對天數比絕對時間好讀太多。 */
+    function relativeDays(iso) {
+        if (!iso) return null;
+        const t = new Date(iso).getTime();
+        if (!isFinite(t)) return null;
+        const d = Math.floor((Date.now() - t) / 86400000);
+        if (d <= 0) return '今天';
+        if (d === 1) return '昨天';
+        if (d < 30) return d + ' 天前';
+        if (d < 365) return Math.floor(d / 30) + ' 個月前';
+        return Math.floor(d / 365) + ' 年前';
+    }
+
+    /** 絕對時間字串（給 title 用）。 */
+    function absTime(iso) {
+        if (!iso) return '';
+        try { return new Date(iso).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }); }
+        catch (e) { return String(iso); }
+    }
+
     // ── 渲染表格資料 ──
     function renderTable(searchQuery) {
         if (typeof searchQuery === 'string') currentQuery = searchQuery;
@@ -933,7 +956,7 @@
         if (filtered.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" style="text-align:center;padding:2rem;color:#94a3b8;">
+                    <td colspan="7" style="text-align:center;padding:2rem;color:#94a3b8;">
                         無符合條件的教師資料
                     </td>
                 </tr>
@@ -942,15 +965,14 @@
         }
 
         tbody.innerHTML = sorted.map(item => {
-            let lastSyncText = '從未同步';
-            if (item.lastSync) {
-                try {
-                    const d = new Date(item.lastSync);
-                    lastSyncText = d.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
-                } catch (e) {
-                    lastSyncText = item.lastSync;
-                }
-            }
+            const lastSyncText = item.lastSync ? absTime(item.lastSync) : '從未同步';
+
+            // 最後登入：活躍度的真實指標。從未同步但最近有登入的老師（實測 17 位）
+            // 在這一欄才看得出來還在用，不會被「從未同步」誤判成停用。
+            const loginRel = relativeDays(item.lastSignIn);
+            const loginCell = loginRel
+                ? `<span title="${absTime(item.lastSignIn)}">${loginRel}</span>`
+                : `<span class="text-gray-400">無紀錄</span>`;
 
             // 殘留＝老師刪掉班級後留在雲端的資料，是正常現象而非故障，
             // 所以用中性灰而不是橘色警告；否則每次開後台都像有一堆問題待處理。
@@ -976,6 +998,7 @@
                     </td>
                     <td style="font-weight: 600;">${item.classCount} 個班級</td>
                     <td>${orphanBadge}</td>
+                    <td class="text-xs text-gray-700 dark:text-gray-300" style="font-weight:600;white-space:nowrap;">${loginCell}</td>
                     <td class="text-xs text-gray-600 dark:text-gray-400">${lastSyncText}</td>
                     <td class="text-xs text-gray-500 dark:text-gray-400" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.device || ''}">${item.device || '-'}</td>
                     <td>${rescueCell}</td>
@@ -1176,7 +1199,7 @@
         if (tbody) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" style="text-align:center;padding:2rem;color:#94a3b8;">
+                    <td colspan="7" style="text-align:center;padding:2rem;color:#94a3b8;">
                         <div class="inline-block animate-spin border-2 border-blue-500 border-t-transparent rounded-full w-6 h-6 mr-2 vertical-middle"></div>
                         正在載入雲端統計中...
                     </td>
@@ -1198,7 +1221,7 @@
             if (tbody) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="6" style="text-align:center;padding:2rem;color:#ef4444;font-weight:600;">
+                        <td colspan="7" style="text-align:center;padding:2rem;color:#ef4444;font-weight:600;">
                             ❌ 載入失敗: ${error.message || '請確認您擁有管理員權限'}
                         </td>
                     </tr>
