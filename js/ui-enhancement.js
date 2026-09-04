@@ -79,48 +79,6 @@
         }
     `;
 
-    // ==================== 拖拽排序 ====================
-    const dragStyles = `
-        /* 拖拽樣式 */
-        .draggable {
-            cursor: grab;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-
-        .draggable:active {
-            cursor: grabbing;
-        }
-
-        .draggable.dragging {
-            opacity: 0.5;
-            transform: scale(1.02);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            z-index: 100;
-        }
-
-        .drag-handle {
-            cursor: grab;
-            opacity: 0.5;
-            transition: opacity 0.2s;
-        }
-
-        .drag-handle:hover {
-            opacity: 1;
-        }
-
-        .drag-over {
-            border: 2px dashed #3b82f6 !important;
-            background-color: rgba(59, 130, 246, 0.1) !important;
-        }
-
-        .drag-placeholder {
-            border: 2px dashed #94a3b8;
-            background-color: rgba(148, 163, 184, 0.1);
-            border-radius: 0.5rem;
-            min-height: 60px;
-        }
-    `;
-
     // ==================== 座位表 ====================
     const seatingStyles = `
         /* 座位表容器 */
@@ -326,111 +284,18 @@
         }
     `;
 
-    // ==================== 拖拽排序功能 ====================
-    let draggedElement = null;
-    let draggedIndex = null;
-
-    /**
-     * 初始化學生列表拖拽
-     */
-    function initStudentDrag() {
-        const studentsList = document.getElementById('studentsList');
-        if (!studentsList) return;
-
-        // 使用 MutationObserver 監聽列表變化
-        const observer = new MutationObserver(() => {
-            setupDraggableItems(studentsList);
-        });
-
-        observer.observe(studentsList, { childList: true });
-        setupDraggableItems(studentsList);
-    }
-
-    /**
-     * 設置可拖拽項目
-     */
-    function setupDraggableItems(container) {
-        const items = container.querySelectorAll(':scope > div:not(.col-span-full)');
-
-        items.forEach((item, index) => {
-            if (item.hasAttribute('data-drag-init')) return;
-            item.setAttribute('data-drag-init', 'true');
-
-            item.draggable = true;
-            item.classList.add('draggable');
-            item.dataset.index = index;
-
-            // 添加拖拽手柄
-            const handle = document.createElement('span');
-            handle.className = 'drag-handle mr-2 text-gray-400';
-            handle.innerHTML = '⠿';
-            handle.style.cssText = 'font-size: 1.25rem; user-select: none;';
-            item.insertBefore(handle, item.firstChild);
-
-            // 拖拽事件
-            item.addEventListener('dragstart', onDragStart);
-            item.addEventListener('dragend', onDragEnd);
-            item.addEventListener('dragover', onDragOver);
-            item.addEventListener('drop', onDrop);
-            item.addEventListener('dragleave', onDragLeave);
-        });
-    }
-
-    function onDragStart(e) {
-        draggedElement = this;
-        draggedIndex = parseInt(this.dataset.index);
-        this.classList.add('dragging');
-        e.dataTransfer.effectAllowed = 'move';
-    }
-
-    function onDragEnd(e) {
-        this.classList.remove('dragging');
-        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-        draggedElement = null;
-        draggedIndex = null;
-    }
-
-    function onDragOver(e) {
-        e.preventDefault();
-        if (this === draggedElement) return;
-        this.classList.add('drag-over');
-    }
-
-    function onDragLeave(e) {
-        this.classList.remove('drag-over');
-    }
-
-    function onDrop(e) {
-        e.preventDefault();
-        this.classList.remove('drag-over');
-
-        if (this === draggedElement || !draggedElement) return;
-
-        const targetIndex = parseInt(this.dataset.index);
-
-        // 重新排序學生陣列
-        if (typeof students !== 'undefined' && Array.isArray(students)) {
-            const [removed] = students.splice(draggedIndex, 1);
-            students.splice(targetIndex, 0, removed);
-
-            // ⚠️ 這裡刻意「只換順序、不動座號」。
-            //    舊版會 students.forEach((s, i) => s.number = i + 1) 把全班座號
-            //    重寫成 1..N，而且提示只說「已更新學生順序」，完全沒提座號被改掉。
-            //    對用「班級座號」的老師（例如 601 班寫成 60101~60125，約四成班級都是）
-            //    只要不小心拖到一張卡片，整班編號就一次消失且無法復原。
-            //    「排列順序」和「座號」本來就是兩件事，拖曳只該負責前者。
-
-            localStorage.setItem(window.STUDENTS_KEY || 'students', JSON.stringify(students));
-
-            if (typeof renderStudents === 'function') {
-                renderStudents();
-            }
-
-            if (typeof NotificationSystem !== 'undefined') {
-                NotificationSystem.success('已更新學生順序（座號不變）');
-            }
-        }
-    }
+    // ==================== 拖拽排序功能（已於 v3.22.0 移除）====================
+    //
+    // ⚠️ 不要再加回來。這個功能與現有設計本質上互斥：
+    //   1) renderStudents()（classnew.html）**每次重繪都會 students.sort() 依座號排序**，
+    //      所以「重排陣列」不會有任何視覺效果——下一次渲染就彈回座號順序。
+    //   2) 舊版之所以「看起來有用」，是因為它同時執行 students.forEach((s,i)=>s.number=i+1)
+    //      把全班座號改寫成 1..N。那等於拖一下就洗掉老師的座號（實測約四成班級用
+    //      「班級座號」五碼如 60101~60125），已於 v3.19.1 移除——但移除後拖曳就變成
+    //      完全無效果，還會跳「已更新學生順序」的假成功提示。
+    //   3) 空間排列已有「座位表」功能負責，不需要用清單拖曳做同一件事。
+    //
+    // 要讓拖曳有效，就一定得改座號；而座號只有老師明確編輯時才能改。兩者無法並存。
 
     // ==================== 座位表功能 ====================
     let seatingConfig = {
@@ -696,12 +561,11 @@
         if (!document.getElementById('ui-enhancement-styles')) {
             const style = document.createElement('style');
             style.id = 'ui-enhancement-styles';
-            style.textContent = darkModeEnhancementStyles + dragStyles + seatingStyles;
+            style.textContent = darkModeEnhancementStyles + seatingStyles;
             document.head.appendChild(style);
         }
 
         // 初始化拖拽
-        setTimeout(initStudentDrag, 500);
 
         // 添加座位表按鈕到學生管理區
         setTimeout(addSeatingButton, 600);
