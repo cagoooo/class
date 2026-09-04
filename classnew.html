@@ -33,9 +33,9 @@
     </script>
 
     <!-- 🔒 多班級資料隔離：必須在所有模組之前載入，攔截 localStorage 自動依班級路由 -->
-    <script src="js/class-aware-storage.js?v=3.16.2"></script>
+    <script src="js/class-aware-storage.js?v=3.18.0"></script>
     <!-- 🌱 通用空狀態元件：各區塊沒資料時顯示友善引導 -->
-    <script src="js/empty-state.js?v=3.16.2"></script>
+    <script src="js/empty-state.js?v=3.18.0"></script>
 
     <!-- 🔧 開發環境：localhost 自動清除 Service Worker 快取，避免 404 攔截問題 -->
     <script>
@@ -68,7 +68,7 @@
     <link rel="icon" href="favicon.ico" sizes="any">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="shortcut icon" href="favicon.ico">
-    <title>班級小管家 v3.16.2</title>
+    <title>班級小管家 v3.18.0</title>
     <meta name="description" content="教師班級管理的貼心小幫手 — 學生管理、作業檢查、計時器、抽籤、考試監考，一站搞定。">
 
     <!-- Open Graph / Facebook / LINE -->
@@ -91,14 +91,14 @@
     <meta name="twitter:description" content="教師班級管理的貼心小幫手 — 學生管理、作業檢查、計時器、抽籤、考試監考，一站搞定。">
     <meta name="twitter:image" content="https://cagoooo.github.io/class/og-preview.png?v=3.12.17">
     <!-- 📦 版本號（由 scripts/update-sw-version.js 自動同步） -->
-    <script>window.APP_VERSION = '3.16.2';</script>
+    <script>window.APP_VERSION = '3.18.0';</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 深色模式統一由 .dark class 驅動（與 theme-toggle.js 一致），不再跟隨作業系統的 prefers-color-scheme，
          否則 OS 深色但 App 淺色（或反之）時，dark: 工具類與自訂 .dark CSS 不同步 → 深底配深字、按鈕文字看不到 -->
     <script>tailwind.config = { darkMode: 'class' };</script>
-    <link rel="stylesheet" href="css/rwd-breakpoints.css?v=3.16.2">
-    <link rel="stylesheet" href="css/pwa-install.css?v=3.16.2">
-    <link rel="stylesheet" href="css/skeleton.css?v=3.16.2">
+    <link rel="stylesheet" href="css/rwd-breakpoints.css?v=3.18.0">
+    <link rel="stylesheet" href="css/pwa-install.css?v=3.18.0">
+    <link rel="stylesheet" href="css/skeleton.css?v=3.18.0">
     <!-- 新增 Excel 讀取套件 -->
 
     <script crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -740,7 +740,7 @@
                                 title="目前版本（點擊查看更新資訊）"
                                 class="text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-800/60 transition-colors"
                                 onclick="window.open('https://github.com/cagoooo/class/blob/main/CHANGELOG.md', '_blank')">
-                                v3.16.2
+                                v3.18.0
                             </span>
                         </div>
                         <div class="hidden sm:block text-xs sm:text-sm text-gray-600">讓課堂管理變得簡單有趣</div>
@@ -905,8 +905,14 @@
                 <p class="text-xs sm:text-sm text-gray-600 mb-3">
                     請選擇 Excel 檔案 (.xlsx, .xls, .csv)。<br>
                     格式要求：A欄為<strong class="text-indigo-700 dark:text-indigo-300">姓名</strong>，B欄為<strong
-                        class="text-indigo-700 dark:text-indigo-300">座號</strong>，從第2行開始讀取。
+                        class="text-indigo-700 dark:text-indigo-300">座號</strong>，從第2行開始讀取。<br>
+                    <span class="text-gray-500">第一次使用建議先下載空白範本，照著填最不會出錯。</span>
                 </p>
+                <div class="mb-3">
+                    <button onclick="downloadStudentTemplate()"
+                        class="w-full sm:w-auto bg-white border border-indigo-300 text-indigo-700 px-4 py-2 rounded-lg hover:bg-indigo-50 transition-colors text-sm active:scale-95 whitespace-nowrap dark:bg-transparent dark:border-indigo-700 dark:text-indigo-300 dark:hover:bg-indigo-900/30">⬇️
+                        下載空白範本</button>
+                </div>
                 <div class="flex flex-col sm:flex-row gap-2 items-center">
                     <input type="file" id="excelFile" accept=".xlsx, .xls, .csv"
                         class="flex-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-100 file:text-indigo-700 dark:file:bg-indigo-900/40 dark:file:text-indigo-300 hover:file:bg-indigo-200 dark:hover:file:bg-indigo-800/60 cursor-pointer">
@@ -3712,6 +3718,65 @@
 
 
         // --- Excel 匯入功能 ---
+
+        /**
+         * 產生並下載「學生名單匯入範本」。
+         *
+         * 設計取捨：
+         *   - 範例資料放在**第二個工作表**，不放在第一張。匯入程式只讀
+         *     `workbook.SheetNames[0]`，範例若放第一張，老師忘了刪就會把
+         *     「王小明」這種假學生一起匯進去。
+         *   - 第一張只留標題列，第 2 列起全空，老師直接往下填。
+         *   - 產生用的是頁面已載入的 SheetJS，不必額外放一個檔案在 repo，
+         *     範本格式跟 handleExcelImport 的解析規則永遠不會走鐘。
+         */
+        function downloadStudentTemplate() {
+            try {
+                if (typeof XLSX === 'undefined') {
+                    NotificationSystem.error('Excel 套件尚未載入完成，請稍候再試');
+                    return;
+                }
+
+                const wb = XLSX.utils.book_new();
+
+                // ── 第一張：老師實際要填的表（只有標題列）──
+                const sheet = XLSX.utils.aoa_to_sheet([['姓名', '座號']]);
+                sheet['!cols'] = [{ wch: 16 }, { wch: 10 }];
+                XLSX.utils.book_append_sheet(wb, sheet, '學生名單');
+
+                // ── 第二張：填寫說明與範例（匯入時不會被讀到）──
+                const help = XLSX.utils.aoa_to_sheet([
+                    ['班級小管家 · 學生名單匯入範本'],
+                    [],
+                    ['怎麼填'],
+                    ['1', '切到「學生名單」工作表填寫，這張說明表不用動。'],
+                    ['2', 'A 欄填姓名，B 欄填座號，從第 2 列開始往下填。'],
+                    ['3', '填完存成 .xlsx，回到班級小管家點「選擇檔案」後按「匯入並預覽」。'],
+                    [],
+                    ['範例'],
+                    ['姓名', '座號'],
+                    ['王小明', 1],
+                    ['陳小美', 2],
+                    ['林大同', 3],
+                    [],
+                    ['注意事項'],
+                    ['·', '座號請填 1、2、3 這種班內序號。'],
+                    ['·', '若學校名冊是「班級座號」五碼（例如 10101 代表 101 班 1 號），'],
+                    ['', '請只保留後兩碼（10101 → 1），否則座號會變成 10101。'],
+                    ['·', '座號留空會自動接續編號；姓名重複或座號重複會被擋下並提示哪一列有問題。'],
+                    ['·', '第 1 列是標題列，匯入時會自動略過，請不要刪掉。'],
+                ]);
+                help['!cols'] = [{ wch: 10 }, { wch: 62 }];
+                XLSX.utils.book_append_sheet(wb, help, '填寫說明');
+
+                XLSX.writeFile(wb, '班級小管家_學生名單範本.xlsx');
+                NotificationSystem.success('範本已下載，請填「學生名單」那張工作表');
+            } catch (e) {
+                console.error('[Template] 產生範本失敗:', e);
+                NotificationSystem.error('產生範本失敗：' + (e.message || ''));
+            }
+        }
+
         function handleExcelImport() {
             const fileInput = document.getElementById('excelFile');
             const file = fileInput.files[0];
@@ -4422,38 +4487,38 @@
         // --- 結束全螢幕時鐘功能 ---
     </script>
     <!-- 增強模組 -->
-    <script src="js/skeleton.js?v=3.16.2"></script>
-    <script src="js/event-bus.js?v=3.16.2"></script>
-    <script src="js/error-handler.js?v=3.16.2"></script>
+    <script src="js/skeleton.js?v=3.18.0"></script>
+    <script src="js/event-bus.js?v=3.18.0"></script>
+    <script src="js/error-handler.js?v=3.18.0"></script>
 
-    <script src="js/class-db.js?v=3.16.2"></script>
-    <script src="js/firebase-config.js?v=3.16.2"></script>
-    <script src="js/usage-notify.js?v=3.16.2"></script>
-    <script src="js/firebase-sync.js?v=3.16.2"></script>
-    <script src="js/firebase-ui.js?v=3.16.2"></script>
-    <script src="js/storage-manager.js?v=3.16.2"></script>
-    <script src="js/app-state.js?v=3.16.2"></script>
-    <script src="js/homework-enhancement.js?v=3.16.2"></script>
-    <script src="js/notebook-enhancement.js?v=3.16.2"></script>
-    <script src="js/leaderboard-enhancement.js?v=3.16.2"></script>
-    <script src="js/timer-enhancement.js?v=3.16.2"></script>
-    <script src="js/theme-toggle.js?v=3.16.2"></script>
-    <script src="js/lottery-enhancement.js?v=3.16.2"></script>
-    <script src="js/grouping-enhancement.js?v=3.16.2"></script>
-    <script src="js/student-enhancement.js?v=3.16.2"></script>
-    <script src="js/pomodoro.js?v=3.16.2"></script>
-    <script src="js/keyboard-shortcuts.js?v=3.16.2"></script>
-    <script src="js/ui-enhancement.js?v=3.16.2"></script>
-    <script src="js/navigation-enhancement.js?v=3.16.2"></script>
-    <script src="js/data-reports.js?v=3.16.2"></script>
-    <script src="js/exam-proctor.js?v=3.16.2"></script>
-    <script src="js/exam-sounds.js?v=3.16.2"></script>
-    <script src="js/announcement.js?v=3.16.2"></script>
+    <script src="js/class-db.js?v=3.18.0"></script>
+    <script src="js/firebase-config.js?v=3.18.0"></script>
+    <script src="js/usage-notify.js?v=3.18.0"></script>
+    <script src="js/firebase-sync.js?v=3.18.0"></script>
+    <script src="js/firebase-ui.js?v=3.18.0"></script>
+    <script src="js/storage-manager.js?v=3.18.0"></script>
+    <script src="js/app-state.js?v=3.18.0"></script>
+    <script src="js/homework-enhancement.js?v=3.18.0"></script>
+    <script src="js/notebook-enhancement.js?v=3.18.0"></script>
+    <script src="js/leaderboard-enhancement.js?v=3.18.0"></script>
+    <script src="js/timer-enhancement.js?v=3.18.0"></script>
+    <script src="js/theme-toggle.js?v=3.18.0"></script>
+    <script src="js/lottery-enhancement.js?v=3.18.0"></script>
+    <script src="js/grouping-enhancement.js?v=3.18.0"></script>
+    <script src="js/student-enhancement.js?v=3.18.0"></script>
+    <script src="js/pomodoro.js?v=3.18.0"></script>
+    <script src="js/keyboard-shortcuts.js?v=3.18.0"></script>
+    <script src="js/ui-enhancement.js?v=3.18.0"></script>
+    <script src="js/navigation-enhancement.js?v=3.18.0"></script>
+    <script src="js/data-reports.js?v=3.18.0"></script>
+    <script src="js/exam-proctor.js?v=3.18.0"></script>
+    <script src="js/exam-sounds.js?v=3.18.0"></script>
+    <script src="js/announcement.js?v=3.18.0"></script>
 
     <!-- PWA 支援 -->
-    <script src="js/pwa-install.js?v=3.16.2"></script>
-    <script src="js/clock-settings-toggle.js?v=3.16.2"></script>
-    <script src="js/admin-console.js?v=3.16.2"></script>
+    <script src="js/pwa-install.js?v=3.18.0"></script>
+    <script src="js/clock-settings-toggle.js?v=3.18.0"></script>
+    <script src="js/admin-console.js?v=3.18.0"></script>
 
     <!-- ===== 一鍵更新浮動按鈕 ===== -->
     <style>
@@ -4521,48 +4586,48 @@
     </button>
 
     <!-- 離線狀態偵測（P12：斷網時頂部 Banner 提示） -->
-    <script src="./js/offline-detector.js?v=3.16.2"></script>
+    <script src="./js/offline-detector.js?v=3.18.0"></script>
     <!-- 自動定時同步（P11：每 10 分鐘自動上傳至 Firebase） -->
-    <script src="./js/auto-sync.js?v=3.16.2"></script>
+    <script src="./js/auto-sync.js?v=3.18.0"></script>
 
     <!-- 手勢操作支援（觸控滑動切換功能區 | 長按快捷選單） -->
-    <script src="./js/gesture-handler.js?v=3.16.2"></script>
+    <script src="./js/gesture-handler.js?v=3.18.0"></script>
 
     <!-- 🧧 十二生肖・開運拉霸機 + 開運籤（開學破冰遊戲） -->
-    <script src="./js/zodiac-slot.js?v=3.16.2"></script>
+    <script src="./js/zodiac-slot.js?v=3.18.0"></script>
 
     <!-- 🛟 資料保險把關（清除前強制備份 + 儲存空間預警） -->
-    <script src="./js/data-safety-guard.js?v=3.16.2"></script>
+    <script src="./js/data-safety-guard.js?v=3.18.0"></script>
 
     <!-- 🎨 班級經營白板（公告白板 + 班級秩序 + 號碼抽籤） -->
-    <script src="./js/class-board.js?v=3.16.2"></script>
+    <script src="./js/class-board.js?v=3.18.0"></script>
 
     <!-- 🦷 潔牙勾選表 -->
-    <script src="./js/brush-check.js?v=3.16.2"></script>
+    <script src="./js/brush-check.js?v=3.18.0"></script>
 
     <!-- ✍️ 成績單評語生成器 -->
-    <script src="./js/comment-gen.js?v=3.16.2"></script>
+    <script src="./js/comment-gen.js?v=3.18.0"></script>
 
     <!-- 💬 生動對話小學堂（國語寫作互動教學） -->
-    <script src="./js/dialogue-school.js?v=3.16.2"></script>
+    <script src="./js/dialogue-school.js?v=3.18.0"></script>
 
     <!-- 學期封存模組（Q01：一鍵封存學期資料至 Firebase archives/） -->
-    <script src="./js/semester-archive.js?v=3.16.2"></script>
+    <script src="./js/semester-archive.js?v=3.18.0"></script>
 
     <!-- 多班級管理模組（在 google-auth-ui.js 之前載入，確保 nav slot 就緒） -->
-    <script src="./js/class-profiles.js?v=3.16.2"></script>
+    <script src="./js/class-profiles.js?v=3.18.0"></script>
     <!-- v3.1.0：Ctrl+K 班級快速切換器 -->
-    <script src="./js/class-quick-switcher.js?v=3.16.2"></script>
+    <script src="./js/class-quick-switcher.js?v=3.18.0"></script>
 
 
     <!-- Google 帳號登入 UI 模組（必須在所有 Firebase 模組之後載入） -->
-    <script src="./js/google-auth-ui.js?v=3.16.2"></script>
+    <script src="./js/google-auth-ui.js?v=3.18.0"></script>
 
     <!-- v3.1.0：同步狀態常駐指示器（位於一鍵更新按鈕左側） -->
-    <script src="./js/sync-status-indicator.js?v=3.16.2"></script>
+    <script src="./js/sync-status-indicator.js?v=3.18.0"></script>
 
     <!-- v3.12.1：版本與健康狀態面板（點版本徽章開啟，R-C1/R-C2） -->
-    <script src="./js/health-panel.js?v=3.16.2"></script>
+    <script src="./js/health-panel.js?v=3.18.0"></script>
 
 </body>
 
