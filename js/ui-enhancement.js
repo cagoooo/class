@@ -413,8 +413,12 @@
             const [removed] = students.splice(draggedIndex, 1);
             students.splice(targetIndex, 0, removed);
 
-            // 更新座號
-            students.forEach((s, i) => s.number = i + 1);
+            // ⚠️ 這裡刻意「只換順序、不動座號」。
+            //    舊版會 students.forEach((s, i) => s.number = i + 1) 把全班座號
+            //    重寫成 1..N，而且提示只說「已更新學生順序」，完全沒提座號被改掉。
+            //    對用「班級座號」的老師（例如 601 班寫成 60101~60125，約四成班級都是）
+            //    只要不小心拖到一張卡片，整班編號就一次消失且無法復原。
+            //    「排列順序」和「座號」本來就是兩件事，拖曳只該負責前者。
 
             localStorage.setItem(window.STUDENTS_KEY || 'students', JSON.stringify(students));
 
@@ -423,7 +427,7 @@
             }
 
             if (typeof NotificationSystem !== 'undefined') {
-                NotificationSystem.success('已更新學生順序');
+                NotificationSystem.success('已更新學生順序（座號不變）');
             }
         }
     }
