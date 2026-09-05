@@ -56,6 +56,26 @@ function clip(s, n) {
   return String(s == null ? '' : s).slice(0, n);
 }
 
+/** 由 User-Agent 推出可讀的「裝置／瀏覽器」標籤。錯誤卡片與後台錯誤紀錄共用。 */
+function deviceLabel(ua) {
+  const s = String(ua || '');
+  if (!s) return '未知裝置';
+  let device = '未知裝置';
+  if (s.includes('iPad')) device = 'iPad';
+  else if (s.includes('iPhone')) device = 'iPhone';
+  else if (s.includes('Macintosh')) device = 'Mac';
+  else if (s.includes('Windows')) device = 'Windows';
+  else if (s.includes('Android')) device = 'Android';
+
+  let browser = '未知瀏覽器';
+  if (s.includes('Edg/')) browser = 'Edge';
+  else if (s.includes('Chrome/')) browser = 'Chrome';
+  else if (s.includes('Safari/') && !s.includes('Chrome/')) browser = 'Safari';
+  else if (s.includes('Firefox/')) browser = 'Firefox';
+
+  return device + ' / ' + browser;
+}
+
 /** 組 cardsV2 卡片 */
 function buildCard(type, data, who) {
   const meta = EVENT_META[type] || { emoji: '🔔', title: '使用事件' };
@@ -1423,6 +1443,11 @@ exports.getUsageAnalytics = onCall(
 
       const dayMap = {};
       const featureTotals = {};
+      // 錯誤紀錄：依訊息分組。
+      // ⚠️ 這裡看得到的會比 Google Chat 通知**多**——錯誤推播有「每人每日 5 則」上限，
+      //    超過的仍會留底但不推播（notifyUsage 是先 log 再判斷 push 配額）。
+      //    所以出大狀況時，手機只會響 5 次，完整清單要來這裡看。
+      const errorMap = {};
       snap.forEach((doc) => {
         const d = doc.data() || {};
         const day = d.day || '';
@@ -1435,7 +1460,37 @@ exports.getUsageAnalytics = onCall(
             featureTotals[k] = (featureTotals[k] || 0) + (Number(d.stats[k]) || 0);
           });
         }
+        if (d.type === 'error') {
+          const msg = clip(d.message, 200) || '(無訊息)';
+          if (!errorMap[msg]) {
+            errorMap[msg] = { message: msg, count: 0, uids: {}, contexts: {}, devices: {}, urls: {}, lastTs: '', firstDay: day };
+          }
+          const g = errorMap[msg];
+          g.count++;
+          if (d.uid) g.uids[d.uid] = d.name || d.email || d.uid;
+          if (d.context) g.contexts[clip(d.context, 80)] = true;
+          if (d.ua) g.devices[deviceLabel(d.ua)] = true;
+          if (d.url) g.urls[clip(d.url, 120)] = true;
+          const ts = d.ts || '';
+          if (ts > g.lastTs) g.lastTs = ts;
+          if (day < g.firstDay) g.firstDay = day;
+        }
       });
+
+      const errors = Object.keys(errorMap).map((k) => {
+        const g = errorMap[k];
+        return {
+          message: g.message,
+          count: g.count,
+          teachers: Object.values(g.uids).slice(0, 5),
+          teacherCount: Object.keys(g.uids).length,
+          contexts: Object.keys(g.contexts).slice(0, 3),
+          devices: Object.keys(g.devices).slice(0, 3),
+          urls: Object.keys(g.urls).slice(0, 2),
+          lastTs: g.lastTs,
+          firstDay: g.firstDay,
+        };
+      }).sort((a, b) => b.count - a.count);
 
       const days = Object.keys(dayMap).sort().map((k) => ({
         day: k,
@@ -1466,7 +1521,7 @@ exports.getUsageAnalytics = onCall(
           personalDomains: Object.keys(personalMap)
             .map((d) => ({ domain: d, teachers: personalMap[d] }))
             .sort((a, b) => b.teachers - a.teachers),
-          events: { days, features, totalEvents: snap.size },
+          events: { days, features, totalEvents: snap.size, errors },
         },
       };
     } catch (error) {

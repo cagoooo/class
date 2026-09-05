@@ -396,6 +396,46 @@
             .trend-bar { background: linear-gradient(180deg, #60a5fa, #2563eb); border-radius: 3px 3px 0 0; min-height: 2px; }
             .trend-labels { display: flex; justify-content: space-between; font-size: 0.68rem; color: #94a3b8; margin-top: 0.15rem; }
 
+            /* ── 錯誤紀錄 ── */
+            .err-item {
+                border: 1px solid #fecaca;
+                background: #fff;
+                border-radius: 0.75rem;
+                padding: 0.75rem 0.85rem;
+                margin-bottom: 0.6rem;
+            }
+            .dark .err-item { background: rgba(127,29,29,.12); border-color: #7f1d1d; }
+            .err-msg {
+                font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                font-size: 0.82rem;
+                font-weight: 700;
+                color: #991b1b;
+                word-break: break-word;
+                line-height: 1.5;
+            }
+            .dark .err-msg { color: #fca5a5; }
+            .err-meta {
+                margin-top: 0.4rem;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.4rem;
+                align-items: center;
+                font-size: 0.75rem;
+                color: #64748b;
+            }
+            .dark .err-meta { color: #94a3b8; }
+            .err-count {
+                background: #dc2626; color: #fff;
+                border-radius: 999px; padding: 0.1rem 0.55rem;
+                font-weight: 800; font-size: 0.75rem;
+            }
+            .err-ok {
+                text-align: center; padding: 1.6rem;
+                color: #059669; font-weight: 700; font-size: 0.9rem;
+                background: #ecfdf5; border-radius: 0.75rem;
+            }
+            .dark .err-ok { background: rgba(6,78,59,.25); color: #6ee7b7; }
+
             /* ── 提醒框（未對應網域）── */
             .an-warn {
                 background: #fffbeb; border: 1px solid #fcd34d; border-radius: 0.75rem;
@@ -1058,6 +1098,46 @@
             + '<div class="an-hint">' + hint + '</div>' + body + '</div>';
     }
 
+
+    /**
+     * 錯誤紀錄區塊。
+     *
+     * ⚠️ 這裡看得到的會比 Google Chat 通知**多**：錯誤推播有「每人每日 5 則」上限，
+     *    超過的仍會留底但不推播。出大狀況時手機只響 5 次，完整清單要看這裡。
+     */
+    function errorSection(errors, sinceLabel) {
+        if (!errors || !errors.length) {
+            return section('🐞 錯誤紀錄',
+                '近 30 天（自 ' + esc(sinceLabel) + ' 起）老師端回報的系統錯誤。',
+                '<div class="err-ok">✅ 近 30 天沒有任何錯誤回報</div>');
+        }
+
+        const total = errors.reduce(function (n, e) { return n + e.count; }, 0);
+        const rows = errors.slice(0, 20).map(function (e) {
+            const when = e.lastTs ? relativeDays(e.lastTs) : '';
+            const bits = [];
+            if (e.teacherCount) {
+                bits.push('<span>👤 ' + e.teacherCount + ' 位老師：' +
+                    esc((e.teachers || []).join('、')) +
+                    (e.teacherCount > (e.teachers || []).length ? '…' : '') + '</span>');
+            }
+            if ((e.contexts || []).length) bits.push('<span>📍 ' + esc(e.contexts.join('、')) + '</span>');
+            if ((e.devices || []).length) bits.push('<span>💻 ' + esc(e.devices.join('、')) + '</span>');
+            if (when) bits.push('<span title="' + esc(absTime(e.lastTs)) + '">🕒 最後 ' + esc(when) + '</span>');
+            return '<div class="err-item">'
+                + '<div class="err-msg">' + esc(e.message) + '</div>'
+                + '<div class="err-meta"><span class="err-count">×' + e.count + '</span>'
+                + bits.join('') + '</div></div>';
+        }).join('');
+
+        const more = errors.length > 20 ? '（僅顯示前 20 種，共 ' + errors.length + ' 種）' : '';
+        return section('🐞 錯誤紀錄',
+            '近 30 天（自 ' + esc(sinceLabel) + ' 起）共 ' + total + ' 次、' + errors.length + ' 種錯誤。'
+            + '依發生次數排序。' + more
+            + '<br>這裡比 Google Chat 通知完整——推播有「每人每日 5 則」上限，超過的仍會留底但不會通知你。',
+            rows);
+    }
+
     function renderAnalytics(d) {
         const box = document.getElementById('admin-analytics-body');
         if (!box) return;
@@ -1114,6 +1194,8 @@
             barChart((ev.features || []).slice(0, 12).map(function (f) {
                 return { label: f.label, value: f.count };
             }), { warm: true, unit: ' 次' }));
+
+        html += errorSection(ev.errors, d.eventsSince || '');
 
         html += section('🏫 學校排行',
             '只含教育網域（.edu.tw）；個人信箱不是學校，不列入。',
