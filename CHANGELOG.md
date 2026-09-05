@@ -1,5 +1,17 @@
 # 班級小管家 Changelog
 
+## [v3.23.1] - 2026-09-05 🧹 刪除 7 個從未被載入的死檔
+
+`js/` 有 53 個檔案，但 `classnew.html` 只載入 46 個。剩下 7 個（共 461 行）從未被載入。
+
+- **這不只是佔空間，是維護陷阱**：其中 5 個定義了與 `classnew.html` 內嵌版本**同名的類別**——
+  `notification.js`→`NotificationSystem`、`validator.js`→`Validator`、`loading.js`→`LoadingIndicator`、
+  `dialog.js`→`ConfirmDialog`、`backup.js`→`DataBackup`。要改通知或確認對話框時很自然會去開這些檔案，
+  改完卻完全沒效果，因為線上跑的是 `classnew.html` 裡的版本。
+- `js/index.js` 是個載入器，內容是載入上述檔案，但它本身也沒被任何地方引用——整組是自成一團的死碼。
+- **`sw.js` 的預快取清單有列 `js/utils.js`**，若只刪檔案不改清單，Service Worker 安裝會失敗。已一併移除。
+- 刪除後 `js/` 剩 46 個檔案，與實際載入數一致。
+
 ## [v3.23.0] - 2026-09-05 🗂️ 管理功能區精簡：四套備份收斂成三段清楚職責
 
 「管理功能（新增／統計／備份）」區同時存在**四套備份機制**，其中兩套還用同一個 💾 圖示，
