@@ -640,11 +640,15 @@
         modal.innerHTML = `
             <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4" onclick="event.stopPropagation()">
                 <div class="flex items-center justify-between p-4 border-b bg-gradient-to-r from-purple-500 to-pink-500 rounded-t-2xl">
-                    <h3 class="text-xl font-bold text-white">💾 備份管理</h3>
+                    <h3 class="text-xl font-bold text-white">🕘 自動備份紀錄</h3>
                     <button onclick="document.getElementById('backup-modal').remove()" class="text-white hover:text-gray-200 text-2xl">✕</button>
                 </div>
 
                 <div class="p-4 space-y-3">
+                    <div style="font-size:0.78rem;color:#64748b;background:#f8fafc;border-radius:0.5rem;padding:0.5rem 0.6rem;">
+                        💡 系統每 5 分鐘自動在<strong>本機</strong>存一份快照，誤刪時可回復。
+                        換裝置不會跟著走——要帶著走請用「匯出完整備份」。
+                    </div>
                     ${backups.length > 0 ? backups.map((b, i) => `
                         <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                             <div>
@@ -712,14 +716,14 @@
         // 使用 id 精確定位班級統計區域，避免誤配學生卡片
         const statsArea = document.getElementById('class-stats-panel');
         if (statsArea) {
+            // ⚠️ v3.23.0 起「備份管理」不放這裡。這一區是班級工具捷徑（座位表／數據面板），
+            //    備份屬於資料管理，全部集中在下方「資料管理」區才不會讓老師分不清
+            //    要按哪一個備份（一度有四套備份機制散在同一個畫面）。
             const btnContainer = document.createElement('div');
-            btnContainer.className = 'flex gap-2 mt-3';
+            btnContainer.className = 'mt-3';
             btnContainer.innerHTML = `
-                <button id="data-panel-btn" onclick="showDataPanel()" class="flex-1 data-panel-btn">
+                <button id="data-panel-btn" onclick="showDataPanel()" class="w-full data-panel-btn">
                     📊 數據面板
-                </button>
-                <button onclick="showBackupManager()" class="flex-1 data-panel-btn" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);">
-                    💾 備份管理
                 </button>
             `;
             statsArea.appendChild(btnContainer);

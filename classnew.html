@@ -33,9 +33,9 @@
     </script>
 
     <!-- 🔒 多班級資料隔離：必須在所有模組之前載入，攔截 localStorage 自動依班級路由 -->
-    <script src="js/class-aware-storage.js?v=3.22.0"></script>
+    <script src="js/class-aware-storage.js?v=3.23.0"></script>
     <!-- 🌱 通用空狀態元件：各區塊沒資料時顯示友善引導 -->
-    <script src="js/empty-state.js?v=3.22.0"></script>
+    <script src="js/empty-state.js?v=3.23.0"></script>
 
     <!-- 🔧 開發環境：localhost 自動清除 Service Worker 快取，避免 404 攔截問題 -->
     <script>
@@ -68,7 +68,7 @@
     <link rel="icon" href="favicon.ico" sizes="any">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="shortcut icon" href="favicon.ico">
-    <title>班級小管家 v3.22.0</title>
+    <title>班級小管家 v3.23.0</title>
     <meta name="description" content="教師班級管理的貼心小幫手 — 學生管理、作業檢查、計時器、抽籤、考試監考，一站搞定。">
 
     <!-- Open Graph / Facebook / LINE -->
@@ -91,14 +91,14 @@
     <meta name="twitter:description" content="教師班級管理的貼心小幫手 — 學生管理、作業檢查、計時器、抽籤、考試監考，一站搞定。">
     <meta name="twitter:image" content="https://cagoooo.github.io/class/og-preview.png?v=3.12.17">
     <!-- 📦 版本號（由 scripts/update-sw-version.js 自動同步） -->
-    <script>window.APP_VERSION = '3.22.0';</script>
+    <script>window.APP_VERSION = '3.23.0';</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 深色模式統一由 .dark class 驅動（與 theme-toggle.js 一致），不再跟隨作業系統的 prefers-color-scheme，
          否則 OS 深色但 App 淺色（或反之）時，dark: 工具類與自訂 .dark CSS 不同步 → 深底配深字、按鈕文字看不到 -->
     <script>tailwind.config = { darkMode: 'class' };</script>
-    <link rel="stylesheet" href="css/rwd-breakpoints.css?v=3.22.0">
-    <link rel="stylesheet" href="css/pwa-install.css?v=3.22.0">
-    <link rel="stylesheet" href="css/skeleton.css?v=3.22.0">
+    <link rel="stylesheet" href="css/rwd-breakpoints.css?v=3.23.0">
+    <link rel="stylesheet" href="css/pwa-install.css?v=3.23.0">
+    <link rel="stylesheet" href="css/skeleton.css?v=3.23.0">
     <!-- 新增 Excel 讀取套件 -->
 
     <script crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -740,7 +740,7 @@
                                 title="目前版本（點擊查看更新資訊）"
                                 class="text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-800/60 transition-colors"
                                 onclick="window.open('https://github.com/cagoooo/class/blob/main/CHANGELOG.md', '_blank')">
-                                v3.22.0
+                                v3.23.0
                             </span>
                         </div>
                         <div class="hidden sm:block text-xs sm:text-sm text-gray-600">讓課堂管理變得簡單有趣</div>
@@ -971,28 +971,21 @@
                                     class="font-semibold text-green-600 text-lg">0</span></div>
                         </div>
 
-                        <h3 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">名單管理</h3>
+                        <h3 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">資料管理</h3>
                         <div class="bg-gray-50 p-3 sm:p-4 rounded-lg">
-                            <div class="flex gap-2">
-                                <button onclick="saveStudentList()"
-                                    class="bg-teal-500 text-white px-4 sm:px-6 py-2 rounded-lg hover:bg-teal-600 transition-colors flex-1 text-sm sm:text-base active:scale-95">💾
-                                    儲存目前名單</button>
-                                <button onclick="loadStudentList()"
-                                    class="bg-cyan-500 text-white px-4 sm:px-6 py-2 rounded-lg hover:bg-cyan-600 transition-colors flex-1 text-sm sm:text-base active:scale-95">📂
-                                    讀取已存名單</button>
-                            </div>
-                            <div class="mt-3">
-                                <button onclick="clearAllStudents()"
-                                    class="w-full bg-red-500 text-white px-4 sm:px-6 py-2 rounded-lg hover:bg-red-600 transition-colors text-sm sm:text-base active:scale-95">🗑️
-                                    一鍵清除所有學生</button>
-                            </div>
-                            <div class="text-xs sm:text-sm text-gray-600 bg-teal-50 p-2 rounded mt-2">
-                                💡 提示：儲存名單以便下次快速載入，不用重新輸入！
+                            <!-- 自動備份：每 5 分鐘存一次到本機，供誤刪時回復 -->
+                            <h4 class="text-sm font-semibold text-gray-700 mb-2">⏱️ 自動備份</h4>
+                            <button onclick="showBackupManager()"
+                                class="w-full bg-violet-500 text-white px-4 py-2 rounded-lg hover:bg-violet-600 transition-colors text-sm active:scale-95">
+                                🕘 查看自動備份紀錄
+                            </button>
+                            <div class="text-xs text-gray-600 bg-violet-50 p-2 rounded mt-2">
+                                💡 系統每 5 分鐘自動在<strong>本機</strong>存一份快照，誤刪學生或分數時可從這裡回復。換裝置不會跟著走。
                             </div>
 
                             <!-- 完整資料備份與恢復 -->
                             <div class="mt-4 pt-4 border-t border-gray-200">
-                                <h4 class="text-sm font-semibold text-gray-700 mb-2">🔐 完整資料備份</h4>
+                                <h4 class="text-sm font-semibold text-gray-700 mb-2">🔐 完整備份（帶著走）</h4>
                                 <div class="space-y-2">
                                     <button onclick="DataBackup.export()"
                                         class="w-full bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transition-colors text-sm active:scale-95">
@@ -1009,6 +1002,17 @@
                                 </div>
                                 <div class="text-xs text-gray-600 bg-purple-50 p-2 rounded mt-2">
                                     💡 匯出的 Excel 含「學生總表（可直接登記成績）、加扣分明細、作業繳交、聯絡簿、小組」等工作表，並保留可完整還原的備份資料；匯入支援 .xlsx 與舊版 .json
+                                </div>
+                            </div>
+                            <!-- 危險操作獨立擺最下面：與備份／封存分開，避免手滑 -->
+                            <div class="mt-4 pt-4 border-t-2 border-red-200" id="danger-zone">
+                                <h4 class="text-sm font-semibold text-red-700 mb-2">⚠️ 危險操作</h4>
+                                <button onclick="clearAllStudents()"
+                                    class="w-full bg-white border border-red-300 text-red-700 px-4 py-2 rounded-lg hover:bg-red-50 transition-colors text-sm active:scale-95 font-semibold">
+                                    🗑️ 一鍵清除所有學生
+                                </button>
+                                <div class="text-xs text-gray-600 bg-red-50 p-2 rounded mt-2">
+                                    💡 會清空目前班級的整份名單，不可復原。建議先做一次「匯出完整備份」再執行。
                                 </div>
                             </div>
                         </div>
@@ -3919,42 +3923,15 @@
             document.body.removeChild(link);
         }
 
-        function saveStudentList() {
-            if (students.length === 0) { alert('目前沒有學生名單可以儲存。'); return; }
-            const listName = prompt('請為這個學生名單命名：', `班級名單 ${new Date().toLocaleDateString()}`);
-            if (!listName || listName.trim() === '') { alert('儲存已取消。'); return; }
-            const savedLists = JSON.parse(localStorage.getItem('savedStudentLists')) || {};
-            savedLists[listName.trim()] = students;
-            localStorage.setItem('savedStudentLists', JSON.stringify(savedLists));
-            alert(`名單「${listName.trim()}」已成功儲存！`);
-        }
-
-        function loadStudentList() {
-            const savedLists = JSON.parse(localStorage.getItem('savedStudentLists')) || {};
-            const listNames = Object.keys(savedLists);
-            if (listNames.length === 0) { alert('沒有任何已儲存的學生名單。'); return; }
-            let message = '請輸入您想載入的名單編號：\n\n';
-            listNames.forEach((name, index) => { message += `${index + 1}. ${name}\n`; });
-            const choice = prompt(message);
-            if (!choice) { alert('載入已取消。'); return; }
-            const index = parseInt(choice) - 1;
-            if (isNaN(index) || index < 0 || index >= listNames.length) { alert('無效的選擇。'); return; }
-            const selectedListName = listNames[index];
-            if (confirm(`確定要載入「${selectedListName}」嗎？\n這將會覆蓋目前的學生名單、分數與分組記錄。`)) {
-                students = savedLists[selectedListName];
-                pointsHistory = [];
-                groups = [];
-                localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
-                localStorage.setItem(window.POINTS_HISTORY_KEY || 'pointsHistory', JSON.stringify(pointsHistory));
-                localStorage.setItem(window.GROUPS_KEY || 'groups', JSON.stringify(groups));
-                renderStudents();
-                updatePointsStudentSelect();
-                renderPointsHistory();
-                updateHomeworkCheckList();
-                renderGroups();
-                alert(`已成功載入名單「${selectedListName}」。`);
-            }
-        }
+        // ==================== 儲存／讀取已存名單（已於 v3.23.0 移除）====================
+        //
+        // ⚠️ 不要再加回來，它的用途已被「多班級」完全取代——每個班的名單本來就永久
+        //    保存，切換班級即可，不需要「儲存再載入」。移除的三個理由：
+        //      1) 只寫 localStorage `savedStudentLists`，不同步雲端，換裝置就沒了。
+        //      2) UX 是舊式 prompt() 數字選單，與 App 其他地方的 modal 不一致。
+        //      3) 🔴 載入時會 pointsHistory = [] 與 groups = []，把整學期的加扣分紀錄
+        //         與分組直接清空——老師以為只是換名單，結果紀錄全失。
+        //    需要保存學期資料請用「封存本學期資料」，需要帶著走請用「匯出完整備份」。
 
         async function clearAllStudents() {
             // 🛟 資料保險把關：清除前強制先備份（避免再次發生清除後紀錄全失的悲劇）
@@ -4520,38 +4497,38 @@
         // --- 結束全螢幕時鐘功能 ---
     </script>
     <!-- 增強模組 -->
-    <script src="js/skeleton.js?v=3.22.0"></script>
-    <script src="js/event-bus.js?v=3.22.0"></script>
-    <script src="js/error-handler.js?v=3.22.0"></script>
+    <script src="js/skeleton.js?v=3.23.0"></script>
+    <script src="js/event-bus.js?v=3.23.0"></script>
+    <script src="js/error-handler.js?v=3.23.0"></script>
 
-    <script src="js/class-db.js?v=3.22.0"></script>
-    <script src="js/firebase-config.js?v=3.22.0"></script>
-    <script src="js/usage-notify.js?v=3.22.0"></script>
-    <script src="js/firebase-sync.js?v=3.22.0"></script>
-    <script src="js/firebase-ui.js?v=3.22.0"></script>
-    <script src="js/storage-manager.js?v=3.22.0"></script>
-    <script src="js/app-state.js?v=3.22.0"></script>
-    <script src="js/homework-enhancement.js?v=3.22.0"></script>
-    <script src="js/notebook-enhancement.js?v=3.22.0"></script>
-    <script src="js/leaderboard-enhancement.js?v=3.22.0"></script>
-    <script src="js/timer-enhancement.js?v=3.22.0"></script>
-    <script src="js/theme-toggle.js?v=3.22.0"></script>
-    <script src="js/lottery-enhancement.js?v=3.22.0"></script>
-    <script src="js/grouping-enhancement.js?v=3.22.0"></script>
-    <script src="js/student-enhancement.js?v=3.22.0"></script>
-    <script src="js/pomodoro.js?v=3.22.0"></script>
-    <script src="js/keyboard-shortcuts.js?v=3.22.0"></script>
-    <script src="js/ui-enhancement.js?v=3.22.0"></script>
-    <script src="js/navigation-enhancement.js?v=3.22.0"></script>
-    <script src="js/data-reports.js?v=3.22.0"></script>
-    <script src="js/exam-proctor.js?v=3.22.0"></script>
-    <script src="js/exam-sounds.js?v=3.22.0"></script>
-    <script src="js/announcement.js?v=3.22.0"></script>
+    <script src="js/class-db.js?v=3.23.0"></script>
+    <script src="js/firebase-config.js?v=3.23.0"></script>
+    <script src="js/usage-notify.js?v=3.23.0"></script>
+    <script src="js/firebase-sync.js?v=3.23.0"></script>
+    <script src="js/firebase-ui.js?v=3.23.0"></script>
+    <script src="js/storage-manager.js?v=3.23.0"></script>
+    <script src="js/app-state.js?v=3.23.0"></script>
+    <script src="js/homework-enhancement.js?v=3.23.0"></script>
+    <script src="js/notebook-enhancement.js?v=3.23.0"></script>
+    <script src="js/leaderboard-enhancement.js?v=3.23.0"></script>
+    <script src="js/timer-enhancement.js?v=3.23.0"></script>
+    <script src="js/theme-toggle.js?v=3.23.0"></script>
+    <script src="js/lottery-enhancement.js?v=3.23.0"></script>
+    <script src="js/grouping-enhancement.js?v=3.23.0"></script>
+    <script src="js/student-enhancement.js?v=3.23.0"></script>
+    <script src="js/pomodoro.js?v=3.23.0"></script>
+    <script src="js/keyboard-shortcuts.js?v=3.23.0"></script>
+    <script src="js/ui-enhancement.js?v=3.23.0"></script>
+    <script src="js/navigation-enhancement.js?v=3.23.0"></script>
+    <script src="js/data-reports.js?v=3.23.0"></script>
+    <script src="js/exam-proctor.js?v=3.23.0"></script>
+    <script src="js/exam-sounds.js?v=3.23.0"></script>
+    <script src="js/announcement.js?v=3.23.0"></script>
 
     <!-- PWA 支援 -->
-    <script src="js/pwa-install.js?v=3.22.0"></script>
-    <script src="js/clock-settings-toggle.js?v=3.22.0"></script>
-    <script src="js/admin-console.js?v=3.22.0"></script>
+    <script src="js/pwa-install.js?v=3.23.0"></script>
+    <script src="js/clock-settings-toggle.js?v=3.23.0"></script>
+    <script src="js/admin-console.js?v=3.23.0"></script>
 
     <!-- ===== 一鍵更新浮動按鈕 ===== -->
     <style>
@@ -4619,48 +4596,48 @@
     </button>
 
     <!-- 離線狀態偵測（P12：斷網時頂部 Banner 提示） -->
-    <script src="./js/offline-detector.js?v=3.22.0"></script>
+    <script src="./js/offline-detector.js?v=3.23.0"></script>
     <!-- 自動定時同步（P11：每 10 分鐘自動上傳至 Firebase） -->
-    <script src="./js/auto-sync.js?v=3.22.0"></script>
+    <script src="./js/auto-sync.js?v=3.23.0"></script>
 
     <!-- 手勢操作支援（觸控滑動切換功能區 | 長按快捷選單） -->
-    <script src="./js/gesture-handler.js?v=3.22.0"></script>
+    <script src="./js/gesture-handler.js?v=3.23.0"></script>
 
     <!-- 🧧 十二生肖・開運拉霸機 + 開運籤（開學破冰遊戲） -->
-    <script src="./js/zodiac-slot.js?v=3.22.0"></script>
+    <script src="./js/zodiac-slot.js?v=3.23.0"></script>
 
     <!-- 🛟 資料保險把關（清除前強制備份 + 儲存空間預警） -->
-    <script src="./js/data-safety-guard.js?v=3.22.0"></script>
+    <script src="./js/data-safety-guard.js?v=3.23.0"></script>
 
     <!-- 🎨 班級經營白板（公告白板 + 班級秩序 + 號碼抽籤） -->
-    <script src="./js/class-board.js?v=3.22.0"></script>
+    <script src="./js/class-board.js?v=3.23.0"></script>
 
     <!-- 🦷 潔牙勾選表 -->
-    <script src="./js/brush-check.js?v=3.22.0"></script>
+    <script src="./js/brush-check.js?v=3.23.0"></script>
 
     <!-- ✍️ 成績單評語生成器 -->
-    <script src="./js/comment-gen.js?v=3.22.0"></script>
+    <script src="./js/comment-gen.js?v=3.23.0"></script>
 
     <!-- 💬 生動對話小學堂（國語寫作互動教學） -->
-    <script src="./js/dialogue-school.js?v=3.22.0"></script>
+    <script src="./js/dialogue-school.js?v=3.23.0"></script>
 
     <!-- 學期封存模組（Q01：一鍵封存學期資料至 Firebase archives/） -->
-    <script src="./js/semester-archive.js?v=3.22.0"></script>
+    <script src="./js/semester-archive.js?v=3.23.0"></script>
 
     <!-- 多班級管理模組（在 google-auth-ui.js 之前載入，確保 nav slot 就緒） -->
-    <script src="./js/class-profiles.js?v=3.22.0"></script>
+    <script src="./js/class-profiles.js?v=3.23.0"></script>
     <!-- v3.1.0：Ctrl+K 班級快速切換器 -->
-    <script src="./js/class-quick-switcher.js?v=3.22.0"></script>
+    <script src="./js/class-quick-switcher.js?v=3.23.0"></script>
 
 
     <!-- Google 帳號登入 UI 模組（必須在所有 Firebase 模組之後載入） -->
-    <script src="./js/google-auth-ui.js?v=3.22.0"></script>
+    <script src="./js/google-auth-ui.js?v=3.23.0"></script>
 
     <!-- v3.1.0：同步狀態常駐指示器（位於一鍵更新按鈕左側） -->
-    <script src="./js/sync-status-indicator.js?v=3.22.0"></script>
+    <script src="./js/sync-status-indicator.js?v=3.23.0"></script>
 
     <!-- v3.12.1：版本與健康狀態面板（點版本徽章開啟，R-C1/R-C2） -->
-    <script src="./js/health-panel.js?v=3.22.0"></script>
+    <script src="./js/health-panel.js?v=3.23.0"></script>
 
 </body>
 
