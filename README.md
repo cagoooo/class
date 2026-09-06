@@ -1,5 +1,7 @@
 # 班級小管家 📚
 
+🌐 **線上使用：[班級小管家](https://cagoooo.github.io/class/)**
+
 一個功能完整的班級管理工具，專為教師設計。
 
 ## 功能特色
@@ -59,7 +61,7 @@ MIT License
 - Repository：`cagoooo/class`
 - 可見性：公開
 - 主要技術：JavaScript、Firebase
-- 線上入口：未在 GitHub repository metadata 設定
+- 線上入口：<https://cagoooo.github.io/class/>
 
 ### 可以怎麼應用
 
