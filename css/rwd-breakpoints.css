@@ -227,3 +227,23 @@
         text-align: center;
     }
 }
+
+/* 手機與平板：常用控制保留觸控空間，長內容可換行。 */
+@media (max-width: 1024px) {
+    :is(#students-section, #points-section, #notebook-section, #homework-section, #lottery-section) button {
+        min-height: 44px;
+        min-width: 44px;
+        white-space: normal;
+        touch-action: manipulation;
+    }
+    :is(#students-section, #notebook-section, #homework-section) :is(input, select, textarea) {
+        min-height: 44px;
+        font-size: 16px;
+        max-width: 100%;
+    }
+    #notebookList, #homeworkCheckList { max-height: min(65dvh, 640px); }
+    #homeworkList { max-height: min(40dvh, 360px); }
+    #notebookList .flex-1, #notebookList .flex > div, #homeworkList .flex > div { min-width: 0; }
+    #notebookList, #homeworkList, #homeworkCheckList { overflow-wrap: anywhere; }
+    #notebookList button, #homeworkList button { flex-shrink: 0; }
+}

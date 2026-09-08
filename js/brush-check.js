@@ -7,7 +7,7 @@
  *   - 標題：「潔牙做得好，健康沒煩惱」（60 號字）
  *   - 內文 24 號字
  *   - 左方提醒區：吃完飯要 潔牙 / 擦桌子 / 上廁所
- *   - 右方號碼區：1～30 號，每顆牙齒上有號碼，點了之後牙齒「亮晶晶」✨
+ *   - 右方號碼區：依目前班級實際座號，每顆牙齒上有號碼，點了之後牙齒「亮晶晶」✨
  *   - 每天自動換新（換日重置勾選），資料依班級隔離
  *
  * 對外：window.BrushCheck.{ init, toggle, reset }
@@ -15,7 +15,11 @@
 (function () {
     'use strict';
 
-    const TOTAL = 30;
+    function rosterNumbers() {
+        const roster = Array.isArray(window.students) ? window.students : [];
+        return [...new Set(roster.map(s => Number(s.number)).filter(n => Number.isInteger(n) && n > 0))].sort((a, b) => a - b);
+    }
+    function completedCount() { return rosterNumbers().filter(n => checked.includes(n)).length; }
     const K = 'brushChecked';   // {date:'YYYY/M/D', ids:[..]}，已加入 class-aware SHARED_KEYS
 
     const REMINDERS = [
@@ -64,7 +68,10 @@
         .bc-teeth{display:grid;grid-template-columns:repeat(5,1fr);gap:.55rem}
         @media(min-width:640px){.bc-teeth{grid-template-columns:repeat(6,1fr)}}
         @media(min-width:1024px){.bc-teeth{grid-template-columns:repeat(10,1fr);gap:.7rem}}
-        .bc-tooth{position:relative;aspect-ratio:1/1.12;border:none;cursor:pointer;padding:0;background:transparent;
+        .bc-empty{grid-column:1/-1;padding:1rem;color:#475569;line-height:1.7}
+        .bc-reset{min-height:44px}
+        @media(max-width:480px){.bc-teeth{grid-template-columns:repeat(4,minmax(0,1fr))}.bc-teeth-area{padding:.75rem}}
+        .bc-tooth{min-width:44px;min-height:44px;position:relative;aspect-ratio:1/1.12;border:none;cursor:pointer;padding:0;background:transparent;
             display:flex;align-items:center;justify-content:center;transition:transform .12s}
         .bc-tooth:hover{transform:translateY(-3px) scale(1.04)}
         .bc-tooth:active{transform:scale(.92)}
@@ -111,7 +118,7 @@
         const wrap = document.getElementById('bc-teeth');
         if (!wrap) return;
         let html = '';
-        for (let n = 1; n <= TOTAL; n++) {
+        for (const n of rosterNumbers()) {
             const on = checked.includes(n);
             html += `<button class="bc-tooth ${on ? 'on' : ''}" data-n="${n}" aria-label="${n} 號" aria-pressed="${on}">
                 <span class="shape"></span>
@@ -119,14 +126,14 @@
                 <span class="bc-num">${n}</span>
             </button>`;
         }
-        wrap.innerHTML = html;
+        wrap.innerHTML = html || '<p class="bc-empty">尚無學生名單，請先到「學生管理」新增學生。</p>';
         wrap.querySelectorAll('.bc-tooth').forEach(b => b.addEventListener('click', () => api.toggle(parseInt(b.dataset.n, 10), b)));
     }
     function updateCount() {
         const c = document.getElementById('bc-count');
-        if (c) c.textContent = '✨ 已潔牙 ' + checked.length + ' / ' + TOTAL;
+        if (c) c.textContent = '✨ 已潔牙 ' + completedCount() + ' / ' + rosterNumbers().length;
         const done = document.getElementById('bc-done');
-        if (done) done.classList.toggle('show', checked.length === TOTAL);
+        if (done) done.classList.toggle('show', rosterNumbers().length > 0 && completedCount() === rosterNumbers().length);
     }
     function sparkleBurst(btn) {
         if (!btn) return;
@@ -153,6 +160,8 @@
             updateCount();
         },
         toggle(n, btn) {
+            if (!rosterNumbers().includes(n)) return;
+            checked = load();
             const i = checked.indexOf(n);
             const nowOn = i === -1;
             if (nowOn) checked.push(n); else checked.splice(i, 1);
@@ -165,7 +174,7 @@
                 renderTeeth();
             }
             updateCount();
-            if (nowOn && checked.length === TOTAL && typeof window.triggerConfetti === 'function') window.triggerConfetti();
+            if (nowOn && rosterNumbers().length > 0 && completedCount() === rosterNumbers().length && typeof window.triggerConfetti === 'function') window.triggerConfetti();
         },
         reset() {
             checked = [];
