@@ -317,7 +317,7 @@
         @keyframes zfCopied{0%{transform:scale(1)}45%{transform:scale(1.14)}100%{transform:scale(1)}}
         .zf-credit{text-align:center;font-size:.72rem;color:#9ca3af;margin-top:.9rem}
 
-        @media (max-width:480px){.zslot-lever{display:none}}
+        @media (max-width:480px){.zslot-lever,.zslot-lever-hint{display:none}}
         `;
         const style = document.createElement('style');
         style.id = 'zodiac-slot-style';

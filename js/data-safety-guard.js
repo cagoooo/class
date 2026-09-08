@@ -124,7 +124,9 @@
             const orig = DB.export.bind(DB);
             DB.export = function () {
                 const r = orig();
+                if (r === false) return false;
                 rawSet(LS_LAST_BACKUP, String(Date.now()));
+                document.querySelector('#dsg-banner.is-stale')?.remove();
                 return r;
             };
             DB.__dsgHooked = true;
@@ -162,8 +164,7 @@
         const DB = getDB();
         if (DB && DB.export) {
             try {
-                DB.export();                         // 已掛鉤，會更新 lastBackup，且與「匯入備份檔」相容可還原
-                return true;
+                return DB.export() !== false;
             } catch (e) { return snapshotFallback(); }
         }
         return snapshotFallback();
@@ -313,6 +314,7 @@
         const usageTxt = state.est && state.est.usage ? '（目前已用約 ' + fmtBytes(state.est.usage) + '）' : '';
         const headline = state.pressure
             ? '⚠️ 瀏覽器儲存空間偏高' + usageTxt + '，清除前請務必先下載備份！'
+            : !lastBackupAt() ? '📥 目前尚無備份紀錄，建議先下載第一份備份，保護班級資料。'
             : '📅 你已經超過 ' + STALE_DAYS + ' 天沒備份了，建議現在下載一份，以免資料意外消失。';
         const cloudBtn = isLoggedInToCloud() ? '' : '<button class="dsg-bn-btn dsg-bn-cloud" data-act="cloud">☁️ 登入雲端同步</button>';
         bar.innerHTML = `
