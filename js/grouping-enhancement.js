@@ -33,7 +33,133 @@
     function init() {
         setupPreview();
         enhanceGroupingButton();
+        setupGroupEditor();
         console.log('🧩 分組增強模組已載入');
+    }
+
+    // 編輯草稿與正式資料分離，儲存前檢查班級與資料是否已變動。
+    function setupGroupEditor() {
+        const result = document.getElementById('groupingResult');
+        if (!result) return;
+        const openButton = document.createElement('button');
+        openButton.type = 'button';
+        openButton.className = 'bg-indigo-600 text-white px-4 py-2 rounded-lg mb-4';
+        openButton.textContent = '✏️ 手動編輯分組';
+        result.before(openButton);
+        openButton.addEventListener('click', () => {
+            if (!students.length) { alert('請先新增學生！'); return; }
+            const key = window.GROUPS_KEY || 'groups';
+            const classId = localStorage.getItem('currentClassId');
+            const original = JSON.stringify(groups);
+            const roster = JSON.stringify(students);
+            const stored = localStorage.getItem(key);
+            const draft = groups.map(g => ({ ...g, members: [...g.members] }));
+            const assignments = students.map(student => draft.findIndex(g =>
+                g.members.some(m => String(m.id) === String(student.id))));
+            const dialog = document.createElement('dialog');
+            dialog.style.cssText = 'width:min(720px,94vw);max-height:90vh;border:0;border-radius:16px;padding:24px;overflow:auto';
+            dialog.setAttribute('aria-label', '手動編輯分組');
+            const heading = document.createElement('h3');
+            heading.className = 'text-xl font-bold mb-3';
+            heading.textContent = '手動編輯分組';
+            const hint = document.createElement('p');
+            hint.className = 'text-sm text-gray-600 mb-4';
+            hint.textContent = '可修改組名及學生所屬組別。既有小組分數保留，新組從 0 分開始；儲存後才套用。';
+            const names = document.createElement('div');
+            const members = document.createElement('div');
+            const status = document.createElement('p');
+            status.className = 'my-3 text-sm text-indigo-700';
+            status.setAttribute('role', 'status');
+            const button = (label, handler) => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'border rounded-lg px-3 py-2 bg-gray-50';
+                b.textContent = label;
+                b.addEventListener('click', handler);
+                return b;
+            };
+            function renderMembers() {
+                members.replaceChildren();
+                students.forEach((student, index) => {
+                    const label = document.createElement('label');
+                    label.className = 'flex items-center justify-between gap-3 py-2 border-b';
+                    const text = document.createElement('span');
+                    text.textContent = `${student.number || student.seatNumber || ''} ${student.name}`.trim();
+                    const select = document.createElement('select');
+                    select.className = 'border rounded-lg p-2';
+                    select.style.maxWidth = '60%';
+                    select.add(new Option('未分組', '-1'));
+                    draft.forEach((g, i) => select.add(new Option(g.name || `第 ${i + 1} 組`, String(i))));
+                    select.value = String(assignments[index]);
+                    select.addEventListener('change', () => {
+                        assignments[index] = Number(select.value);
+                        updateStatus();
+                    });
+                    label.append(text, select);
+                    members.append(label);
+                });
+                updateStatus();
+            }
+            function updateStatus() {
+                const missing = assignments.filter(i => i < 0).length;
+                status.textContent = `共 ${students.length} 人，未分組 ${missing} 人。` + draft.map((g, i) =>
+                    `${g.name || '未命名'}：${assignments.filter(a => a === i).length} 人`).join('；');
+            }
+            function renderNames() {
+                names.replaceChildren();
+                draft.forEach((g, i) => {
+                    const row = document.createElement('div');
+                    row.className = 'flex gap-2 mb-2';
+                    const input = document.createElement('input');
+                    input.className = 'border rounded-lg p-2 flex-1 min-w-0';
+                    input.value = g.name;
+                    input.maxLength = 40;
+                    input.setAttribute('aria-label', `第 ${i + 1} 組組名`);
+                    input.addEventListener('input', () => { g.name = input.value; renderMembers(); });
+                    row.append(input, button('刪除組別', () => {
+                        draft.splice(i, 1);
+                        assignments.forEach((a, n) => { assignments[n] = a === i ? -1 : a > i ? a - 1 : a; });
+                        renderNames(); renderMembers();
+                    }));
+                    names.append(row);
+                });
+            }
+            const add = button('＋ 新增組別', () => {
+                draft.push({ id: Date.now() + draft.length, name: `第 ${draft.length + 1} 組`, members: [], score: 0 });
+                renderNames(); renderMembers();
+            });
+            const actions = document.createElement('div');
+            actions.className = 'flex justify-end gap-3 mt-4';
+            const cancel = button('取消', () => dialog.close());
+            const save = button('儲存分組', () => {
+                if (key !== (window.GROUPS_KEY || 'groups') || classId !== localStorage.getItem('currentClassId') ||
+                    original !== JSON.stringify(groups) || roster !== JSON.stringify(students) || stored !== localStorage.getItem(key)) {
+                    alert('班級或資料已變更，請取消後重新開啟編輯，避免覆蓋新資料。'); return;
+                }
+                if (!draft.length || assignments.some(i => i < 0)) {
+                    alert('請建立組別，並為每位學生選擇組別後再儲存。'); return;
+                }
+                if (draft.some(g => !g.name.trim())) { alert('請填寫每個組別的名稱。'); return; }
+                const next = draft.map((g, i) => ({ ...g, name: g.name.trim(),
+                    members: students.filter((student, n) => assignments[n] === i) }));
+                try {
+                    localStorage.setItem(key, JSON.stringify(next));
+                } catch (error) {
+                    alert('儲存失敗，請確認儲存空間後重試；編輯內容仍保留。'); return;
+                }
+                groups = next;
+                window.renderGroups();
+                dialog.close();
+                if (typeof NotificationSystem !== 'undefined') NotificationSystem.success('分組已儲存！');
+            });
+            save.className = 'bg-indigo-600 text-white rounded-lg px-4 py-2';
+            actions.append(cancel, save);
+            dialog.append(heading, hint, names, add, status, members, actions);
+            dialog.addEventListener('close', () => { dialog.remove(); openButton.focus(); });
+            document.body.append(dialog);
+            renderNames(); renderMembers();
+            dialog.showModal();
+        });
     }
 
     // 設置分組預覽
@@ -278,10 +404,10 @@
             div.innerHTML = `
                 <div class="flex-grow">
                     <div class="flex items-center justify-between mb-2">
-                        <h4 class="font-bold text-lg ${colorConfig.text}">${emoji} ${group.name}</h4>
+                        <h4 class="font-bold text-lg ${colorConfig.text}">${emoji} ${escapeGroupText(group.name)}</h4>
                         <span class="text-xs ${colorConfig.text} bg-white px-2 py-1 rounded-full">${memberCount} 人</span>
                     </div>
-                    <p class="text-gray-600 text-sm mb-3 h-12 overflow-y-auto">${memberNames}</p>
+                    <p class="text-gray-600 text-sm mb-3 h-12 overflow-y-auto">${escapeGroupText(memberNames)}</p>
                 </div>
                 <div class="flex items-center justify-between mt-2 pt-2 border-t border-gray-200">
                     <span class="font-semibold text-xl">分數: <span class="text-indigo-600">${group.score}</span></span>
@@ -323,10 +449,10 @@
             div.innerHTML = `
                 <div class="flex-grow">
                     <div class="flex items-center justify-between mb-2">
-                        <h4 class="font-bold text-lg ${colorConfig.text}">${emoji} ${group.name}</h4>
+                        <h4 class="font-bold text-lg ${colorConfig.text}">${emoji} ${escapeGroupText(group.name)}</h4>
                         <span class="text-xs ${colorConfig.text} bg-white px-2 py-1 rounded-full">${memberCount} 人</span>
                     </div>
-                    <p class="text-gray-600 text-sm mb-3 h-12 overflow-y-auto">${memberNames}</p>
+                    <p class="text-gray-600 text-sm mb-3 h-12 overflow-y-auto">${escapeGroupText(memberNames)}</p>
                 </div>
                 <div class="flex items-center justify-between mt-2 pt-2 border-t border-gray-200">
                     <span class="font-semibold text-xl">分數: <span class="text-indigo-600">${group.score}</span></span>
@@ -350,6 +476,12 @@
             originalRenderGroups();
         }
     };
+
+    function escapeGroupText(value) {
+        const span = document.createElement('span');
+        span.textContent = String(value ?? '');
+        return span.innerHTML;
+    }
 
     // 工具函式
     function sleep(ms) {
