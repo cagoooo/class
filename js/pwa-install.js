@@ -32,12 +32,14 @@
                 });
             }
 
-            // 延遲顯示安裝提示（首次訪問後 30 秒）
+            // 至少使用兩分鐘並操作過頁面後，才邀請安裝。
             const hasSeenPrompt = localStorage.getItem('pwaPromptSeen');
             const installDismissed = localStorage.getItem('pwaInstallDismissed');
 
             if (!this.isInstalled && !hasSeenPrompt && !installDismissed) {
-                setTimeout(() => this.showInstallPrompt(), 30000);
+                document.addEventListener('pointerdown', () => { this._hasInteracted = true; }, { once: true });
+                document.addEventListener('keydown', () => { this._hasInteracted = true; }, { once: true });
+                setTimeout(() => this.showInstallPrompt(), 120000);
             }
 
             console.log('[PWA] 安裝模組已初始化', { isInstalled: this.isInstalled });
@@ -372,7 +374,11 @@
 
         // 顯示安裝提示彈窗
         showInstallPrompt() {
-            if (this.isInstalled) return;
+            if (this.isInstalled || localStorage.getItem('pwaPromptSeen') || localStorage.getItem('pwaInstallDismissed')) return;
+            const blocked = document.visibilityState !== 'visible' || !this._hasInteracted ||
+                document.querySelector('#gauth-welcome-overlay, .confirm-dialog-overlay, dialog[open], .pwa-install-modal') ||
+                document.activeElement?.matches('input, textarea, select');
+            if (blocked) { setTimeout(() => this.showInstallPrompt(), 30000); return; }
 
             localStorage.setItem('pwaPromptSeen', 'true');
 

@@ -258,3 +258,13 @@
 .class-management-action button { display: block; min-height: 44px; margin: 0; font-size: 14px; }
 #studentsList .truncate { white-space: normal; overflow-wrap: anywhere; }
 @media(max-width: 359px) { .hw-filter-controls { grid-template-columns: 1fr; } }
+
+.restore-preview { margin: 0 0 1.25rem; font-size: 14px; }
+.restore-preview-row { padding: .6rem .75rem; border-bottom: 1px solid #e2e8f0; }
+.restore-preview dt { color: #64748b; font-size: 13px; margin-bottom: .2rem; }
+.restore-preview dd { margin: 0; color: #1e293b; font-weight: 600; overflow-wrap: anywhere; }
+.restore-preview .restore-target { border: 2px solid #f59e0b; border-radius: 8px; background: #fffbeb; }
+.confirm-dialog { max-height: calc(100dvh - 24px); overflow-y: auto; }
+.confirm-dialog button { min-height: 44px; }
+.dark .restore-preview dd { color: #e2e8f0; }
+.dark .restore-preview .restore-target { background: #422006; }
