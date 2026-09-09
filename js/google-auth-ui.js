@@ -903,6 +903,7 @@
     function showWelcomeModal() {
         // 未登入老師：每次頁面載入（含 F5 重新整理）都跳（不提供永久關閉）。同一次載入內只跳一次，避免短時間重複彈出。
         if (isLoggedInGoogle()) return;                  // 已登入 → 不跳
+        try { if (sessionStorage.getItem('gauth_welcomeDismissed')) return; } catch (e) { /* 儲存不可用時仍可登入 */ }
         if (welcomeShownThisLoad) return;                // 本次載入已跳過（含關閉後）→ 不重複
         if (document.getElementById('gauth-welcome-overlay')) return;
         welcomeShownThisLoad = true;
@@ -1099,8 +1100,9 @@
             this.login();
         },
 
-        /** 關閉歡迎彈窗（先逛逛看看）：只關這次；下次重新進入仍會再跳引導 */
+        /** 關閉歡迎彈窗（先逛逛看看）：同一分頁使用期間不再自動彈出 */
         dismissWelcome() {
+            try { sessionStorage.setItem('gauth_welcomeDismissed', '1'); } catch (e) { /* ignore */ }
             closeWelcomeModal();
         },
 

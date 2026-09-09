@@ -208,6 +208,7 @@
         // 彈出常駐更新提示橫幅（Update Banner）
         showUpdateBanner() {
             if (document.getElementById('pwa-update-banner')) return;
+            try { if (sessionStorage.getItem('pwa_updateDeferred') === window.APP_VERSION) return; } catch (e) { /* ignore */ }
 
             // 注入 Banner 專屬樣式
             if (!document.getElementById('pwa-update-banner-style')) {
@@ -215,9 +216,8 @@
                 s.id = 'pwa-update-banner-style';
                 s.textContent = `
                     #pwa-update-banner {
-                        position: fixed;
-                        bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-                        left: 50%;
+                        position: relative;
+                        margin: 12px auto;
                         width: min(520px, calc(100vw - 24px));
                         box-sizing: border-box;
                         z-index: 19998;
@@ -232,14 +232,14 @@
                         align-items: center;
                         gap: 0.65rem;
                         flex-wrap: wrap;
-                        transform: translate(-50%, calc(100% + 16px));
+                        transform: none;
                         transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
                         backdrop-filter: blur(8px);
                         border: 1px solid rgba(255,255,255,0.24);
                         border-radius: 16px;
                     }
                     #pwa-update-banner.show {
-                        transform: translate(-50%, 0);
+                        transform: none;
                     }
                     .pwa-update-message {
                         flex: 1 1 220px;
@@ -249,6 +249,7 @@
                         background: #ffffff;
                         color: #1d4ed8;
                         border: none;
+                        min-height: 44px;
                         padding: 4px 14px;
                         border-radius: 999px;
                         font-weight: 700;
@@ -268,6 +269,7 @@
                         background: rgba(255,255,255,0.18);
                         border: none;
                         color: #ffffff;
+                        min-height: 44px;
                         padding: 2px 8px;
                         border-radius: 4px;
                         cursor: pointer;
@@ -290,7 +292,8 @@
                 <button class="pwa-update-close" id="pwa-update-btn-close">稍後</button>
             `;
 
-            document.body.appendChild(banner);
+            const host = document.getElementById('students-section')?.parentElement || document.body;
+            host.insertBefore(banner, host.firstChild);
 
             banner.querySelector('#pwa-update-btn-action').addEventListener('click', (e) => {
                 const b = e.currentTarget;
@@ -300,6 +303,7 @@
             });
 
             banner.querySelector('#pwa-update-btn-close').addEventListener('click', () => {
+                try { sessionStorage.setItem('pwa_updateDeferred', window.APP_VERSION || ''); } catch (e) { /* ignore */ }
                 banner.classList.remove('show');
                 setTimeout(() => banner.remove(), 400);
             });

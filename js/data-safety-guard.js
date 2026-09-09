@@ -56,7 +56,7 @@
         } catch (e) { /* ignore */ }
         return false;
     }
-    function lastBackupAt() { const v = rawGet(LS_LAST_BACKUP); return v ? parseInt(v, 10) : 0; }
+    function lastBackupAt() { const v = Number(rawGet(LS_LAST_BACKUP)); return Number.isFinite(v) && v > 0 && v <= Date.now() ? v : 0; }
     function daysSince(ts) { return ts ? (Date.now() - ts) / 86400000 : Infinity; }
     function fmtBytes(b) {
         if (b == null) return '未知';
@@ -355,6 +355,7 @@
             const pressure = est.usage >= PRESSURE_BYTES || ratio >= PRESSURE_RATIO;
             const stale = daysSince(lastBackupAt()) >= STALE_DAYS;
             if (pressure || stale) showBanner({ pressure, stale, est });
+            else document.getElementById('dsg-banner')?.remove();
         });
     }
 
