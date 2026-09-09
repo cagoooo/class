@@ -101,12 +101,15 @@
             const draft = groups.map(g => ({ ...g, members: [...g.members] }));
             const assignments = students.map(student => draft.findIndex(g =>
                 g.members.some(m => String(m.id) === String(student.id))));
+            const baseline = JSON.stringify({ draft, assignments });
+            let saved = false;
+            const isDirty = () => !saved && JSON.stringify({ draft, assignments }) !== baseline;
             const dialog = document.createElement('dialog');
             dialog.className = 'group-editor';
             dialog.setAttribute('aria-label', '手動編輯分組');
             const heading = document.createElement('h3');
             heading.className = 'text-xl font-bold mb-3';
-            heading.textContent = '手動編輯分組';
+            heading.textContent = `手動編輯分組 · ${window.ClassProfiles?.currentProfile()?.name || '目前班級'}`;
             const hint = document.createElement('p');
             hint.className = 'text-sm text-gray-600 mb-4';
             hint.textContent = '可修改組名及學生所屬組別。既有小組分數保留，新組從 0 分開始；儲存後才套用。';
@@ -150,6 +153,7 @@
             function updateStatus() {
                 const missing = assignments.filter(i => i < 0).length;
                 status.textContent = missing ? `尚有 ${missing} 位學生未分組，請選擇組別。` : `✓ 全班 ${students.length} 人已分配至 ${draft.length} 組，按儲存套用。`;
+                status.textContent = (isDirty() ? '尚未儲存 · ' : '') + status.textContent;
                 names.querySelectorAll('.ge-count').forEach((badge, i) => {
                     badge.textContent = `${assignments.filter(a => a === i).length} 人 · 小組分數 ${draft[i].score || 0}`;
                 });
@@ -183,7 +187,8 @@
             add.className = 'ge-add';
             const actions = document.createElement('div');
             actions.className = 'ge-actions';
-            const cancel = button('取消', () => dialog.close());
+            const requestClose = () => { if (!isDirty() || confirm('分組尚未儲存，確定放棄修改？')) dialog.close(); };
+            const cancel = button('取消', requestClose);
             const save = button('儲存分組', () => {
                 if (key !== (window.GROUPS_KEY || 'groups') || classId !== localStorage.getItem('currentClassId') ||
                     original !== JSON.stringify(groups) || roster !== JSON.stringify(students) || stored !== localStorage.getItem(key)) {
@@ -201,9 +206,10 @@
                     alert('儲存失敗，請確認儲存空間後重試；編輯內容仍保留。'); return;
                 }
                 groups = next;
+                saved = true;
                 window.renderGroups();
                 dialog.close();
-                if (typeof NotificationSystem !== 'undefined') NotificationSystem.success('分組已儲存！');
+                if (typeof NotificationSystem !== 'undefined') NotificationSystem.success('分組已儲存至本機；雲端同步狀態請查看同步指示。');
             });
             save.className = 'ge-save';
             actions.append(cancel, save);
@@ -223,7 +229,10 @@
             footer.className = 'ge-footer';
             footer.append(status, actions);
             dialog.append(header, body, footer);
-            dialog.addEventListener('close', () => { dialog.remove(); openButton.focus(); });
+            const warnUnload = e => { if (isDirty()) { e.preventDefault(); e.returnValue = ''; } };
+            window.addEventListener('beforeunload', warnUnload);
+            dialog.addEventListener('cancel', e => { e.preventDefault(); requestClose(); });
+            dialog.addEventListener('close', () => { window.removeEventListener('beforeunload', warnUnload); dialog.remove(); openButton.focus(); });
             document.body.append(dialog);
             renderNames(); renderMembers();
             dialog.showModal();

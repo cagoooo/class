@@ -247,3 +247,14 @@
     #notebookList, #homeworkList, #homeworkCheckList { overflow-wrap: anywhere; }
     #notebookList button, #homeworkList button { flex-shrink: 0; }
 }
+
+.class-context { margin: .5rem 0 1rem; padding: .55rem .8rem; border-left: 4px solid #6366f1; border-radius: 6px; background: #eef2ff; color: #3730a3; font-weight: 600; overflow-wrap: anywhere; }
+.dark .class-context { background: #1e293b; color: #c7d2fe; }
+.hw-filter-controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .75rem; margin-top: .75rem; }
+.hw-filter-controls label { font-size: 14px; min-width: 0; }
+.hw-filter-controls input, .hw-filter-controls select { display: block; width: 100%; min-height: 44px; margin-top: .25rem; padding: .5rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; }
+.class-management-action { flex-shrink: 0; margin-left: .5rem; font-size: 14px; }
+.class-management-action summary { cursor: pointer; min-height: 44px; padding: .7rem .5rem; color: #475569; }
+.class-management-action button { display: block; min-height: 44px; margin: 0; font-size: 14px; }
+#studentsList .truncate { white-space: normal; overflow-wrap: anywhere; }
+@media(max-width: 359px) { .hw-filter-controls { grid-template-columns: 1fr; } }
