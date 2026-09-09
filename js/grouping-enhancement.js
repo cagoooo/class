@@ -66,6 +66,8 @@
             .ge-member select { width:100%; min-width:0; text-overflow:ellipsis; }
             .ge-member:has(select:invalid) { border-color:#f59e0b; background:#fffbeb; }
             .ge-footer { flex:none; padding:14px 24px max(16px,env(safe-area-inset-bottom)); border-top:1px solid #e2e8f0; background:#fff; }
+            .ge-discard { padding:12px; margin-bottom:12px; background:#fff7ed; border:1px solid #fdba74; border-radius:9px; }
+            .ge-discard button { margin:8px 8px 0 0; }
             .ge-status { margin:0 0 10px; font-size:14px; line-height:1.5; color:#4338ca; }
             .ge-actions { display:flex; justify-content:flex-end; gap:12px; }
             .group-editor .ge-save { color:#fff; background:#4f46e5; border-color:#4f46e5; min-width:160px; }
@@ -187,7 +189,16 @@
             add.className = 'ge-add';
             const actions = document.createElement('div');
             actions.className = 'ge-actions';
-            const requestClose = () => { if (!isDirty() || confirm('分組尚未儲存，確定放棄修改？')) dialog.close(); };
+            const discardPrompt = document.createElement('div');
+            discardPrompt.hidden = true;
+            discardPrompt.setAttribute('role', 'alert');
+            discardPrompt.className = 'ge-discard';
+            const discardText = document.createElement('p');
+            discardText.textContent = '分組尚未儲存，要放棄修改嗎？';
+            const keepEditing = button('繼續編輯', () => { discardPrompt.hidden = true; cancel.focus(); });
+            const discard = button('放棄修改', () => dialog.close());
+            discardPrompt.append(discardText, keepEditing, discard);
+            const requestClose = () => { if (isDirty()) { discardPrompt.hidden = false; keepEditing.focus(); } else dialog.close(); };
             const cancel = button('取消', requestClose);
             const save = button('儲存分組', () => {
                 if (key !== (window.GROUPS_KEY || 'groups') || classId !== localStorage.getItem('currentClassId') ||
@@ -227,7 +238,7 @@
             body.append(groupTitle, names, add, memberTitle, members);
             const footer = document.createElement('footer');
             footer.className = 'ge-footer';
-            footer.append(status, actions);
+            footer.append(status, discardPrompt, actions);
             dialog.append(header, body, footer);
             const warnUnload = e => { if (isDirty()) { e.preventDefault(); e.returnValue = ''; } };
             window.addEventListener('beforeunload', warnUnload);
