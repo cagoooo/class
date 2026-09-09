@@ -220,7 +220,7 @@
                 saved = true;
                 window.renderGroups();
                 dialog.close();
-                if (typeof NotificationSystem !== 'undefined') NotificationSystem.success('分組已儲存至本機；雲端同步狀態請查看同步指示。');
+                if (typeof NotificationSystem !== 'undefined') NotificationSystem.success('已存本機');
             });
             save.className = 'ge-save';
             actions.append(cancel, save);
