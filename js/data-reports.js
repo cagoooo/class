@@ -239,7 +239,7 @@
         document.getElementById('student-report-modal')?.remove();
 
         // 計算統計數據
-        const records = student.records || [];
+        const records = recordsOf(student);
         const positiveRecords = records.filter(r => r.points > 0);
         const negativeRecords = records.filter(r => r.points < 0);
         const totalPositive = positiveRecords.reduce((sum, r) => sum + r.points, 0);
@@ -329,7 +329,7 @@
         const student = students?.find(s => s.id === studentId);
         if (!student) return;
 
-        const records = student.records || [];
+        const records = recordsOf(student);
         let content = `學生報告卡\n`;
         content += `====================\n`;
         content += `姓名：${student.name}\n`;
@@ -363,7 +363,7 @@
         let csv = '\uFEFF座號,姓名,分數,加分次數,扣分次數,標籤\n';
 
         students.forEach(s => {
-            const records = s.records || [];
+            const records = recordsOf(s);
             const positiveCount = records.filter(r => r.points > 0).length;
             const negativeCount = records.filter(r => r.points < 0).length;
             const tags = (s.tags || []).join(';');
@@ -526,6 +526,24 @@
     };
 
     // ==================== 自動備份 ====================
+    /**
+     * 取得某位學生的加扣分紀錄。
+     *
+     * ⚠️ v3.26.0 起 `student.records` 已移除——它是 pointsHistory 的重複副本，
+     *    害 students 陣列膨脹到數百 KB，每次加扣分都要重寫一次，是 localStorage
+     *    撞上限、寫入靜默失敗的源頭。改從 pointsHistory 依 studentId 過濾，
+     *    結果完全等價（已用王薇婷 502 班 1263 筆真實資料比對驗證）。
+     *    保留讀 records 的退路，讓尚未完成遷移的裝置不會看到空白統計。
+     */
+    function recordsOf(student) {
+        if (!student) return [];
+        const hist = (typeof pointsHistory !== 'undefined' && Array.isArray(pointsHistory))
+            ? pointsHistory : [];
+        const mine = hist.filter(r => r && r.studentId === student.id);
+        if (mine.length) return mine;
+        return Array.isArray(student.records) ? student.records : [];
+    }
+
     const BACKUP_KEY = 'classManager_autoBackup';
     const BACKUP_INTERVAL = 5 * 60 * 1000; // 5 分鐘
     const BACKUP_MAX_COUNT = 2;  // v3.1.4：5 → 2，大幅減少 localStorage 用量

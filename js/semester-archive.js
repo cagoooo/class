@@ -163,7 +163,10 @@ const SemesterArchive = (() => {
         let count = 0;
         for (const s of students) {
             const ref = base.collection('students').doc(String(s.id));
-            batch.update(ref, { score: 0 });
+            // ⚠️ 必須同時歸零 points。加扣分系統寫的是 student.points，
+            //    舊版只改 score（另一個欄位），所以老師按了「封存並清空分數」之後
+            //    學生卡片上的分數其實原封不動——實測王薇婷的班就是這樣。
+            batch.update(ref, { score: 0, points: 0 });
             count++;
             if (count >= 490) {
                 await batch.commit();
@@ -177,7 +180,9 @@ const SemesterArchive = (() => {
         await _clearCollection(base, 'pointsHistory');
 
         // 同步本地 localStorage
-        window.students?.forEach(s => { s.score = 0; });
+        // points 才是加扣分系統實際使用的欄位；records 是舊版遺留的重複副本，
+        // 若尚未遷移就一併清掉，否則封存後匯出的統計會混入上學期的數字。
+        window.students?.forEach(s => { s.score = 0; s.points = 0; if (s.records) s.records = []; });
         localStorage.setItem(window.STUDENTS_KEY || 'students', JSON.stringify(window.students || []));
         localStorage.setItem(window.POINTS_HISTORY_KEY || 'pointsHistory', JSON.stringify([]));
         if (typeof window.pointsHistory !== 'undefined') window.pointsHistory = [];
