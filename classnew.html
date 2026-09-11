@@ -33,9 +33,9 @@
     </script>
 
     <!-- 🔒 多班級資料隔離：必須在所有模組之前載入，攔截 localStorage 自動依班級路由 -->
-    <script src="js/class-aware-storage.js?v=3.26.0"></script>
+    <script src="js/class-aware-storage.js?v=3.26.1"></script>
     <!-- 🌱 通用空狀態元件：各區塊沒資料時顯示友善引導 -->
-    <script src="js/empty-state.js?v=3.26.0"></script>
+    <script src="js/empty-state.js?v=3.26.1"></script>
 
     <!-- 🔧 開發環境：localhost 自動清除 Service Worker 快取，避免 404 攔截問題 -->
     <script>
@@ -68,7 +68,7 @@
     <link rel="icon" href="favicon.ico" sizes="any">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="shortcut icon" href="favicon.ico">
-    <title>班級小管家 v3.26.0</title>
+    <title>班級小管家 v3.26.1</title>
     <meta name="description" content="教師班級管理的貼心小幫手 — 學生管理、作業檢查、計時器、抽籤、考試監考，一站搞定。">
 
     <!-- Open Graph / Facebook / LINE -->
@@ -91,14 +91,14 @@
     <meta name="twitter:description" content="教師班級管理的貼心小幫手 — 學生管理、作業檢查、計時器、抽籤、考試監考，一站搞定。">
     <meta name="twitter:image" content="https://cagoooo.github.io/class/og-preview.png?v=3.12.17">
     <!-- 📦 版本號（由 scripts/update-sw-version.js 自動同步） -->
-    <script>window.APP_VERSION = '3.26.0';</script>
+    <script>window.APP_VERSION = '3.26.1';</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 深色模式統一由 .dark class 驅動（與 theme-toggle.js 一致），不再跟隨作業系統的 prefers-color-scheme，
          否則 OS 深色但 App 淺色（或反之）時，dark: 工具類與自訂 .dark CSS 不同步 → 深底配深字、按鈕文字看不到 -->
     <script>tailwind.config = { darkMode: 'class' };</script>
-    <link rel="stylesheet" href="css/rwd-breakpoints.css?v=3.26.0">
-    <link rel="stylesheet" href="css/pwa-install.css?v=3.26.0">
-    <link rel="stylesheet" href="css/skeleton.css?v=3.26.0">
+    <link rel="stylesheet" href="css/rwd-breakpoints.css?v=3.26.1">
+    <link rel="stylesheet" href="css/pwa-install.css?v=3.26.1">
+    <link rel="stylesheet" href="css/skeleton.css?v=3.26.1">
     <!-- 新增 Excel 讀取套件 -->
 
     <script crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -740,7 +740,7 @@
                                 title="目前版本（點擊查看更新資訊）"
                                 class="text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-800/60 transition-colors"
                                 onclick="window.open('https://github.com/cagoooo/class/blob/main/CHANGELOG.md', '_blank')">
-                                v3.26.0
+                                v3.26.1
                             </span>
                         </div>
                         <div class="hidden sm:block text-xs sm:text-sm text-gray-600">讓課堂管理變得簡單有趣</div>
@@ -2235,7 +2235,7 @@
                 const s1 = [['座號', '姓名', '目前總分', '加分次數', '扣分次數', '加分小計', '扣分小計']];
                 studs.forEach(s => {
                     let addN = 0, subN = 0, addSum = 0, subSum = 0;
-                    // v3.26.0：records 已移除（原本是 pointsHistory 的重複副本）。
+                    // v3.26.1：records 已移除（原本是 pointsHistory 的重複副本）。
                     // 改從 pointsHistory 依 studentId 取，結果等價；保留 records
                     // 退路讓尚未遷移的裝置不會匯出一片 0。
                     const _hist = Array.isArray(pointsHistory) ? pointsHistory : [];
@@ -2941,7 +2941,7 @@
             if (group) group.score += points;
 
             const record = { id: Date.now(), studentId: studentId, studentName: student.name, points: points, reason: reason, date: new Date().toLocaleDateString('zh-TW'), timestamp: new Date().toLocaleString('zh-TW', { hour12: false }) };
-            // ⚠️ v3.26.0 起不再寫 student.records。它是 pointsHistory 的重複副本，
+            // ⚠️ v3.26.1 起不再寫 student.records。它是 pointsHistory 的重複副本，
             //    會讓 students 陣列膨脹到數百 KB，而這裡每按一次就要重寫整個陣列——
             //    那是 localStorage 撞 5~10 MB 上限、寫入靜默失敗的源頭。
             //    需要某位學生的紀錄時，一律從 pointsHistory 依 studentId 過濾
@@ -2979,7 +2979,7 @@
          * 就要重寫整個陣列——這是 localStorage 撞上限、寫入靜默失敗的源頭。
          *
          * ⚠️ 不能直接刪 records：實測王薇婷的預設班級中，records 比 pointsHistory
-         *    多出數十筆（v3.26.0 之前寫入失敗累積的落差），那些是老師真實的加扣分。
+         *    多出數十筆（v3.26.1 之前寫入失敗累積的落差），那些是老師真實的加扣分。
          *    所以要先「補回 pointsHistory」再刪。
          *
          * ⚠️ 寫入順序刻意是「先 students 後 pointsHistory」：移除 records 會讓
@@ -3029,8 +3029,20 @@
                 localStorage.setItem(STUDENTS_KEY, JSON.stringify(slimmed));
                 localStorage.setItem(window.POINTS_HISTORY_KEY || 'pointsHistory', JSON.stringify(pointsHistory));
             } catch (err) {
-                // 遷移失敗就整個放棄，不留半套資料；下次載入再試
+                // 遷移失敗就整個放棄，不留半套資料；下次載入再試。
+                // 一樣要通報——遷移失敗代表這台裝置空間已經滿到連瘦身都做不到，
+                // 那是最需要有人介入的狀態，不能只寫 console 就算了。
                 console.error('[Migrate] records 遷移失敗，維持原狀:', err);
+                try {
+                    if (typeof ErrorHandler !== 'undefined' && ErrorHandler.handle) {
+                        ErrorHandler.handle(
+                            new Error('records 遷移失敗：' + ((err && err.message) || String(err))),
+                            'STORAGE',
+                            '資料瘦身遷移（待補回 ' + recovered.length + ' 筆）',
+                            { severity: 'critical' }
+                        );
+                    }
+                } catch (e) { /* 通知失敗不可影響流程 */ }
                 return;
             }
 
@@ -3079,6 +3091,23 @@
                 renderGroups && renderGroups();
 
                 const quota = err && (err.name === 'QuotaExceededError' || err.code === 22 || err.code === 1014);
+
+                // ⚠️ 一定要走 ErrorHandler：它是「發 webhook 通知開發者」的唯一入口。
+                //    NotificationSystem.error() 只是畫面上的紅色提示，不會通知任何人。
+                //    這正是先前 11 位老師掉了 2182 筆紀錄卻沒人發現的原因——寫入失敗是
+                //    靜默例外，從未進入錯誤處理器，後台的錯誤紀錄也因此一直是 0 筆。
+                //    severity 必須是 critical（VALIDATION／NETWORK 會被降級成 warning 不通報）。
+                try {
+                    if (typeof ErrorHandler !== 'undefined' && ErrorHandler.handle) {
+                        ErrorHandler.handle(
+                            new Error('加扣分寫入失敗：' + (quota ? 'localStorage 配額已滿' : (err && err.message) || String(err))),
+                            'STORAGE',
+                            '加扣分存檔（' + (student && student.name || '') + '，' + (points > 0 ? '+' : '') + points + '）',
+                            { severity: 'critical' }
+                        );
+                    }
+                } catch (e) { /* 通知失敗不可影響回復流程 */ }
+
                 const msg = quota
                     ? '⚠️ 這次加扣分「沒有存檔」，因為瀏覽器儲存空間已滿。\n\n' +
                       '分數已還原，請先到「管理功能 → 匯出完整備份」存一份，\n' +
@@ -4100,7 +4129,7 @@
             document.body.removeChild(link);
         }
 
-        // ==================== 儲存／讀取已存名單（已於 v3.26.0 移除）====================
+        // ==================== 儲存／讀取已存名單（已於 v3.26.1 移除）====================
         //
         // ⚠️ 不要再加回來，它的用途已被「多班級」完全取代——每個班的名單本來就永久
         //    保存，切換班級即可，不需要「儲存再載入」。移除的三個理由：
@@ -4674,38 +4703,38 @@
         // --- 結束全螢幕時鐘功能 ---
     </script>
     <!-- 增強模組 -->
-    <script src="js/skeleton.js?v=3.26.0"></script>
-    <script src="js/event-bus.js?v=3.26.0"></script>
-    <script src="js/error-handler.js?v=3.26.0"></script>
+    <script src="js/skeleton.js?v=3.26.1"></script>
+    <script src="js/event-bus.js?v=3.26.1"></script>
+    <script src="js/error-handler.js?v=3.26.1"></script>
 
-    <script src="js/class-db.js?v=3.26.0"></script>
-    <script src="js/firebase-config.js?v=3.26.0"></script>
-    <script src="js/usage-notify.js?v=3.26.0"></script>
-    <script src="js/firebase-sync.js?v=3.26.0"></script>
-    <script src="js/firebase-ui.js?v=3.26.0"></script>
-    <script src="js/storage-manager.js?v=3.26.0"></script>
-    <script src="js/app-state.js?v=3.26.0"></script>
-    <script src="js/homework-enhancement.js?v=3.26.0"></script>
-    <script src="js/notebook-enhancement.js?v=3.26.0"></script>
-    <script src="js/leaderboard-enhancement.js?v=3.26.0"></script>
-    <script src="js/timer-enhancement.js?v=3.26.0"></script>
-    <script src="js/theme-toggle.js?v=3.26.0"></script>
-    <script src="js/lottery-enhancement.js?v=3.26.0"></script>
-    <script src="js/grouping-enhancement.js?v=3.26.0"></script>
-    <script src="js/student-enhancement.js?v=3.26.0"></script>
-    <script src="js/pomodoro.js?v=3.26.0"></script>
-    <script src="js/keyboard-shortcuts.js?v=3.26.0"></script>
-    <script src="js/ui-enhancement.js?v=3.26.0"></script>
-    <script src="js/navigation-enhancement.js?v=3.26.0"></script>
-    <script src="js/data-reports.js?v=3.26.0"></script>
-    <script src="js/exam-proctor.js?v=3.26.0"></script>
-    <script src="js/exam-sounds.js?v=3.26.0"></script>
-    <script src="js/announcement.js?v=3.26.0"></script>
+    <script src="js/class-db.js?v=3.26.1"></script>
+    <script src="js/firebase-config.js?v=3.26.1"></script>
+    <script src="js/usage-notify.js?v=3.26.1"></script>
+    <script src="js/firebase-sync.js?v=3.26.1"></script>
+    <script src="js/firebase-ui.js?v=3.26.1"></script>
+    <script src="js/storage-manager.js?v=3.26.1"></script>
+    <script src="js/app-state.js?v=3.26.1"></script>
+    <script src="js/homework-enhancement.js?v=3.26.1"></script>
+    <script src="js/notebook-enhancement.js?v=3.26.1"></script>
+    <script src="js/leaderboard-enhancement.js?v=3.26.1"></script>
+    <script src="js/timer-enhancement.js?v=3.26.1"></script>
+    <script src="js/theme-toggle.js?v=3.26.1"></script>
+    <script src="js/lottery-enhancement.js?v=3.26.1"></script>
+    <script src="js/grouping-enhancement.js?v=3.26.1"></script>
+    <script src="js/student-enhancement.js?v=3.26.1"></script>
+    <script src="js/pomodoro.js?v=3.26.1"></script>
+    <script src="js/keyboard-shortcuts.js?v=3.26.1"></script>
+    <script src="js/ui-enhancement.js?v=3.26.1"></script>
+    <script src="js/navigation-enhancement.js?v=3.26.1"></script>
+    <script src="js/data-reports.js?v=3.26.1"></script>
+    <script src="js/exam-proctor.js?v=3.26.1"></script>
+    <script src="js/exam-sounds.js?v=3.26.1"></script>
+    <script src="js/announcement.js?v=3.26.1"></script>
 
     <!-- PWA 支援 -->
-    <script src="js/pwa-install.js?v=3.26.0"></script>
-    <script src="js/clock-settings-toggle.js?v=3.26.0"></script>
-    <script src="js/admin-console.js?v=3.26.0"></script>
+    <script src="js/pwa-install.js?v=3.26.1"></script>
+    <script src="js/clock-settings-toggle.js?v=3.26.1"></script>
+    <script src="js/admin-console.js?v=3.26.1"></script>
 
     <!-- ===== 一鍵更新浮動按鈕 ===== -->
     <style>
@@ -4773,50 +4802,50 @@
     </button>
 
     <!-- 離線狀態偵測（P12：斷網時頂部 Banner 提示） -->
-    <script src="./js/offline-detector.js?v=3.26.0"></script>
+    <script src="./js/offline-detector.js?v=3.26.1"></script>
     <!-- 自動定時同步（P11：每 10 分鐘自動上傳至 Firebase） -->
-    <script src="./js/auto-sync.js?v=3.26.0"></script>
+    <script src="./js/auto-sync.js?v=3.26.1"></script>
 
     <!-- 手勢操作支援（觸控滑動切換功能區 | 長按快捷選單） -->
-    <script src="./js/gesture-handler.js?v=3.26.0"></script>
+    <script src="./js/gesture-handler.js?v=3.26.1"></script>
 
     <!-- 🧧 十二生肖・開運拉霸機 + 開運籤（開學破冰遊戲） -->
-    <script src="./js/zodiac-slot.js?v=3.26.0"></script>
+    <script src="./js/zodiac-slot.js?v=3.26.1"></script>
 
     <!-- 🛟 資料保險把關（清除前強制備份 + 儲存空間預警） -->
-    <script src="./js/data-safety-guard.js?v=3.26.0"></script>
+    <script src="./js/data-safety-guard.js?v=3.26.1"></script>
 
     <!-- 🎨 班級經營白板（公告白板 + 班級秩序 + 號碼抽籤） -->
-    <script src="./js/class-board.js?v=3.26.0"></script>
+    <script src="./js/class-board.js?v=3.26.1"></script>
 
     <!-- 🦷 潔牙勾選表 -->
-    <script src="./js/brush-check.js?v=3.26.0"></script>
+    <script src="./js/brush-check.js?v=3.26.1"></script>
 
     <!-- ✍️ 成績單評語生成器 -->
-    <script src="./js/comment-gen.js?v=3.26.0"></script>
+    <script src="./js/comment-gen.js?v=3.26.1"></script>
 
     <!-- 💬 生動對話小學堂（國語寫作互動教學） -->
-    <script src="./js/dialogue-school.js?v=3.26.0"></script>
+    <script src="./js/dialogue-school.js?v=3.26.1"></script>
 
     <!-- 學期封存模組（Q01：一鍵封存學期資料至 Firebase archives/） -->
-    <script src="./js/semester-archive.js?v=3.26.0"></script>
+    <script src="./js/semester-archive.js?v=3.26.1"></script>
 
     <!-- 多班級管理模組（在 google-auth-ui.js 之前載入，確保 nav slot 就緒） -->
-    <script src="./js/class-profiles.js?v=3.26.0"></script>
+    <script src="./js/class-profiles.js?v=3.26.1"></script>
     <!-- v3.1.0：Ctrl+K 班級快速切換器 -->
-    <script src="./js/class-quick-switcher.js?v=3.26.0"></script>
+    <script src="./js/class-quick-switcher.js?v=3.26.1"></script>
 
 
     <!-- Google 帳號登入 UI 模組（必須在所有 Firebase 模組之後載入） -->
-    <script src="./js/google-auth-ui.js?v=3.26.0"></script>
+    <script src="./js/google-auth-ui.js?v=3.26.1"></script>
 
     <!-- v3.1.0：同步狀態常駐指示器（位於一鍵更新按鈕左側） -->
-    <script src="./js/sync-status-indicator.js?v=3.26.0"></script>
+    <script src="./js/sync-status-indicator.js?v=3.26.1"></script>
 
     <!-- v3.12.1：版本與健康狀態面板（點版本徽章開啟，R-C1/R-C2） -->
-    <script src="./js/health-panel.js?v=3.26.0"></script>
+    <script src="./js/health-panel.js?v=3.26.1"></script>
 
-    <script src="./js/classroom-ux.js?v=3.26.0"></script>
+    <script src="./js/classroom-ux.js?v=3.26.1"></script>
 </body>
 
 </html>
