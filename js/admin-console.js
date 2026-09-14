@@ -45,8 +45,8 @@
             .admin-modal-content {
                 background: #ffffff;
                 width: 100%;
-                max-width: min(1040px, 96vw);
-                max-height: 88vh;
+                max-width: min(1380px, 98vw);
+                max-height: min(92vh, 900px);
                 border-radius: 1.25rem;
                 box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
                 display: flex;
@@ -83,14 +83,16 @@
                 display: flex;
                 align-items: center;
                 gap: 8px;
+                min-width: 0;
             }
             .admin-modal-body {
                 padding: 1.5rem;
                 overflow-y: auto;
                 flex: 1;
+                min-width: 0;
             }
             .admin-table-container {
-                overflow-x: auto;
+                overflow: visible;
                 border: 1px solid #e2e8f0;
                 border-radius: 8px;
             }
@@ -99,11 +101,19 @@
             }
             .admin-table {
                 width: 100%;
-                min-width: 760px; /* 欄位有足夠空間不被擠到跳行；不夠寬時容器橫向捲動 */
+                min-width: 0;
+                table-layout: fixed;
                 border-collapse: collapse;
                 text-align: left;
                 font-size: 0.875rem;
             }
+            .admin-table th:nth-child(1) { width: 18%; }
+            .admin-table th:nth-child(2) { width: 11%; }
+            .admin-table th:nth-child(3) { width: 11%; }
+            .admin-table th:nth-child(4) { width: 12%; }
+            .admin-table th:nth-child(5) { width: 17%; }
+            .admin-table th:nth-child(6) { width: 15%; }
+            .admin-table th:nth-child(7) { width: 16%; }
             .admin-table th {
                 background: #f8fafc;
                 padding: 0.7rem 0.85rem;
@@ -122,13 +132,26 @@
                 border-bottom: 1px solid #e2e8f0;
                 color: #334155;
                 vertical-align: middle;
+                overflow-wrap: anywhere;
             }
-            /* 數字/狀態/時間/操作欄不跳行；只有姓名(第1欄)與裝置(第5欄)可換行或省略 */
+            /* 數字/狀態/時間欄維持單行；裝置資訊在寬版也允許換行，避免資料被截斷。 */
             .admin-table td:nth-child(2),
             .admin-table td:nth-child(3),
-            .admin-table td:nth-child(4),
-            .admin-table td:nth-child(6) {
+            .admin-table td:nth-child(4) {
                 white-space: nowrap;
+            }
+            .admin-table td:nth-child(6) {
+                max-width: none !important;
+                overflow: visible !important;
+                text-overflow: clip !important;
+                white-space: normal !important;
+                overflow-wrap: anywhere;
+                word-break: break-word;
+            }
+            .admin-table td:last-child > div {
+                display: flex;
+                gap: 0.35rem;
+                flex-wrap: wrap;
             }
             .dark .admin-table td {
                 border-bottom: 1px solid #334155;
@@ -258,15 +281,148 @@
             .orphan-id { margin-top: 0.3rem; font-size: 0.72rem; color: #cbd5e1; font-family: monospace; }
             .dark .orphan-id { color: #64748b; }
 
-            /* 手機版：縮邊距、搜尋框佔滿一行、標題略縮 */
+            /* 中等寬度改用資訊卡：每筆資料都能完整閱讀，不必拖曳整張表格。 */
+            @media (max-width: 1280px) {
+                .admin-modal-overlay { padding: 0.75rem; }
+                .admin-modal-content { max-width: min(960px, 100%); }
+                .admin-table-container {
+                    border: 0;
+                    border-radius: 0;
+                }
+                .admin-table,
+                .admin-table thead,
+                .admin-table tbody,
+                .admin-table tr,
+                .admin-table td {
+                    display: block;
+                }
+                .admin-table thead { display: none; }
+                .admin-table tbody {
+                    display: grid;
+                    gap: 0.75rem;
+                }
+                .admin-table tbody tr:not(.admin-empty-row) {
+                    display: grid;
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                    gap: 0.75rem 1rem;
+                    padding: 1rem;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 0.9rem;
+                    background: #ffffff;
+                    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+                }
+                .dark .admin-table tbody tr:not(.admin-empty-row) {
+                    border-color: #334155;
+                    background: #1e293b;
+                    box-shadow: none;
+                }
+                .admin-table tbody tr:not(.admin-empty-row):hover {
+                    background: #f8fafc;
+                }
+                .dark .admin-table tbody tr:not(.admin-empty-row):hover {
+                    background: #334155;
+                }
+                .admin-table tbody tr:not(.admin-empty-row) td {
+                    min-width: 0;
+                    padding: 0;
+                    border: 0;
+                    white-space: normal !important;
+                }
+                .admin-table tbody tr:not(.admin-empty-row) td::before {
+                    content: attr(data-label);
+                    display: block;
+                    margin-bottom: 0.25rem;
+                    color: #64748b;
+                    font-size: 0.72rem;
+                    font-weight: 700;
+                    line-height: 1.2;
+                    letter-spacing: 0.02em;
+                }
+                .dark .admin-table tbody tr:not(.admin-empty-row) td::before {
+                    color: #94a3b8;
+                }
+                .admin-table tbody tr:not(.admin-empty-row) td:first-child,
+                .admin-table tbody tr:not(.admin-empty-row) td:last-child {
+                    grid-column: 1 / -1;
+                }
+                .admin-table tbody tr:not(.admin-empty-row) td:first-child {
+                    padding-bottom: 0.75rem;
+                    border-bottom: 1px solid #e2e8f0;
+                }
+                .dark .admin-table tbody tr:not(.admin-empty-row) td:first-child {
+                    border-bottom-color: #334155;
+                }
+                .admin-table tbody tr:not(.admin-empty-row) td:last-child {
+                    padding-top: 0.75rem;
+                    border-top: 1px solid #e2e8f0;
+                }
+                .dark .admin-table tbody tr:not(.admin-empty-row) td:last-child {
+                    border-top-color: #334155;
+                }
+                .admin-table tbody tr:not(.admin-empty-row) td:nth-child(6) {
+                    max-width: none !important;
+                    overflow: visible !important;
+                    text-overflow: clip !important;
+                    overflow-wrap: anywhere;
+                    word-break: break-word;
+                }
+                .admin-table tbody tr:not(.admin-empty-row) td:last-child > div {
+                    width: 100%;
+                    gap: 0.5rem;
+                }
+                .admin-table tbody tr:not(.admin-empty-row) td:last-child .admin-btn-rescue,
+                .admin-table tbody tr:not(.admin-empty-row) td:last-child .admin-btn-purge {
+                    flex: 1 1 150px;
+                    min-height: 44px;
+                    padding: 0.6rem 0.75rem;
+                }
+                .admin-table tbody .admin-empty-row {
+                    display: block;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 0.9rem;
+                }
+                .dark .admin-table tbody .admin-empty-row { border-color: #334155; }
+                .admin-table tbody .admin-empty-row td {
+                    display: block;
+                    padding: 1.5rem !important;
+                    border: 0 !important;
+                    text-align: center;
+                }
+                .admin-table tbody .admin-empty-row td::before { display: none; }
+            }
+
+            /* 手機版：縮邊距、搜尋框佔滿一行、操作按鈕保持拇指可點。 */
             @media (max-width: 640px) {
-                .admin-modal-overlay { padding: 0.5rem; }
-                .admin-modal-content { max-width: 100vw; max-height: 92vh; border-radius: 1rem; }
-                .admin-modal-header { padding: 1rem; }
-                .admin-modal-title { font-size: 1.05rem; }
-                .admin-modal-body { padding: 1rem; }
+                .admin-modal-overlay { padding: 0; align-items: stretch; }
+                .admin-modal-content {
+                    max-width: 100%;
+                    max-height: 100dvh;
+                    min-height: 100dvh;
+                    border-radius: 0;
+                    border: 0;
+                }
+                .admin-modal-header { padding: 0.9rem 1rem; gap: 0.75rem; }
+                .admin-modal-title { font-size: 1rem; line-height: 1.3; flex: 1; }
+                .admin-btn-back { padding: 0.6rem 0.75rem; font-size: 0.78rem; white-space: nowrap; }
+                .admin-modal-body { padding: 0.85rem; }
+                .admin-tabs { flex-wrap: wrap; }
+                .admin-tab { min-height: 44px; padding: 0.55rem 0.75rem; }
                 #admin-search-input { width: 100% !important; }
-                .admin-table th, .admin-table td { padding: 0.6rem 0.7rem; font-size: 0.82rem; }
+                .admin-table { font-size: 0.84rem; }
+                .admin-table tbody tr:not(.admin-empty-row) {
+                    grid-template-columns: 1fr;
+                    gap: 0.7rem;
+                    padding: 0.9rem;
+                }
+                .admin-table tbody tr:not(.admin-empty-row) td:first-child,
+                .admin-table tbody tr:not(.admin-empty-row) td:last-child {
+                    grid-column: 1;
+                }
+                .admin-modal-footer {
+                    padding: 0.75rem 1rem;
+                    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+                }
+                .admin-btn-close-large { width: 100%; min-height: 44px; }
             }
             /* ── 清理殘留（破壞性操作，視覺刻意與救援完全不同）── */
             .admin-btn-purge {
@@ -496,7 +652,7 @@
                                 </tr>
                             </thead>
                             <tbody id="admin-table-body">
-                                <tr>
+                                <tr class="admin-empty-row">
                                     <td colspan="7" style="text-align:center;padding:2rem;color:#94a3b8;">
                                         <div class="inline-block animate-spin border-2 border-blue-500 border-t-transparent rounded-full w-6 h-6 mr-2 vertical-middle"></div>
                                         正在讀取雲端統計...
@@ -995,7 +1151,7 @@
 
         if (filtered.length === 0) {
             tbody.innerHTML = `
-                <tr>
+                <tr class="admin-empty-row">
                     <td colspan="7" style="text-align:center;padding:2rem;color:#94a3b8;">
                         無符合條件的教師資料
                     </td>
@@ -1018,11 +1174,14 @@
             // 所以用中性灰而不是橘色警告；否則每次開後台都像有一堆問題待處理。
             const orphanBadge = item.orphanCount > 0
                 ? `<span class="badge-neutral" title="已刪除班級的殘留資料
-班級 ID: ${item.orphans.join(', ')}">${item.orphanCount} 筆</span>`
+班級 ID: ${esc((item.orphans || []).join(', '))}">${item.orphanCount} 筆</span>`
                 : `<span class="badge-neutral" style="opacity:.5;">—</span>`;
 
             // 只有「有孤兒」的老師才出現救援按鈕；用 data-* 帶 uid 給事件委派
-            const safeName = (item.name || '').replace(/"/g, '&quot;');
+            const safeName = esc(item.name || '');
+            const safeEmail = esc(item.email || '無電子郵件');
+            const safeDevice = esc(item.device || '-');
+            const safeDeviceTitle = esc(item.device || '');
             const rescueCell = item.orphanCount > 0
                 ? `<div style="display:flex;gap:0.35rem;flex-wrap:wrap;">`
                   + `<button class="admin-btn-rescue" title="僅在老師回報「班級誤刪」時使用。按下去是把刪掉的班復活，不是清理殘留。" data-rescue-uid="${item.uid}" data-rescue-name="${safeName}" data-rescue-count="${item.orphanCount}">🩺 救回誤刪</button>`
@@ -1032,16 +1191,16 @@
 
             return `
                 <tr>
-                    <td>
-                        <div class="font-semibold text-gray-800 dark:text-gray-100">${item.name}</div>
-                        <div class="text-xs text-gray-500 dark:text-gray-400">${item.email || '無電子郵件'}</div>
+                    <td data-label="教師姓名／帳號">
+                        <div class="font-semibold text-gray-800 dark:text-gray-100">${safeName}</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">${safeEmail}</div>
                     </td>
-                    <td style="font-weight: 600;">${item.classCount} 個班級</td>
-                    <td>${orphanBadge}</td>
-                    <td class="text-xs text-gray-700 dark:text-gray-300" style="font-weight:600;white-space:nowrap;">${loginCell}</td>
-                    <td class="text-xs text-gray-600 dark:text-gray-400">${lastSyncText}</td>
-                    <td class="text-xs text-gray-500 dark:text-gray-400" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.device || ''}">${item.device || '-'}</td>
-                    <td>${rescueCell}</td>
+                    <td data-label="有效班級數" style="font-weight: 600;">${item.classCount} 個班級</td>
+                    <td data-label="已刪除殘留">${orphanBadge}</td>
+                    <td data-label="最後登入" class="text-xs text-gray-700 dark:text-gray-300" style="font-weight:600;white-space:nowrap;">${loginCell}</td>
+                    <td data-label="最後同步時間" class="text-xs text-gray-600 dark:text-gray-400">${lastSyncText}</td>
+                    <td data-label="同步裝置資訊" class="text-xs text-gray-500 dark:text-gray-400" title="${safeDeviceTitle}">${safeDevice}</td>
+                    <td data-label="操作">${rescueCell}</td>
                 </tr>
             `;
         }).join('');
@@ -1280,7 +1439,7 @@
         const tbody = document.getElementById('admin-table-body');
         if (tbody) {
             tbody.innerHTML = `
-                <tr>
+                <tr class="admin-empty-row">
                     <td colspan="7" style="text-align:center;padding:2rem;color:#94a3b8;">
                         <div class="inline-block animate-spin border-2 border-blue-500 border-t-transparent rounded-full w-6 h-6 mr-2 vertical-middle"></div>
                         正在載入雲端統計中...
@@ -1302,7 +1461,7 @@
             console.error('[AdminConsole] 載入資料失敗:', error);
             if (tbody) {
                 tbody.innerHTML = `
-                    <tr>
+                    <tr class="admin-empty-row">
                         <td colspan="7" style="text-align:center;padding:2rem;color:#ef4444;font-weight:600;">
                             ❌ 載入失敗: ${error.message || '請確認您擁有管理員權限'}
                         </td>
