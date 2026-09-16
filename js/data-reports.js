@@ -392,7 +392,8 @@
 
         let csv = '\uFEFF日期,學生,分數變動,原因\n';
         history.forEach(h => {
-            csv += `"${h.date || ''}","${h.studentName || ''}",${h.points > 0 ? '+' : ''}${h.points},"${h.reason || ''}"\n`;
+            if (h && h.type === 'reset') { csv += `"${h.date || ''}","🔄 全班分數重置",,"分數歸零（之前的紀錄仍保留）"\n`; return; }
+            csv +=`"${h.date || ''}","${h.studentName || ''}",${h.points > 0 ? '+' : ''}${h.points},"${h.reason || ''}"\n`;
         });
 
         downloadFile('分數歷史記錄.csv', csv);
@@ -539,8 +540,11 @@
         if (!student) return [];
         const hist = (typeof pointsHistory !== 'undefined' && Array.isArray(pointsHistory))
             ? pointsHistory : [];
-        const mine = hist.filter(r => r && r.studentId === student.id);
-        if (mine.length) return mine;
+        // v3.27.0：只算最後一次「重置分數」之後的紀錄（重置不再刪除舊紀錄）
+        const PR = window.PointsReset;
+        const scoped = PR ? PR.sinceReset(hist) : hist;
+        const mine = scoped.filter(r => r && r.studentId === student.id);
+        if (mine.length || (PR && PR.lastResetId(hist) > 0)) return mine;
         return Array.isArray(student.records) ? student.records : [];
     }
 
