@@ -608,13 +608,16 @@ async function mergeWithCloud() {
             localStorage.setItem('clockSettings', JSON.stringify(cloudData.clockSettings));
         }
 
-        // 存 localStorage
-        localStorage.setItem(window.STUDENTS_KEY || 'students', JSON.stringify(students));
-        localStorage.setItem(window.POINTS_HISTORY_KEY || 'pointsHistory', JSON.stringify(pointsHistory));
-        localStorage.setItem(window.GROUPS_KEY || 'groups', JSON.stringify(groups));
-        localStorage.setItem('notebookEntries', JSON.stringify(notebookEntries));
-        localStorage.setItem('homeworkList', JSON.stringify(homeworkList));
-        localStorage.setItem('lotteryHistory', JSON.stringify(lotteryHistory));
+        // 存 localStorage：六個 key 一起，失敗就整批退回合併前的內容。
+        // 半套的合併結果如果被後面的 syncToCloud() 上傳，雲端也會跟著壞掉。
+        if (!window.SafeStorage.write([
+            [window.STUDENTS_KEY || 'students', JSON.stringify(students)],
+            [window.POINTS_HISTORY_KEY || 'pointsHistory', JSON.stringify(pointsHistory)],
+            [window.GROUPS_KEY || 'groups', JSON.stringify(groups)],
+            ['notebookEntries', JSON.stringify(notebookEntries)],
+            ['homeworkList', JSON.stringify(homeworkList)],
+            ['lotteryHistory', JSON.stringify(lotteryHistory)]
+        ], { context: '合併雲端與本機資料' })) return false;
 
         // 上傳合併結果
         await syncToCloud();

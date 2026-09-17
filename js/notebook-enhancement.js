@@ -151,7 +151,10 @@ function addNotebookEnhanced() {
     };
 
     notebookEntries.unshift(entry);
-    localStorage.setItem('notebookEntries', JSON.stringify(notebookEntries));
+    if (!window.SafeStorage.set('notebookEntries', JSON.stringify(notebookEntries), {
+        context: '新增聯絡事項',
+        rollback: () => { const i = notebookEntries.indexOf(entry); if (i >= 0) notebookEntries.splice(i, 1); }
+    })) { renderNotebookEnhanced(); return; }
 
     document.getElementById('notebookContent').value = '';
     renderNotebookEnhanced();
@@ -429,7 +432,10 @@ function saveFromFullscreen() {
     };
 
     notebookEntries.unshift(entry);
-    localStorage.setItem('notebookEntries', JSON.stringify(notebookEntries));
+    if (!window.SafeStorage.set('notebookEntries', JSON.stringify(notebookEntries), {
+        context: '新增聯絡事項',
+        rollback: () => { const i = notebookEntries.indexOf(entry); if (i >= 0) notebookEntries.splice(i, 1); }
+    })) { renderNotebookEnhanced(); return; }
 
     closeFullscreenEditor();
     renderNotebookEnhanced();

@@ -629,11 +629,14 @@
         const backup = backups[index];
 
         if (confirm(`確定要恢復 ${new Date(backup.timestamp).toLocaleString()} 的備份嗎？\n\n⚠️ 目前資料將被覆蓋！`)) {
-            localStorage.setItem(window.STUDENTS_KEY || 'students', JSON.stringify(backup.students));
-            localStorage.setItem(window.POINTS_HISTORY_KEY || 'pointsHistory', JSON.stringify(backup.pointsHistory));
-            localStorage.setItem('notebookEntries', JSON.stringify(backup.notebookEntries));
-            localStorage.setItem('groups', JSON.stringify(backup.groups));
-            localStorage.setItem('seatingConfig', JSON.stringify(backup.seatingConfig));
+            // 五個 key 一起還原：中途失敗會整批退回，不會只還原一半
+            if (!window.SafeStorage.write([
+                [window.STUDENTS_KEY || 'students', JSON.stringify(backup.students)],
+                [window.POINTS_HISTORY_KEY || 'pointsHistory', JSON.stringify(backup.pointsHistory)],
+                ['notebookEntries', JSON.stringify(backup.notebookEntries)],
+                ['groups', JSON.stringify(backup.groups)],
+                ['seatingConfig', JSON.stringify(backup.seatingConfig)]
+            ], { context: '還原本機備份' })) return;
 
             if (typeof NotificationSystem !== 'undefined') {
                 NotificationSystem.success('已恢復備份，重新載入頁面...');

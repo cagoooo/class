@@ -549,7 +549,7 @@
      * 儲存座位表
      */
     window.saveSeatingChart = function () {
-        localStorage.setItem('seatingConfig', JSON.stringify(seatingConfig));
+        if (!window.SafeStorage.set('seatingConfig', JSON.stringify(seatingConfig), { context: '儲存座位表' })) return;
         if (typeof NotificationSystem !== 'undefined') {
             NotificationSystem.success('座位表已儲存');
         }

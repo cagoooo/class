@@ -75,8 +75,12 @@ function selectAvatar(avatar, studentId) {
         // 更新現有學生的頭像
         const student = students.find(s => s.id === studentId);
         if (student) {
+            const prevAvatar = student.avatar;
             student.avatar = avatar;
-            localStorage.setItem(window.STUDENTS_KEY || 'students', JSON.stringify(students));
+            if (!window.SafeStorage.set(window.STUDENTS_KEY || 'students', JSON.stringify(students), {
+                context: '更換「' + student.name + '」的頭像',
+                rollback: () => { student.avatar = prevAvatar; }
+            })) { renderStudentsEnhanced(); return; }
             renderStudentsEnhanced();
             if (typeof NotificationSystem !== 'undefined') {
                 NotificationSystem.success(`已更新「${student.name}」的頭像`);
@@ -148,6 +152,7 @@ function toggleStudentTag(studentId, tagKey) {
 
     if (!student.tags) student.tags = [];
 
+    const prevTags = student.tags.slice();
     const index = student.tags.indexOf(tagKey);
     if (index > -1) {
         student.tags.splice(index, 1);
@@ -155,7 +160,10 @@ function toggleStudentTag(studentId, tagKey) {
         student.tags.push(tagKey);
     }
 
-    localStorage.setItem(window.STUDENTS_KEY || 'students', JSON.stringify(students));
+    if (!window.SafeStorage.set(window.STUDENTS_KEY || 'students', JSON.stringify(students), {
+        context: '修改「' + student.name + '」的標籤',
+        rollback: () => { student.tags = prevTags; }
+    })) return;
 
     // 更新 Modal 中的樣式
     const modal = document.getElementById('tag-editor-modal');
@@ -344,7 +352,12 @@ function enhanceAddStudentForm() {
                 const newStudent = students[students.length - 1];
                 newStudent.avatar = pendingAvatar;
                 newStudent.tags = [];
-                localStorage.setItem(window.STUDENTS_KEY || 'students', JSON.stringify(students));
+                // 學生本體已由 addStudent() 存檔成功，這裡只補頭像與標籤；
+                // 失敗就讓兩者回到未設定狀態，學生本身保留。
+                window.SafeStorage.set(window.STUDENTS_KEY || 'students', JSON.stringify(students), {
+                    context: '設定新學生「' + (newStudent.name || '') + '」的頭像',
+                    rollback: () => { delete newStudent.avatar; delete newStudent.tags; }
+                });
                 renderStudentsEnhanced();
             }
 

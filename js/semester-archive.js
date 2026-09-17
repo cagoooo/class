@@ -183,8 +183,10 @@ const SemesterArchive = (() => {
         // points 才是加扣分系統實際使用的欄位；records 是舊版遺留的重複副本，
         // 若尚未遷移就一併清掉，否則封存後匯出的統計會混入上學期的數字。
         window.students?.forEach(s => { s.score = 0; s.points = 0; if (s.records) s.records = []; });
-        localStorage.setItem(window.STUDENTS_KEY || 'students', JSON.stringify(window.students || []));
-        localStorage.setItem(window.POINTS_HISTORY_KEY || 'pointsHistory', JSON.stringify([]));
+        window.SafeStorage.write([
+            [window.STUDENTS_KEY || 'students', JSON.stringify(window.students || [])],
+            [window.POINTS_HISTORY_KEY || 'pointsHistory', JSON.stringify([])]
+        ], { context: '封存後清空本機分數' });
         if (typeof window.pointsHistory !== 'undefined') window.pointsHistory = [];
         if (typeof renderStudents === 'function') renderStudents();
     }

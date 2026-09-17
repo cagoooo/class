@@ -408,7 +408,10 @@
             group.score = group.members.reduce((total, member) => total + member.points, 0);
         });
 
-        localStorage.setItem(window.GROUPS_KEY || 'groups', JSON.stringify(groups));
+        window.SafeStorage.set(window.GROUPS_KEY || 'groups', JSON.stringify(groups), {
+            context: '儲存分組結果',
+            rollback: () => { groups = []; }
+        });
 
         // 更新進度到 100%
         const progressBar = document.getElementById('groupingProgress');

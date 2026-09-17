@@ -1132,7 +1132,14 @@
         const nextStatus = statusOrder[(currentIndex + 1) % statusOrder.length];
 
         homeworkChecks[homeworkId][studentId] = nextStatus;
-        localStorage.setItem('homeworkChecks', JSON.stringify(homeworkChecks));
+        if (!window.SafeStorage.set('homeworkChecks', JSON.stringify(homeworkChecks), {
+            context: '勾選作業繳交狀態',
+            rollback: () => {
+                // 原本沒勾過就刪掉這個 key，不要留下 'unchecked' 的空紀錄
+                if (currentStatus === 'unchecked') delete homeworkChecks[homeworkId][studentId];
+                else homeworkChecks[homeworkId][studentId] = currentStatus;
+            }
+        })) { renderStudentGrid(); return; }
 
         renderStudentGrid();
         updateFullscreenStats();
@@ -1146,6 +1153,7 @@
 
         if (!homeworkChecks[homeworkId]) homeworkChecks[homeworkId] = {};
 
+        const prevChecks = Object.assign({}, homeworkChecks[homeworkId]);
         students.forEach(student => {
             if (status === 'unchecked') {
                 delete homeworkChecks[homeworkId][student.id];
@@ -1154,7 +1162,10 @@
             }
         });
 
-        localStorage.setItem('homeworkChecks', JSON.stringify(homeworkChecks));
+        if (!window.SafeStorage.set('homeworkChecks', JSON.stringify(homeworkChecks), {
+            context: '整批設定作業繳交狀態',
+            rollback: () => { homeworkChecks[homeworkId] = prevChecks; }
+        })) { renderStudentGrid(); return; }
         renderStudentGrid();
         updateFullscreenStats();
         syncToMainView(); // 同步至主畫面
@@ -1433,7 +1444,14 @@
         const nextStatus = statusOrder[(currentIndex + 1) % statusOrder.length];
 
         homeworkChecks[homeworkId][studentId] = nextStatus;
-        localStorage.setItem('homeworkChecks', JSON.stringify(homeworkChecks));
+        if (!window.SafeStorage.set('homeworkChecks', JSON.stringify(homeworkChecks), {
+            context: '勾選作業繳交狀態',
+            rollback: () => {
+                // 原本沒勾過就刪掉這個 key，不要留下 'unchecked' 的空紀錄
+                if (currentStatus === 'unchecked') delete homeworkChecks[homeworkId][studentId];
+                else homeworkChecks[homeworkId][studentId] = currentStatus;
+            }
+        })) return;
 
         // 即時更新元件 UI
         const config = STATUS_CONFIG[nextStatus];

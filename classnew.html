@@ -33,9 +33,9 @@
     </script>
 
     <!-- 🔒 多班級資料隔離：必須在所有模組之前載入，攔截 localStorage 自動依班級路由 -->
-    <script src="js/class-aware-storage.js?v=3.27.1"></script>
+    <script src="js/class-aware-storage.js?v=3.28.0"></script>
     <!-- 🌱 通用空狀態元件：各區塊沒資料時顯示友善引導 -->
-    <script src="js/empty-state.js?v=3.27.1"></script>
+    <script src="js/empty-state.js?v=3.28.0"></script>
 
     <!-- 🔧 開發環境：localhost 自動清除 Service Worker 快取，避免 404 攔截問題 -->
     <script>
@@ -68,7 +68,7 @@
     <link rel="icon" href="favicon.ico" sizes="any">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="shortcut icon" href="favicon.ico">
-    <title>班級小管家 v3.27.1</title>
+    <title>班級小管家 v3.28.0</title>
     <meta name="description" content="教師班級管理的貼心小幫手 — 學生管理、作業檢查、計時器、抽籤、考試監考，一站搞定。">
 
     <!-- Open Graph / Facebook / LINE -->
@@ -91,14 +91,14 @@
     <meta name="twitter:description" content="教師班級管理的貼心小幫手 — 學生管理、作業檢查、計時器、抽籤、考試監考，一站搞定。">
     <meta name="twitter:image" content="https://cagoooo.github.io/class/og-preview.png?v=3.12.17">
     <!-- 📦 版本號（由 scripts/update-sw-version.js 自動同步） -->
-    <script>window.APP_VERSION = '3.27.1';</script>
+    <script>window.APP_VERSION = '3.28.0';</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 深色模式統一由 .dark class 驅動（與 theme-toggle.js 一致），不再跟隨作業系統的 prefers-color-scheme，
          否則 OS 深色但 App 淺色（或反之）時，dark: 工具類與自訂 .dark CSS 不同步 → 深底配深字、按鈕文字看不到 -->
     <script>tailwind.config = { darkMode: 'class' };</script>
-    <link rel="stylesheet" href="css/rwd-breakpoints.css?v=3.27.1">
-    <link rel="stylesheet" href="css/pwa-install.css?v=3.27.1">
-    <link rel="stylesheet" href="css/skeleton.css?v=3.27.1">
+    <link rel="stylesheet" href="css/rwd-breakpoints.css?v=3.28.0">
+    <link rel="stylesheet" href="css/pwa-install.css?v=3.28.0">
+    <link rel="stylesheet" href="css/skeleton.css?v=3.28.0">
     <!-- 新增 Excel 讀取套件 -->
 
     <script crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -740,7 +740,7 @@
                                 title="目前版本（點擊查看更新資訊）"
                                 class="text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-800/60 transition-colors"
                                 onclick="window.open('https://github.com/cagoooo/class/blob/main/CHANGELOG.md', '_blank')">
-                                v3.27.1
+                                v3.28.0
                             </span>
                         </div>
                         <div class="hidden sm:block text-xs sm:text-sm text-gray-600">讓課堂管理變得簡單有趣</div>
@@ -2372,21 +2372,31 @@
                     // 向下相容舊備份（只含 7 個 key 的 v1.0 仍可還原）
                     const allowed = new Set(['students', 'groups', 'pointsHistory', ...(window.ClassAwareStorage?.SHARED_KEYS || [])]);
                     // 完整取代目前班級，避免舊備份未包含的資料殘留；不接受班級目錄或其他班級的儲存鍵。
+                    // 刪除與寫入一起交給 SafeStorage：中途空間不足時會整批還原，
+                    // 不會留下「舊資料已刪、新資料沒寫進去」的半套狀態。
+                    const ops = [];
                     allowed.forEach(k => {
                         if (Object.prototype.hasOwnProperty.call(data, k)) return;
                         const key = k === 'students' ? window.STUDENTS_KEY : k === 'groups' ? window.GROUPS_KEY : k === 'pointsHistory' ? window.POINTS_HISTORY_KEY : k;
-                        localStorage.removeItem(key || k);
+                        ops.push([key || k, null]);
                     });
                     Object.keys(data).forEach(k => {
                         if (!allowed.has(k)) return;
                         let val;
                         // 純字串（如 boardNote/boardActivity）直接寫回，避免被再次 JSON 編碼多出引號；物件/陣列才序列化
                         try { val = (typeof data[k] === 'string') ? data[k] : JSON.stringify(data[k]); } catch (e) { return; }
-                        if (k === 'students') { students = data[k] || []; localStorage.setItem(window.STUDENTS_KEY || 'students', val); }
-                        else if (k === 'groups') { groups = data[k] || []; localStorage.setItem(window.GROUPS_KEY || 'groups', val); }
-                        else if (k === 'pointsHistory') { pointsHistory = data[k] || []; localStorage.setItem(window.POINTS_HISTORY_KEY || 'pointsHistory', val); }
-                        else { localStorage.setItem(k, val); }
+                        if (k === 'students') ops.push([window.STUDENTS_KEY || 'students', val]);
+                        else if (k === 'groups') ops.push([window.GROUPS_KEY || 'groups', val]);
+                        else if (k === 'pointsHistory') ops.push([window.POINTS_HISTORY_KEY || 'pointsHistory', val]);
+                        else ops.push([k, val]);
                     });
+                    if (!SafeStorage.write(ops, { context: '匯入備份資料' })) {
+                        LoadingIndicator.hide();
+                        return;   // 已整批還原成匯入前的資料，不重新載入
+                    }
+                    students = data.students || students;
+                    groups = data.groups || groups;
+                    pointsHistory = data.pointsHistory || pointsHistory;
 
                     LoadingIndicator.hide();
                     NotificationSystem.success('資料匯入成功，頁面即將重新載入');
@@ -2682,7 +2692,11 @@
             };
 
             students.push(student);
-            localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
+            // 存檔失敗就整筆退回（含記憶體），不要留下「畫面有、資料沒有」的學生
+            if (!SafeStorage.set(STUDENTS_KEY, JSON.stringify(students), {
+                context: '新增學生（' + nameValidation.value + '）',
+                rollback: () => { const i = students.indexOf(student); if (i >= 0) students.splice(i, 1); }
+            })) { renderStudents(); return; }
 
             // 清空輸入
             document.getElementById('studentName').value = '';
@@ -2718,7 +2732,10 @@
             const confirmMessage = `即將新增 ${newStudents.length} 位學生：\n\n${newStudents.map(s => `${s.name} (座號：${s.number})`).join('\n')}\n\n確定要新增嗎？`;
             if (confirm(confirmMessage)) {
                 students.push(...newStudents);
-                localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
+                if (!SafeStorage.set(STUDENTS_KEY, JSON.stringify(students), {
+                    context: '批次新增 ' + newStudents.length + ' 位學生',
+                    rollback: () => { students = students.filter(s => !newStudents.includes(s)); }
+                })) { renderStudents(); return; }
                 document.getElementById('batchStudents').value = '';
                 renderStudents();
                 updatePointsStudentSelect();
@@ -2751,8 +2768,12 @@
             });
 
             if (confirmed) {
+                const before = students;
                 students = students.filter(s => s.id !== id);
-                localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
+                if (!SafeStorage.set(STUDENTS_KEY, JSON.stringify(students), {
+                    context: '刪除學生（' + student.name + '）',
+                    rollback: () => { students = before; }
+                })) { renderStudents(); return; }
                 renderStudents();
                 updatePointsStudentSelect();
                 updateHomeworkCheckList();
@@ -3343,7 +3364,10 @@
         function saveLotteryHistory(result, type) {
             const record = { id: Date.now(), type: type, result: result, timestamp: new Date().toLocaleString('zh-TW', { hour12: false }) };
             lotteryHistory.unshift(record);
-            localStorage.setItem('lotteryHistory', JSON.stringify(lotteryHistory));
+            SafeStorage.set('lotteryHistory', JSON.stringify(lotteryHistory), {
+                context: '記錄抽籤結果',
+                rollback: () => { const i = lotteryHistory.indexOf(record); if (i >= 0) lotteryHistory.splice(i, 1); }
+            });
             renderLotteryHistory();
         }
         function renderLotteryHistory() {
@@ -3694,11 +3718,23 @@
             if (!date || !content) { alert('請填寫日期和內容'); return; }
             const entry = { id: Date.now(), date: date, type: type, content: content, timestamp: new Date().toLocaleString('zh-TW', { hour12: false }) };
             notebookEntries.unshift(entry);
-            localStorage.setItem('notebookEntries', JSON.stringify(notebookEntries));
+            if (!SafeStorage.set('notebookEntries', JSON.stringify(notebookEntries), {
+                context: '新增聯絡事項',
+                rollback: () => { const i = notebookEntries.indexOf(entry); if (i >= 0) notebookEntries.splice(i, 1); }
+            })) { renderNotebook(); return; }
             document.getElementById('notebookContent').value = '';
             renderNotebook();
         }
-        function removeNotebook(id) { if (confirm('確定要刪除這筆聯絡事項嗎？')) { notebookEntries = notebookEntries.filter(e => e.id !== id); localStorage.setItem('notebookEntries', JSON.stringify(notebookEntries)); renderNotebook(); } }
+        function removeNotebook(id) {
+            if (!confirm('確定要刪除這筆聯絡事項嗎？')) return;
+            const before = notebookEntries;
+            notebookEntries = notebookEntries.filter(e => e.id !== id);
+            SafeStorage.set('notebookEntries', JSON.stringify(notebookEntries), {
+                context: '刪除聯絡事項',
+                rollback: () => { notebookEntries = before; }
+            });
+            renderNotebook();
+        }
 
         function renderNotebook() {
             const container = document.getElementById('notebookList');
@@ -3769,8 +3805,12 @@
             const entryMap = new Map(notebookEntries.map(entry => [entry.id, entry]));
             const newNotebookEntries = orderedIds.map(id => entryMap.get(id)).filter(Boolean);
 
+            const before = notebookEntries;
             notebookEntries = newNotebookEntries;
-            localStorage.setItem('notebookEntries', JSON.stringify(notebookEntries));
+            if (!SafeStorage.set('notebookEntries', JSON.stringify(notebookEntries), {
+                context: '調整聯絡事項順序',
+                rollback: () => { notebookEntries = before; }
+            })) renderNotebook();   // 順序沒存成功，畫面重畫回原本的排序
         }
 
         function handleNotebookDragOver(e) {
@@ -3809,12 +3849,30 @@
             if (!name || !due) { alert('請填寫作業名稱和繳交日期'); return; }
             const homework = { id: Date.now(), name: name, due: due };
             homeworkList.push(homework);
-            localStorage.setItem('homeworkList', JSON.stringify(homeworkList));
+            if (!SafeStorage.set('homeworkList', JSON.stringify(homeworkList), {
+                context: '新增作業（' + name + '）',
+                rollback: () => { const i = homeworkList.indexOf(homework); if (i >= 0) homeworkList.splice(i, 1); }
+            })) { renderHomework(); return; }
             document.getElementById('homeworkName').value = '';
             renderHomework();
             updateHomeworkSelect();
         }
-        function removeHomework(id) { if (confirm('確定要刪除這項作業嗎？相關的檢查記錄也會被刪除。')) { homeworkList = homeworkList.filter(h => h.id !== id); delete homeworkChecks[id]; localStorage.setItem('homeworkList', JSON.stringify(homeworkList)); localStorage.setItem('homeworkChecks', JSON.stringify(homeworkChecks)); renderHomework(); updateHomeworkSelect(); updateHomeworkCheckList(); } }
+        function removeHomework(id) {
+            if (!confirm('確定要刪除這項作業嗎？相關的檢查記錄也會被刪除。')) return;
+            const prevList = homeworkList;
+            const prevChecks = homeworkChecks[id];
+            homeworkList = homeworkList.filter(h => h.id !== id);
+            delete homeworkChecks[id];
+            // 作業清單與繳交紀錄要嘛一起存成功、要嘛一起還原，不能只刪一半
+            if (!SafeStorage.write([
+                ['homeworkList', JSON.stringify(homeworkList)],
+                ['homeworkChecks', JSON.stringify(homeworkChecks)]
+            ], {
+                context: '刪除作業',
+                rollback: () => { homeworkList = prevList; if (prevChecks !== undefined) homeworkChecks[id] = prevChecks; }
+            })) { renderHomework(); updateHomeworkCheckList(); return; }
+            renderHomework(); updateHomeworkSelect(); updateHomeworkCheckList();
+        }
         function renderHomework() {
             const container = document.getElementById('homeworkList');
             if (homeworkList.length === 0) {
@@ -3877,7 +3935,19 @@
             });
             updateHomeworkStats();
         }
-        function setHomeworkStatus(homeworkId, studentId, status) { if (!homeworkChecks[homeworkId]) homeworkChecks[homeworkId] = {}; homeworkChecks[homeworkId][studentId] = status; localStorage.setItem('homeworkChecks', JSON.stringify(homeworkChecks)); updateHomeworkCheckList(); }
+        function setHomeworkStatus(homeworkId, studentId, status) {
+            if (!homeworkChecks[homeworkId]) homeworkChecks[homeworkId] = {};
+            const prev = homeworkChecks[homeworkId][studentId];
+            homeworkChecks[homeworkId][studentId] = status;
+            SafeStorage.set('homeworkChecks', JSON.stringify(homeworkChecks), {
+                context: '勾選作業繳交狀態',
+                rollback: () => {
+                    if (prev === undefined) delete homeworkChecks[homeworkId][studentId];
+                    else homeworkChecks[homeworkId][studentId] = prev;
+                }
+            });
+            updateHomeworkCheckList();
+        }
 
         function updateHomeworkStats() {
             const homeworkId = document.getElementById('checkHomework').value;
@@ -4132,7 +4202,10 @@
                     const confirmMessage = `預覽即將從 Excel 匯入的 ${newStudents.length} 位學生：\n\n${newStudents.map(s => `${s.name} (座號：${s.number})`).join('\n')}\n\n確定要新增嗎？`;
                     if (confirm(confirmMessage)) {
                         students.push(...newStudents);
-                        localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
+                        if (!SafeStorage.set(STUDENTS_KEY, JSON.stringify(students), {
+                            context: '從 Excel 匯入 ' + newStudents.length + ' 位學生',
+                            rollback: () => { students = students.filter(s => !newStudents.includes(s)); }
+                        })) { renderStudents(); return; }
                         fileInput.value = ''; // 清空 file input
                         renderStudents();
                         updatePointsStudentSelect();
@@ -4189,15 +4262,22 @@
                 })
                 : confirm('確定要清除所有學生名單嗎？\n此操作將會刪除所有學生、分數、分組與作業記錄，且無法復原。');
             if (proceed) {
+                const before = { s: students, p: pointsHistory, g: groups, h: homeworkChecks };
                 students = [];
                 pointsHistory = [];
                 groups = [];
                 homeworkChecks = {};
 
-                localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
-                localStorage.setItem(window.POINTS_HISTORY_KEY || 'pointsHistory', JSON.stringify(pointsHistory));
-                localStorage.setItem(window.GROUPS_KEY || 'groups', JSON.stringify(groups));
-                localStorage.setItem('homeworkChecks', JSON.stringify(homeworkChecks));
+                // 四個 key 要嘛全部清成功、要嘛全部還原，不能清一半
+                if (!SafeStorage.write([
+                    [STUDENTS_KEY, JSON.stringify(students)],
+                    [window.POINTS_HISTORY_KEY || 'pointsHistory', JSON.stringify(pointsHistory)],
+                    [window.GROUPS_KEY || 'groups', JSON.stringify(groups)],
+                    ['homeworkChecks', JSON.stringify(homeworkChecks)]
+                ], {
+                    context: '清除全班資料',
+                    rollback: () => { students = before.s; pointsHistory = before.p; groups = before.g; homeworkChecks = before.h; }
+                })) { renderStudents(); renderGroups(); renderPointsHistory(); updateHomeworkCheckList(); return; }
 
                 renderStudents();
                 updatePointsStudentSelect();
@@ -4234,7 +4314,10 @@
                 group.score = group.members.reduce((total, member) => total + member.points, 0);
             });
 
-            localStorage.setItem(window.GROUPS_KEY || 'groups', JSON.stringify(groups));
+            SafeStorage.set(window.GROUPS_KEY || 'groups', JSON.stringify(groups), {
+                context: '儲存分組結果',
+                rollback: () => { groups = []; }
+            });
             renderGroups();
         }
 
@@ -4254,7 +4337,10 @@
         function adjustGroupScore(groupIndex, amount) {
             if (groups[groupIndex]) {
                 groups[groupIndex].score += amount;
-                localStorage.setItem(window.GROUPS_KEY || 'groups', JSON.stringify(groups));
+                SafeStorage.set(window.GROUPS_KEY || 'groups', JSON.stringify(groups), {
+                    context: '調整小組分數',
+                    rollback: () => { groups[groupIndex].score -= amount; }
+                });
                 renderGroups();
             }
         }
@@ -4768,37 +4854,37 @@
         // --- 結束全螢幕時鐘功能 ---
     </script>
     <!-- 增強模組 -->
-    <script src="js/skeleton.js?v=3.27.1"></script>
-    <script src="js/event-bus.js?v=3.27.1"></script>
-    <script src="js/error-handler.js?v=3.27.1"></script>
+    <script src="js/skeleton.js?v=3.28.0"></script>
+    <script src="js/event-bus.js?v=3.28.0"></script>
+    <script src="js/error-handler.js?v=3.28.0"></script>
 
-    <script src="js/class-db.js?v=3.27.1"></script>
-    <script src="js/firebase-config.js?v=3.27.1"></script>
-    <script src="js/usage-notify.js?v=3.27.1"></script>
-    <script src="js/firebase-sync.js?v=3.27.1"></script>
-    <script src="js/firebase-ui.js?v=3.27.1"></script>
-    <script src="js/storage-manager.js?v=3.27.1"></script>
-    <script src="js/app-state.js?v=3.27.1"></script>
-    <script src="js/homework-enhancement.js?v=3.27.1"></script>
-    <script src="js/notebook-enhancement.js?v=3.27.1"></script>
-    <script src="js/leaderboard-enhancement.js?v=3.27.1"></script>
-    <script src="js/timer-enhancement.js?v=3.27.1"></script>
-    <script src="js/theme-toggle.js?v=3.27.1"></script>
-    <script src="js/lottery-enhancement.js?v=3.27.1"></script>
-    <script src="js/grouping-enhancement.js?v=3.27.1"></script>
-    <script src="js/student-enhancement.js?v=3.27.1"></script>
-    <script src="js/pomodoro.js?v=3.27.1"></script>
-    <script src="js/keyboard-shortcuts.js?v=3.27.1"></script>
-    <script src="js/ui-enhancement.js?v=3.27.1"></script>
-    <script src="js/navigation-enhancement.js?v=3.27.1"></script>
-    <script src="js/data-reports.js?v=3.27.1"></script>
-    <script src="js/exam-proctor.js?v=3.27.1"></script>
-    <script src="js/exam-sounds.js?v=3.27.1"></script>
-    <script src="js/announcement.js?v=3.27.1"></script>
+    <script src="js/class-db.js?v=3.28.0"></script>
+    <script src="js/firebase-config.js?v=3.28.0"></script>
+    <script src="js/usage-notify.js?v=3.28.0"></script>
+    <script src="js/firebase-sync.js?v=3.28.0"></script>
+    <script src="js/firebase-ui.js?v=3.28.0"></script>
+    <script src="js/storage-manager.js?v=3.28.0"></script>
+    <script src="js/app-state.js?v=3.28.0"></script>
+    <script src="js/homework-enhancement.js?v=3.28.0"></script>
+    <script src="js/notebook-enhancement.js?v=3.28.0"></script>
+    <script src="js/leaderboard-enhancement.js?v=3.28.0"></script>
+    <script src="js/timer-enhancement.js?v=3.28.0"></script>
+    <script src="js/theme-toggle.js?v=3.28.0"></script>
+    <script src="js/lottery-enhancement.js?v=3.28.0"></script>
+    <script src="js/grouping-enhancement.js?v=3.28.0"></script>
+    <script src="js/student-enhancement.js?v=3.28.0"></script>
+    <script src="js/pomodoro.js?v=3.28.0"></script>
+    <script src="js/keyboard-shortcuts.js?v=3.28.0"></script>
+    <script src="js/ui-enhancement.js?v=3.28.0"></script>
+    <script src="js/navigation-enhancement.js?v=3.28.0"></script>
+    <script src="js/data-reports.js?v=3.28.0"></script>
+    <script src="js/exam-proctor.js?v=3.28.0"></script>
+    <script src="js/exam-sounds.js?v=3.28.0"></script>
+    <script src="js/announcement.js?v=3.28.0"></script>
 
     <!-- PWA 支援 -->
-    <script src="js/pwa-install.js?v=3.27.1"></script>
-    <script src="js/clock-settings-toggle.js?v=3.27.1"></script>
+    <script src="js/pwa-install.js?v=3.28.0"></script>
+    <script src="js/clock-settings-toggle.js?v=3.28.0"></script>
     <script src="js/admin-console.js?v=3.26.2"></script>
 
     <!-- ===== 一鍵更新浮動按鈕 ===== -->
@@ -4867,50 +4953,50 @@
     </button>
 
     <!-- 離線狀態偵測（P12：斷網時頂部 Banner 提示） -->
-    <script src="./js/offline-detector.js?v=3.27.1"></script>
+    <script src="./js/offline-detector.js?v=3.28.0"></script>
     <!-- 自動定時同步（P11：每 10 分鐘自動上傳至 Firebase） -->
-    <script src="./js/auto-sync.js?v=3.27.1"></script>
+    <script src="./js/auto-sync.js?v=3.28.0"></script>
 
     <!-- 手勢操作支援（觸控滑動切換功能區 | 長按快捷選單） -->
-    <script src="./js/gesture-handler.js?v=3.27.1"></script>
+    <script src="./js/gesture-handler.js?v=3.28.0"></script>
 
     <!-- 🧧 十二生肖・開運拉霸機 + 開運籤（開學破冰遊戲） -->
-    <script src="./js/zodiac-slot.js?v=3.27.1"></script>
+    <script src="./js/zodiac-slot.js?v=3.28.0"></script>
 
     <!-- 🛟 資料保險把關（清除前強制備份 + 儲存空間預警） -->
-    <script src="./js/data-safety-guard.js?v=3.27.1"></script>
+    <script src="./js/data-safety-guard.js?v=3.28.0"></script>
 
     <!-- 🎨 班級經營白板（公告白板 + 班級秩序 + 號碼抽籤） -->
-    <script src="./js/class-board.js?v=3.27.1"></script>
+    <script src="./js/class-board.js?v=3.28.0"></script>
 
     <!-- 🦷 潔牙勾選表 -->
-    <script src="./js/brush-check.js?v=3.27.1"></script>
+    <script src="./js/brush-check.js?v=3.28.0"></script>
 
     <!-- ✍️ 成績單評語生成器 -->
-    <script src="./js/comment-gen.js?v=3.27.1"></script>
+    <script src="./js/comment-gen.js?v=3.28.0"></script>
 
     <!-- 💬 生動對話小學堂（國語寫作互動教學） -->
-    <script src="./js/dialogue-school.js?v=3.27.1"></script>
+    <script src="./js/dialogue-school.js?v=3.28.0"></script>
 
     <!-- 學期封存模組（Q01：一鍵封存學期資料至 Firebase archives/） -->
-    <script src="./js/semester-archive.js?v=3.27.1"></script>
+    <script src="./js/semester-archive.js?v=3.28.0"></script>
 
     <!-- 多班級管理模組（在 google-auth-ui.js 之前載入，確保 nav slot 就緒） -->
-    <script src="./js/class-profiles.js?v=3.27.1"></script>
+    <script src="./js/class-profiles.js?v=3.28.0"></script>
     <!-- v3.1.0：Ctrl+K 班級快速切換器 -->
-    <script src="./js/class-quick-switcher.js?v=3.27.1"></script>
+    <script src="./js/class-quick-switcher.js?v=3.28.0"></script>
 
 
     <!-- Google 帳號登入 UI 模組（必須在所有 Firebase 模組之後載入） -->
-    <script src="./js/google-auth-ui.js?v=3.27.1"></script>
+    <script src="./js/google-auth-ui.js?v=3.28.0"></script>
 
     <!-- v3.1.0：同步狀態常駐指示器（位於一鍵更新按鈕左側） -->
-    <script src="./js/sync-status-indicator.js?v=3.27.1"></script>
+    <script src="./js/sync-status-indicator.js?v=3.28.0"></script>
 
     <!-- v3.12.1：版本與健康狀態面板（點版本徽章開啟，R-C1/R-C2） -->
-    <script src="./js/health-panel.js?v=3.27.1"></script>
+    <script src="./js/health-panel.js?v=3.28.0"></script>
 
-    <script src="./js/classroom-ux.js?v=3.27.1"></script>
+    <script src="./js/classroom-ux.js?v=3.28.0"></script>
 </body>
 
 </html>

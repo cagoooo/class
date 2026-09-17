@@ -267,6 +267,78 @@
         console.warn('[ClassAwareStorage] 遷移失敗（非致命）:', e);
     }
 
+    // ==================== SafeStorage：不會靜默吃掉資料的寫入 ====================
+    /**
+     * v3.28.0：共用的「存檔失敗就講出來」寫入器。
+     *
+     * 背景：localStorage 只有幾 MB，寫滿時 setItem 會丟 QuotaExceededError。
+     * 舊寫法多半是裸的 `localStorage.setItem(...)`——例外往上拋，後面的 render 不會執行，
+     * 老師只看到畫面沒更新，以為只是卡頓，實際上這筆資料「從來沒存進去」。
+     * 王薇婷老師就是這樣掉了數十筆加扣分（v3.25.0 已修加扣分那條路徑，這裡把同一套
+     * 保護推廣到新增學生、作業、聯絡簿、抽籤等其餘寫入點）。
+     *
+     * 保證三件事：
+     *   1. 多個 key 要嘛全部寫成功，要嘛全部還原成寫入前的內容（不留半套資料）。
+     *   2. 失敗時呼叫 rollback() 把記憶體狀態也還原，畫面與資料才不會對不上。
+     *   3. 失敗時一定會讓老師看到（通知＋alert），並透過 ErrorHandler 通報開發者。
+     *
+     * @param {Array<[string,?string]>} pairs 要寫入的 [key, value] 陣列（value 必須已是字串；
+     *        value 給 null 代表「刪除這個 key」，讓匯入／還原可以把刪除也納入同一次原子操作）
+     * @param {{context?:string, rollback?:Function, message?:string}} [opts]
+     *        context  — 出事時要顯示／通報的情境，例如「新增學生（王小明）」
+     *        rollback — 還原記憶體狀態的函式（例如把剛 push 的項目 pop 回來）
+     *        message  — 自訂給老師看的訊息；預設會用 context 組一句
+     * @returns {boolean} true=已存檔；false=沒存檔（呼叫端應該 return，不要繼續往下走）
+     */
+    function safeWrite(pairs, opts) {
+        opts = opts || {};
+        const list = (pairs || []).filter(p => Array.isArray(p) && p[0]);
+        if (!list.length) return true;
+
+        // 先拍快照（走一般 getItem，與 setItem 同一套班級 key 路由）
+        const snapshot = list.map(p => [p[0], localStorage.getItem(p[0])]);
+        try {
+            list.forEach(p => p[1] === null ? localStorage.removeItem(p[0]) : localStorage.setItem(p[0], p[1]));
+            return true;
+        } catch (err) {
+            // 前面幾個 key 可能已寫進去，全部還原成寫入前的樣子
+            snapshot.forEach(function (s) {
+                try {
+                    s[1] === null ? localStorage.removeItem(s[0]) : localStorage.setItem(s[0], s[1]);
+                } catch (e) { /* 空間已滿時還原也可能失敗，記憶體狀態才是主要保障 */ }
+            });
+            try { if (typeof opts.rollback === 'function') opts.rollback(); }
+            catch (e) { console.error('[SafeStorage] rollback 失敗:', e); }
+
+            const context = opts.context || '資料存檔';
+            console.error('[SafeStorage] 寫入失敗（' + context + '）:', err);
+
+            // 通報開發者：只有 ErrorHandler.handle 這條路會發 webhook
+            try {
+                if (window.ErrorHandler && window.ErrorHandler.handle) {
+                    window.ErrorHandler.handle(
+                        new Error('資料寫入失敗：' + ((err && err.message) || err)),
+                        'STORAGE', context, { severity: 'critical' }
+                    );
+                }
+            } catch (e) { /* 通報失敗不能再擋住主流程 */ }
+
+            // 告訴老師：這次「沒有存檔」
+            const msg = opts.message || ('⚠️ 這次「' + context + '」沒有存檔！\n\n' +
+                '可能是瀏覽器儲存空間已滿。請先登入 Google 同步到雲端，或匯出備份後再試一次。');
+            try { if (window.NotificationSystem && NotificationSystem.error) NotificationSystem.error(context + ' 沒有存檔（儲存空間可能已滿）'); }
+            catch (e) { /* noop */ }
+            try { alert(msg); } catch (e) { /* noop */ }
+            return false;
+        }
+    }
+
+    window.SafeStorage = {
+        write: safeWrite,
+        /** 單一 key 的捷徑：SafeStorage.set(KEY, JSON.stringify(x), { context, rollback }) */
+        set(key, value, opts) { return safeWrite([[key, value]], opts); },
+    };
+
     // 暴露工具給其他模組（特別是 firebase-sync.js）使用
     window.ClassAwareStorage = {
         SHARED_KEYS: Array.from(SHARED_KEYS),

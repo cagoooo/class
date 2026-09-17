@@ -35,7 +35,11 @@
     }
 
     function saveData() {
-        localStorage.setItem('classAnnouncements', JSON.stringify(announcements));
+        // 沒有 rollback：呼叫端已改過記憶體，但至少不會靜默失敗——
+        // 老師會看到「沒有存檔」，開發者也會收到通報。
+        return window.SafeStorage.set('classAnnouncements', JSON.stringify(announcements), {
+            context: '儲存班級公告'
+        });
     }
 
     // =============================================
