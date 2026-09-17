@@ -560,10 +560,15 @@
      * - 若儲存失敗自動刪除所有舊備份後放棄（避免擋到主流程）
      */
     function performAutoBackup() {
-        // 已登入雲端同步者跳過本地備份（避免與 Firebase 同步資料重複）
+        // 已用 Google 登入者跳過本地備份（雲端已有可跨裝置取回的完整資料）
+        //
+        // ⚠️ v3.27.1：這裡原本用 isConnected()，但那對「匿名登入」也回傳 true——
+        //    而 App 一開頁就會自動匿名登入。結果是沒用 Google 登入的老師：
+        //    本機備份被跳過，雲端那份又綁在只有這台瀏覽器認得的匿名帳號上，
+        //    瀏覽器資料一清就永遠取不回（雲端實測有 97 個這種孤兒匿名帳號）。
+        //    改成只認 Google 帳號，匿名時照常留本機備份。
         try {
-            if (window.FirebaseConfig?.isConnected?.()) {
-                // 已登入，雲端已有完整資料，不需要佔用 localStorage
+            if (window.FirebaseConfig?.isGoogleUser?.()) {
                 return;
             }
         } catch (e) { /* FirebaseConfig 可能尚未載入，繼續備份 */ }

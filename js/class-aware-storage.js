@@ -69,8 +69,11 @@
     //           - 已登入：可以安全清 autoBackup（雲端有完整資料）
     //           - 未登入：只清節流/暫存，保留 autoBackup 避免資料永久遺失
     function isLoggedInToCloud() {
+        // ⚠️ v3.27.1：必須是 Google 帳號才算「雲端有備份」。
+        //    isConnected() 對自動匿名登入也回傳 true，會讓這裡在空間不足時
+        //    刪掉 classManager_autoBackup——那可能是未登入老師僅存的一份副本。
         try {
-            return !!(window.FirebaseConfig?.isConnected?.());
+            return !!(window.FirebaseConfig?.isGoogleUser?.());
         } catch (e) { return false; }
     }
 
