@@ -97,28 +97,27 @@
          * @param {string} failedKey - 失敗的鍵名
          */
         handleQuotaExceeded(failedKey) {
-            console.warn('[StorageManager] localStorage 配額已滿，嘗試清理...');
+            console.warn('[StorageManager] localStorage 配額已滿：', failedKey);
 
-            // 嘗試清理舊的歷史記錄
-            const keysToTrim = ['pointsHistory', 'lotteryHistory'];
-
-            keysToTrim.forEach(key => {
-                try {
-                    const data = this.get(key, []);
-                    if (Array.isArray(data) && data.length > 100) {
-                        // 只保留最新的 100 筆
-                        const trimmed = data.slice(0, 100);
-                        localStorage.setItem(key, JSON.stringify(trimmed));
-                        console.log(`[StorageManager] 已裁剪 "${key}"，從 ${data.length} 筆減至 100 筆`);
-                    }
-                } catch (e) {
-                    console.error(`[StorageManager] 裁剪 "${key}" 失敗:`, e);
+            // ⚠️ v3.28.4：這裡原本會「把 pointsHistory 與 lotteryHistory 裁到只剩 100 筆」。
+            //    那是不可逆的資料刪除——老師整學期的加扣分會在毫無互動的情況下少掉一大半，
+            //    而且裁完還會同步上雲端，雲端那份也跟著被覆蓋（v3.27.0 的重置分數就是同一種災難）。
+            //    空間不足的正解是請老師備份／同步，不是替他刪資料。
+            //
+            //    註：目前 StorageManager.set() 與 AppState 的存檔方法全專案都沒有人呼叫
+            //    （資料寫入一律走 SafeStorage）。這段留著是為了避免日後有人接上來就踩到。
+            try {
+                if (window.ErrorHandler && window.ErrorHandler.handle) {
+                    window.ErrorHandler.handle(
+                        new Error('localStorage 配額已滿，寫入失敗：' + failedKey),
+                        'STORAGE', '儲存空間不足（' + failedKey + '）', { severity: 'critical' }
+                    );
                 }
-            });
+            } catch (e) { /* 通報失敗不能再擋住主流程 */ }
 
             // 通知用戶
             if (typeof NotificationSystem !== 'undefined') {
-                NotificationSystem.warning('儲存空間不足，部分舊資料已被清理');
+                NotificationSystem.error('儲存空間不足，這次沒有存檔！請先下載備份或登入雲端同步。');
             }
         },
 
