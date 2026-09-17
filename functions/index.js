@@ -967,10 +967,11 @@ exports.getAdminStats = onCall(
         // 讀取 classProfiles, syncInfo 以及 classes
         const metaCol = userRef.collection('_meta');
         
-        const [profilesDoc, syncInfoDoc, classesDocs] = await Promise.all([
+        const [profilesDoc, syncInfoDoc, classesDocs, rootCols] = await Promise.all([
           metaCol.doc('classProfiles').get(),
           metaCol.doc('syncInfo').get(),
-          userRef.collection('classes').listDocuments()
+          userRef.collection('classes').listDocuments(),
+          userRef.listCollections()   // 預設班級的資料直接掛在 users/{uid} 底下
         ]);
 
         const classProfiles = profilesDoc.exists ? (profilesDoc.data().profiles || []) : [];
@@ -993,6 +994,30 @@ exports.getAdminStats = onCall(
 
         const orphans = cloudClassIds.filter(id => !activeClassIds.has(id));
 
+        // 「未備份班級」＝名冊上有，但雲端根本沒資料的班。這種班只存在老師那台電腦裡，
+        // 電腦壞掉或清掉瀏覽器資料就沒了，而且後台其他欄位都看不出來
+        // （最後同步時間只要同步過一個班就會有值）。實測 30 位使用者、106 個班屬於這類。
+        //
+        // 兩種情況都要算，缺一種就會漏掉（實測 86 + 20）：
+        //   a. classes 集合裡連這個班的文件都沒有 → 從沒同步過
+        //   b. 文件在（切換班級時寫的班級標記），但底下沒有任何資料子集合 → 只有標記沒有資料
+        const cloudClassIdSet = new Set(cloudClassIds);
+        const registryIds = Array.from(activeClassIds);
+        const markerOnly = await Promise.all(
+          registryIds
+            .filter(id => id !== 'default' && cloudClassIdSet.has(id))
+            .map(async (id) => {
+              const subs = await userRef.collection('classes').doc(id).listCollections();
+              return subs.length === 0 ? id : null;
+            })
+        );
+        const unbacked = registryIds
+          .filter(id => id !== 'default' && !cloudClassIdSet.has(id))
+          .concat(markerOnly.filter(Boolean));
+        // 預設班級：資料掛在 users/{uid} 底下，沒有 students 就是沒備份過
+        const rootColIds = new Set(rootCols.map(c => c.id));
+        if (activeClassIds.has('default') && !rootColIds.has('students')) unbacked.push('default');
+
         return {
           uid,
           email: authUser.email,
@@ -1003,6 +1028,9 @@ exports.getAdminStats = onCall(
           classCount: activeClassIds.size,
           orphanCount: orphans.length,
           orphans: orphans,
+          // 名冊上有、雲端卻沒有資料的班（等於完全沒有雲端備份）
+          unbackedCount: unbacked.length,
+          unbacked: unbacked,
           lastSync: syncInfo && syncInfo.lastUploadAt ? syncInfo.lastUploadAt.toDate().toISOString() : null,
           device: syncInfo ? (syncInfo.device || '') : ''
         };

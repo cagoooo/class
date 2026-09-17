@@ -178,6 +178,22 @@
                 color: #cbd5e1;
                 border-color: #475569;
             }
+            /* 未備份班級：真的需要提醒老師的狀況，用橘色與中性徽章區隔 */
+            .badge-warn {
+                display: inline-block;
+                padding: 0.2rem 0.6rem;
+                border-radius: 999px;
+                font-size: 0.78rem;
+                font-weight: 700;
+                background: #fff7ed;
+                color: #c2410c;
+                border: 1px solid #fed7aa;
+            }
+            .dark .badge-warn {
+                background: rgba(154, 52, 18, 0.35);
+                color: #fdba74;
+                border-color: #9a3412;
+            }
             .badge-green, .badge-orange {
                 display: inline-block;
                 white-space: nowrap;
@@ -645,6 +661,7 @@
                                     <th class="sortable" data-sort="name" tabindex="0">教師姓名 / 帳號<span class="sort-ind">⇅</span></th>
                                     <th class="sortable" data-sort="classCount" tabindex="0">有效班級數<span class="sort-ind">⇅</span></th>
                                     <th class="sortable" data-sort="orphanCount" tabindex="0" title="老師刪除班級後留在雲端的學生資料。屬正常現象，不是故障。">已刪除殘留<span class="sort-ind">⇅</span></th>
+                                    <th class="sortable" data-sort="unbackedCount" tabindex="0" title="名冊上有、雲端卻沒有任何資料的班級。這些班只存在老師那台電腦裡，換電腦或清掉瀏覽器資料就沒了。看「最後同步時間」看不出來——只要同步過一個班就會有時間。">未備份班級<span class="sort-ind">⇅</span></th>
                                     <th class="sortable" data-sort="lastSignIn" tabindex="0" title="Firebase 帳號的最後登入時間。這才是「有沒有在用」的指標——同步要老師主動按，很多人只在本機用。">最後登入<span class="sort-ind">⇅</span></th>
                                     <th class="sortable" data-sort="lastSync" tabindex="0" title="最後一次把資料上傳到雲端的時間。「從未同步」不代表沒在用。">最後同步時間<span class="sort-ind">⇅</span></th>
                                     <th class="sortable" data-sort="device" tabindex="0">同步裝置資訊<span class="sort-ind">⇅</span></th>
@@ -653,7 +670,7 @@
                             </thead>
                             <tbody id="admin-table-body">
                                 <tr class="admin-empty-row">
-                                    <td colspan="7" style="text-align:center;padding:2rem;color:#94a3b8;">
+                                    <td colspan="8" style="text-align:center;padding:2rem;color:#94a3b8;">
                                         <div class="inline-block animate-spin border-2 border-blue-500 border-t-transparent rounded-full w-6 h-6 mr-2 vertical-middle"></div>
                                         正在讀取雲端統計...
                                     </td>
@@ -867,6 +884,7 @@
         name:       { type: 'text', firstDir: 'asc',  get: (r) => (r.name || '') + ' ' + (r.email || '') },
         classCount: { type: 'num',  firstDir: 'desc', get: (r) => r.classCount || 0 },
         orphanCount:{ type: 'num',  firstDir: 'desc', get: (r) => r.orphanCount || 0 },
+        unbackedCount:{ type: 'num', firstDir: 'desc', get: (r) => r.unbackedCount || 0 },
         lastSignIn: { type: 'date', firstDir: 'desc', get: (r) => r.lastSignIn || null },
         lastSync:   { type: 'date', firstDir: 'desc', get: (r) => r.lastSync || null },
         device:     { type: 'text', firstDir: 'asc',  get: (r) => r.device || '' },
@@ -1152,7 +1170,7 @@
         if (filtered.length === 0) {
             tbody.innerHTML = `
                 <tr class="admin-empty-row">
-                    <td colspan="7" style="text-align:center;padding:2rem;color:#94a3b8;">
+                    <td colspan="8" style="text-align:center;padding:2rem;color:#94a3b8;">
                         無符合條件的教師資料
                     </td>
                 </tr>
@@ -1177,6 +1195,14 @@
 班級 ID: ${esc((item.orphans || []).join(', '))}">${item.orphanCount} 筆</span>`
                 : `<span class="badge-neutral" style="opacity:.5;">—</span>`;
 
+            // 未備份班級＝只存在老師電腦裡的班，電腦壞了就沒了 → 用橘色警告，
+            // 這是真的需要提醒老師「請按一鍵同步」的狀況，與中性的「已刪除殘留」不同。
+            const unbackedBadge = item.unbackedCount > 0
+                ? `<span class="badge-warn" title="這些班級在雲端沒有任何資料，只存在老師的電腦裡
+請提醒老師使用「一鍵同步所有班級」
+班級 ID: ${esc((item.unbacked || []).join(', '))}">${item.unbackedCount} 班</span>`
+                : `<span class="badge-neutral" style="opacity:.5;">—</span>`;
+
             // 只有「有孤兒」的老師才出現救援按鈕；用 data-* 帶 uid 給事件委派
             const safeName = esc(item.name || '');
             const safeEmail = esc(item.email || '無電子郵件');
@@ -1197,6 +1223,7 @@
                     </td>
                     <td data-label="有效班級數" style="font-weight: 600;">${item.classCount} 個班級</td>
                     <td data-label="已刪除殘留">${orphanBadge}</td>
+                    <td data-label="未備份班級">${unbackedBadge}</td>
                     <td data-label="最後登入" class="text-xs text-gray-700 dark:text-gray-300" style="font-weight:600;white-space:nowrap;">${loginCell}</td>
                     <td data-label="最後同步時間" class="text-xs text-gray-600 dark:text-gray-400">${lastSyncText}</td>
                     <td data-label="同步裝置資訊" class="text-xs text-gray-500 dark:text-gray-400" title="${safeDeviceTitle}">${safeDevice}</td>
@@ -1440,7 +1467,7 @@
         if (tbody) {
             tbody.innerHTML = `
                 <tr class="admin-empty-row">
-                    <td colspan="7" style="text-align:center;padding:2rem;color:#94a3b8;">
+                    <td colspan="8" style="text-align:center;padding:2rem;color:#94a3b8;">
                         <div class="inline-block animate-spin border-2 border-blue-500 border-t-transparent rounded-full w-6 h-6 mr-2 vertical-middle"></div>
                         正在載入雲端統計中...
                     </td>
@@ -1462,7 +1489,7 @@
             if (tbody) {
                 tbody.innerHTML = `
                     <tr class="admin-empty-row">
-                        <td colspan="7" style="text-align:center;padding:2rem;color:#ef4444;font-weight:600;">
+                        <td colspan="8" style="text-align:center;padding:2rem;color:#ef4444;font-weight:600;">
                             ❌ 載入失敗: ${error.message || '請確認您擁有管理員權限'}
                         </td>
                     </tr>
