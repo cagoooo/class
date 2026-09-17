@@ -28,10 +28,23 @@
 
     const LS_LAST_BACKUP = 'dsg_lastBackupAt';
     const LS_SNOOZE = 'dsg_bannerSnoozeUntil';
-    const PRESSURE_RATIO = 0.7;                 // 已用 / 總配額 達 70%
-    const PRESSURE_BYTES = 50 * 1024 * 1024;    // 或絕對用量達 ~50MB
-    const STALE_DAYS = 7;                       // 超過 7 天沒備份就提醒
-    const SNOOZE_MS = 24 * 60 * 60 * 1000;      // 「今天不再提醒」snooze 1 天
+    /**
+     * v3.28.2：門檻改看 localStorage，而不是 navigator.storage.estimate() 的總用量。
+     *
+     * 舊版的條件是「總用量 ≥ 50MB 或 已用/配額 ≥ 70%」，但 estimate() 算的是
+     * Cache Storage（PWA 預快取本身就好幾 MB）＋ IndexedDB（Firestore 離線快取可以到數十 MB）
+     * ＋ localStorage 的總和，而且瀏覽器回收空間很慢。結果是：王薇婷老師早上才清過一次，
+     * 橫幅馬上又跳出來，而她真正會出事的地方根本不是那 50MB。
+     *
+     * 真正會讓資料寫不進去的是 localStorage 的 5～10MB 上限——超過就丟 QuotaExceededError。
+     * 所以改成直接量 localStorage 的實際用量，接近上限才提醒；estimate() 只留「整個瀏覽器
+     * 幾乎滿了（≥ 90%）」這個極端情況當第二道。
+     */
+    const LS_PRESSURE_BYTES = 3.5 * 1024 * 1024;  // localStorage 已用 ≥ 3.5MB（上限約 5MB）
+    const PRESSURE_RATIO = 0.9;                   // 或整個瀏覽器配額已用 ≥ 90%
+    const STALE_DAYS = 7;                         // 超過 7 天沒備份就提醒
+    const SNOOZE_MS = 24 * 60 * 60 * 1000;        // 「今天不再提醒」snooze 1 天
+    const SNOOZE_LONG_MS = 30 * 24 * 60 * 60 * 1000;  // 「30 天內不再提醒」
 
     // ───────────────── 工具 ─────────────────
     // 直接讀寫（繞過 class-aware-storage 的班級路由攔截，避免讀到錯班別資料）
@@ -214,9 +227,16 @@
         .dsg-btn-danger:hover:not(:disabled){background:#b91c1c}
         .dsg-btn-danger:disabled{opacity:.45;cursor:not-allowed}
 
-        .dsg-banner{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem;justify-content:space-between;
-            border-radius:14px;padding:.9rem 1.1rem;margin-bottom:1rem;box-shadow:0 6px 18px rgba(0,0,0,.08);
+        /* v3.28.2：改成右下角浮動卡片。舊版是插進 students-section 上方，
+           出現當下整頁往下推 55px，老師正要按的按鈕就跑掉了（實測回報「出現之後變不能按」）。
+           固定定位不影響版面，不會再有位移。 */
+        /* bottom 留 5.25rem：右下角已經有「一鍵更新」與同步狀態兩顆浮動鈕（z-index 9998/9999），
+           貼齊 1rem 會疊在它們上面擋住點擊。 */
+        .dsg-banner{position:fixed;right:1rem;bottom:5.25rem;left:auto;z-index:1200;max-width:min(440px,calc(100vw - 2rem));
+            display:flex;flex-wrap:wrap;align-items:center;gap:.75rem;justify-content:space-between;
+            border-radius:14px;padding:.9rem 1.1rem;box-shadow:0 10px 30px rgba(0,0,0,.18);
             animation:dsgFade .25s ease}
+        @media (max-width:640px){.dsg-banner{left:1rem;right:1rem;max-width:none;bottom:5rem}}
         .dsg-banner.is-pressure{background:linear-gradient(135deg,#fff1f2,#fef3c7);border:2px solid #fca5a5}
         .dsg-banner.is-stale{background:linear-gradient(135deg,#eff6ff,#f0f9ff);border:2px solid #bfdbfe}
         .dsg-bn-text{flex:1 1 260px;font-size:.92rem;font-weight:700;color:#7f1d1d;line-height:1.5}
@@ -311,9 +331,10 @@
         const bar = document.createElement('div');
         bar.id = 'dsg-banner';
         bar.className = 'dsg-banner ' + (state.pressure ? 'is-pressure' : 'is-stale');
-        const usageTxt = state.est && state.est.usage ? '（目前已用約 ' + fmtBytes(state.est.usage) + '）' : '';
+        // 顯示 localStorage 的實際用量（真正會滿的那一個），而不是整個瀏覽器的總用量
+        const usageTxt = state.est && state.est.lsBytes ? '（本機資料已用約 ' + fmtBytes(state.est.lsBytes) + '）' : '';
         const headline = state.pressure
-            ? '⚠️ 瀏覽器儲存空間偏高' + usageTxt + '，清除前請務必先下載備份！'
+            ? '⚠️ 本機儲存空間快滿了' + usageTxt + '，資料可能存不進去，請先下載備份或登入雲端同步！'
             : !lastBackupAt() ? '📥 目前尚無備份紀錄，建議先下載第一份備份，保護班級資料。'
             : '📅 你已經超過 ' + STALE_DAYS + ' 天沒備份了，建議現在下載一份，以免資料意外消失。';
         const cloudBtn = isLoggedInToCloud() ? '' : '<button class="dsg-bn-btn dsg-bn-cloud" data-act="cloud">☁️ 登入雲端同步</button>';
@@ -325,6 +346,7 @@
                 <button class="dsg-bn-btn dsg-bn-backup" data-act="backup">📥 立即下載備份</button>
                 ${cloudBtn}
                 <button class="dsg-bn-btn dsg-bn-dismiss" data-act="dismiss">今天不再提醒</button>
+                <button class="dsg-bn-btn dsg-bn-dismiss" data-act="dismiss-long" title="30 天內不再顯示這個提醒">30 天內不用提醒我</button>
             </div>`;
         const host = bannerHost();
         host.insertBefore(bar, host.firstChild);
@@ -342,6 +364,11 @@
             rawSet(LS_SNOOZE, String(Date.now() + SNOOZE_MS));
             bar.remove();
         });
+        // 老師反映「一直跳出來、清過了還跳」，給一個真的能安靜一陣子的選項
+        bar.querySelector('[data-act="dismiss-long"]').addEventListener('click', () => {
+            rawSet(LS_SNOOZE, String(Date.now() + SNOOZE_LONG_MS));
+            bar.remove();
+        });
     }
 
     function checkStorage(force) {
@@ -352,7 +379,10 @@
         }
         estimateUsage().then(est => {
             const ratio = est.quota ? est.usage / est.quota : 0;
-            const pressure = est.usage >= PRESSURE_BYTES || ratio >= PRESSURE_RATIO;
+            // localStorage 才是加扣分寫不進去的主因；estimate() 的總用量只當極端情況的第二道
+            const lsBytes = localStorageBytes();
+            const pressure = lsBytes >= LS_PRESSURE_BYTES || ratio >= PRESSURE_RATIO;
+            est.lsBytes = lsBytes;
             const stale = daysSince(lastBackupAt()) >= STALE_DAYS;
             if (pressure || stale) showBanner({ pressure, stale, est });
             else document.getElementById('dsg-banner')?.remove();
