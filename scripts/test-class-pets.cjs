@@ -157,5 +157,22 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
         assert.equal(JSON.parse(storage.getItem('petSettings')).products[0].cost,3);assert.equal(storage.data.has('petSettings'),false);
         storage.setItem('currentClassId','C');assert.equal(storage.getItem('petSettings'),null);assert.equal(await pet.refund(ctx.pointsHistory[0].id),false);
     });
+    await test('12 種寵物與三種樣態只改造型，帳本與成長金幣不變',async()=>{
+        const {pet,ctx,storage}=setup('B');await pet.setCoinsEnabled(true);await pet.award([1],15,'努力');const before=JSON.stringify([ctx.groups,ctx.pointsHistory]);
+        for(const kind of ['cat','dog','rabbit','panda','fox','bear','penguin','owl','turtle','dragon','capybara','axolotl'])for(const mood of ['normal','happy','sleepy']) {
+            assert.equal(await pet.setPetLook(1,kind,mood),true);assert.equal(ctx.students[0].classPet,kind);assert.equal(ctx.students[0].classPetMood,mood);
+            assert.equal(pet.xpFor(1),15);assert.equal(pet.coinsFor(1),15);assert.equal(ctx.students[0].points,20);assert.equal(JSON.stringify([ctx.groups,ctx.pointsHistory]),before);
+        }
+        const saved=JSON.parse(storage.getItem(ctx.STUDENTS_KEY))[0];assert.equal(saved.classPet,'axolotl');assert.equal(saved.classPetMood,'sleepy');
+        for(const kind of ['missing','__proto__','../../evil'])assert.equal(await pet.setPetLook(1,kind),false);
+        assert.equal(await pet.setPetLook(1,'fox','missing'),false);assert.equal(await pet.setPetLook(999,'fox'),false);
+    });
+    await test('渲染路徑白名單與成長門檻，蛋不受表情影響',async()=>{
+        const {pet}=setup();assert.equal(pet.assetName('fox',0,'happy'),'fox-egg-normal.webp');assert.equal(pet.assetName('fox',10,'happy'),'fox-baby-happy.webp');assert.equal(pet.assetName('owl',50,'sleepy'),'owl-junior-sleepy.webp');assert.equal(pet.assetName('dragon',90),'dragon-grown-normal.webp');
+        assert.equal(pet.assetName('../bad',90,'bad'),'cat-grown-normal.webp');assert.equal(pet.assetName('__proto__',90),'cat-grown-normal.webp');
+    });
+    await test('更換寵物存檔失敗不破壞原造型',async()=>{
+        const {pet,ctx,storage}=setup();await pet.setPetLook(1,'panda');storage.failKey='students';assert.equal(await pet.setPetLook(1,'fox','happy'),false);assert.equal(ctx.students[0].classPet,'panda');assert.equal(ctx.students[0].classPetMood,'normal');
+    });
     console.log(`${passed} checks passed`);
 })().catch(e=>{console.error(e);process.exitCode=1;});

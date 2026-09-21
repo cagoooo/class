@@ -11,3 +11,11 @@ Thumbs.db
 
 # Claude Code 本地開發設定（不入庫）
 .claude/
+
+# Reproducible intermediate Blender renders and machine-local MCP logs
+art/pets/renders/
+art/pets/*.log
+art/pets/*.err
+art/pets/render-one.py
+art/pets/fox-preview.png
+art/pets/source/*.blend1

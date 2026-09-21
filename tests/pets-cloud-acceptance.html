@@ -12,7 +12,7 @@ window.STUDENTS_KEY='students-'+testClass;window.GROUPS_KEY='groups-'+testClass;
 window.students=[];window.groups=[];window.pointsHistory=[];window.homeworkChecks={};window.notebookEntries=[];window.homeworkList=[];window.lotteryHistory=[];
 window.NotificationSystem={success(){},error(m){document.getElementById('result').textContent=m},warning(){}};
 </script>
-<script src="../js/class-aware-storage.js?v=3.32.1"></script><script src="../js/firebase-config.js?v=3.32.1"></script><script>FirebaseConfig.signIn=()=>new Promise(resolve=>FirebaseConfig.onAuthStateChanged(()=>{if(!FirebaseConfig.isGoogleUser())document.getElementById('account').textContent='請先在正式網站登入 Google，再重新整理本頁。';resolve(FirebaseConfig.getCurrentUserId());}));</script><script src="../js/firebase-sync.js?v=3.32.1"></script><script src="../js/class-pets.js?v=3.32.1"></script>
+<script src="../js/class-aware-storage.js?v=3.33.0"></script><script src="../js/firebase-config.js?v=3.33.0"></script><script>FirebaseConfig.signIn=()=>new Promise(resolve=>FirebaseConfig.onAuthStateChanged(()=>{if(!FirebaseConfig.isGoogleUser())document.getElementById('account').textContent='請先在正式網站登入 Google，再重新整理本頁。';resolve(FirebaseConfig.getCurrentUserId());}));</script><script src="../js/firebase-sync.js?v=3.33.0"></script><script src="../js/class-pets.js?v=3.33.0"></script>
 <script>
 // 使用正式同步 helper；不呼叫全班同步或名冊寫入。
 const ready=setInterval(()=>{if(!FirebaseConfig.isConnected()||!FirebaseConfig.isGoogleUser())return;clearInterval(ready);document.getElementById('account').textContent='已登入；僅測試虛構資料';document.getElementById('run').disabled=false;},500);
@@ -23,12 +23,12 @@ document.getElementById('run').onclick=async()=>{
  check(localStorage.getItem('currentClassId')===testClass && testClass.startsWith('pet-qa-'),'測試路徑不符');
  window.students=[{id:1,name:'虛構驗收學生',number:1,points:0,classPet:'panda'}];window.groups=[];window.pointsHistory=[];
  localStorage.setItem(STUDENTS_KEY,JSON.stringify(students));localStorage.setItem(GROUPS_KEY,'[]');localStorage.setItem(POINTS_HISTORY_KEY,'[]');localStorage.setItem('petSettings',JSON.stringify({enabled:true,coinsEnabled:true,rules:[{id:'qa-rule',name:'驗收任務',points:10,xp:10,coins:7}]}));
- ClassPets.prepare();check(await ClassPets.award([1],10,'驗收任務',10,undefined,7),'本機發放失敗');
+ ClassPets.prepare();check(await ClassPets.setPetLook(1,'axolotl','happy'),'造型儲存失敗');check(await ClassPets.award([1],10,'驗收任務',10,undefined,7),'本機發放失敗');
  const results=await Promise.all([uploadCollection('students',students),uploadCollection('pointsHistory',pointsHistory),uploadSingleDoc('appSettings','pets',{data:ClassPets.settings()})]);check(results.every(Boolean),'雲端寫入失敗');
- const server=await getUserCollection('students').doc('1').get({source:'server'});check(server.exists&&server.data().classPet==='panda'&&server.data().points===10,'伺服器讀回不符');
+ const server=await getUserCollection('students').doc('1').get({source:'server'});check(server.exists&&server.data().classPet==='axolotl'&&server.data().classPetMood==='happy'&&server.data().points===10,'伺服器讀回不符');
  const restored={students:await downloadCollection('students'),pointsHistory:await downloadCollection('pointsHistory'),groups:[],petSettings:(await downloadSingleDoc('appSettings','pets')).data,notebookEntries:[],homeworkList:[],lotteryHistory:[],homeworkChecks:{}};
  window.students=[];window.pointsHistory=[];check(await loadFromCloudData(restored),'正式還原函式失敗');
- check(students[0].classPet==='panda'&&ClassPets.xpFor(1)===10&&ClassPets.coinsFor(1)===7&&ClassPets.settings().coinsEnabled&&ClassPets.settings().rules[0].coins===7&&ClassPets.settings().rules[0].name==='驗收任務','還原後寵物或規則不符');
+ check(students[0].classPet==='axolotl'&&students[0].classPetMood==='happy'&&ClassPets.xpFor(1)===10&&ClassPets.coinsFor(1)===7&&ClassPets.settings().coinsEnabled&&ClassPets.settings().rules[0].coins===7&&ClassPets.settings().rules[0].name==='驗收任務','還原後寵物或規則不符');
  let otherOwnerDenied=false;try{await FirebaseConfig.getDb().collection('users').doc('pet-qa-non-owner').collection('classes').doc(testClass).collection('pointsHistory').get({source:'server'});}catch(e){otherOwnerDenied=e.code==='permission-denied';}check(otherOwnerDenied,'其他帳號路徑未被權限阻擋');
  const ownerPath=getUserCollection('pointsHistory').path;check(ownerPath==='users/'+FirebaseConfig.getCurrentUserId()+'/classes/'+testClass+'/pointsHistory','雲端帳號或班級路徑不符');
  ClassPets.prepare();check(await ClassPets.saveProduct({name:'虛構兌換商品',cost:3}),'商品儲存失敗');const product=ClassPets.settings().products[0];check(await ClassPets.redeem(1,product.id,3),'兌換失敗');const purchase=pointsHistory[0].id;
@@ -38,7 +38,7 @@ document.getElementById('run').onclick=async()=>{
  ClassPets.prepare();check(await ClassPets.refund(purchase),'退幣失敗');check(await uploadCollection('pointsHistory',pointsHistory),'退幣上傳失敗');const refunded=await downloadCollection('pointsHistory');check(ClassPets.coinsFor(1,refunded)===7&&refunded.filter(r=>r.petReverses===purchase).length===1,'退幣讀回錯誤');
  const firstKey=localStorage.getItem('currentClassId');localStorage.setItem('currentClassId',testClass+'-other');check(localStorage.getItem('petSettings')===null,'另一班讀到設定');const other=await downloadCollection('pointsHistory');check(other.length===0,'另一班讀到紀錄');localStorage.setItem('currentClassId',firstKey);
  ClassPets.prepare();check(await ClassPets.undo([pointsHistory.find(r=>r.petEvent&&!r.petShopType&&!r.petReverses).id]),'撤銷失敗');check((await Promise.all([uploadCollection('pointsHistory',pointsHistory),uploadCollection('students',students)])).every(Boolean),'撤銷上傳失敗');const after=await downloadCollection('pointsHistory');check(ClassPets.xpFor(1,after)===0&&ClassPets.coinsFor(1,after)===0&&after.some(r=>r.petReverses),'雲端撤銷紀錄不符');
- out.textContent='通過：登入老師帳號路徑與跨帳號讀取拒絕確認、商品／兌換／退幣伺服器讀回、寵物、成長與獨立金幣還原、自訂規則金額還原、另一班設定與紀錄隔離、撤銷紀錄雲端讀回。\n測試班 ID：'+testClass+'\n虛構學生：1 人；保留 4 筆獎勵／兌換／退幣／撤銷紀錄。正式班級未改動。';
+ out.textContent='通過：登入老師帳號路徑與跨帳號讀取拒絕確認、商品／兌換／退幣伺服器讀回、新寵物與表情樣態、成長與獨立金幣還原、自訂規則金額還原、另一班設定與紀錄隔離、撤銷紀錄雲端讀回。\n測試班 ID：'+testClass+'\n虛構學生：1 人；保留 4 筆獎勵／兌換／退幣／撤銷紀錄。正式班級未改動。';
  }catch(e){out.textContent='未通過：'+e.message+'\n測試班 ID：'+testClass;}finally{button.disabled=false;}
 };
 </script></html>
