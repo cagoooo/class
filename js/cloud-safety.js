@@ -17,6 +17,7 @@
     };
     const sameAccount = c => { if (window.FirebaseConfig.getCurrentUserId() !== c.uid) throw Error('登入帳號已改變，已停止同步'); };
     const root = c => c.id === 'default' ? c.db.collection('users').doc(c.uid) : c.db.collection('users').doc(c.uid).collection('classes').doc(c.id);
+    const doc = (c, path) => { const [collection, id] = path.split('/'); return root(c).collection(collection).doc(id); };
     const baseKey = c => `cloudSafetyBase:${c.uid}:${c.id}`;
     const recoveryKey = c => `${c.uid || 'local'}:${c.id}`;
     const fingerprint = values => BackupIntegrity.checksum(JSON.stringify(Object.keys(values).sort().map(k => [k, values[k]])));
@@ -55,24 +56,24 @@
         }));
         const settings = { 'appSettings/pets': 'petSettings', 'appSettings/seating': 'seatingConfig', 'examData/subjects': 'examSubjects', 'examData/reminders': 'examReminders', 'examData/attendance': 'examAttendance', 'examData/absenceRecords': 'examAbsenceRecords', 'examData/dayPresets': 'examDayPresets' };
         await Promise.all(Object.entries(settings).map(async ([path, key]) => {
-            const doc = await root(c).doc(path).get({ source: 'server' });
-            if (doc.exists && doc.data().data != null) { values[key] = JSON.stringify(doc.data().data); hasData = true; }
+            const setting = await doc(c, path).get({ source: 'server' });
+            if (setting.exists && setting.data().data != null) { values[key] = JSON.stringify(setting.data().data); hasData = true; }
         }));
         const checks = await root(c).collection('homeworkChecks').get({ source: 'server' });
-        const lottery = await root(c).doc('appSettings/lottery').get({ source: 'server' });
+        const lottery = await doc(c, 'appSettings/lottery').get({ source: 'server' });
         if (!checks.empty) { values.homeworkChecks = JSON.stringify(Object.fromEntries(checks.docs.map(d => [d.id, d.data().checks || {}]))); hasData = true; }
         if (lottery.exists) {
             if (lottery.data().drawnStudentIds) values.drawnStudentIds = JSON.stringify(lottery.data().drawnStudentIds);
             if (lottery.data().noRepeatLottery != null) values.noRepeatLottery = String(lottery.data().noRepeatLottery);
         }
-        const [clock, prefs] = await Promise.all(['clock', 'uiPrefs'].map(k => root(c).doc('appSettings/' + k).get({ source: 'server' })));
+        const [clock, prefs] = await Promise.all(['clock', 'uiPrefs'].map(k => doc(c, 'appSettings/' + k).get({ source: 'server' })));
         if (clock.exists) { const { updatedAt, ...settings } = clock.data(); values.clockSettings = JSON.stringify(settings); }
         if (prefs.exists) for (const k of globalKeys.filter(k => !['clockSettings','noRepeatLottery'].includes(k))) if (prefs.data()[k] != null) values[k] = String(prefs.data()[k]);
         return { values, token: `legacy:${fingerprint(values)}`, empty: !hasData };
     }
     async function read(id = current()) {
         if (navigator.onLine === false) throw Error('目前離線，請恢復連線後再讀取雲端');
-        const c = context(id), ref = root(c).doc('appSettings/syncRevision');
+        const c = context(id), ref = doc(c, 'appSettings/syncRevision');
         const snap = await ref.get({ source: 'server' });
         if (!snap.exists) {
             const old = await legacy(c);
@@ -109,7 +110,7 @@
             await batch.commit();
         }
         sameAccount(c);
-        const ref = root(c).doc('appSettings/syncRevision');
+        const ref = doc(c, 'appSettings/syncRevision');
         await c.db.runTransaction(async tx => {
             const latest = await tx.get(ref);
             if ((latest.exists ? latest.data().token : remote.token) !== remote.token) throw conflict();

@@ -1,7 +1,7 @@
 const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict'),{webcrypto}=require('crypto');
 class FakeDb {
  constructor(){this.data=new Map();this.failStage=false;this.failHead=false;this.tail=Promise.resolve();this.afterStage=null;}
- ref(path){const db=this;return {path,doc:k=>db.ref(path+'/'+k),collection:k=>db.ref(path+'/'+k),async get(){if(db.offline)throw Error('network');const value=db.data.get(path);return {id:path.split('/').at(-1),exists:value!==undefined,data:()=>structuredClone(value)};}};}
+ ref(path){const db=this;return {path,doc:k=>{if(path.split('/').length%2===0)throw Error('DocumentReference has no doc method');return db.ref(path+'/'+k)},collection:k=>db.ref(path+'/'+k),async get(){if(db.offline)throw Error('network');const value=db.data.get(path);return {id:path.split('/').at(-1),exists:value!==undefined,data:()=>structuredClone(value)};}};}
  collection(path){const db=this;const ref=db.ref(path);ref.doc=id=>db.ref(path+'/'+id);return ref;}
  batch(){const ops=[];return{set:(r,d)=>ops.push([r.path,d]),commit:async()=>{if(this.failStage)throw Error('stage failed');for(const[p,d]of ops)this.data.set(p,structuredClone(d));if(this.afterStage){const f=this.afterStage;this.afterStage=null;f();}}};}
  async runTransaction(fn){const previous=this.tail;let unlock;this.tail=new Promise(r=>unlock=r);await previous;try{if(this.failHead)throw Error('transaction failed');const ops=[];const result=await fn({get:r=>r.get(),set:(r,d)=>ops.push([r.path,d])});for(const[p,d]of ops)this.data.set(p,structuredClone(d));return result;}finally{unlock();}}
