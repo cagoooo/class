@@ -291,7 +291,8 @@
         const name = el('input'); name.required = true; name.maxLength = 40; name.value = productDraft.name; name.placeholder = '例如：優先選座位'; name.setAttribute('aria-label', '商品名稱'); name.dataset.petFocus = 'product-name'; name.addEventListener('input', () => productDraft.name = name.value);
         const cost = el('input'); cost.type = 'number'; cost.required = true; cost.min = 1; cost.max = 10000; cost.step = 1; cost.value = productDraft.cost; cost.setAttribute('aria-label', '商品價格（金幣）'); cost.addEventListener('input', () => productDraft.cost = cost.value);
         const submit = el('button', editingProduct ? '儲存商品' : '新增商品', 'pet-primary'); submit.type = 'submit';
-        form.append(name, cost, submit);
+        const nameLabel = el('label', '商品名稱'), costLabel = el('label', '價格（金幣）'); nameLabel.append(name); costLabel.append(cost);
+        form.append(nameLabel, costLabel, submit);
         if (editingProduct) form.append(button('取消商品編輯', () => { editingProduct = null; productDraft = { name: '', cost: '10' }; render(); }));
         form.addEventListener('submit', async e => { e.preventDefault(); if (await saveProduct({ name: name.value, cost: cost.value }, editingProduct)) { editingProduct = null; productDraft = { name: '', cost: '10' }; render(); window.NotificationSystem?.success?.('商品已存本機'); } });
         manage.append(form);
@@ -410,7 +411,7 @@
             give.disabled = false;
         }, 'pet-primary');
         give.dataset.petFocus = 'award';
-        function updateCount() { const shown = visibleStudents().filter(s => selected.has(String(s.id))).length; count.textContent = `已選 ${selected.size} 人${selected.size > shown ? `（篩選外 ${selected.size - shown} 人）` : ''}`; give.disabled = !selected.size || busy; }
+        function updateCount() { bar.classList.toggle('pet-award-active', selected.size > 0); const shown = visibleStudents().filter(s => selected.has(String(s.id))).length; count.textContent = `已選 ${selected.size} 人${selected.size > shown ? `（篩選外 ${selected.size - shown} 人）` : ''}`; give.disabled = !selected.size || busy; }
         bar.append(count, ruleSelect, give); root.append(bar); renderCards(); updateCount();
         const rules = el('details'); rules.dataset.petKey = 'rules'; rules.append(el('summary', '⚙️ 自訂獎勵規則與設定'));
         rules.append(el('p', '規則修改只影響之後的發放；已發放的分數、成長值與金幣不會改動。'));
