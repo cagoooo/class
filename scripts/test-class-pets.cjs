@@ -124,5 +124,38 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
         const history=JSON.parse(storage.getItem(ctx.POINTS_HISTORY_KEY));assert.equal(pet.coinsFor(1,[...history,...history]),17);assert.equal(storage.data.has('petSettings'),false);
         await pet.undo([ctx.pointsHistory[0].id]);assert.equal(pet.coinsFor(1),12);assert.equal(pet.xpFor(1),0);
     });
+    await test('商店只扣金幣，退回成交價一次，商品改價下架不改舊帳',async()=>{
+        const {pet,ctx}=setup(); await pet.setCoinsEnabled(true);await pet.award([1],20,'努力');
+        await pet.saveProduct({name:'優先選座位',cost:7});const product=pet.settings().products[0];
+        assert.equal(await pet.redeem(1,product.id,7,'shop-1'),true);const id=ctx.pointsHistory[0].id;
+        assert.equal(pet.coinsFor(1),13);assert.equal(pet.xpFor(1),20);assert.equal(ctx.students[0].points,25);
+        assert.equal(await pet.redeem(1,product.id,7,'shop-1'),false);
+        await pet.saveProduct({name:'改名商品',cost:9},product.id);await pet.setProductActive(product.id,false);
+        assert.equal(await pet.redeem(1,product.id,9),false);assert.equal(await pet.refund(id),true);
+        assert.equal(pet.coinsFor(1),20);assert.equal(ctx.pointsHistory[0].productName,'優先選座位');assert.equal(await pet.refund(id),false);
+        assert.equal(await pet.refund(ctx.pointsHistory[0].id),false);assert.equal(pet.xpFor(1),20);
+    });
+    await test('阻止餘額不足、失效價格、外班學生與已花費金幣的獎勵撤銷',async()=>{
+        const {pet,ctx}=setup();await pet.setCoinsEnabled(true);await pet.award([1],10,'努力');const award=ctx.pointsHistory[0].id;
+        await pet.saveProduct({name:'獎勵',cost:7});const p=pet.settings().products[0];
+        for(const args of [[2,p.id,7],[999,p.id,7],[1,p.id,6],[1,'missing',7]])assert.equal(await pet.redeem(...args),false);
+        await pet.redeem(1,p.id,7);const purchase=ctx.pointsHistory[0].id;
+        assert.equal(await pet.undo([purchase]),false);assert.equal(await pet.undo([award]),false);assert.equal(pet.coinsFor(1),3);
+        assert.equal(await pet.redeem(1,p.id,7),false);await pet.refund(purchase);assert.equal(await pet.undo([award]),true);assert.equal(pet.coinsFor(1),0);
+    });
+    for(const key of ['students','groups','pointsHistory']) await test('兌換與退幣 '+key+' 存檔失敗完整回復',async()=>{
+        const {pet,ctx,storage}=setup();await pet.setCoinsEnabled(true);await pet.award([1],20,'努力');await pet.saveProduct({name:'獎勵',cost:5});const p=pet.settings().products[0];
+        const before=JSON.stringify(ctx.pointsHistory);storage.failKey=key;assert.equal(await pet.redeem(1,p.id,5),false);assert.equal(JSON.stringify(ctx.pointsHistory),before);assert.equal(pet.coinsFor(1),20);
+        await pet.redeem(1,p.id,5);const id=ctx.pointsHistory[0].id;storage.failKey=key;assert.equal(await pet.refund(id),false);assert.equal(pet.coinsFor(1),15);assert.equal(await pet.refund(id),true);assert.equal(pet.coinsFor(1),20);
+    });
+    await test('商品驗證、暫停累積後可兌換、設定與帳本備份保留',async()=>{
+        const {pet,ctx,storage}=setup('B');await pet.setCoinsEnabled(true);await pet.award([1],10,'努力');await pet.setCoinsEnabled(false);
+        for(const cost of [0,-1,1.5,10001,NaN])assert.equal(await pet.saveProduct({name:'商品',cost}),false);
+        storage.failKey='petSettings-B';assert.equal(await pet.saveProduct({name:'失敗商品',cost:3}),false);
+        await pet.saveProduct({name:'獎勵',cost:3});const p=pet.settings().products[0];await pet.redeem(1,p.id,3);
+        assert.equal(pet.coinsFor(1),7);const backup=JSON.parse(storage.getItem(ctx.POINTS_HISTORY_KEY));assert.equal(pet.coinsFor(1,backup),7);
+        assert.equal(JSON.parse(storage.getItem('petSettings')).products[0].cost,3);assert.equal(storage.data.has('petSettings'),false);
+        storage.setItem('currentClassId','C');assert.equal(storage.getItem('petSettings'),null);assert.equal(await pet.refund(ctx.pointsHistory[0].id),false);
+    });
     console.log(`${passed} checks passed`);
 })().catch(e=>{console.error(e);process.exitCode=1;});

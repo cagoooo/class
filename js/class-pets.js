@@ -19,6 +19,8 @@
     let query = '';
     let selectedRule = '';
     let editingRuleId = null;
+    let shopStudent = '', shopProduct = '', editingProduct = null, shopPage = 0;
+    let productDraft = { name: '', cost: '10' };
     const blankRule = () => ({ name: '', points: '2', xp: '2', coins: '2' });
     let ruleDraft = blankRule();
     let onlySelected = false;
@@ -162,6 +164,10 @@
         return change(() => {
             const hh = clone(window.pointsHistory), ss = clone(window.students), gg = clone(window.groups);
             const originals = hh.filter(r => ids.includes(r.id) && r.petEvent && !r.petReverses);
+            if (originals.some(r => r.petShopType)) return fail('商店兌換請使用退幣功能。');
+            const deductions = new Map();
+            originals.forEach(r => deductions.set(String(r.studentId), (deductions.get(String(r.studentId)) || 0) + (r.coinDelta || 0)));
+            if ([...deductions].some(([id, amount]) => coinsFor(id) < amount)) return fail('金幣已用於兌換，請先退回相關兌換，再撤銷獎勵。');
             if (!originals.length || originals.some(r => hh.some(x => x.petReverses === r.id))) return fail('這筆獎勵已撤銷，請重新查看紀錄。');
             if (originals.some(r => !ss.some(s => String(s.id) === String(r.studentId)))) return fail('學生已不在目前名單，無法撤銷；原紀錄仍保留。');
             const reset = Math.max(0, ...hh.filter(r => r.type === 'reset').map(r => Number(r.createdAtMs || r.id) || 0));
@@ -220,6 +226,98 @@
         const rule = { id: id || uid(), name, points, xp, coins };
         return saveSettings({ ...config, rules: id ? config.rules.map(r => r.id === id ? rule : r) : [...config.rules, rule] });
     }
+    function saveProduct(values, id = null) {
+        const name = String(values.name || '').trim(), cost = Number(values.cost);
+        if (!name || name.length > 40 || !Number.isSafeInteger(cost) || cost < 1 || cost > 10000) return Promise.resolve(fail('商品名稱限 40 字，價格請填 1～10000 的整數。'));
+        const config = settings(), products = config.products || [];
+        if (id && !products.some(p => p.id === id)) return Promise.resolve(fail('商品已不存在，請重新整理。'));
+        const product = { id: id || uid(), name, cost, active: products.find(p => p.id === id)?.active ?? true };
+        return saveSettings({ ...config, products: id ? products.map(p => p.id === id ? product : p) : [...products, product] });
+    }
+    function setProductActive(id, active) {
+        const config = settings();
+        return saveSettings({ ...config, products: (config.products || []).map(p => p.id === id ? { ...p, active: !!active } : p) });
+    }
+    async function redeem(studentId, productId, expectedCost, requestId = uid()) {
+        return change(() => {
+            if (window.pointsHistory.some(r => r.petShopRequest === requestId)) return false;
+            const student = window.students.find(s => String(s.id) === String(studentId));
+            const product = (settings().products || []).find(p => p.id === productId && p.active);
+            if (!student || !product) return fail('請選擇目前班級的學生與上架商品。');
+            if (!Number.isSafeInteger(product.cost) || product.cost < 1 || product.cost !== expectedCost) return fail('商品價格已變更，請重新確認。');
+            if (coinsFor(student.id) < product.cost) return fail('金幣不足，尚未兌換或扣款。');
+            const now = new Date();
+            const record = { id: uid(), studentId: student.id, studentName: student.name, points: 0, petXp: 0, petEvent: true,
+                coinDelta: -product.cost, petShopType: 'redeem', petShopRequest: requestId, productId, productName: product.name, productCost: product.cost,
+                reason: '兌換：' + product.name, createdAtMs: now.getTime(), date: now.toLocaleDateString('zh-TW'), timestamp: now.toLocaleString('zh-TW', { hour12: false }) };
+            return commit(window.students, window.groups, [record, ...window.pointsHistory]);
+        });
+    }
+    async function refund(id) {
+        return change(() => {
+            const record = window.pointsHistory.find(r => r.id === id && r.petShopType === 'redeem');
+            if (!record || window.pointsHistory.some(r => r.petReverses === id)) return fail('這筆兌換不存在或已退幣。');
+            if (!window.students.some(s => String(s.id) === String(record.studentId))) return fail('學生已不在本班，請先還原學生名單再退幣。');
+            if (!Number.isSafeInteger(record.productCost) || record.productCost < 1 || record.coinDelta !== -record.productCost) return fail('原始兌換金額不符，無法退幣。');
+            const now = new Date();
+            const reversal = { ...record, id: uid(), coinDelta: record.productCost, petShopType: 'refund', petReverses: id,
+                petShopRequest: uid(), reason: '退幣：' + record.productName, createdAtMs: now.getTime(), date: now.toLocaleDateString('zh-TW'), timestamp: now.toLocaleString('zh-TW', { hour12: false }) };
+            return commit(window.students, window.groups, [reversal, ...window.pointsHistory]);
+        });
+    }
+    function renderShop(root, config) {
+        const shop = el('details', undefined, 'pet-shop'); shop.dataset.petKey = 'shop'; shop.append(el('summary', '🛍️ 兌換商店與退幣'));
+        shop.append(el('p', '老師代為兌換，每次一位學生、一件商品。只扣金幣，不扣分數或成長值。獎勵由老師安排交付；退幣會保留原始紀錄。'));
+        const account = window.FirebaseConfig?.getCurrentProfile?.();
+        shop.append(el('p', window.FirebaseConfig?.isGoogleUser?.() ? `雲端歸屬：${account?.email || account?.displayName || '目前登入的 Google 帳號'}。商品與紀錄沿用本班雲端同步，換裝置前請確認同步成功。` : '目前先存本機。登入老師自己的 Google 帳號後，商品與紀錄會隨本班資料同步。', 'pet-shop-sync'));
+        const students = el('select'); students.setAttribute('aria-label', '兌換學生'); students.add(new Option('請選擇學生…', ''));
+        window.students.forEach(s => students.add(new Option(`${s.number || ''} ${s.name} · 金幣 ${coinsFor(s.id)}`, String(s.id)))); students.value = shopStudent;
+        students.addEventListener('change', () => { shopStudent = students.value; shopPage = 0; render(); });
+        const products = el('select'); products.setAttribute('aria-label', '兌換商品'); products.add(new Option('請選擇商品…', ''));
+        (config.products || []).filter(p => p.active).forEach(p => products.add(new Option(`${p.name} · ${p.cost} 金幣`, p.id))); products.value = shopProduct;
+        products.addEventListener('change', () => { shopProduct = products.value; render(); });
+        const product = (config.products || []).find(p => p.id === shopProduct && p.active);
+        const student = window.students.find(s => String(s.id) === shopStudent);
+        const balance = student ? coinsFor(student.id) : 0;
+        const preview = el('p', !student ? '先選學生，即可查看金幣餘額與兌換紀錄。' : !product ? `可用金幣 ${balance}，請選擇商品。` : balance < product.cost ? `可用金幣 ${balance}，還差 ${product.cost - balance} 金幣。` : `可用金幣 ${balance} → 兌換後 ${balance - product.cost}`);
+        const buy = button('確認兌換', async () => {
+            if (!student || !product || !await confirmAction(`${student.name} 兌換「${product.name}」？\n扣除 ${product.cost} 金幣，餘額 ${balance - product.cost}。分數與成長值不變。`)) return;
+            if (await redeem(student.id, product.id, product.cost)) window.NotificationSystem?.success?.('兌換已存本機');
+        }, 'pet-primary'); buy.disabled = !student || !product || balance < product.cost || busy;
+        const controls = el('div', undefined, 'pet-shop-controls'); controls.append(students, products, preview, buy); shop.append(controls);
+        const manage = el('details'); manage.dataset.petKey = 'products'; manage.append(el('summary', '管理商品（新增／改價／上下架）'));
+        const form = el('form', undefined, 'pet-product-editor');
+        form.append(el('strong', editingProduct ? '編輯商品' : '新增商品'));
+        const name = el('input'); name.required = true; name.maxLength = 40; name.value = productDraft.name; name.placeholder = '例如：優先選座位'; name.setAttribute('aria-label', '商品名稱'); name.dataset.petFocus = 'product-name'; name.addEventListener('input', () => productDraft.name = name.value);
+        const cost = el('input'); cost.type = 'number'; cost.required = true; cost.min = 1; cost.max = 10000; cost.step = 1; cost.value = productDraft.cost; cost.setAttribute('aria-label', '商品價格（金幣）'); cost.addEventListener('input', () => productDraft.cost = cost.value);
+        const submit = el('button', editingProduct ? '儲存商品' : '新增商品', 'pet-primary'); submit.type = 'submit';
+        form.append(name, cost, submit);
+        if (editingProduct) form.append(button('取消商品編輯', () => { editingProduct = null; productDraft = { name: '', cost: '10' }; render(); }));
+        form.addEventListener('submit', async e => { e.preventDefault(); if (await saveProduct({ name: name.value, cost: cost.value }, editingProduct)) { editingProduct = null; productDraft = { name: '', cost: '10' }; render(); window.NotificationSystem?.success?.('商品已存本機'); } });
+        manage.append(form);
+        (config.products || []).forEach(p => {
+            const row = el('div', undefined, 'pet-rule');
+            const edit = button('編輯商品', () => { editingProduct = p.id; productDraft = { name: p.name, cost: String(p.cost) }; render(); document.querySelector('[data-pet-focus="product-name"]')?.focus(); }); edit.setAttribute('aria-label', `編輯商品「${p.name}」`);
+            row.append(el('span', `${p.name} · ${p.cost} 金幣 · ${p.active ? '上架中' : '已下架'}`), edit, button(p.active ? '下架' : '重新上架', () => setProductActive(p.id, !p.active))); manage.append(row);
+        });
+        shop.append(manage, el('h3', '兌換與退幣紀錄'));
+        shop.append(el('p', '依上方所選學生篩選，每頁 20 筆。改價或下架不影響歷史成交金額；每筆僅能退幣一次。學期封存後請到封存備份查閱舊紀錄。'));
+        const history = window.pointsHistory.filter(r => r.petShopType && (!shopStudent || String(r.studentId) === shopStudent));
+        history.slice(shopPage * 20, (shopPage + 1) * 20).forEach(r => {
+            const returned = window.pointsHistory.some(x => x.petReverses === r.id);
+            const row = el('div', undefined, 'pet-history');
+            row.append(el('strong', `${r.studentName} · ${r.productName}`), el('span', `${r.petShopType === 'refund' ? '退幣 +' : '兌換 -'}${r.productCost} 金幣`), el('small', r.timestamp));
+            if (r.petShopType === 'redeem' && !returned) row.append(button('退回金幣', async () => { if (await confirmAction(`取消 ${r.studentName} 的「${r.productName}」兌換，退回 ${r.productCost} 金幣？`)) { if (await refund(r.id)) window.NotificationSystem?.success?.('退幣已存本機'); } }));
+            else if (returned) row.append(el('span', '已退幣'));
+            shop.append(row);
+        });
+        if (!history.length) shop.append(el('p', '尚無兌換紀錄。'));
+        const paging = el('div', undefined, 'pet-tools');
+        if (shopPage > 0) paging.append(button('上一頁兌換', () => { shopPage--; render(); }));
+        paging.append(el('span', `第 ${shopPage + 1} / ${Math.max(1, Math.ceil(history.length / 20))} 頁`));
+        if ((shopPage + 1) * 20 < history.length) paging.append(button('下一頁兌換', () => { shopPage++; render(); }));
+        shop.append(paging); root.append(shop);
+    }
     function render() {
         const root = document.getElementById('pets-section'); if (!root) return;
         const scroll = window.scrollY || 0;
@@ -246,11 +344,12 @@
         root.append(guide);
         const wallet = el('div', undefined, 'pet-wallet-status');
         wallet.append(el('strong', config.coinsEnabled ? '🪙 本班金幣累積中' : '🪙 本班金幣尚未啟用／已暫停'));
-        const coinGuide = el('details'); coinGuide.dataset.petKey = 'coins-guide'; coinGuide.append(el('summary', '金幣規則與使用說明'), el('p', '金幣與成長值分開記錄。啟用後，原本正向加分會獲得等量金幣；自訂規則可調整金額。舊分數不換算，一般扣分與分數歸零不扣金幣，撤銷獎勵會扣回該筆金幣。本階段先累積，兌換商店稍後加入。'));
+        const coinGuide = el('details'); coinGuide.dataset.petKey = 'coins-guide'; coinGuide.append(el('summary', '金幣規則與使用說明'), el('p', '金幣與成長值分開記錄。啟用後，原本正向加分會獲得等量金幣；自訂規則可調整金額。舊分數不換算，一般扣分與分數歸零不扣金幣，撤銷獎勵會扣回該筆金幣。可在兌換商店使用金幣；暫停累積後仍可使用餘額。'));
         wallet.append(button(config.coinsEnabled ? '暫停金幣累積' : '啟用本班金幣', async () => {
             if (!await confirmAction(config.coinsEnabled ? '暫停本班金幣累積？現有金幣與紀錄會保留。' : '啟用後才開始累積金幣，舊分數不換算。\n原本正向加分會發放等量金幣；尚未設定金幣的規則將先使用相同數量，可在規則編輯中調整。')) return;
             await setCoinsEnabled(!config.coinsEnabled);
         })); wallet.append(coinGuide); root.append(wallet);
+        renderShop(root, config);
         const views = el('div', undefined, 'pet-view-tools'); views.setAttribute('aria-label', '寵物顯示方式');
         ['compact', 'cards'].forEach(mode => {
             const b = button(mode === 'compact' ? '精簡名單' : '成長卡片', () => { viewMode = mode; try { localStorage.setItem('petViewMode', mode); } catch {} render(); });
@@ -349,7 +448,7 @@
         const rows = el('div'); const paging = el('div', undefined, 'pet-tools');
         function renderHistory() {
             const matches = new Set(visibleStudents().map(s => String(s.id)));
-            const records = (window.pointsHistory || []).filter(r => r.petEvent && matches.has(String(r.studentId)));
+            const records = (window.pointsHistory || []).filter(r => r.petEvent && !r.petShopType && matches.has(String(r.studentId)));
             const reversedIds = new Set(window.pointsHistory.filter(r => r.petReverses).map(r => r.petReverses));
             const batches = new Map();
             window.pointsHistory.forEach(r => {
@@ -391,6 +490,6 @@
         render();
         if (location.hash === '#pets') window.showSection('pets');
     }
-    window.ClassPets = { award, undo, xpFor, coinsFor, setCoinsEnabled, saveRule, stage, appearance, milestone, render, prepare, settings };
+    window.ClassPets = { award, undo, xpFor, coinsFor, setCoinsEnabled, saveRule, saveProduct, setProductActive, redeem, refund, stage, appearance, milestone, render, prepare, settings };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

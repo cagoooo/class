@@ -86,3 +86,9 @@
 .dark .pet-wallet-status { background:#3c321f; color:#ffe3a6; border-color:#967944; }
 .dark .pet-coin-balance { background:#3c321f; color:#ffe3a6; }
 @media(max-width:600px) { .pet-rule-editor { grid-template-columns:1fr; padding:12px; } .pet-rule-editor label { flex-direction:row; align-items:center; justify-content:space-between; } .pet-rule-editor label input { width:65%; } }
+
+.pet-shop-controls,.pet-product-editor { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; padding:16px; border:1px solid #cbd5e1; border-radius:12px; }
+.pet-shop-controls select,.pet-product-editor input { width:100%; min-width:0; box-sizing:border-box; }
+.pet-product-editor>strong { grid-column:1/-1; }
+.pet-shop-sync { font-size:14px; overflow-wrap:anywhere; }
+@media(max-width:600px) { .pet-shop-controls,.pet-product-editor { grid-template-columns:1fr; padding:12px; } }
