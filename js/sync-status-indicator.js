@@ -20,6 +20,7 @@
     'use strict';
 
     const STATES = {
+        conflict: { color: '#b45309', icon: '🛟', label: '需要比較資料', title: '另一台裝置已更新；本機成果已保留，點擊比較' },
         synced: { color: '#10b981', icon: '✅', label: '已同步', title: '所有資料已安全儲存至雲端' },
         pending: { color: '#f59e0b', icon: '🔄', label: '有未同步變更', title: '有新變動尚未同步到雲端' },
         syncing: { color: '#3b82f6', icon: '☁️', label: '同步中', title: '正在上傳到雲端...' },
@@ -34,6 +35,7 @@
 
     // ── 待同步變更 Key 與中文對照表 ──
     const KEY_ZH_MAP = {
+        petSettings: '寵物規則與商店',
         students: '學生資料',
         pointsHistory: '加扣分歷史',
         groups: '分組資料',
@@ -63,7 +65,7 @@
         let baseKey = key;
         if (key.includes('-')) {
             const matched = [
-                'students', 'pointsHistory', 'groups',
+                'students', 'pointsHistory', 'groups', 'petSettings',
                 'notebookEntries', 'homeworkList', 'homeworkChecks',
                 'lotteryHistory', 'classAnnouncements',
                 'examSubjects', 'examReminders', 'examAttendance', 'examAbsenceRecords',
@@ -318,14 +320,14 @@
             }
         }
 
+        if (currentState === 'conflict') { await window.CloudSafety?.showConflict(); updateStateBasedOnSync(); return; }
         if (currentState === 'syncing') return;
         // 其他狀態（synced/pending/error/disconnected(在線)）都可觸發手動同步
         if (window.FirebaseSync?.syncToCloud) {
             setState('syncing');
             try {
                 const ok = await window.FirebaseSync.syncToCloud();
-                setState(ok ? 'synced' : 'error');
-                lastChangedAt = null;
+                updateStateBasedOnSync();
             } catch (e) {
                 console.error('[SyncStatus] 手動同步失敗:', e);
                 setState('error');
@@ -357,6 +359,7 @@
             return;
         }
 
+        if (window.CloudSafety) { setState(CloudSafety.status()); return; }
         const lastSync = localStorage.getItem('lastSyncTime');
         if (!lastSync) {
             setState('pending');  // 已登入但從未同步
@@ -380,7 +383,7 @@
         const orig = proto.setItem;
         // 會觸發 pending 狀態的 key（只有使用者資料類）
         const USER_DATA_KEYS = [
-            'students', 'pointsHistory', 'groups',
+            'students', 'pointsHistory', 'groups', 'petSettings',
             'notebookEntries', 'homeworkList', 'homeworkChecks',
             'lotteryHistory', 'classAnnouncements',
             'examSubjects', 'examReminders', 'examAttendance', 'examAbsenceRecords',

@@ -1016,7 +1016,10 @@ exports.getAdminStats = onCall(
           .concat(markerOnly.filter(Boolean));
         // 預設班級：資料掛在 users/{uid} 底下，沒有 students 就是沒備份過
         const rootColIds = new Set(rootCols.map(c => c.id));
-        if (activeClassIds.has('default') && !rootColIds.has('students')) unbacked.push('default');
+        if (activeClassIds.has('default') && !rootColIds.has('students')) {
+          const snapshotHead = await userRef.collection('appSettings').doc('syncRevision').get();
+          if (!snapshotHead.exists) unbacked.push('default');
+        }
 
         return {
           uid,
@@ -1133,6 +1136,13 @@ exports.getTeacherOrphanDetails = onCall(
           } catch (e) { counts[name] = 0; }
         }));
 
+        const head = await ref.collection('appSettings').doc('syncRevision').get();
+        if (head.exists && head.data().schema === 1) {
+          studentCount = Number(head.data().students) || 0;
+          counts.pointsHistory = Number(head.data().pointsHistory) || 0;
+          sampleNames = []; // Legacy roster names may no longer match the active snapshot.
+          lastWriteMs = Date.parse(head.data().at) || lastWriteMs;
+        }
         return {
           id: ref.id,
           markerName,
@@ -1635,6 +1645,10 @@ exports.purgeDeletedClassLeftovers = onCall(
     const results = [];
     for (const classId of targets) {
       const classRef = userRef.collection('classes').doc(classId);
+
+      // Snapshot parts are nested. Never recursively purge with the legacy flat backup.
+      const snapshots = await classRef.collection('syncSnapshots').listDocuments();
+      if (snapshots.length) { results.push({ classId, status: 'fail', error: '此班含完整版本備份，已保護並停止舊版清理流程' }); continue; }
 
       // ── 安全機制 3：先備份 ──
       const dump = { uid: targetUid, classId, purgedAt: new Date().toISOString(), purgedBy: adminEmail, data: {} };

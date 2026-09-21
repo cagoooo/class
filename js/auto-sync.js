@@ -38,6 +38,8 @@
     const state = {
         timer: null,
         running: false,
+        retryTimer: null,
+        retryDelay: 5000,
         intervalMs: DEFAULTS.intervalMin * 60 * 1000,
     };
 
@@ -100,9 +102,15 @@
         showSyncSpinner(true);
 
         try {
-            const ok = await window.FirebaseSync.syncToCloud(true);   // 靜默：不顯示全螢幕遮罩（用本模組的小圖示 + Toast）
+            const ok = await window.FirebaseSync.syncPendingClasses();   // 靜默：不顯示全螢幕遮罩（用本模組的小圖示 + Toast）
             if (ok && silent) {
-                showSilentToast('☁️ 已自動同步');
+                if (window.CloudSafety?.status() === 'synced') showSilentToast('☁️ 已自動同步');
+            }
+            if (ok) { state.retryDelay = 5000; clearTimeout(state.retryTimer); }
+            else if (navigator.onLine && window.CloudSafety?.status() !== 'conflict') {
+                clearTimeout(state.retryTimer);
+                state.retryTimer = setTimeout(() => { if (state.running) trySync(true); }, state.retryDelay);
+                state.retryDelay = Math.min(state.retryDelay * 2, 60000);
             }
             return ok;
         } catch (e) {
@@ -253,6 +261,7 @@
         stop() {
             if (!state.running) return;
             clearInterval(state.timer);
+            clearTimeout(state.retryTimer);
             state.timer = null;
             document.removeEventListener('visibilitychange', onVisibilityChange);
             state.running = false;

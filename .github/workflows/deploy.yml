@@ -36,6 +36,12 @@ jobs:
         with:
           python-version: '3.x'
 
+      - name: Check classroom data safety
+        run: |
+          node scripts/test-class-pets.cjs
+          node scripts/test-data-safety.cjs
+          node scripts/test-pet-sync.cjs
+
       - name: Inject Secrets 💉
         run: python .github/inject.py
         env:

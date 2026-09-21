@@ -229,340 +229,44 @@ function getLocalStats() {
 // 同步所有本地資料到雲端
 // ─────────────────────────────────────────────────────
 async function syncToCloud(silent = false) {
-    if (!window.FirebaseConfig.isConnected()) {
-        if (!silent) NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號');
-        return false;
-    }
-    // R-A3：背景／自動同步時，若這台是「空白且從未同步」的裝置，直接略過上傳，
-    //       避免在尚未下載雲端資料前就用空資料覆蓋、洗掉雲端（手動上傳不受此限，會走確認 modal）
-    if (silent && looksLikeBlankDevice()) {
-        console.warn('[Sync] R-A3：偵測到空白／未同步裝置，略過自動上傳以保護雲端資料');
-        return false;
-    }
-    if (syncStatus.isSyncing) { console.warn('同步進行中...'); return false; }
-
+    if (syncStatus.isSyncing) return false;
+    const id = CloudSafety.current();
     syncStatus.isSyncing = true;
     try {
-        // silent=true（自動 / 背景同步）：不顯示全螢幕遮罩，避免每次切回頁面就擋住操作；
-        // 由 auto-sync.js 自己的右上角小圖示 + 底部靜默 Toast 提供低調回饋。
-        if (!silent) typeof LoadingIndicator !== 'undefined' && LoadingIndicator.show('正在同步至雲端...');
-
-        const db = window.FirebaseConfig.getDb();
-        const userId = window.FirebaseConfig.getCurrentUserId();
-        const annData = safeLS('classAnnouncements', []);
-
-        // 讀取考試監考資料
-        const examSubjects = safeLS('examSubjects', []);
-        const examReminders = safeLS('examReminders', { exam: [], break: [] });
-        const examAttendance = safeLS('examAttendance', {});
-        const examAbsenceRecords = safeLS('examAbsenceRecords', {});  // 缺考詳細記錄
-        const examDayPresets = safeLS('examDayPresets', null);        // v3.1.6：多日考試預設（第一天/第二天...）
-        // 讀取 App 設定
-        const clockSettings = safeLS('clockSettings', {});
-        const noRepeat = localStorage.getItem('noRepeatLottery');
-        // 讀取座位表（依班級隔離，由攔截器處理）
-        const seatingConfig = safeLS('seatingConfig', null);
-        // 讀取抽籤已抽出 ID 清單（依班級隔離）
-        const drawnStudentIds = safeLS('drawnStudentIds', []);
-        // UI 偏好（全域，不依班級）
-        const examLightMode = localStorage.getItem('examLightMode');
-        const examAnalogClock = localStorage.getItem('examAnalogClock');
-        const examSoundsEnabled = localStorage.getItem('examSoundsEnabled');
-        const homeworkDashboardView = localStorage.getItem('homeworkDashboardView');
-        const theme = localStorage.getItem('theme');  // v3.1.6：深色/淺色模式偏好
-
-        // ── 並行上傳全部集合 ──
-        const uploadResults = await Promise.all([
-            uploadCollection(COLLECTIONS.STUDENTS, students || []),
-            uploadCollection(COLLECTIONS.POINTS_HISTORY, pointsHistory || []),
-            uploadCollection(COLLECTIONS.GROUPS, groups || []),
-            uploadCollection(COLLECTIONS.NOTEBOOKS, notebookEntries || []),
-            uploadCollection(COLLECTIONS.HOMEWORKS, homeworkList || []),
-            uploadCollection(COLLECTIONS.LOTTERY_HISTORY, lotteryHistory || []),
-            uploadCollection(COLLECTIONS.ANNOUNCEMENTS, annData),
-            // 考試監考設定（單一 doc）
-            uploadSingleDoc(COLLECTIONS.EXAM_DATA, 'subjects', { data: examSubjects }),
-            uploadSingleDoc(COLLECTIONS.EXAM_DATA, 'reminders', { data: examReminders }),
-            uploadSingleDoc(COLLECTIONS.EXAM_DATA, 'attendance', { data: examAttendance }),
-            uploadSingleDoc(COLLECTIONS.EXAM_DATA, 'absenceRecords', { data: examAbsenceRecords }),
-            uploadSingleDoc(COLLECTIONS.EXAM_DATA, 'dayPresets', { data: examDayPresets }),  // v3.1.6
-            // App 設定（時鐘 + 抽籤偏好 + 座位表 + 已抽 ID + UI 偏好）
-            uploadSingleDoc(COLLECTIONS.APP_SETTINGS, 'clock', clockSettings),
-            uploadSingleDoc(COLLECTIONS.APP_SETTINGS, 'lottery', {
-                noRepeatLottery: noRepeat,
-                drawnStudentIds: drawnStudentIds
-            }),
-            uploadSingleDoc(COLLECTIONS.APP_SETTINGS, 'pets', { data: safeLS('petSettings', null) }),
-            uploadSingleDoc(COLLECTIONS.APP_SETTINGS, 'seating', { data: seatingConfig }),
-            uploadSingleDoc(COLLECTIONS.APP_SETTINGS, 'uiPrefs', {
-                examLightMode, examAnalogClock, examSoundsEnabled, homeworkDashboardView, theme
-            }),
-        ]);
-
-        if (uploadResults.some(result => result !== true)) throw new Error('部分資料未上傳完成，請稍後重新同步；本機資料與待同步標記仍保留。');
-
-        // 作業繳交狀態（特殊結構）— 使用動態路徑（修正多班級漏洞）
-        if (homeworkChecks && Object.keys(homeworkChecks).length > 0) {
-            const checksCol = getUserCollection(COLLECTIONS.HOMEWORK_CHECKS);
-            if (checksCol) {
-                for (const [hwId, checks] of Object.entries(homeworkChecks)) {
-                    await checksCol.doc(String(hwId)).set({
-                        checks,
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                }
-            }
-        }
-
-        // 同步班級清單（classProfiles）到雲端 meta 節點，確保多裝置可識別所有班級
-        // 路徑：users/{uid}/_meta/classProfiles（不受多班級路徑影響，固定全域）
-        // ⚠️ 合併寫入（只增不減），避免空白裝置覆蓋洗掉雲端完整班級索引
+        await CloudSafety.publish(id);
         await uploadClassProfilesMerged();
-        await writeCloudSyncInfo();  // R-A5：記錄本次上傳時間
-
-        syncStatus.lastSyncTime = new Date();
-        localStorage.setItem('lastSyncTime', syncStatus.lastSyncTime.toISOString());
-
-        // 離線優先佇列：上傳成功後清空待同步 Key，並重整指示器狀態
-        localStorage.removeItem('pendingSyncKeys');
-        if (window.SyncStatusIndicator && window.SyncStatusIndicator.updateStateBasedOnSync) {
-            window.SyncStatusIndicator.updateStateBasedOnSync();
-        }
-
-        if (!silent) typeof LoadingIndicator !== 'undefined' && LoadingIndicator.hide();
-        if (typeof window.GoogleAuthUI !== 'undefined') {
-            window.GoogleAuthUI.refreshSyncTime && window.GoogleAuthUI.refreshSyncTime();
-        }
-        if (!silent) NotificationSystem && NotificationSystem.success('資料已完整同步至雲端 ☁️');
-        console.log('✅ 同步完成:', syncStatus.lastSyncTime);
+        await writeCloudSyncInfo();
+        if (!silent) NotificationSystem.success(CloudSafety.status(id) === 'pending' ? '已同步；上傳期間新增的操作仍待同步' : '班級成果已完整同步 ☁️');
         return true;
     } catch (error) {
-        console.error('同步失敗:', error);
-        if (!silent) typeof LoadingIndicator !== 'undefined' && LoadingIndicator.hide();
-        if (!silent) NotificationSystem && NotificationSystem.error('同步失敗: ' + error.message);
+        await CloudSafety.report(error, id, silent);
         return false;
-    } finally {
-        syncStatus.isSyncing = false;
-    }
+    } finally { syncStatus.isSyncing = false; }
 }
 
-// ─────────────────────────────────────────────────────
-// 從雲端下載資料（靜默）→ 返回資料物件
-// ─────────────────────────────────────────────────────
 async function syncFromCloud() {
-    if (!window.FirebaseConfig.isConnected()) return null;
     try {
-        typeof LoadingIndicator !== 'undefined' && LoadingIndicator.show('正在讀取雲端資料...');
-
-        const db = window.FirebaseConfig.getDb();
-        const userId = window.FirebaseConfig.getCurrentUserId();
-
-        const [
-            cloudStudents, cloudPoints, cloudGroups,
-            cloudNotebooks, cloudHomeworks, cloudLottery,
-            cloudAnn,
-            examSubjectsDoc, examRemindersDoc, examAttendDoc, examAbsenceDoc, examDayPresetsDoc,
-            clockDoc, lotterySettingDoc, seatingDoc, uiPrefsDoc, petsDoc
-        ] = await Promise.all([
-            downloadCollection(COLLECTIONS.STUDENTS),
-            downloadCollection(COLLECTIONS.POINTS_HISTORY),
-            downloadCollection(COLLECTIONS.GROUPS),
-            downloadCollection(COLLECTIONS.NOTEBOOKS),
-            downloadCollection(COLLECTIONS.HOMEWORKS),
-            downloadCollection(COLLECTIONS.LOTTERY_HISTORY),
-            downloadCollection(COLLECTIONS.ANNOUNCEMENTS),
-            downloadSingleDoc(COLLECTIONS.EXAM_DATA, 'subjects'),
-            downloadSingleDoc(COLLECTIONS.EXAM_DATA, 'reminders'),
-            downloadSingleDoc(COLLECTIONS.EXAM_DATA, 'attendance'),
-            downloadSingleDoc(COLLECTIONS.EXAM_DATA, 'absenceRecords'),
-            downloadSingleDoc(COLLECTIONS.EXAM_DATA, 'dayPresets'),  // v3.1.6
-            downloadSingleDoc(COLLECTIONS.APP_SETTINGS, 'clock'),
-            downloadSingleDoc(COLLECTIONS.APP_SETTINGS, 'lottery'),
-            downloadSingleDoc(COLLECTIONS.APP_SETTINGS, 'seating'),
-            downloadSingleDoc(COLLECTIONS.APP_SETTINGS, 'uiPrefs'),
-            downloadSingleDoc(COLLECTIONS.APP_SETTINGS, 'pets'),
-        ]);
-
-        // 作業繳交狀態 — 使用動態路徑（修正多班級漏洞）
-        const checksCol = getUserCollection(COLLECTIONS.HOMEWORK_CHECKS);
-        const cloudChecks = {};
-        if (checksCol) {
-            const checksSnap = await checksCol.get();
-            checksSnap.forEach(doc => { cloudChecks[doc.id] = doc.data().checks || {}; });
-        }
-
-        // 下載班級清單 classProfiles（全域 meta 節點）
-        let cloudProfiles = null;
-        try {
-            const db = window.FirebaseConfig.getDb();
-            const userId = window.FirebaseConfig.getCurrentUserId();
-            const metaDoc = await db.collection('users').doc(userId)
-                .collection('_meta').doc('classProfiles').get();
-            if (metaDoc.exists) cloudProfiles = metaDoc.data().profiles;
-        } catch (e) { /* 無 meta 則略過 */ }
-
-        typeof LoadingIndicator !== 'undefined' && LoadingIndicator.hide();
-
-        return {
-            students: cloudStudents,
-            pointsHistory: cloudPoints,
-            groups: cloudGroups,
-            notebookEntries: cloudNotebooks,
-            homeworkList: cloudHomeworks,
-            lotteryHistory: cloudLottery,
-            homeworkChecks: cloudChecks,
-            announcements: cloudAnn,
-            examSubjects: examSubjectsDoc?.data ?? [],
-            examReminders: examRemindersDoc?.data ?? { exam: [], break: [] },
-            examAttendance: examAttendDoc?.data ?? {},
-            examAbsenceRecords: examAbsenceDoc?.data ?? null,   // 新增：缺考詳細記錄
-            examDayPresets: examDayPresetsDoc?.data ?? null,    // v3.1.6：多日考試預設
-            clockSettings: clockDoc ?? null,
-            lotterySettings: lotterySettingDoc ?? null,         // 包含 noRepeatLottery + drawnStudentIds
-            seatingConfig: seatingDoc?.data ?? null,            // 新增：座位表
-            petSettings: petsDoc?.data ?? null,
-            uiPrefs: uiPrefsDoc ?? null,                        // 新增：UI 偏好（examLightMode/examAnalogClock 等）
-            classProfiles: cloudProfiles,
-        };
-
+        const snapshot = await CloudSafety.read();
+        const d = CloudSafety.dataFor(snapshot.values);
+        return { ...d, announcements: d.classAnnouncements || [], homeworkChecks: d.homeworkChecks || {}, __snapshot: snapshot };
     } catch (error) {
-        console.error('下載失敗:', error);
-        typeof LoadingIndicator !== 'undefined' && LoadingIndicator.hide();
-        NotificationSystem && NotificationSystem.error('讀取雲端失敗: ' + error.message);
+        NotificationSystem.error('讀取雲端失敗：' + error.message);
         return null;
     }
 }
 
-// ─────────────────────────────────────────────────────
-// 從雲端還原並覆蓋本地（核心覆蓋邏輯，接受已下載的 cloudData）
-// ─────────────────────────────────────────────────────
 async function loadFromCloudData(cloudData) {
-    if (!cloudData) return false;
-    // 防止並行執行
-    if (syncStatus.isSyncing) {
-        console.warn('[Sync] 同步進行中，跳過 loadFromCloudData');
-        return false;
-    }
+    if (syncStatus.isSyncing || !cloudData?.__snapshot) return false;
     syncStatus.isSyncing = true;
     try {
-        // 主資料覆蓋（優先使用 ClassDB，自動備份至 localStorage）
-        const dbSave = (typeof ClassDB !== 'undefined' && ClassDB.isReady)
-            ? (k, v) => ClassDB.save(k, v)
-            : (k, v) => localStorage.setItem(k, JSON.stringify(v));
-
-        await Promise.all([
-            dbSave(window.STUDENTS_KEY || 'students', cloudData.students),
-            dbSave(window.POINTS_HISTORY_KEY || 'pointsHistory', cloudData.pointsHistory),
-            dbSave(window.GROUPS_KEY || 'groups', cloudData.groups),
-            dbSave('notebookEntries', cloudData.notebookEntries),
-            dbSave('homeworkList', cloudData.homeworkList),
-            dbSave('lotteryHistory', cloudData.lotteryHistory),
-            dbSave('homeworkChecks', cloudData.homeworkChecks),
-        ]);
-
-        // ✅ 同步更新記憶體中的全域變數
-        // getLocalStats() 讀取全域變數，若不更新則 getLocalStats() 永遠回傳 0
-        window.students = cloudData.students || [];
-        window.pointsHistory = cloudData.pointsHistory || [];
-        window.groups = cloudData.groups || [];
-        window.notebookEntries = cloudData.notebookEntries || [];
-        window.homeworkList = cloudData.homeworkList || [];
-        window.lotteryHistory = cloudData.lotteryHistory || [];
-        window.homeworkChecks = cloudData.homeworkChecks || {};
-
-        // 還原班級清單 classProfiles
-        if (cloudData.classProfiles && Array.isArray(cloudData.classProfiles)) {
-            try {
-                const localRaw = localStorage.getItem('classProfiles');
-                const localProfiles = localRaw ? JSON.parse(localRaw) : [];
-                const cloudIds = new Set(cloudData.classProfiles.map(p => p.id));
-                const localOnlyProfiles = localProfiles.filter(p => !cloudIds.has(p.id));
-                const merged = [...cloudData.classProfiles, ...localOnlyProfiles];
-                localStorage.setItem('classProfiles', JSON.stringify(merged));
-                console.log(`[MultiClass] 已還原 classProfiles（${merged.length} 個班級）`);
-            } catch (e) {
-                console.warn('[MultiClass] classProfiles 還原失敗:', e);
-            }
-        }
-
-        // 公告
-        if (cloudData.announcements && cloudData.announcements.length > 0) {
-            await dbSave('classAnnouncements', cloudData.announcements);
-        }
-
-        // 考試監考設定
-        if (cloudData.examSubjects && cloudData.examSubjects.length > 0) {
-            await dbSave('examSubjects', cloudData.examSubjects);
-        }
-        if (cloudData.examReminders) {
-            await dbSave('examReminders', cloudData.examReminders);
-        }
-        if (cloudData.examAttendance && Object.keys(cloudData.examAttendance).length > 0) {
-            await dbSave('examAttendance', cloudData.examAttendance);
-        }
-        // 缺考詳細記錄（含座號、原因等）
-        if (cloudData.examAbsenceRecords && Object.keys(cloudData.examAbsenceRecords).length > 0) {
-            await dbSave('examAbsenceRecords', cloudData.examAbsenceRecords);
-        }
-        // v3.1.6：考試多日預設（第一天/第二天... 完整科目清單）
-        if (cloudData.examDayPresets && cloudData.examDayPresets.days) {
-            await dbSave('examDayPresets', cloudData.examDayPresets);
-        }
-
-        // App 設定
-        if (cloudData.clockSettings) {
-            await dbSave('clockSettings', cloudData.clockSettings);
-        }
-        if (cloudData.lotterySettings?.noRepeatLottery !== undefined) {
-            localStorage.setItem('noRepeatLottery', cloudData.lotterySettings.noRepeatLottery);
-        }
-        // 抽籤已抽出 ID 清單（依班級隔離，由攔截器處理）
-        if (cloudData.lotterySettings?.drawnStudentIds && Array.isArray(cloudData.lotterySettings.drawnStudentIds)) {
-            await dbSave('drawnStudentIds', cloudData.lotterySettings.drawnStudentIds);
-        }
-        // 座位表（依班級隔離）
-        await dbSave('petSettings', cloudData.petSettings || { enabled: false, rules: [] });
-        if (cloudData.seatingConfig) {
-            await dbSave('seatingConfig', cloudData.seatingConfig);
-        }
-        // UI 偏好（全域）
-        if (cloudData.uiPrefs) {
-            ['examLightMode', 'examAnalogClock', 'examSoundsEnabled', 'homeworkDashboardView', 'theme'].forEach(k => {
-                if (cloudData.uiPrefs[k] !== null && cloudData.uiPrefs[k] !== undefined) {
-                    localStorage.setItem(k, cloudData.uiPrefs[k]);
-                }
-            });
-        }
-
-        // ✅ 更新同步時間，防止 AutoSync 還原後立即再觸發
-        syncStatus.lastSyncTime = new Date();
-        localStorage.setItem('lastSyncTime', syncStatus.lastSyncTime.toISOString());
-
-        // 重繪 UI
-        if (typeof renderStudents === 'function') renderStudents();
-        if (typeof renderGroups === 'function') renderGroups();
-        if (typeof renderNotebook === 'function') renderNotebook();
-        if (typeof renderHomework === 'function') renderHomework();
-        if (typeof renderLotteryHistory === 'function') renderLotteryHistory();
-        if (typeof updatePointsStudentSelect === 'function') updatePointsStudentSelect();
-        if (typeof updateHomeworkSelect === 'function') updateHomeworkSelect();
-        window.ClassPets?.render();
-
-        NotificationSystem && NotificationSystem.success('已從雲端完整還原資料 ✅');
-        // 重大資料操作：本地資料被雲端覆蓋，不可逆
-        try {
-            if (window.UsageNotify) {
-                const n = (cloudData.students && cloudData.students.length) || 0;
-                UsageNotify.dataAction('從雲端還原（覆蓋本地）', `已用雲端資料覆蓋本機，還原 ${n} 位學生`);
-            }
-        } catch (e) { /* ignore */ }
-        return true;
-    } finally {
-        syncStatus.isSyncing = false;
-    }
+        if (cloudData.__snapshot.classId !== CloudSafety.current()) throw Error('預覽後已切換班級，請重新讀取雲端');
+        const ok = await CloudSafety.restore(cloudData.__snapshot);
+        if (ok) NotificationSystem.success('已完整還原；還原前本機副本已保留');
+        return ok;
+    } catch (error) { NotificationSystem.error(error.message); return false; }
+    finally { syncStatus.isSyncing = false; }
 }
 
-// 從雲端下載後還原（公開 API，兼容舊版呼叫）
 async function loadFromCloud() {
     const cloudData = await syncFromCloud();
     return loadFromCloudData(cloudData);
@@ -572,92 +276,13 @@ async function loadFromCloud() {
 // 合併雲端與本地資料
 // ─────────────────────────────────────────────────────
 async function mergeWithCloud() {
-    if (!window.FirebaseConfig.isConnected()) return false;
-    try {
-        typeof LoadingIndicator !== 'undefined' && LoadingIndicator.show('正在合併資料...');
-        const cloudData = await syncFromCloud();
-        if (!cloudData) throw new Error('無法取得雲端資料');
-
-        // 學生：本地優先 + 雲端獨有
-        const localIds = new Set((students || []).map(s => s.id));
-        students = [
-            ...(students || []),
-            ...(cloudData.students || []).filter(s => !localIds.has(s.id))
-        ];
-
-        // 加扣分記錄：合併去重
-        const localHistIds = new Set((pointsHistory || []).map(h => h.id));
-        pointsHistory = [
-            ...(pointsHistory || []),
-            ...(cloudData.pointsHistory || []).filter(h => !localHistIds.has(h.id))
-        ].sort((a, b) => (Number(b.createdAtMs || b.id) || 0) - (Number(a.createdAtMs || a.id) || 0));
-
-        // 公告：合併去重
-        const localAnn = safeLS('classAnnouncements', []);
-        const localAnnIds = new Set(localAnn.map(a => a.id));
-        const mergedAnn = [
-            ...localAnn,
-            ...(cloudData.announcements || []).filter(a => !localAnnIds.has(a.id))
-        ];
-        localStorage.setItem('classAnnouncements', JSON.stringify(mergedAnn));
-
-        // 其餘：本地為空才用雲端
-        if (!groups.length && cloudData.groups.length) groups = cloudData.groups;
-        if (!notebookEntries.length && cloudData.notebookEntries.length) notebookEntries = cloudData.notebookEntries;
-        if (!homeworkList.length && cloudData.homeworkList.length) homeworkList = cloudData.homeworkList;
-        if (!lotteryHistory.length && cloudData.lotteryHistory.length) lotteryHistory = cloudData.lotteryHistory;
-
-        // 考試監考設定：本地無則採雲端
-        if (!safeLS('examSubjects', null) && cloudData.examSubjects?.length) {
-            localStorage.setItem('examSubjects', JSON.stringify(cloudData.examSubjects));
-        }
-        if (!safeLS('clockSettings', null) && cloudData.clockSettings) {
-            localStorage.setItem('clockSettings', JSON.stringify(cloudData.clockSettings));
-        }
-
-        // 存 localStorage：六個 key 一起，失敗就整批退回合併前的內容。
-        // 半套的合併結果如果被後面的 syncToCloud() 上傳，雲端也會跟著壞掉。
-        if (!window.SafeStorage.write([
-            [window.STUDENTS_KEY || 'students', JSON.stringify(students)],
-            [window.POINTS_HISTORY_KEY || 'pointsHistory', JSON.stringify(pointsHistory)],
-            [window.GROUPS_KEY || 'groups', JSON.stringify(groups)],
-            ['notebookEntries', JSON.stringify(notebookEntries)],
-            ['homeworkList', JSON.stringify(homeworkList)],
-            ['petSettings', JSON.stringify(safeLS('petSettings', null) || cloudData.petSettings || { enabled: false, rules: [] })],
-            ['lotteryHistory', JSON.stringify(lotteryHistory)]
-        ], { context: '合併雲端與本機資料' })) return false;
-
-        // 上傳合併結果
-        await syncToCloud();
-
-        // 重繪
-        if (typeof renderStudents === 'function') renderStudents();
-        if (typeof renderNotebook === 'function') renderNotebook();
-        if (typeof renderHomework === 'function') renderHomework();
-        if (typeof renderLotteryHistory === 'function') renderLotteryHistory();
-        if (typeof updatePointsStudentSelect === 'function') updatePointsStudentSelect();
-
-        typeof LoadingIndicator !== 'undefined' && LoadingIndicator.hide();
-        NotificationSystem && NotificationSystem.success('合併完成！資料已同步 🎉');
-        return true;
-    } catch (error) {
-        console.error('合併失敗:', error);
-        typeof LoadingIndicator !== 'undefined' && LoadingIndicator.hide();
-        NotificationSystem && NotificationSystem.error('合併失敗: ' + error.message);
-        return false;
-    }
+    // Point ledgers and coin purchases cannot be safely merged by student ID alone.
+    try { await CloudSafety.showConflict(); return false; }
+    catch (error) { NotificationSystem.error(error.message); return false; }
 }
 
-// ─────────────────────────────────────────────────────
-// 同步確認 Modal：本地 vs. 雲端詳細差異預覽
-// ─────────────────────────────────────────────────────
+/** Build a class-scoped, reviewable upload/download preview. */
 
-/**
- * 建立差異預覽 Modal HTML
- * @param {'upload'|'download'} direction
- * @param {Object} local  本地統計
- * @param {Object} cloud  雲端統計（null 表示讀取失敗）
- */
 function buildSyncPreviewHTML(direction, local, cloud, extraWarnHtml = '') {
     const isUpload = direction === 'upload';
     const icon = isUpload ? '📤' : '📥';
@@ -673,8 +298,8 @@ function buildSyncPreviewHTML(direction, local, cloud, extraWarnHtml = '') {
     })();
     const title = isUpload ? `立即同步（本地 → 雲端）` : `從雲端還原（雲端 → 本地）`;
     const warn = isUpload
-        ? `⚠️ <b>只同步「${currentClassName}」班的資料</b>至雲端，將完整覆蓋該班雲端資料，此操作無法復原。`
-        : `⚠️ <b>只還原「${currentClassName}」班的資料</b>至本地，本地未同步變更將遺失。`;
+        ? `⚠️ <b>只同步「${currentClassName}」班的資料</b>至雲端，將建立完整雲端版本；若其他裝置已更新，會先停止並請你比較資料。`
+        : `⚠️ <b>只還原「${currentClassName}」班的資料</b>至本地，會先保存還原前副本，再取代本機資料。`;
     const btnText = isUpload ? '✅ 確認上傳' : '✅ 確認還原';
     const btnClass = isUpload ? 'gauth-btn-primary' : 'gauth-btn-danger';
 
@@ -817,7 +442,10 @@ async function showSyncConfirmModal(direction) {
     document.body.appendChild(tempDiv);
 
     // 靜默取得雲端資料作比對
+    const previewClass = CloudSafety.current();
+    const previewFingerprint = CloudSafety.fingerprint(CloudSafety.capture(previewClass));
     const cloudData = await syncFromCloud();
+    if (!cloudData) { document.getElementById('sync-loading-tip')?.remove(); return false; }
 
     // R-A3 / R-A5：上傳前的額外風險提示（雲端有更多班 / 雲端較新）
     let extraWarnHtml = '';
@@ -865,6 +493,7 @@ async function showSyncConfirmModal(direction) {
         });
         document.getElementById('sync-modal-confirm').addEventListener('click', async () => {
             document.getElementById('sync-preview-modal')?.remove();
+            if (CloudSafety.current() !== previewClass || CloudSafety.fingerprint(CloudSafety.capture(previewClass)) !== previewFingerprint) { NotificationSystem.warning('預覽期間資料已變更，請重新確認'); resolve(false); return; }
             if (direction === 'upload') {
                 await syncToCloud();
             } else {
@@ -887,31 +516,7 @@ async function showSyncDialog() {
 // 匯出所有資料為 JSON
 // ─────────────────────────────────────────────────────
 function exportAllData() {
-    const exportData = {
-        exportDate: new Date().toISOString(),
-        students: students || [],
-        pointsHistory: pointsHistory || [],
-        groups: groups || [],
-        notebookEntries: notebookEntries || [],
-        homeworkList: homeworkList || [],
-        homeworkChecks: homeworkChecks || {},
-        lotteryHistory: lotteryHistory || [],
-        announcements: safeLS('classAnnouncements', []),
-        examSubjects: safeLS('examSubjects', []),
-        clockSettings: safeLS('clockSettings', {}),
-        petSettings: safeLS('petSettings', null),
-    };
-
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `班級資料備份_${new Date().toLocaleDateString('zh-TW').replace(/\//g, '-')}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    NotificationSystem && NotificationSystem.success('資料已完整匯出 ✅');
+    DataBackup.exportJSON(DataBackup.collectData());
 }
 
 // ─────────────────────────────────────────────────────
@@ -1032,138 +637,49 @@ async function uploadCollectionForClass(collectionName, dataArray, classId) {
  * @param {Function} onProgress - 進度回呼 (classIndex, total, className, status)
  */
 async function syncAllClassesToCloud(onProgress) {
-    if (syncStatus.isSyncing) return { success: 0, failed: 0, results: [] };
-    if (!window.FirebaseConfig.isConnected()) {
-        NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號');
-        return null;
-    }
+    if (syncStatus.isSyncing) return [];
     syncStatus.isSyncing = true;
     const results = [];
-
     try {
-        const profiles = JSON.parse(localStorage.getItem('classProfiles') || '[]');
-        const allClasses = buildAllClassList(profiles);   // 含 default、已去重
-
-        const db = window.FirebaseConfig.getDb();
-        const userId = window.FirebaseConfig.getCurrentUserId();
-
-        for (let i = 0; i < allClasses.length; i++) {
-            const cls = allClasses[i];
-            const classId = cls.id;
-            onProgress && onProgress(i, allClasses.length, cls.name, 'syncing');
-
-            // 讀取各班 localStorage 資料
-            // ⚠️ 重要：必須繞過 ClassAwareStorage 攔截器，直接讀取每個班級的 per-class key
-            //         否則會永遠讀到當前班級的資料，覆蓋其他班級
-            const _raw = window.ClassAwareStorage?.rawGet
-                ? window.ClassAwareStorage.rawGet
-                : (k) => localStorage.getItem(k);
-            const _classKey = (k) => (classId === 'default' ? k : `${k}-${classId}`);
-
-            // class-isolated keys
-            const localStudents = JSON.parse(_raw(_classKey('students')) || '[]');
-            const localGroups = JSON.parse(_raw(_classKey('groups')) || '[]');
-            const localPoints = JSON.parse(_raw(_classKey('pointsHistory')) || '[]');
-            const localNotebooks = JSON.parse(_raw(_classKey('notebookEntries')) || '[]');
-            const localHomeworks = JSON.parse(_raw(_classKey('homeworkList')) || '[]');
-            const localLottery = JSON.parse(_raw(_classKey('lotteryHistory')) || '[]');
-            const localAnn = JSON.parse(_raw(_classKey('classAnnouncements')) || '[]');
-            const examSubjects = JSON.parse(_raw(_classKey('examSubjects')) || '[]');
-            const examReminders = JSON.parse(_raw(_classKey('examReminders')) || 'null');
-            const examAttendance = JSON.parse(_raw(_classKey('examAttendance')) || '{}');
-            const examAbsenceRecords = JSON.parse(_raw(_classKey('examAbsenceRecords')) || '{}');
-            const examDayPresets = JSON.parse(_raw(_classKey('examDayPresets')) || 'null');  // v3.1.6：多日考試
-            const seatingConfig = JSON.parse(_raw(_classKey('seatingConfig')) || 'null');
-            const drawnStudentIds = JSON.parse(_raw(_classKey('drawnStudentIds')) || '[]');
-            const localChecks = JSON.parse(_raw(_classKey('homeworkChecks')) || '{}');
-
-            // global keys (UI 偏好 / 系統設定，跨班共用)
-            const clockSettings = JSON.parse(_raw('clockSettings') || '{}');
-            const noRepeat = _raw('noRepeatLottery');
-            const examLightMode = _raw('examLightMode');
-            const examAnalogClock = _raw('examAnalogClock');
-            const examSoundsEnabled = _raw('examSoundsEnabled');
-            const homeworkDashboardView = _raw('homeworkDashboardView');
-            const theme = _raw('theme');  // v3.1.6：深色/淺色模式
-
+        const all = buildAllClassList(JSON.parse(localStorage.getItem('classProfiles') || '[]'));
+        for (const [i, cls] of all.entries()) {
+            onProgress?.(i, all.length, cls.name, 'syncing');
             try {
-                await Promise.all([
-                    uploadCollectionForClass(COLLECTIONS.STUDENTS, localStudents, classId),
-                    uploadCollectionForClass(COLLECTIONS.GROUPS, localGroups, classId),
-                    uploadCollectionForClass(COLLECTIONS.POINTS_HISTORY, localPoints, classId),
-                    uploadCollectionForClass(COLLECTIONS.NOTEBOOKS, localNotebooks, classId),
-                    uploadCollectionForClass(COLLECTIONS.HOMEWORKS, localHomeworks, classId),
-                    uploadCollectionForClass(COLLECTIONS.LOTTERY_HISTORY, localLottery, classId),
-                    uploadCollectionForClass(COLLECTIONS.ANNOUNCEMENTS, localAnn, classId),
-                    // 考試監考設定（單一 doc）
-                    (async () => {
-                        const col = getUserCollectionForClass(COLLECTIONS.EXAM_DATA, classId);
-                        if (col) {
-                            const db = window.FirebaseConfig.getDb();
-                            const b = db.batch();
-                            b.set(col.doc('subjects'), { data: examSubjects, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-                            b.set(col.doc('reminders'), { data: examReminders, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-                            b.set(col.doc('attendance'), { data: examAttendance, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-                            b.set(col.doc('absenceRecords'), { data: examAbsenceRecords, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-                            b.set(col.doc('dayPresets'), { data: examDayPresets, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });  // v3.1.6
-                            await b.commit();
-                        }
-                    })(),
-                    // App 設定（時鐘 + 抽籤偏好+已抽 ID + 座位表 + UI 偏好）
-                    (async () => {
-                        const col = getUserCollectionForClass(COLLECTIONS.APP_SETTINGS, classId);
-                        if (col) {
-                            const db = window.FirebaseConfig.getDb();
-                            const b = db.batch();
-                            b.set(col.doc('clock'), { ...clockSettings, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-                            b.set(col.doc('lottery'), {
-                                noRepeatLottery: noRepeat,
-                                drawnStudentIds: drawnStudentIds,
-                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                            });
-                            b.set(col.doc('pets'), { data: JSON.parse(_raw(_classKey('petSettings')) || 'null'), updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-                            b.set(col.doc('seating'), { data: seatingConfig, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-                            b.set(col.doc('uiPrefs'), {
-                                examLightMode, examAnalogClock, examSoundsEnabled, homeworkDashboardView, theme,
-                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                            });
-                            await b.commit();
-                        }
-                    })(),
-                    // 作業繳交狀態
-                    (async () => {
-                        if (!localChecks || Object.keys(localChecks).length === 0) return;
-                        const col = getUserCollectionForClass(COLLECTIONS.HOMEWORK_CHECKS, classId);
-                        if (!col) return;
-                        for (const [hwId, checks] of Object.entries(localChecks)) {
-                            await col.doc(String(hwId)).set({ checks, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-                        }
-                    })(),
-                ]);
-                results.push({ name: cls.name, status: 'ok', count: localStudents.length });
-                onProgress && onProgress(i + 1, allClasses.length, cls.name, 'ok', localStudents.length);
-            } catch (err) {
-                results.push({ name: cls.name, status: 'fail', error: err.message });
-                onProgress && onProgress(i + 1, allClasses.length, cls.name, 'fail');
+                await CloudSafety.publish(String(cls.id));
+                const count = CloudSafety.dataFor(CloudSafety.capture(String(cls.id))).students.length;
+                results.push({ name: cls.name, status: 'ok', count });
+                onProgress?.(i + 1, all.length, cls.name, 'ok', count);
+            } catch (error) {
+                await CloudSafety.report(error, String(cls.id), true);
+                results.push({ name: cls.name, status: 'fail', error: error.message });
+                onProgress?.(i + 1, all.length, cls.name, 'fail');
             }
         }
-
-        // 同步班級清單 meta（合併寫入，只增不減，避免洗掉雲端既有班級索引）
         await uploadClassProfilesMerged();
-        await writeCloudSyncInfo();  // R-A5：記錄本次上傳時間
-
-        syncStatus.lastSyncTime = new Date();
-        localStorage.setItem('lastSyncTime', syncStatus.lastSyncTime.toISOString());
-
-    } finally {
-        syncStatus.isSyncing = false;
-    }
-    return results;
+        if (results.some(r => r.status === 'ok')) await writeCloudSyncInfo();
+        return results;
+    } finally { syncStatus.isSyncing = false; }
 }
 
-/**
- * 顯示一鍵同步所有班級的進度 Modal
- */
+async function syncPendingClasses() {
+    if (syncStatus.isSyncing || navigator.onLine === false || !window.FirebaseConfig.isConnected()) return false;
+    syncStatus.isSyncing = true;
+    let ok = true, uploaded = false;
+    try {
+        const all = buildAllClassList(JSON.parse(localStorage.getItem('classProfiles') || '[]'));
+        for (const cls of all) {
+            const id = String(cls.id);
+            if (CloudSafety.status(id) === 'synced' || CloudSafety.status(id) === 'conflict') continue;
+            if (!CloudSafety.dataFor(CloudSafety.capture(id)).students.length && !CloudSafety.dataFor(CloudSafety.capture(id)).pointsHistory.length) continue;
+            try { await CloudSafety.publish(id); uploaded = true; }
+            catch (e) { ok = false; await CloudSafety.report(e, id, true); }
+        }
+        if (ok) await uploadClassProfilesMerged();
+        if (uploaded) await writeCloudSyncInfo();
+        return ok;
+    } finally { syncStatus.isSyncing = false; window.SyncStatusIndicator?.updateStateBasedOnSync(); }
+}
+
 async function showAllClassSyncModal() {
     // 移除既有 Modal
     const existId = 'all-class-sync-modal';
@@ -1421,19 +937,15 @@ async function uploadClassProfilesMerged() {
         let localProfiles = [];
         try { localProfiles = JSON.parse(localStorage.getItem('classProfiles') || '[]'); } catch { localProfiles = []; }
 
-        const cloudProfiles = await fetchCloudClassProfiles();
-
-        // 以 id 為鍵聯集：先放雲端，再用本地覆蓋/附加
-        const byId = new Map();
-        cloudProfiles.forEach(p => { if (p && p.id != null) byId.set(String(p.id), p); });
-        localProfiles.forEach(p => { if (p && p.id != null) byId.set(String(p.id), { ...byId.get(String(p.id)), ...p }); });
-
-        const merged = Array.from(byId.values());
-        if (merged.length === 0) return;
-
-        await db.collection('users').doc(userId)
-            .collection('_meta').doc('classProfiles')
-            .set({ profiles: merged, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+        const ref = db.collection('users').doc(userId).collection('_meta').doc('classProfiles');
+        const merged = await db.runTransaction(async tx => {
+            const snap = await tx.get(ref);
+            const byId = new Map((snap.exists ? snap.data().profiles || [] : []).map(p => [String(p.id), p]));
+            localProfiles.forEach(p => { if (p?.id != null) byId.set(String(p.id), { ...byId.get(String(p.id)), ...p }); });
+            const result = [...byId.values()];
+            tx.set(ref, { profiles: result, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+            return result;
+        });
 
         // R-A1：同時為每個「本地有的」非 default 班級寫 classes/{id} marker，達成名冊自我修復
         //   （只為本地 profile 寫，避免把雲端獨有的也亂寫；雲端獨有者其資料本就在、discover 也找得到）
@@ -1569,145 +1081,29 @@ async function deleteClassFromCloud(classId) {
  * @param {Function} onProgress - 進度回呼 (done, total, name, status, count)
  */
 async function syncAllClassesFromCloud(onProgress) {
-    if (syncStatus.isSyncing) return null;
-    if (!window.FirebaseConfig.isConnected()) {
-        NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號');
-        return null;
-    }
+    if (syncStatus.isSyncing) return [];
     syncStatus.isSyncing = true;
     const results = [];
-
     try {
-        // ⚡ 先從雲端 _meta 取得完整班級清單並合併進本地，
-        //    否則新裝置本地只有 default，這個迴圈永遠只還原預設班（601~606 不會被發現）
-        const profiles = await syncClassProfilesFromCloud();
-        const allClasses = buildAllClassList(profiles);   // 含 default、已去重
-
-        for (let i = 0; i < allClasses.length; i++) {
-            const cls = allClasses[i];
-            const classId = cls.id;
-            onProgress && onProgress(i, allClasses.length, cls.name, 'syncing');
-
-            // 用 raw 寫入避開 ClassAwareStorage 攔截，明確指定每個班級的 key
-            const _rawSet = window.ClassAwareStorage?.rawSet
-                ? window.ClassAwareStorage.rawSet
-                : (k, v) => localStorage.setItem(k, v);
-            const _classKey = (k) => (classId === 'default' ? k : `${k}-${classId}`);
-
+        const all = buildAllClassList(await syncClassProfilesFromCloud());
+        for (const [i, cls] of all.entries()) {
+            onProgress?.(i, all.length, cls.name, 'syncing');
             try {
-                // 從對應班級的 Firebase 路徑下載
-                const [
-                    cloudStudents, cloudGroups, cloudPoints,
-                    cloudNotebooks, cloudHomeworks, cloudLottery, cloudAnn
-                ] = await Promise.all([
-                    (async () => { const col = getUserCollectionForClass(COLLECTIONS.STUDENTS, classId); if (!col) return []; const s = await col.get(); return s.docs.map(d => ({ id: d.id, ...d.data() })); })(),
-                    (async () => { const col = getUserCollectionForClass(COLLECTIONS.GROUPS, classId); if (!col) return []; const s = await col.get(); return s.docs.map(d => ({ id: d.id, ...d.data() })); })(),
-                    (async () => { const col = getUserCollectionForClass(COLLECTIONS.POINTS_HISTORY, classId); if (!col) return []; const s = await col.get(); return s.docs.map(d => ({ id: d.id, ...d.data() })); })(),
-                    (async () => { const col = getUserCollectionForClass(COLLECTIONS.NOTEBOOKS, classId); if (!col) return []; const s = await col.get(); return s.docs.map(d => ({ id: d.id, ...d.data() })); })(),
-                    (async () => { const col = getUserCollectionForClass(COLLECTIONS.HOMEWORKS, classId); if (!col) return []; const s = await col.get(); return s.docs.map(d => ({ id: d.id, ...d.data() })); })(),
-                    (async () => { const col = getUserCollectionForClass(COLLECTIONS.LOTTERY_HISTORY, classId); if (!col) return []; const s = await col.get(); return s.docs.map(d => ({ id: d.id, ...d.data() })); })(),
-                    (async () => { const col = getUserCollectionForClass(COLLECTIONS.ANNOUNCEMENTS, classId); if (!col) return []; const s = await col.get(); return s.docs.map(d => ({ id: d.id, ...d.data() })); })(),
-                ]);
-
-                // 寫入該班級的 per-class localStorage（每個班級獨立保存，不互相覆蓋！）
-                _rawSet(_classKey('students'), JSON.stringify(cloudStudents));
-                _rawSet(_classKey('groups'), JSON.stringify(cloudGroups));
-                _rawSet(_classKey('pointsHistory'), JSON.stringify(cloudPoints));
-                _rawSet(_classKey('notebookEntries'), JSON.stringify(cloudNotebooks));
-                _rawSet(_classKey('homeworkList'), JSON.stringify(cloudHomeworks));
-                _rawSet(_classKey('lotteryHistory'), JSON.stringify(cloudLottery));
-                _rawSet(_classKey('classAnnouncements'), JSON.stringify(cloudAnn));
-
-                // 寫入該班級的考試監考設定
-                const colExam = getUserCollectionForClass(COLLECTIONS.EXAM_DATA, classId);
-                if (colExam) {
-                    const [subjDoc, remDoc, attDoc, absDoc, dayDoc] = await Promise.all([
-                        colExam.doc('subjects').get(),
-                        colExam.doc('reminders').get(),
-                        colExam.doc('attendance').get(),
-                        colExam.doc('absenceRecords').get(),
-                        colExam.doc('dayPresets').get(),  // v3.1.6
-                    ]);
-                    if (subjDoc.exists && subjDoc.data().data?.length) _rawSet(_classKey('examSubjects'), JSON.stringify(subjDoc.data().data));
-                    if (remDoc.exists && remDoc.data().data) _rawSet(_classKey('examReminders'), JSON.stringify(remDoc.data().data));
-                    if (attDoc.exists && Object.keys(attDoc.data().data || {}).length) _rawSet(_classKey('examAttendance'), JSON.stringify(attDoc.data().data));
-                    if (absDoc.exists && absDoc.data().data) _rawSet(_classKey('examAbsenceRecords'), JSON.stringify(absDoc.data().data));
-                    // v3.1.6：多日考試預設
-                    if (dayDoc.exists && dayDoc.data().data && dayDoc.data().data.days) {
-                        _rawSet(_classKey('examDayPresets'), JSON.stringify(dayDoc.data().data));
-                    }
-                }
-                // App 設定
-                const colApp = getUserCollectionForClass(COLLECTIONS.APP_SETTINGS, classId);
-                if (colApp) {
-                    const [clockDoc, lotteryDoc, seatingDoc, uiPrefsDoc, petsDoc] = await Promise.all([
-                        colApp.doc('clock').get(),
-                        colApp.doc('lottery').get(),
-                        colApp.doc('seating').get(),
-                        colApp.doc('uiPrefs').get(),
-                        colApp.doc('pets').get(),
-                    ]);
-                    _rawSet(_classKey('petSettings'), JSON.stringify(petsDoc.exists && petsDoc.data().data || { enabled: false, rules: [] }));
-                    // 時鐘設定（全域，最後一班會覆蓋；可接受因為是 UI 偏好）
-                    if (clockDoc.exists) _rawSet('clockSettings', JSON.stringify(clockDoc.data()));
-                    // 抽籤偏好 + 已抽 ID
-                    if (lotteryDoc.exists) {
-                        const ld = lotteryDoc.data();
-                        if (ld.noRepeatLottery !== undefined) _rawSet('noRepeatLottery', String(ld.noRepeatLottery));
-                        if (Array.isArray(ld.drawnStudentIds)) _rawSet(_classKey('drawnStudentIds'), JSON.stringify(ld.drawnStudentIds));
-                    }
-                    // 座位表（per-class）
-                    if (seatingDoc.exists && seatingDoc.data().data) {
-                        _rawSet(_classKey('seatingConfig'), JSON.stringify(seatingDoc.data().data));
-                    }
-                    // UI 偏好（全域）
-                    if (uiPrefsDoc.exists) {
-                        const u = uiPrefsDoc.data();
-                        ['examLightMode', 'examAnalogClock', 'examSoundsEnabled', 'homeworkDashboardView', 'theme'].forEach(k => {
-                            if (u[k] !== null && u[k] !== undefined) _rawSet(k, String(u[k]));
-                        });
-                    }
-                }
-                // 作業繳交狀態（per-class）
-                const colChecks = getUserCollectionForClass(COLLECTIONS.HOMEWORK_CHECKS, classId);
-                if (colChecks) {
-                    const checksSnap = await colChecks.get();
-                    if (!checksSnap.empty) {
-                        const checks = {};
-                        checksSnap.forEach(doc => { checks[doc.id] = doc.data().checks || {}; });
-                        _rawSet(_classKey('homeworkChecks'), JSON.stringify(checks));
-                    }
-                }
-
-                results.push({ name: cls.name, status: 'ok', count: cloudStudents.length });
-                onProgress && onProgress(i + 1, allClasses.length, cls.name, 'ok', cloudStudents.length);
-            } catch (err) {
-                console.error(`[AllSync] 雲端→本地 ${cls.name} 失敗:`, err);
-                results.push({ name: cls.name, status: 'fail', error: err.message });
-                onProgress && onProgress(i + 1, allClasses.length, cls.name, 'fail');
+                const remote = await CloudSafety.read(String(cls.id));
+                if (remote.empty) throw Error('雲端沒有完整班級資料，保留本機');
+                if (!await CloudSafety.restore(remote)) throw Error('本機儲存未完成，未還原');
+                const count = CloudSafety.dataFor(remote.values).students.length;
+                results.push({ name: cls.name, status: 'ok', count });
+                onProgress?.(i + 1, all.length, cls.name, 'ok', count);
+            } catch (error) {
+                results.push({ name: cls.name, status: 'fail', error: error.message });
+                onProgress?.(i + 1, all.length, cls.name, 'fail');
             }
         }
-
-        // 若目前班級資料被覆蓋，刷新全域變數
-        try {
-            const curId = localStorage.getItem('currentClassId') || 'default';
-            const curSKey = curId === 'default' ? 'students' : `students-${curId}`;
-            window.students = JSON.parse(localStorage.getItem(curSKey) || '[]');
-            if (typeof renderStudents === 'function') renderStudents();
-        } catch (e) { /* 非致命 */ }
-
-        syncStatus.lastSyncTime = new Date();
-        localStorage.setItem('lastSyncTime', syncStatus.lastSyncTime.toISOString());
-
-    } finally {
-        syncStatus.isSyncing = false;
-    }
-    return results;
+        return results;
+    } finally { syncStatus.isSyncing = false; }
 }
 
-/**
- * 顯示一鍵雲端→本地的進度 Modal
- */
 async function showAllClassDownloadModal() {
     const existId = 'all-class-dl-modal';
     document.getElementById(existId)?.remove();
@@ -1818,13 +1214,17 @@ async function showAllClassDownloadModal() {
             closeBtn.textContent = '完成';
             closeBtn.style.background = failed === 0 ? '#16a34a' : '#d97706';
         }
-        NotificationSystem && NotificationSystem.success(`所有班級已從雲端還原 📥`);
+        if (results.length) {
+            if (failed) window.NotificationSystem?.warning(`已還原 ${results.length - failed} 班，${failed} 班未完成；原資料已保留`);
+            else window.NotificationSystem?.success('所有班級已從雲端還原 📥');
+        }
     }
 }
 
 
 window.FirebaseSync = {
     syncToCloud,
+    syncPendingClasses,
     syncFromCloud,
     loadFromCloud,
     loadFromCloudData,
@@ -1842,8 +1242,6 @@ window.FirebaseSync = {
     repairClassRegistry,         // R-A4：班級健檢與修復
     looksLikeBlankDevice,        // R-A3：判斷空白裝置
     init: initFirebaseAndSync,
-    uploadItem,
-    deleteItem,
 };
 
 // 頁面載入時自動初始化

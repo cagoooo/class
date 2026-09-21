@@ -298,15 +298,18 @@
         if (!list.length) return true;
 
         // 先拍快照（走一般 getItem，與 setItem 同一套班級 key 路由）
-        const snapshot = list.map(p => [p[0], localStorage.getItem(p[0])]);
+        const get = k => opts.raw ? _origGet.call(localStorage, k) : localStorage.getItem(k);
+        const set = (k, v) => opts.raw ? _origSet.call(localStorage, k, v) : localStorage.setItem(k, v);
+        const remove = k => opts.raw ? _origRemove.call(localStorage, k) : localStorage.removeItem(k);
+        const snapshot = list.map(p => [p[0], get(p[0])]);
         try {
-            list.forEach(p => p[1] === null ? localStorage.removeItem(p[0]) : localStorage.setItem(p[0], p[1]));
+            list.forEach(p => p[1] === null ? remove(p[0]) : set(p[0], p[1]));
             return true;
         } catch (err) {
             // 前面幾個 key 可能已寫進去，全部還原成寫入前的樣子
             snapshot.forEach(function (s) {
                 try {
-                    s[1] === null ? localStorage.removeItem(s[0]) : localStorage.setItem(s[0], s[1]);
+                    s[1] === null ? remove(s[0]) : set(s[0], s[1]);
                 } catch (e) { /* 空間已滿時還原也可能失敗，記憶體狀態才是主要保障 */ }
             });
             try { if (typeof opts.rollback === 'function') opts.rollback(); }
@@ -337,6 +340,7 @@
 
     window.SafeStorage = {
         write: safeWrite,
+        writeRaw(pairs, opts) { return safeWrite(pairs, { ...opts, raw: true }); },
         /** 單一 key 的捷徑：SafeStorage.set(KEY, JSON.stringify(x), { context, rollback }) */
         set(key, value, opts) { return safeWrite([[key, value]], opts); },
     };

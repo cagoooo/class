@@ -99,6 +99,22 @@ def build(kind,stage,mood):
     fur=material(kind,colors[0]);cream=material(kind+'_light',colors[1]);dark=material('ink',(.025,.045,.08));white=material('white',(1,1,1));pink=material('blush',(1,.36,.49));gold=material('gold',(1,.65,.07));mint=material('mint',(.06,.56,.45))
     ball('Pedestal',(0,.06,.09),(.83,.68,.08),material('base',(.67,.85,.86)))
     if stage=='egg':
+        # The common candy shell never hints at the species inside.
+        shellmat=material('rainbow_shell_v2',(.85,.35,.70))
+        nodes=shellmat.node_tree.nodes;links=shellmat.node_tree.links
+        if nodes.get('CandyNoise') is None:
+            noise=nodes.new('ShaderNodeTexNoise');noise.name='CandyNoise';noise.inputs['Scale'].default_value=2.1;noise.inputs['Detail'].default_value=1.0
+            ramp=nodes.new('ShaderNodeValToRGB');ramp.name='CandyPalette'
+            palette=[(0.0,(.16,.78,.95,1)),(.28,(.32,.18,.92,1)),(.48,(1,.20,.51,1)),(.69,(1,.70,.10,1)),(1.0,(.18,.93,.68,1))]
+            ramp.color_ramp.elements.remove(ramp.color_ramp.elements[1])
+            for index,(position,color) in enumerate(palette):
+                element=ramp.color_ramp.elements[0] if index==0 else ramp.color_ramp.elements.new(position)
+                element.position=position;element.color=color
+            links.new(noise.outputs['Fac'],ramp.inputs['Fac']);links.new(ramp.outputs['Color'],nodes.get('Principled BSDF').inputs['Base Color'])
+            nodes.get('Principled BSDF').inputs['Roughness'].default_value=.27
+        cream=shellmat
+        scene.camera.data.ortho_scale=2.65
+        scene.camera.rotation_euler=(Vector((0,0,1.12))-scene.camera.location).to_track_quat('-Z','Y').to_euler()
         if kind!='mystery' or mood in ['normal','rest']:
             ball('Egg',(0,0,1.03),(.60,.53,.85),cream)
         else:
@@ -135,8 +151,11 @@ def build(kind,stage,mood):
                 for x,z in [(-.76,1.45),(.77,1.75)]:
                     ball('HatchSparkle',(x,-.04,z),(.04,.035,.12),gold)
                     ball('HatchSparkle',(x,-.04,z),(.10,.035,.035),gold)
-        for x,z in [(-.25,1.3),(.22,.83),(.02,1.66)]:
-            ball('EggSpot',(x,-.48,z+(.25 if mood=='hatching' and z>1.15 else .065 if mood=='splitting' and z>1.15 else 0)),(.10,.025,.115),fur)
+        for index,(x,z) in enumerate([(-.25,1.3),(.24,.73),(.04,1.65),(-.28,.63),(.36,1.38)]):
+            lift=.25 if mood=='hatching' and z>1.15 else .065 if mood=='splitting' and z>1.15 else 0
+            surface=-.53*math.sqrt(max(.01,1-(x/.60)**2-((z-1.03)/.85)**2))-.016
+            spotmat=material('candy_spot_'+str(index),[(1,.85,.18),(.20,.95,.88),(1,.52,.77),(.68,.42,1),(.98,.97,1)][index])
+            ball('CandySpot',(x,surface,z+lift),(.073,.032,.079),spotmat)
         return scene
     baby=stage=='baby';grown=stage=='grown'
     bodyz=.80 if baby else .88

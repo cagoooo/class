@@ -99,27 +99,15 @@
 /* Blender-rendered WebP: same bounding box in cards, compact rows and feedback. */
 .pet-rendered { object-fit:contain; }
 .pet-fallback { display:grid; place-items:center; font-size:64px; }
-.pet-album { width:min(820px,calc(100vw - 24px)); max-height:85dvh; box-sizing:border-box; padding:20px; border:1px solid #b7c5d5; border-radius:18px; color:#172033; background:#fff; }
-.pet-album::backdrop { background:#0f172a99; }
-.pet-album h3 { font-size:22px; font-weight:750; margin:0; }
-.pet-album p { line-height:1.6; margin:12px 0; }
-.pet-album > button { position:sticky; top:0; z-index:1; box-shadow:0 2px 8px #17203320; }
-.pet-album button { min-height:46px; border:1px solid #a8b8c6; border-radius:12px; background:#f4f8fb; color:inherit; padding:10px; cursor:pointer; font:inherit; }
-.pet-album button:focus-visible { outline:3px solid #6366f1; outline-offset:2px; }
-.pet-album button[aria-pressed=true] { border:2px solid #34766b; background:#e6f3ec; }
-.pet-album-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:16px; }
-.pet-album-entry { min-width:0; display:flex; flex-direction:column; align-items:center; padding:10px; border:1px solid #d7e1e8; border-radius:12px; background:#f4f8fb; }
-.dark .pet-album-entry { background:#243347; }
-.pet-album-grid .pet-portrait { width:136px; height:153px; }
-.pet-card-options button { width:100%; margin:8px 0; }
-.dark .pet-album { background:#172033; color:#e2e8f0; }
-.dark .pet-album button { background:#243347; }
-.dark .pet-album button[aria-pressed=true] { background:#254b41; border-color:#86cdb8; }
-@media(max-width:600px) { .pet-album { padding:16px; } .pet-album-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; } .pet-album-grid .pet-portrait { width:112px; height:126px; } }
-
-/* Transform-only breathing: hatched pets in cards/compact rows; eggs and reveal animation stay separate. */
 .pet-avatar .pet-breathing { transform-origin:50% 85%; animation:pet-breathe var(--pet-breath-duration,4.6s) ease-in-out infinite; }
 .pet-card:nth-child(3n+2) .pet-breathing { animation-delay:-1.4s; }
 .pet-card:nth-child(3n) .pet-breathing { animation-delay:-2.8s; }
 @keyframes pet-breathe { 0%,100% { transform:translateY(0) scale(1); } 50% { transform:translateY(-1px) scale(1.018,1.035); } }
 @media(prefers-reduced-motion:reduce) { .pet-avatar .pet-breathing { animation:none; transform:none; } }
+
+/* Larger common egg: transform-only motion, never changes growth or random result. */
+.pet-avatar .pet-egg { width:168px; height:189px; transform-origin:50% 86%; animation:pet-egg-breathe var(--egg-duration,5.6s) ease-in-out infinite; }
+.pet-compact .pet-card:has(.pet-egg) { grid-template-columns:88px minmax(0,1fr); }
+.pet-compact .pet-avatar .pet-egg { width:88px; height:99px; }
+@keyframes pet-egg-breathe { 0%,100% { transform:translateY(0) rotate(-1deg) scale(1); } 50% { transform:translateY(-2px) rotate(1deg) scale(1.025,1.035); } }
+@media(prefers-reduced-motion:reduce) { .pet-avatar .pet-egg { animation:none; transform:none; } }
