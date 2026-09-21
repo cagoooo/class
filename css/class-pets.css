@@ -71,3 +71,5 @@
   #pets-section .pet-award-bar select { order:3; }
 }
 @media(prefers-reduced-motion:reduce) { .pet-growth-feedback .pet-portrait { animation:none; } }
+
+#pets-section .pet-student { min-height:44px; }

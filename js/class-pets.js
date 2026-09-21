@@ -202,7 +202,7 @@
     function renderContent(root) {
         prepare();
         const config = settings(); root.replaceChildren();
-        root.append(el('h2', '🐾 班級寵物'), el('p', `目前班級：${window.ClassProfiles?.currentProfile()?.name || '預設班級'}`));
+        root.append(el('h2', '🐾 班級寵物'), el('p', `目前班級：${window.ClassProfiles?.currentProfile()?.name || '預設班級'}`, 'class-context'));
         if (!config.enabled) {
             root.append(el('p', '從今天的努力開始養一隻寵物。啟用後，原本的正向加分會同時獲得等量成長值；舊分數不換算，扣分不讓寵物退化。'));
             root.append(button('啟用本班寵物成長', () => saveSettings({ ...config, enabled: true, enabledAt: new Date().toISOString() }), 'pet-primary'));
