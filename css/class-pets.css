@@ -103,6 +103,7 @@
 .pet-album::backdrop { background:#0f172a99; }
 .pet-album h3 { font-size:22px; font-weight:750; margin:0; }
 .pet-album p { line-height:1.6; margin:12px 0; }
+.pet-album > button { position:sticky; top:0; z-index:1; box-shadow:0 2px 8px #17203320; }
 .pet-album button { min-height:46px; border:1px solid #a8b8c6; border-radius:12px; background:#f4f8fb; color:inherit; padding:10px; cursor:pointer; font:inherit; }
 .pet-album button:focus-visible { outline:3px solid #6366f1; outline-offset:2px; }
 .pet-album button[aria-pressed=true] { border:2px solid #34766b; background:#e6f3ec; }

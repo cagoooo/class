@@ -2,13 +2,13 @@
 (function () {
     'use strict';
     const KEY = 'petSettings';
-    const pets = { cat: ['🐱', '小貓'], dog: ['🐶', '小狗'], rabbit: ['🐰', '小兔'], panda: ['🐼', '熊貓'], fox: ['🦊', '狐狸'], bear: ['🐻', '小熊'], penguin: ['🐧', '企鵝'], owl: ['🦉', '貓頭鷹'], turtle: ['🐢', '烏龜'], dragon: ['🐲', '小龍'], capybara: ['🦫', '水豚'], axolotl: ['🪸', '六角恐龍'] };
+    const pets = { cat: ['🐱', '小貓'], dog: ['🐶', '小狗'], rabbit: ['🐰', '小兔'], panda: ['🐼', '熊貓'], fox: ['🦊', '狐狸'], bear: ['🐻', '小熊'], penguin: ['🐧', '企鵝'], owl: ['🦉', '貓頭鷹'], turtle: ['🐢', '烏龜'], dragon: ['🐲', '小龍'], capybara: ['🦫', '水豚'], axolotl: ['🪸', '六角恐龍'], lion: ['🦁', '獅子'], tiger: ['🐯', '老虎'], elephant: ['🐘', '大象'], giraffe: ['🦒', '長頸鹿'], zebra: ['🦓', '斑馬'], monkey: ['🐒', '猴子'], koala: ['🐨', '無尾熊'], redpanda: ['🐾', '小熊貓'], raccoon: ['🦝', '浣熊'], otter: ['🦦', '水獺'], hedgehog: ['🦔', '刺蝟'], squirrel: ['🐿️', '松鼠'], sheep: ['🐑', '綿羊'], pig: ['🐷', '小豬'], frog: ['🐸', '青蛙'], seal: ['🦭', '海豹'], deer: ['🦌', '小鹿'], unicorn: ['🦄', '獨角獸'] };
     const moods = { normal: '精神飽滿', happy: '開心歡呼', sleepy: '安心休息' };
     const assetBase = document.currentScript?.src ? new URL('../assets/pets/rendered/', document.currentScript.src).href : 'assets/pets/rendered/';
     function assetName(kind, xp, mood = 'normal') {
         kind = Object.hasOwn(pets, kind) ? kind : 'cat';
         const look = appearance(xp).id;
-        if (look === 'egg') return 'mystery-egg-normal.webp';
+        if (look === 'egg') return `mystery-egg-${eggStage(xp).id}.webp`;
         mood = look === 'egg' || !Object.hasOwn(moods, mood) ? 'normal' : mood;
         return `${kind}-${look}-${mood}.webp`;
     }
@@ -17,7 +17,7 @@
         const image = el('img', undefined, 'pet-portrait pet-rendered');
         image.width = 320; image.height = 360; image.loading = 'lazy'; image.decoding = 'async';
         if (xp >= 10) { image.classList.add('pet-breathing'); image.style.setProperty('--pet-breath-duration', mood === 'sleepy' ? '6s' : mood === 'happy' ? '3.8s' : '4.6s'); }
-        image.alt = xp < 10 ? '神祕寵物蛋・等待隨機孵化' : `${pets[kind][1]}・${appearance(xp).label}・${moods[mood] || moods.normal}`;
+        image.alt = xp < 10 ? `神祕寵物蛋・${eggStage(xp).label}` : `${pets[kind][1]}・${appearance(xp).label}・${moods[mood] || moods.normal}`;
         image.src = assetBase + assetName(kind, xp, mood);
         image.addEventListener('error', () => {
             if (xp >= 10 && ['cat', 'dog', 'rabbit', 'panda'].includes(kind)) image.replaceWith(vectorPortrait(kind, xp));
@@ -38,7 +38,7 @@
         const dialog = el('dialog', undefined, 'pet-album');
         const title = el('h3', `${student.name}的寵物圖鑑`); title.id = 'pet-album-title'; dialog.setAttribute('aria-labelledby', title.id);
         const close = button('關閉圖鑑', () => { dialog.close(); dialog.remove(); });
-        dialog.append(title, el('p', '12 種可能開出的成熟造型。首次孵化才隨機揭曉，老師也無法指定；每顆蛋獨立抽選，可能開出相同種類。'), close);
+        dialog.append(title, el('p', `${Object.keys(pets).length} 種可能開出的成熟造型。首次孵化才隨機揭曉，老師也無法指定；每顆蛋獨立抽選，可能開出相同種類。`), close);
         const grid = el('div', undefined, 'pet-album-grid');
         Object.entries(pets).forEach(([kind, info]) => {
             const choice = el('div', undefined, 'pet-album-entry');
@@ -111,9 +111,12 @@
         const level = 1 + Math.floor((xp - 10) / 20);
         return { level, label: `Lv.${level}`, start: 10 + (level - 1) * 20, next: 10 + level * 20 };
     }
+    function eggStage(xp) {
+        return xp < 3 ? { id: 'rest', label: '安靜孵育' } : xp < 6 ? { id: 'crack', label: '出現裂紋' } : xp < 9 ? { id: 'splitting', label: '裂縫擴大' } : { id: 'hatching', label: '即將破殼' };
+    }
     function appearance(xp) {
         const level = stage(xp).level;
-        return level === 0 ? { id: 'egg', label: '等待孵化' } : level < 3 ? { id: 'baby', label: '幼年' } : level < 5 ? { id: 'junior', label: '成長' } : { id: 'grown', label: '成熟' };
+        return level === 0 ? { id: 'egg', label: eggStage(xp).label } : level < 3 ? { id: 'baby', label: '幼年' } : level < 5 ? { id: 'junior', label: '成長' } : { id: 'grown', label: '成熟' };
     }
     function milestone(before, after) {
         const from = stage(before).level, to = stage(after).level;
@@ -403,7 +406,7 @@
         const guide = el('details', undefined, 'pet-guide'); guide.dataset.petKey = 'guide';
         guide.append(el('summary', '成長指南與同步說明'));
         guide.append(el('p', '10 成長值孵化，每增加 20 成長值升一級。Lv.1 幼年 → Lv.3 成長 → Lv.5 成熟。分數歸零不影響成長；撤銷誤加獎勵會回復成長。'));
-        guide.append(el('p', '12 種寵物各有蛋、幼年、成長、成熟造型；孵化後可選精神飽滿、開心歡呼或安心休息樣態。首次達到 10 成長值才隨機開蛋，抽出後固定保留，撤銷再加分不重抽。表情只改外觀，不影響分數、成長或金幣。'));
+        guide.append(el('p', `${Object.keys(pets).length} 種寵物各有幼年、成長、成熟造型；孵化後可選精神飽滿、開心歡呼或安心休息樣態。蛋會隨成長值變化：0–2 安靜孵育、3–5 出現裂紋、6–8 裂縫擴大、9 即將破殼。首次達到 10 才隨機揭曉，抽出後固定保留，撤銷再加分不重抽。表情只改外觀，不影響分數、成長或金幣。`));
         guide.append(el('p', '資料先存在本機，登入後沿用雲端同步。換裝置前請完成同步，同一班請避免兩台裝置同時加分。'));
         root.append(guide);
         const wallet = el('div', undefined, 'pet-wallet-status');
@@ -452,7 +455,7 @@
                 const progress = el('progress'); progress.max = growth.next - growth.start; progress.value = xp - growth.start; progress.setAttribute('aria-label', `${s.name}成長進度`);
                 card.append(progress, el('p', `成長值 ${xp} · 距離${growth.level ? '升級' : '孵化'}還有 ${growth.next - xp}`));
                 card.append(el('span', `🪙 金幣 ${coinsFor(s.id)}`, 'pet-coin-balance'));
-                const options = el('details', undefined, 'pet-card-options'); options.dataset.petKey = 'options-' + s.id; options.append(el('summary', '寵物圖鑑與表情'), button('查看 12 種寵物圖鑑', () => openPetAlbum(s)));
+                const options = el('details', undefined, 'pet-card-options'); options.dataset.petKey = 'options-' + s.id; options.append(el('summary', '寵物圖鑑與表情'), button(`查看 ${Object.keys(pets).length} 種寵物圖鑑`, () => openPetAlbum(s)));
                 const mood = el('select'); mood.setAttribute('aria-label', `${s.name}的表情樣態`);
                 Object.entries(moods).forEach(([key, label]) => mood.add(new Option(label, key))); mood.value = s.classPetMood || 'normal';
                 mood.addEventListener('change', () => setPetMood(s.id, mood.value));

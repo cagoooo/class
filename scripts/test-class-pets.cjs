@@ -157,12 +157,12 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
         assert.equal(JSON.parse(storage.getItem('petSettings')).products[0].cost,3);assert.equal(storage.data.has('petSettings'),false);
         storage.setItem('currentClassId','C');assert.equal(storage.getItem('petSettings'),null);assert.equal(await pet.refund(ctx.pointsHistory[0].id),false);
     });
-    await test('盲盒孵化前不抽選，12 種可被抽出且一律顯示神祕蛋',async()=>{
-        const kinds='cat dog rabbit panda fox bear penguin owl turtle dragon capybara axolotl'.split(' ');
-        for(let index=0;index<12;index++){
+    await test('盲盒孵化前不抽選，30 種可被抽出且一律顯示神祕蛋',async()=>{
+        const kinds='cat dog rabbit panda fox bear penguin owl turtle dragon capybara axolotl lion tiger elephant giraffe zebra monkey koala redpanda raccoon otter hedgehog squirrel sheep pig frog seal deer unicorn'.split(' ');
+        for(let index=0;index<30;index++){
             const {pet,ctx}=setup();let draws=0;ctx.crypto={randomUUID:()=>webcrypto.randomUUID(),getRandomValues:a=>{draws++;a[0]=index;return a;}};
             await pet.award([1],9,'努力');assert.equal(draws,0);assert.equal(ctx.students[0].classPet,undefined);
-            assert.equal(pet.assetName(kinds[index],9,'happy'),'mystery-egg-normal.webp');
+            assert.equal(pet.assetName(kinds[index],9,'happy'),'mystery-egg-hatching.webp');
             await pet.award([1],1,'孵化');assert.equal(draws,1);assert.equal(ctx.students[0].classPet,kinds[index]);assert.equal(ctx.students[0].classPetRevealed,true);
         }
     });
@@ -191,6 +191,21 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
         const {pet,ctx,storage}=setup();await pet.setPetMood(1,'normal');storage.failKey='students';assert.equal(await pet.setPetMood(1,'happy'),false);assert.equal(ctx.students[0].classPetMood,'normal');
         assert.equal(await pet.setPetMood(1,'missing'),false);assert.equal(await pet.setPetMood(999,'happy'),false);
         assert.equal(pet.assetName('fox',10,'happy'),'fox-baby-happy.webp');assert.equal(pet.assetName('owl',50,'sleepy'),'owl-junior-sleepy.webp');assert.equal(pet.assetName('__proto__',90),'cat-grown-normal.webp');
+    });
+    await test('四段蛋造型門檻、表情不洩漏種類與撤銷後進度回復', async()=>{
+        const {pet,ctx}=setup();
+        for(const [xp,name,label] of [[0,'rest','安靜孵育'],[2,'rest','安靜孵育'],[3,'crack','出現裂紋'],[5,'crack','出現裂紋'],[6,'splitting','裂縫擴大'],[8,'splitting','裂縫擴大'],[9,'hatching','即將破殼']]){
+            for(const kind of ['cat','unicorn'])for(const mood of ['normal','happy','sleepy'])assert.equal(pet.assetName(kind,xp,mood),`mystery-egg-${name}.webp`);
+            assert.equal(pet.appearance(xp).label,label);assert.equal(pet.stage(xp).next,10);
+        }
+        await pet.award([1],3,'裂紋');await pet.award([1],3,'裂縫');await pet.award([1],3,'破殼');
+        assert.equal(pet.xpFor(1),9);assert.equal(ctx.students[0].classPet,undefined);
+        await pet.undo([ctx.pointsHistory[0].id]);assert.equal(pet.assetName('cat',pet.xpFor(1)),'mystery-egg-splitting.webp');
+    });
+    await test('30 種抽樣的接受與拒絕邊界',async()=>{
+        const {pet,ctx}=setup();const values=[4294967280,4294967279];let draws=0;
+        ctx.crypto={randomUUID:()=>webcrypto.randomUUID(),getRandomValues:a=>{a[0]=values[draws++];return a;}};
+        await pet.award([1],10,'孵化');assert.equal(draws,2);assert.equal(ctx.students[0].classPet,'unicorn');
     });
     console.log(`${passed} checks passed`);
 })().catch(e=>{console.error(e);process.exitCode=1;});
