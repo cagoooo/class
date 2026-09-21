@@ -133,3 +133,11 @@
 .dark .pet-collection button,.dark .pet-collection-locked { background:#243247; color:#e2e8f0; }
 @media(max-width:800px) { .pet-collection-grid { grid-template-columns:repeat(4,minmax(0,1fr)); } }
 @media(max-width:500px) { .pet-collection-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .pet-collection-variants { gap:6px; font-size:14px; } .pet-collection header { padding:12px; } .pet-collection header button { flex-shrink:0; } }
+
+/* Animate the button wrapper, leaving the portrait's breathing transform independent. */
+#pets-section button.pet-touch, .pet-collection button.pet-touch { position:relative; display:inline-flex; justify-content:center; align-items:center; flex:none; max-width:100%; min-width:46px; min-height:46px; padding:0; border:0; background:transparent; border-radius:12px; line-height:0; touch-action:manipulation; transform-origin:50% 85%; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.pet-touch:focus-visible { outline:3px solid #6366f1; outline-offset:3px; }
+.pet-touch-reply { position:absolute; z-index:2; bottom:92%; left:50%; transform:translateX(-50%); width:max-content; max-width:150px; padding:6px 9px; border-radius:10px; background:#334155; color:#fff; font:600 12px/1.5 system-ui; text-align:center; pointer-events:none; box-shadow:0 2px 6px #0002; }
+.pet-touch-reply[hidden] { display:none; }
+.pet-compact .pet-touch-reply { left:0; transform:none; max-width:140px; }
+#pets-section .pet-touch-hint { font-size:14px; color:var(--text-secondary,#64748b); margin:8px 0; }

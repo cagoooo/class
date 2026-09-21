@@ -26,6 +26,37 @@
         }, { once: true });
         return image;
     }
+    function interactivePortrait(kind, xp, mood = 'normal') {
+        const egg = xp < 10;
+        const names = { cat:'喵～蹭蹭你', dog:'汪！開心搖搖', rabbit:'蹦蹦跳！', panda:'伸個懶腰～', fox:'俏皮搖搖', bear:'給你一個抱抱', penguin:'搖搖擺擺', owl:'歪頭看看你', turtle:'慢慢點頭', dragon:'展翅飛一下', capybara:'悠閒晃一晃', axolotl:'水中游呀游', lion:'精神抖擻！', tiger:'輕輕撲一下', elephant:'踏踏步！', giraffe:'伸長脖子打招呼', zebra:'小跑步！', monkey:'跳起來打招呼', koala:'抱緊緊～', redpanda:'害羞晃晃', raccoon:'探頭看看', otter:'水中翻個身', hedgehog:'縮成小小球', squirrel:'輕快跳跳', sheep:'軟綿綿蹦一下', pig:'開心扭扭', frog:'呱！跳一下', seal:'滑呀滑', deer:'輕輕躍起', unicorn:'魔法跳躍！' };
+        const type = egg ? 'wobble' : ['rabbit','monkey','squirrel','sheep','frog','deer','unicorn'].includes(kind) ? 'hop' : ['dragon','owl'].includes(kind) ? 'float' : ['turtle','giraffe','raccoon','koala'].includes(kind) ? 'nod' : ['axolotl','otter','seal'].includes(kind) ? 'swim' : ['lion','tiger','elephant','zebra'].includes(kind) ? 'pounce' : ['panda','bear','hedgehog'].includes(kind) ? 'squish' : 'wobble';
+        const frames = {
+            wobble:['rotate(0)','rotate(-5deg)','rotate(5deg)','rotate(-3deg)','rotate(0)'],
+            hop:['translateY(0)','translateY(-12px) rotate(-3deg)','translateY(0)','translateY(-5px)','translateY(0)'],
+            float:['translateY(0) rotate(0)','translateY(-9px) rotate(-4deg)','translateY(-5px) rotate(4deg)','translateY(0) rotate(0)'],
+            nod:['rotate(0) scaleY(1)','rotate(5deg) scaleY(.94)','rotate(-4deg) scaleY(1.02)','rotate(0) scaleY(1)'],
+            swim:['translateX(0) rotate(0)','translateX(-5px) rotate(-6deg)','translateX(5px) rotate(6deg)','translateX(0) rotate(0)'],
+            pounce:['scale(1)','scale(.95,1.03)','translateY(-5px) scale(1.04,.96)','scale(1)'],
+            squish:['scale(1)','scale(1.05,.94)','scale(.97,1.03)','scale(1)']
+        };
+        let cooling = false;
+        const target = button(undefined, event => {
+            event.stopPropagation();
+            if (cooling) return;
+            cooling = true;
+            bubble.textContent = egg ? '咚咚！裡面有動靜～' : names[kind] || '你好呀！';
+            bubble.hidden = false;
+            if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches && target.animate) {
+                target.animate(frames[type].map(transform => ({ transform })), { duration:680, easing:'ease-in-out' });
+            }
+            setTimeout(() => { bubble.hidden = true; bubble.textContent = ''; cooling = false; }, 1100);
+        }, 'pet-touch');
+        target.setAttribute('aria-label', egg ? '和神祕寵物蛋互動' : `和${pets[kind][1]}互動`);
+        target.title = '點一下，打個招呼';
+        const bubble = el('span', '', 'pet-touch-reply'); bubble.hidden = true; bubble.setAttribute('role', 'status');
+        target.append(portrait(kind, xp, mood), bubble);
+        return target;
+    }
     function setPetMood(id, mood) {
         return change(() => {
             if (!Object.hasOwn(moods, mood)) return fail('請選擇清單中的表情樣態。');
@@ -206,9 +237,9 @@
         function showDetail(kind, number) {
             const holders = (window.students || []).filter(s => s.classPet === kind && (s.classPetRevealed || xpFor(s.id) >= 10)).length;
             const variants = el('div', undefined, 'pet-collection-variants');
-            for (const xp of [10, 50, 90]) { const figure = el('figure'); figure.append(portrait(kind, xp), el('figcaption', `${appearance(xp).label}・${stage(xp).label}`)); variants.append(figure); }
+            for (const xp of [10, 50, 90]) { const figure = el('figure'); figure.append(interactivePortrait(kind, xp), el('figcaption', `${appearance(xp).label}・${stage(xp).label}`)); variants.append(figure); }
             const moodsRow = el('div', undefined, 'pet-collection-variants');
-            for (const [mood, label] of Object.entries(moods)) { const figure = el('figure'); figure.append(portrait(kind, 10, mood), el('figcaption', label)); moodsRow.append(figure); }
+            for (const [mood, label] of Object.entries(moods)) { const figure = el('figure'); figure.append(interactivePortrait(kind, 10, mood), el('figcaption', label)); moodsRow.append(figure); }
             content.replaceChildren(button('← 返回收集進度', showGrid), el('h3', `No.${number} ${pets[kind][1]}`), el('p', `全班已解鎖・目前 ${holders} 位同學擁有。已解鎖紀錄不因扣分或學生離班而消失。`), variants, el('h3', '表情樣態'), moodsRow);
             content.querySelector('button').focus();
         }
@@ -452,6 +483,7 @@
         guide.append(el('p', `${Object.keys(pets).length} 種寵物藏在神祕蛋中，孵化才揭曉種類；各有幼年、成長、成熟造型。孵化後可選精神飽滿、開心歡呼或安心休息樣態。蛋會隨成長值變化：0–2 安靜孵育、3–5 出現裂紋、6–8 裂縫擴大、9 即將破殼。首次達到 10 才隨機揭曉，抽出後固定保留，撤銷再加分不重抽。表情只改外觀，不影響分數、成長或金幣。`));
         guide.append(el('p', '資料先存在本機，登入後沿用雲端同步。換裝置前請完成同步，同一班請避免兩台裝置同時加分。'));
         root.append(guide);
+        root.append(el('p', '輕點蛋或寵物，和牠打個招呼！互動不會增加成長值或金幣。', 'pet-touch-hint'));
         root.append(button(`全班收集圖鑑 · ${Object.keys(collectionFor()).length} / ${Object.keys(pets).length}`, openCollection, 'pet-collection-entry'));
         const wallet = el('div', undefined, 'pet-wallet-status');
         wallet.append(el('strong', config.coinsEnabled ? '🪙 本班金幣累積中' : '🪙 本班金幣尚未啟用／已暫停'));
@@ -494,7 +526,7 @@
                 check.dataset.petFocus = 'student-' + s.id;
                 check.addEventListener('change', () => { check.checked ? selected.add(String(s.id)) : selected.delete(String(s.id)); if (onlySelected) render(); else updateCount(); });
                 label.append(check, el('span', `${s.number || s.seatNumber || ''} ${s.name}`));
-                const avatar = el('div', undefined, 'pet-avatar'); avatar.append(portrait(kind, xp, s.classPetMood || 'normal'));
+                const avatar = el('div', undefined, 'pet-avatar'); avatar.append(interactivePortrait(kind, xp, s.classPetMood || 'normal'));
                 card.append(label, avatar, el('strong', `${xp < 10 ? '神祕寵物蛋' : pets[kind][1]} · ${appearance(xp).label}${growth.level ? ' · ' + growth.label : ''}`, 'pet-stage-label'));
                 const progress = el('progress'); progress.max = growth.next - growth.start; progress.value = xp - growth.start; progress.setAttribute('aria-label', `${s.name}成長進度`);
                 card.append(progress, el('p', `成長值 ${xp} · 距離${growth.level ? '升級' : '孵化'}還有 ${growth.next - xp}`));
