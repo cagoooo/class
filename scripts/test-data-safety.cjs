@@ -16,7 +16,7 @@ function setup(db=new FakeDb(),classId='A',uid='teacher'){
  c.window=c;vm.createContext(c);for(const f of ['class-aware-storage','backup-integrity','cloud-safety','firebase-sync','data-backup'])vm.runInContext(fs.readFileSync('js/'+f+'.js','utf8'),c);
  c.STUDENTS_KEY='students-'+classId;c.GROUPS_KEY='groups-'+classId;c.POINTS_HISTORY_KEY='pointsHistory-'+classId;
  c.students=[{id:1,name:'虛構學生 🦄',points:10,classPet:'unicorn',classPetRevealed:true,classPetMood:'happy',petCarryXp:4,petCarryCoins:2}];c.groups=[];c.pointsHistory=[{id:'earn',studentId:1,points:10,petEvent:true,petXp:10,coinDelta:7},{id:'buy',studentId:1,points:0,petEvent:true,petXp:0,coinDelta:-3,petShopType:'purchase',productName:'獎勵'},{id:'refund',studentId:1,points:0,petEvent:true,petXp:0,coinDelta:3,petReverses:'buy'}];
- const save=()=>{for(const k of ['students','groups','pointsHistory'])storage.setItem(k+'-'+classId,JSON.stringify(c[k]));};save();storage.setItem('petSettings',JSON.stringify({enabled:true,coinsEnabled:true,rules:[{id:'r',name:'努力',xp:3,coins:2,points:1}],products:[{id:'p',name:'獎勵',cost:3}]}));
+ const save=()=>{for(const k of ['students','groups','pointsHistory'])storage.setItem(k+'-'+classId,JSON.stringify(c[k]));};save();storage.setItem('petSettings',JSON.stringify({enabled:true,coinsEnabled:true,collection:{unicorn:{discoveredAt:'2026-09-22T00:00:00Z'}},rules:[{id:'r',name:'努力',xp:3,coins:2,points:1}],products:[{id:'p',name:'獎勵',cost:3}]}));
  const recovery=new Map();c.LocalRecovery={put:async(k,v)=>recovery.set(k,structuredClone(v)),get:async k=>recovery.get(k)};
  return {c,db,storage,save,recovery,notices,s:c.CloudSafety};
 }

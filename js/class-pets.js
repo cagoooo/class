@@ -73,7 +73,7 @@
     }
     function prepare() {
         // 只接受與磁碟一致的記憶體，不能把其他分頁的新快照當作本頁舊資料。
-        if (cid() === expectedClass && memoryMatchesStorage()) remember();
+        if (cid() === expectedClass && memoryMatchesStorage()) { preserveCollection(); remember(); }
     }
     const fail = message => { window.alert(message); return false; };
     function xpFor(id, history = window.pointsHistory || [], carry = Number(window.students?.find(s => String(s.id) === String(id))?.petCarryXp) || 0) {
@@ -163,9 +163,64 @@
             return fail('這次操作未完成，請確認資料與儲存空間後再試。');
         } finally { busy = false; render(); }
     }
+    function collectionFor(roster = window.students || [], history = window.pointsHistory || [], config = settings()) {
+        const found = {};
+        for (const kind of Object.keys(pets)) {
+            if (config.collection?.[kind]) found[kind] = { discoveredAt: config.collection[kind].discoveredAt || null };
+        }
+        for (const student of roster) {
+            if (!student.classPetRevealed && xpFor(student.id, history, Number(student.petCarryXp) || 0) < 10) continue;
+            const kind = Object.hasOwn(pets, student.classPet) ? student.classPet : 'cat';
+            if (!found[kind]) found[kind] = { discoveredAt: new Date().toISOString() };
+        }
+        return found;
+    }
+    function preserveCollection() {
+        const config = settings(), collection = collectionFor();
+        if (!Object.keys(collection).length || JSON.stringify(config.collection || {}) === JSON.stringify(collection)) return true;
+        return SafeStorage.set(KEY, JSON.stringify({ ...config, collection }), { context: '班級圖鑑解鎖紀錄' });
+    }
+    function openCollection() {
+        const found = collectionFor(), count = Object.keys(found).length;
+        const dialog = el('dialog', undefined, 'pet-collection');
+        const header = el('header'), title = el('h2', '全班收集圖鑑'); title.id = 'pet-collection-title';
+        dialog.setAttribute('aria-labelledby', title.id);
+        header.append(title, button('關閉圖鑑', () => { dialog.close(); dialog.remove(); }));
+        const content = el('div', undefined, 'pet-collection-body');
+        const progress = el('p', `已收集 ${count} / ${Object.keys(pets).length} 種`); progress.setAttribute('role', 'status');
+        const bar = el('progress'); bar.max = Object.keys(pets).length; bar.value = count; bar.setAttribute('aria-label', '全班圖鑑收集進度');
+        const grid = el('div', undefined, 'pet-collection-grid');
+        Object.entries(pets).forEach(([kind, [, name]], index) => {
+            const number = String(index + 1).padStart(2, '0');
+            if (!found[kind]) {
+                const locked = el('div', undefined, 'pet-collection-locked');
+                locked.append(el('small', `No.${number}`), el('span', '？'), el('strong', '未發現'));
+                grid.append(locked); return;
+            }
+            const tile = button(undefined, () => showDetail(kind, number), 'pet-collection-unlocked');
+            tile.setAttribute('aria-label', `查看已解鎖圖鑑：${name}`);
+            tile.append(el('small', `No.${number}`), portrait(kind, 10), el('strong', name)); grid.append(tile);
+        });
+        const intro = el('p', count === Object.keys(pets).length ? '全圖鑑收集完成！這是全班一起累積的成果。' : '任一位同學孵化成功，全班就解鎖一格！未發現的寵物保留神祕，等下一顆蛋揭曉。');
+        function showGrid() { content.replaceChildren(progress, bar, intro, grid); }
+        function showDetail(kind, number) {
+            const holders = (window.students || []).filter(s => s.classPet === kind && (s.classPetRevealed || xpFor(s.id) >= 10)).length;
+            const variants = el('div', undefined, 'pet-collection-variants');
+            for (const xp of [10, 50, 90]) { const figure = el('figure'); figure.append(portrait(kind, xp), el('figcaption', `${appearance(xp).label}・${stage(xp).label}`)); variants.append(figure); }
+            const moodsRow = el('div', undefined, 'pet-collection-variants');
+            for (const [mood, label] of Object.entries(moods)) { const figure = el('figure'); figure.append(portrait(kind, 10, mood), el('figcaption', label)); moodsRow.append(figure); }
+            content.replaceChildren(button('← 返回收集進度', showGrid), el('h3', `No.${number} ${pets[kind][1]}`), el('p', `全班已解鎖・目前 ${holders} 位同學擁有。已解鎖紀錄不因扣分或學生離班而消失。`), variants, el('h3', '表情樣態'), moodsRow);
+            content.querySelector('button').focus();
+        }
+        showGrid(); dialog.append(header, content); document.body.append(dialog);
+        dialog.addEventListener('cancel', () => dialog.remove()); dialog.showModal();
+    }
     function commit(nextStudents, nextGroups, nextHistory) {
         const values = [nextStudents, nextGroups, nextHistory];
-        if (!SafeStorage.write(keys().map((k, i) => [k, JSON.stringify(values[i])]), { context: '寵物獎勵與班級分數' })) return false;
+        const config = settings(), collection = collectionFor(nextStudents, nextHistory, config);
+        const writes = keys().map((k, i) => [k, JSON.stringify(values[i])]);
+        if (Object.keys(collection).length) writes.push([KEY, JSON.stringify({ ...config, collection })]);
+        if (!SafeStorage.write(writes, { context: '寵物獎勵與班級分數' })) return false;
         window.students = nextStudents; window.groups = nextGroups; window.pointsHistory = nextHistory;
         remember(); redraw();
         return true;
@@ -397,6 +452,7 @@
         guide.append(el('p', `${Object.keys(pets).length} 種寵物藏在神祕蛋中，孵化才揭曉種類；各有幼年、成長、成熟造型。孵化後可選精神飽滿、開心歡呼或安心休息樣態。蛋會隨成長值變化：0–2 安靜孵育、3–5 出現裂紋、6–8 裂縫擴大、9 即將破殼。首次達到 10 才隨機揭曉，抽出後固定保留，撤銷再加分不重抽。表情只改外觀，不影響分數、成長或金幣。`));
         guide.append(el('p', '資料先存在本機，登入後沿用雲端同步。換裝置前請完成同步，同一班請避免兩台裝置同時加分。'));
         root.append(guide);
+        root.append(button(`全班收集圖鑑 · ${Object.keys(collectionFor()).length} / ${Object.keys(pets).length}`, openCollection, 'pet-collection-entry'));
         const wallet = el('div', undefined, 'pet-wallet-status');
         wallet.append(el('strong', config.coinsEnabled ? '🪙 本班金幣累積中' : '🪙 本班金幣尚未啟用／已暫停'));
         const coinGuide = el('details'); coinGuide.dataset.petKey = 'coins-guide'; coinGuide.append(el('summary', '金幣規則與使用說明'), el('p', '金幣與成長值分開記錄。啟用後，原本正向加分會獲得等量金幣；自訂規則可調整金額。舊分數不換算，一般扣分與分數歸零不扣金幣，撤銷獎勵會扣回該筆金幣。可在兌換商店使用金幣；暫停累積後仍可使用餘額。'));
@@ -533,7 +589,7 @@
         renderHistory(); history.append(rows, paging); root.append(history);
     }
     function init() {
-        remember();
+        preserveCollection(); remember();
         const menu = document.getElementById('feature-menu-grid') || document.querySelector('button[onclick="showSection(\'grouping\')"]')?.parentElement;
         const nav = button(undefined, () => { render(); window.showSection('pets'); }, 'bg-gradient-to-br from-amber-50 to-orange-50 p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-amber-500 active:scale-95');
         nav.id = 'petsNavBtn';
@@ -547,6 +603,6 @@
         render();
         if (location.hash === '#pets') window.showSection('pets');
     }
-    window.ClassPets = { award, undo, xpFor, coinsFor, setCoinsEnabled, saveRule, saveProduct, setProductActive, redeem, refund, setPetMood, assetName, stage, appearance, milestone, render, prepare, settings };
+    window.ClassPets = { award, undo, xpFor, coinsFor, setCoinsEnabled, saveRule, saveProduct, setProductActive, redeem, refund, setPetMood, assetName, stage, appearance, milestone, render, prepare, settings, collectionFor };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

@@ -207,5 +207,20 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
         ctx.crypto={randomUUID:()=>webcrypto.randomUUID(),getRandomValues:a=>{a[0]=values[draws++];return a;}};
         await pet.award([1],10,'孵化');assert.equal(draws,2);assert.equal(ctx.students[0].classPet,'unicorn');
     });
+    await test('班級圖鑑只在孵化後解鎖且同種不重複計數',async()=>{
+        const {pet,ctx}=setup();ctx.crypto={randomUUID:()=>webcrypto.randomUUID(),getRandomValues:a=>{a[0]=0;return a;}};
+        await pet.award([1],9,'未孵化');assert.equal(Object.keys(pet.collectionFor()).length,0);
+        await pet.award([1],1,'孵化');await pet.award([2],10,'相同種類');assert.equal(Object.keys(pet.settings().collection).length,1);assert.ok(pet.settings().collection.cat);
+    });
+    await test('撤銷獎勵、學生離班及重新載入不抹除已解鎖圖鑑',async()=>{
+        const {pet,ctx,persist}=setup();await pet.award([1],10,'孵化');const kind=ctx.students[0].classPet;await pet.undo([ctx.pointsHistory[0].id]);assert.ok(pet.collectionFor()[kind]);ctx.students=[];persist();pet.prepare();assert.ok(pet.settings().collection[kind]);
+        vm.runInContext(fs.readFileSync('js/class-pets.js','utf8'),ctx);ctx.ClassPets.prepare();assert.ok(ctx.ClassPets.collectionFor()[kind]);
+    });
+    await test('圖鑑寫入失敗會一起還原孵化和帳本',async()=>{
+        const {pet,ctx,storage}=setup();const before=JSON.stringify([ctx.students,ctx.pointsHistory]);storage.failKey='petSettings';assert.equal(await pet.award([1],10,'孵化'),false);assert.equal(JSON.stringify([ctx.students,ctx.pointsHistory]),before);assert.equal(Object.keys(pet.collectionFor()).length,0);
+    });
+    await test('各班圖鑑獨立；舊版已孵化自動收錄且不暴露未孵化預選',async()=>{
+        const {pet,ctx,storage,persist}=setup('A');ctx.students[0].classPet='unicorn';ctx.students[0].classPetRevealed=true;ctx.students[1].classPet='dragon';persist();pet.prepare();assert.ok(pet.settings().collection.unicorn);assert.equal(pet.collectionFor().dragon,undefined);storage.setItem('currentClassId','B');assert.equal(pet.settings().collection,undefined);
+    });
     console.log(`${passed} checks passed`);
 })().catch(e=>{console.error(e);process.exitCode=1;});
