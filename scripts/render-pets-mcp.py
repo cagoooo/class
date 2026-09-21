@@ -21,6 +21,7 @@ async def main():
                 source=(root/'art/pets/build-pets.py').read_text(encoding='utf-8-sig')
                 kinds=['cat','dog','rabbit','panda','fox','bear','penguin','owl','turtle','dragon','capybara','axolotl']
                 jobs=[(k,stage,mood) for k in kinds for stage in ['egg','baby','junior','grown'] for mood in (['normal'] if stage=='egg' else ['normal','happy','sleepy'])]
+                jobs.append(('mystery','egg','normal'))
                 target=root/'art/pets/renders';target.mkdir(exist_ok=True)
                 blends=root/'art/pets/source';blends.mkdir(exist_ok=True)
                 for index,(kind,stage,mood) in enumerate(jobs):

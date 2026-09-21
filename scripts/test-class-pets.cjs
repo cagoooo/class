@@ -157,22 +157,40 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
         assert.equal(JSON.parse(storage.getItem('petSettings')).products[0].cost,3);assert.equal(storage.data.has('petSettings'),false);
         storage.setItem('currentClassId','C');assert.equal(storage.getItem('petSettings'),null);assert.equal(await pet.refund(ctx.pointsHistory[0].id),false);
     });
-    await test('12 種寵物與三種樣態只改造型，帳本與成長金幣不變',async()=>{
-        const {pet,ctx,storage}=setup('B');await pet.setCoinsEnabled(true);await pet.award([1],15,'努力');const before=JSON.stringify([ctx.groups,ctx.pointsHistory]);
-        for(const kind of ['cat','dog','rabbit','panda','fox','bear','penguin','owl','turtle','dragon','capybara','axolotl'])for(const mood of ['normal','happy','sleepy']) {
-            assert.equal(await pet.setPetLook(1,kind,mood),true);assert.equal(ctx.students[0].classPet,kind);assert.equal(ctx.students[0].classPetMood,mood);
-            assert.equal(pet.xpFor(1),15);assert.equal(pet.coinsFor(1),15);assert.equal(ctx.students[0].points,20);assert.equal(JSON.stringify([ctx.groups,ctx.pointsHistory]),before);
+    await test('盲盒孵化前不抽選，12 種可被抽出且一律顯示神祕蛋',async()=>{
+        const kinds='cat dog rabbit panda fox bear penguin owl turtle dragon capybara axolotl'.split(' ');
+        for(let index=0;index<12;index++){
+            const {pet,ctx}=setup();let draws=0;ctx.crypto={randomUUID:()=>webcrypto.randomUUID(),getRandomValues:a=>{draws++;a[0]=index;return a;}};
+            await pet.award([1],9,'努力');assert.equal(draws,0);assert.equal(ctx.students[0].classPet,undefined);
+            assert.equal(pet.assetName(kinds[index],9,'happy'),'mystery-egg-normal.webp');
+            await pet.award([1],1,'孵化');assert.equal(draws,1);assert.equal(ctx.students[0].classPet,kinds[index]);assert.equal(ctx.students[0].classPetRevealed,true);
         }
-        const saved=JSON.parse(storage.getItem(ctx.STUDENTS_KEY))[0];assert.equal(saved.classPet,'axolotl');assert.equal(saved.classPetMood,'sleepy');
-        for(const kind of ['missing','__proto__','../../evil'])assert.equal(await pet.setPetLook(1,kind),false);
-        assert.equal(await pet.setPetLook(1,'fox','missing'),false);assert.equal(await pet.setPetLook(999,'fox'),false);
     });
-    await test('渲染路徑白名單與成長門檻，蛋不受表情影響',async()=>{
-        const {pet}=setup();assert.equal(pet.assetName('fox',0,'happy'),'fox-egg-normal.webp');assert.equal(pet.assetName('fox',10,'happy'),'fox-baby-happy.webp');assert.equal(pet.assetName('owl',50,'sleepy'),'owl-junior-sleepy.webp');assert.equal(pet.assetName('dragon',90),'dragon-grown-normal.webp');
-        assert.equal(pet.assetName('../bad',90,'bad'),'cat-grown-normal.webp');assert.equal(pet.assetName('__proto__',90),'cat-grown-normal.webp');
+    await test('隨機抽樣排除模數偏差範圍，批次每位獨立抽取',async()=>{
+        const {pet,ctx}=setup();const values=[4294967295,4,11];let draws=0;ctx.crypto={randomUUID:()=>webcrypto.randomUUID(),getRandomValues:a=>{a[0]=values[draws++];return a;}};
+        await pet.award([1,2],10,'一起孵化');assert.equal(draws,3);assert.equal(ctx.students[0].classPet,'fox');assert.equal(ctx.students[1].classPet,'axolotl');
     });
-    await test('更換寵物存檔失敗不破壞原造型',async()=>{
-        const {pet,ctx,storage}=setup();await pet.setPetLook(1,'panda');storage.failKey='students';assert.equal(await pet.setPetLook(1,'fox','happy'),false);assert.equal(ctx.students[0].classPet,'panda');assert.equal(ctx.students[0].classPetMood,'normal');
+    await test('撤銷再孵化與重新載入不重抽，表情不改帳本或種類',async()=>{
+        const {pet,ctx,storage}=setup();await pet.setCoinsEnabled(true);await pet.award([1],10,'孵化');const kind=ctx.students[0].classPet,id=ctx.pointsHistory[0].id;
+        await pet.undo([id]);assert.equal(ctx.students[0].classPet,kind);assert.equal(ctx.students[0].classPetRevealed,true);
+        ctx.crypto={randomUUID:()=>webcrypto.randomUUID(),getRandomValues:()=>{throw Error('must not reroll')}};
+        vm.runInContext(fs.readFileSync('js/class-pets.js','utf8'),ctx);ctx.ClassPets.prepare();await ctx.ClassPets.award([1],10,'再次孵化');assert.equal(ctx.students[0].classPet,kind);
+        const before=JSON.stringify([ctx.groups,ctx.pointsHistory]);for(const mood of ['normal','happy','sleepy'])assert.equal(await ctx.ClassPets.setPetMood(1,mood),true);
+        assert.equal(ctx.students[0].classPet,kind);assert.equal(JSON.stringify([ctx.groups,ctx.pointsHistory]),before);assert.equal(ctx.ClassPets.xpFor(1),10);assert.equal(ctx.ClassPets.coinsFor(1),10);
+        const saved=JSON.parse(storage.getItem(ctx.STUDENTS_KEY))[0];assert.equal(saved.classPet,kind);assert.equal(saved.classPetRevealed,true);assert.equal(saved.classPetMood,'sleepy');assert.equal(typeof ctx.ClassPets.setPetLook,'undefined');
+    });
+    await test('舊版已孵化寵物保留種類，舊版撤銷後也不重抽',async()=>{
+        const {pet,ctx,persist}=setup();ctx.students[0].classPet='panda';ctx.pointsHistory.unshift({id:'old-award',studentId:1,petEvent:true,petXp:10,points:10,createdAtMs:Date.now()});persist();pet.prepare();
+        ctx.crypto={randomUUID:()=>webcrypto.randomUUID(),getRandomValues:()=>{throw Error('legacy must not reroll')}};
+        await pet.undo(['old-award']);await pet.award([1],10,'再次孵化');assert.equal(ctx.students[0].classPet,'panda');assert.equal(ctx.students[0].classPetRevealed,true);
+    });
+    await test('孵化存檔失敗不留下半筆揭曉或扣款',async()=>{
+        const {pet,ctx,storage}=setup();storage.failKey='pointsHistory';assert.equal(await pet.award([1],10,'孵化'),false);assert.equal(ctx.students[0].classPet,undefined);assert.equal(ctx.students[0].classPetRevealed,undefined);assert.equal(pet.xpFor(1),0);
+    });
+    await test('表情與資產路徑白名單，存檔失敗保留原樣態',async()=>{
+        const {pet,ctx,storage}=setup();await pet.setPetMood(1,'normal');storage.failKey='students';assert.equal(await pet.setPetMood(1,'happy'),false);assert.equal(ctx.students[0].classPetMood,'normal');
+        assert.equal(await pet.setPetMood(1,'missing'),false);assert.equal(await pet.setPetMood(999,'happy'),false);
+        assert.equal(pet.assetName('fox',10,'happy'),'fox-baby-happy.webp');assert.equal(pet.assetName('owl',50,'sleepy'),'owl-junior-sleepy.webp');assert.equal(pet.assetName('__proto__',90),'cat-grown-normal.webp');
     });
     console.log(`${passed} checks passed`);
 })().catch(e=>{console.error(e);process.exitCode=1;});

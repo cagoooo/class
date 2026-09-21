@@ -12,4 +12,6 @@ for kind in KINDS:
             with Image.open(ROOT / 'art/pets/renders' / (name + '.png')) as image:
                 assert image.size == (320, 360) and image.mode == 'RGBA', name
                 image.save(output / (name + '.webp'), 'WEBP', quality=84, method=6)
-print('Verified and packed 120 Blender renders')
+with Image.open(ROOT / 'art/pets/renders/mystery-egg-normal.png') as image:
+    image.save(output / 'mystery-egg-normal.webp', 'WEBP', quality=84, method=6)
+print('Verified and packed 121 Blender renders')

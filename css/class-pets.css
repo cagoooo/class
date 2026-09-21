@@ -107,7 +107,8 @@
 .pet-album button:focus-visible { outline:3px solid #6366f1; outline-offset:2px; }
 .pet-album button[aria-pressed=true] { border:2px solid #34766b; background:#e6f3ec; }
 .pet-album-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:16px; }
-.pet-album-grid button { min-width:0; display:flex; flex-direction:column; align-items:center; }
+.pet-album-entry { min-width:0; display:flex; flex-direction:column; align-items:center; padding:10px; border:1px solid #d7e1e8; border-radius:12px; background:#f4f8fb; }
+.dark .pet-album-entry { background:#243347; }
 .pet-album-grid .pet-portrait { width:136px; height:153px; }
 .pet-card-options button { width:100%; margin:8px 0; }
 .dark .pet-album { background:#172033; color:#e2e8f0; }
