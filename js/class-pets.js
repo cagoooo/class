@@ -18,6 +18,9 @@
     let selected = new Set();
     let query = '';
     let selectedRule = '';
+    let onlySelected = false;
+    let viewMode = ['compact', 'cards'].includes(localStorage.getItem('petViewMode')) ? localStorage.getItem('petViewMode') : (window.matchMedia?.('(max-width: 600px)').matches ? 'compact' : 'cards');
+    let feedbackTimer;
     let expected = null;
     let expectedClass = cid();
     const fingerprint = () => JSON.stringify([...keys(), KEY].map(k => localStorage.getItem(k)));
@@ -43,6 +46,45 @@
         if (xp < 10) return { level: 0, label: '等待孵化', start: 0, next: 10 };
         const level = 1 + Math.floor((xp - 10) / 20);
         return { level, label: `Lv.${level}`, start: 10 + (level - 1) * 20, next: 10 + level * 20 };
+    }
+    function appearance(xp) {
+        const level = stage(xp).level;
+        return level === 0 ? { id: 'egg', label: '等待孵化' } : level < 3 ? { id: 'baby', label: '幼年' } : level < 5 ? { id: 'junior', label: '成長' } : { id: 'grown', label: '成熟' };
+    }
+    function milestone(before, after) {
+        const from = stage(before).level, to = stage(after).level;
+        return to > from ? { type: from === 0 ? 'hatch' : 'level', level: to } : null;
+    }
+    // 固定向量圖形與白名單色彩；不將學生姓名或輸入文字插入 SVG。
+    function portrait(kind, xp) {
+        kind = pets[kind] ? kind : 'cat';
+        const look = appearance(xp), grown = look.id === 'grown', baby = look.id === 'baby';
+        const colors = { cat: ['#f5b45f', '#ffe2b5'], dog: ['#b98259', '#f6d7b0'], rabbit: ['#e0c8ed', '#faf1ff'], panda: ['#f6f8fc', '#dce5f2'] };
+        const [fur, belly] = colors[kind];
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 160 160'); svg.setAttribute('role', 'img');
+        svg.setAttribute('aria-label', `${pets[kind][1]}・${look.label}造型`);
+        svg.classList.add('pet-portrait');
+        let shape;
+        if (look.id === 'egg') {
+            shape = `<path d="M80 24C60 24 38 66 38 100a42 42 0 0 0 84 0C122 66 100 24 80 24Z" fill="${belly}" stroke="#586174" stroke-width="3"/><path d="m42 93 16-10 16 14 16-14 17 12 12-7" fill="none" stroke="${fur}" stroke-width="7"/><circle cx="65" cy="64" r="7" fill="${fur}"/><circle cx="99" cy="116" r="8" fill="${fur}"/>`;
+        } else {
+            const ears = kind === 'cat' ? `<path d="m42 60-4-38 32 22m20 0 32-22-4 38" fill="${fur}" stroke="#586174" stroke-width="3"/>` : kind === 'rabbit' ? `<ellipse cx="59" cy="34" rx="13" ry="30" fill="${fur}"/><ellipse cx="101" cy="34" rx="13" ry="30" fill="${fur}"/><path d="M59 14v32m42-32v32" stroke="#efb8c9" stroke-width="8" stroke-linecap="round"/>` : kind === 'panda' ? '<circle cx="44" cy="46" r="19" fill="#445065"/><circle cx="116" cy="46" r="19" fill="#445065"/>' : `<ellipse cx="41" cy="68" rx="17" ry="32" fill="#895b43"/><ellipse cx="119" cy="68" rx="17" ry="32" fill="#895b43"/>`;
+            shape = `<ellipse cx="80" cy="116" rx="${baby ? 28 : 37}" ry="${baby ? 25 : 31}" fill="${fur}" stroke="#586174" stroke-width="2"/><ellipse cx="80" cy="120" rx="19" ry="22" fill="${belly}"/>${ears}<ellipse cx="80" cy="74" rx="${baby ? 46 : 40}" ry="38" fill="${fur}" stroke="#586174" stroke-width="2"/>${kind === 'panda' ? '<ellipse cx="61" cy="72" rx="13" ry="16" fill="#445065"/><ellipse cx="99" cy="72" rx="13" ry="16" fill="#445065"/>' : ''}<circle cx="62" cy="73" r="5" fill="${kind === 'panda' ? '#fff' : '#354158'}"/><circle cx="98" cy="73" r="5" fill="${kind === 'panda' ? '#fff' : '#354158'}"/><ellipse cx="80" cy="88" rx="5" ry="4" fill="#354158"/><path d="M69 94q11 11 22 0" fill="none" stroke="#354158" stroke-width="3" stroke-linecap="round"/><ellipse cx="48" cy="88" rx="8" ry="4" fill="#eea5a1"/><ellipse cx="112" cy="88" rx="8" ry="4" fill="#eea5a1"/>${!baby ? '<path d="M52 105q28 14 56 0l-5 14H57Z" fill="#3d9488"/><path d="m89 117 14 18-17-3Z" fill="#3d9488"/>' : ''}${grown ? '<path d="m80 120 3 7 8 1-6 5 2 8-7-4-7 4 2-8-6-5 8-1Z" fill="#f6c455" stroke="#8f6b1c"/>' : ''}`;
+        }
+        svg.innerHTML = `<ellipse cx="80" cy="149" rx="48" ry="6" fill="#d9e5e4"/>${shape}`;
+        return svg;
+    }
+    function celebrate(events) {
+        if (!events.length || !document.body) return;
+        document.getElementById('pet-growth-feedback')?.remove(); clearTimeout(feedbackTimer);
+        const box = el('aside', undefined, 'pet-growth-feedback'); box.id = 'pet-growth-feedback';
+        const hatch = events.filter(e => e.type === 'hatch').length;
+        const title = events.length === 1 ? `${events[0].name}的寵物${hatch ? '孵化了！' : '升級了！'}` : `${hatch ? `${hatch} 隻孵化` : ''}${hatch && hatch < events.length ? '、' : ''}${events.length > hatch ? `${events.length - hatch} 隻升級` : ''}！`;
+        const message = el('div'); message.setAttribute('role', 'status'); message.setAttribute('aria-live', 'polite');
+        message.append(el('strong', title), el('p', events.length === 1 ? `${appearance(events[0].xp).label} · Lv.${events[0].level}，一起繼續成長！` : '這次努力已存本機，到班級寵物查看新造型。'));
+        box.append(portrait(events[0].kind, events[0].xp), message, button('關閉', () => { clearTimeout(feedbackTimer); box.remove(); }));
+        document.body.append(box); feedbackTimer = setTimeout(() => box.remove(), 8000);
     }
     function remember() { expected = fingerprint(); expectedClass = cid(); }
     function fresh() {
@@ -83,6 +125,7 @@
             const unique = [...new Set(ids.map(String))];
             if (!unique.length || unique.some(id => !window.students.some(s => String(s.id) === id))) return fail('請選擇目前班級的學生。');
             const ss = clone(window.students), gg = clone(window.groups), hh = clone(window.pointsHistory);
+            const events = unique.map(id => { const before = xpFor(id), event = milestone(before, before + xp), student = ss.find(s => String(s.id) === id); return event && { ...event, name: student.name, kind: student.classPet, xp: before + xp }; }).filter(Boolean);
             const now = new Date();
             unique.forEach(id => {
                 const s = ss.find(s => String(s.id) === id);
@@ -95,7 +138,8 @@
                     petBatch: batchId, petGroupId: g?.id ?? null });
             });
             if (!commit(ss, gg, hh)) return false;
-            selected.clear(); render();
+            selected.clear(); onlySelected = false; render();
+            celebrate(events);
             if (typeof NotificationSystem !== 'undefined') NotificationSystem.success(`已存本機 · ${unique.length} 人${xp ? `，每人成長 +${xp}` : ''}`);
             return true;
         });
@@ -147,6 +191,15 @@
     }
     function render() {
         const root = document.getElementById('pets-section'); if (!root) return;
+        const scroll = window.scrollY || 0;
+        const opened = [...root.querySelectorAll('details[open][data-pet-key]')].map(d => d.dataset.petKey);
+        const focusKey = root.contains(document.activeElement) ? document.activeElement.dataset.petFocus : null;
+        renderContent(root);
+        opened.forEach(key => { const d = [...root.querySelectorAll('details[data-pet-key]')].find(d => d.dataset.petKey === key); if (d) d.open = true; });
+        if (focusKey) [...root.querySelectorAll('[data-pet-focus]')].find(e => e.dataset.petFocus === focusKey)?.focus({ preventScroll: true });
+        if (!root.classList.contains('hidden')) window.scrollTo?.({ top: scroll, behavior: 'instant' });
+    }
+    function renderContent(root) {
         prepare();
         const config = settings(); root.replaceChildren();
         root.append(el('h2', '🐾 班級寵物'), el('p', `目前班級：${window.ClassProfiles?.currentProfile()?.name || '預設班級'}`));
@@ -154,38 +207,58 @@
             root.append(el('p', '從今天的努力開始養一隻寵物。啟用後，原本的正向加分會同時獲得等量成長值；舊分數不換算，扣分不讓寵物退化。'));
             root.append(button('啟用本班寵物成長', () => saveSettings({ ...config, enabled: true, enabledAt: new Date().toISOString() }), 'pet-primary'));
             if (!(window.pointsHistory || []).some(r => r.petEvent)) return;
-        } else root.append(el('p', '🥚 10 成長值孵化，每增加 20 成長值升一級。分數歸零不影響成長；撤銷誤加獎勵會回復成長。'));
-        root.append(el('p', '資料先存在本機，登入後沿用雲端同步。換裝置前請完成同步，同一班請避免兩台裝置同時加分。'));
+        }
+        const guide = el('details', undefined, 'pet-guide'); guide.dataset.petKey = 'guide';
+        guide.append(el('summary', '成長指南與同步說明'));
+        guide.append(el('p', '10 成長值孵化，每增加 20 成長值升一級。Lv.1 幼年 → Lv.3 成長 → Lv.5 成熟。分數歸零不影響成長；撤銷誤加獎勵會回復成長。'));
+        guide.append(el('p', '資料先存在本機，登入後沿用雲端同步。換裝置前請完成同步，同一班請避免兩台裝置同時加分。'));
+        root.append(guide);
+        const views = el('div', undefined, 'pet-view-tools'); views.setAttribute('aria-label', '寵物顯示方式');
+        ['compact', 'cards'].forEach(mode => {
+            const b = button(mode === 'compact' ? '精簡名單' : '成長卡片', () => { viewMode = mode; try { localStorage.setItem('petViewMode', mode); } catch {} render(); });
+            b.setAttribute('aria-pressed', String(viewMode === mode)); b.dataset.petFocus = mode; views.append(b);
+        });
+        const selectedFilter = button('只看已選', () => { onlySelected = !onlySelected; render(); });
+        selectedFilter.setAttribute('aria-pressed', String(onlySelected)); selectedFilter.dataset.petFocus = 'selected-filter'; views.append(selectedFilter); root.append(views);
         const tools = el('div', undefined, 'pet-tools');
         const search = el('input'); search.type = 'search'; search.placeholder = '搜尋姓名或座號'; search.value = query; search.setAttribute('aria-label', '搜尋寵物學生');
-        search.addEventListener('input', () => { query = search.value; renderCards(); page = 0; renderHistory(); });
+        search.dataset.petFocus = 'search';
+        search.addEventListener('input', () => { query = search.value; renderCards(); updateCount(); page = 0; renderHistory(); });
         tools.append(search, button('選取目前顯示學生', () => { visibleStudents().forEach(s => selected.add(String(s.id))); render(); }), button('取消選取', () => { selected.clear(); render(); }));
         const groupSelect = el('select'); groupSelect.setAttribute('aria-label', '選取小組'); groupSelect.add(new Option('選取整組…', ''));
+        groupSelect.dataset.petFocus = 'group';
         window.groups.forEach((g, i) => groupSelect.add(new Option(g.name, String(i))));
         groupSelect.addEventListener('change', () => { if (groupSelect.value !== '') { window.groups[Number(groupSelect.value)].members.forEach(s => selected.add(String(s.id))); render(); } });
         tools.append(groupSelect); root.append(tools);
-        const cards = el('div', undefined, 'pet-cards'); root.append(cards);
-        function visibleStudents() { return window.students.filter(s => `${s.name} ${s.number || s.seatNumber || ''}`.includes(query.trim())); }
+        const cards = el('div', undefined, 'pet-cards' + (viewMode === 'compact' ? ' pet-compact' : '')); root.append(cards);
+        function visibleStudents() { return window.students.filter(s => `${s.name} ${s.number || s.seatNumber || ''}`.includes(query.trim()) && (!onlySelected || selected.has(String(s.id)))); }
         function renderCards() {
             cards.replaceChildren();
             const list = visibleStudents();
-            if (!list.length) cards.append(el('p', '沒有符合的學生，請調整搜尋或先到學生管理新增名單。'));
+            if (!list.length) {
+                cards.append(el('p', onlySelected ? '目前沒有符合的已選學生。可返回全部名單繼續選取。' : '沒有符合的學生，請調整搜尋或先到學生管理新增名單。'));
+                if (onlySelected || query) cards.append(button('返回全部名單', () => { onlySelected = false; query = ''; render(); }));
+            }
             list.forEach(s => {
                 const xp = xpFor(s.id), growth = stage(xp), kind = pets[s.classPet] ? s.classPet : 'cat';
                 const card = el('article', undefined, 'pet-card');
                 const label = el('label', undefined, 'pet-student'); const check = el('input'); check.type = 'checkbox'; check.checked = selected.has(String(s.id));
-                check.addEventListener('change', () => { check.checked ? selected.add(String(s.id)) : selected.delete(String(s.id)); updateCount(); });
+                check.dataset.petFocus = 'student-' + s.id;
+                check.addEventListener('change', () => { check.checked ? selected.add(String(s.id)) : selected.delete(String(s.id)); if (onlySelected) render(); else updateCount(); });
                 label.append(check, el('span', `${s.number || s.seatNumber || ''} ${s.name}`));
-                card.append(label, el('div', growth.level ? pets[kind][0] : '🥚', 'pet-avatar'), el('strong', growth.level ? `${pets[kind][1]} · ${growth.label}` : `等待孵化 · ${pets[kind][1]}`));
+                const avatar = el('div', undefined, 'pet-avatar'); avatar.append(portrait(kind, xp));
+                card.append(label, avatar, el('strong', `${pets[kind][1]} · ${appearance(xp).label}${growth.level ? ' · ' + growth.label : ''}`, 'pet-stage-label'));
                 const progress = el('progress'); progress.max = growth.next - growth.start; progress.value = xp - growth.start; progress.setAttribute('aria-label', `${s.name}成長進度`);
                 card.append(progress, el('p', `成長值 ${xp} · 距離${growth.level ? '升級' : '孵化'}還有 ${growth.next - xp}`));
-                const choose = el('select'); choose.setAttribute('aria-label', `${s.name}的寵物`); Object.entries(pets).forEach(([id, p]) => choose.add(new Option(p.join(' '), id))); choose.value = kind;
+                const choose = el('select'); choose.setAttribute('aria-label', `${s.name}的寵物`); choose.dataset.petFocus = 'kind-' + s.id; Object.entries(pets).forEach(([id, p]) => choose.add(new Option(p.join(' '), id))); choose.value = kind;
                 choose.addEventListener('change', async () => { const value = choose.value; const ok = await change(() => { const ss = clone(window.students); ss.find(x => x.id === s.id).classPet = value; return commit(ss, window.groups, window.pointsHistory); }); if (!ok) choose.value = kind; });
-                card.append(choose); cards.append(card);
+                const options = el('details', undefined, 'pet-card-options'); options.dataset.petKey = 'options-' + s.id; options.append(el('summary', '更換寵物'), choose);
+                card.append(options); cards.append(card);
             });
         }
         const bar = el('div', undefined, 'pet-award-bar'); const count = el('span'); count.setAttribute('role', 'status');
         const ruleSelect = el('select'); ruleSelect.setAttribute('aria-label', '獎勵規則');
+        ruleSelect.dataset.petFocus = 'rule';
         config.rules.forEach(r => ruleSelect.add(new Option(`${r.name} · ${r.points > 0 ? '+' : ''}${r.points} 分 / 成長 +${config.enabled ? r.xp : 0}`, r.id)));
         if (config.rules.some(r => r.id === selectedRule)) ruleSelect.value = selectedRule;
         ruleSelect.addEventListener('change', () => { selectedRule = ruleSelect.value; });
@@ -198,9 +271,10 @@
             await award(ids, r.points, r.name, r.xp);
             give.disabled = false;
         }, 'pet-primary');
-        function updateCount() { count.textContent = `已選 ${selected.size} 人`; give.disabled = !selected.size || busy; }
+        give.dataset.petFocus = 'award';
+        function updateCount() { const shown = visibleStudents().filter(s => selected.has(String(s.id))).length; count.textContent = `已選 ${selected.size} 人${selected.size > shown ? `（篩選外 ${selected.size - shown} 人）` : ''}`; give.disabled = !selected.size || busy; }
         bar.append(count, ruleSelect, give); root.append(bar); renderCards(); updateCount();
-        const rules = el('details'); rules.append(el('summary', '⚙️ 自訂獎勵規則與設定'));
+        const rules = el('details'); rules.dataset.petKey = 'rules'; rules.append(el('summary', '⚙️ 自訂獎勵規則與設定'));
         const form = el('form', undefined, 'pet-tools');
         const name = el('input'); name.required = true; name.maxLength = 40; name.placeholder = '規則名稱'; name.setAttribute('aria-label', '規則名稱');
         function number(label, value, min) { const wrapper = el('label', label); const input = el('input'); input.type = 'number'; input.value = value; input.required = true; input.min = min; input.max = 1000; input.step = 1; wrapper.append(input); return [wrapper, input]; }
@@ -211,7 +285,7 @@
         config.rules.forEach(r => { const row = el('div', undefined, 'pet-rule'); row.append(el('span', `${r.name} · ${r.points} 分 / 成長 ${r.xp}`), button('移除規則', () => saveSettings({ ...config, rules: config.rules.filter(x => x.id !== r.id) }))); rules.append(row); });
         if (config.enabled) rules.append(button('暫停成長獎勵（保留寵物與紀錄）', () => saveSettings({ ...config, enabled: false })));
         root.append(rules);
-        const history = el('details'); history.append(el('summary', '📒 獎勵紀錄與撤銷'));
+        const history = el('details'); history.dataset.petKey = 'history'; history.append(el('summary', '📒 獎勵紀錄與撤銷'));
         history.append(el('p', '顯示本次搜尋學生的紀錄，每頁 30 筆。撤銷保留原紀錄；已歸零的舊分數不重複扣回。'));
         let page = 0;
         const rows = el('div'); const paging = el('div', undefined, 'pet-tools');
@@ -256,6 +330,6 @@
         render();
         if (location.hash === '#pets') window.showSection('pets');
     }
-    window.ClassPets = { award, undo, xpFor, stage, render, prepare, settings };
+    window.ClassPets = { award, undo, xpFor, stage, appearance, milestone, render, prepare, settings };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

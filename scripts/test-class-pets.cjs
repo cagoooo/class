@@ -81,5 +81,11 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
         const {pet,ctx,persist}=setup(); ctx.students[0].petCarryXp=30; persist(); pet.prepare();
         await pet.award([1],10,'努力'); assert.equal(pet.xpFor(1),40); await pet.undo([ctx.pointsHistory[0].id]); assert.equal(pet.xpFor(1),30);
     });
+    await test('造型依既有等級分段，門檻前後不改變分數與成長算法',async()=>{
+        const {pet}=setup(); for(const [xp,id] of [[0,'egg'],[9,'egg'],[10,'baby'],[49,'baby'],[50,'junior'],[89,'junior'],[90,'grown'],[1000,'grown']]) assert.equal(pet.appearance(xp).id,id);
+    });
+    await test('跨多級只產生一次里程碑，扣分、撤銷與同級不觸發',async()=>{
+        const {pet}=setup();assert.equal(pet.milestone(9,10).type,'hatch');assert.equal(pet.milestone(0,90).level,5);assert.equal(pet.milestone(10,90).type,'level');for(const pair of [[10,11],[30,10],[0,0]])assert.equal(pet.milestone(...pair),null);
+    });
     console.log(`${passed} checks passed`);
 })().catch(e=>{console.error(e);process.exitCode=1;});

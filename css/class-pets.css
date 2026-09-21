@@ -32,3 +32,42 @@
 .pet-confirm p { white-space:pre-line; line-height:1.8; overflow-wrap:anywhere; }
 .pet-confirm button { min-height:46px; padding:10px 24px; border:1px solid #94a3b8; border-radius:10px; font-size:16px; cursor:pointer; }
 .pet-confirm .pet-primary { color:white; background:#4f46e5; }
+
+/* 成長造型與精簡名單：SVG 使用固定 viewBox，跨平台保持相同外觀。 */
+.pet-avatar { display:flex; justify-content:center; }
+.pet-portrait { width:144px; height:144px; flex:none; max-width:100%; }
+.pet-view-tools { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0; }
+#pets-section .pet-view-tools button[aria-pressed=true] { background:#e0eeea; border-color:#28796d; color:#16554a; font-weight:700; }
+#pets-section .pet-guide { margin-top:8px; padding:0; border:0; font-size:14px; }
+#pets-section .pet-card-options { margin:0; padding:0; border:0; font-size:14px; }
+#pets-section .pet-card-options summary { padding:8px 0; min-height:44px; box-sizing:border-box; }
+.pet-card-options select { width:100%; }
+.pet-compact { grid-template-columns:1fr; gap:8px; }
+.pet-compact .pet-card { display:grid; grid-template-columns:72px minmax(0,1fr); gap:4px 12px; padding:12px; }
+.pet-compact .pet-avatar { grid-column:1; grid-row:1 / 5; align-items:center; }
+.pet-compact .pet-portrait { width:72px; height:80px; }
+.pet-compact .pet-student, .pet-compact .pet-stage-label, .pet-compact progress, .pet-compact .pet-card>p { grid-column:2; }
+#pets-section .pet-compact .pet-student { min-height:44px; }
+#pets-section .pet-compact .pet-card>p { margin:2px 0; font-size:13px; }
+.pet-compact .pet-stage-label { font-size:14px; }
+.pet-compact .pet-card-options { grid-column:1 / -1; }
+#pets-section .pet-compact .pet-card-options summary { padding:8px 0 8px 84px; font-weight:400; }
+.pet-growth-feedback { position:fixed; top:16px; left:50%; transform:translateX(-50%); width:min(540px,calc(100% - 24px)); box-sizing:border-box; z-index:10020; display:flex; align-items:center; gap:12px; padding:14px; border:1px solid #8ab9a9; border-radius:18px; background:#f1fcf7; color:#173d32; box-shadow:0 10px 30px #173d3230; }
+.pet-growth-feedback .pet-portrait { width:80px; height:80px; animation:pet-grow-pop .55s ease-out; }
+.pet-growth-feedback>div { flex:1; min-width:0; overflow-wrap:anywhere; }
+.pet-growth-feedback strong { font-size:18px; }
+.pet-growth-feedback p { margin:4px 0 0; font-size:14px; line-height:1.6; }
+.pet-growth-feedback button { align-self:flex-start; min-width:46px; min-height:46px; padding:8px; border:1px solid #8ab9a9; border-radius:10px; background:transparent; color:inherit; cursor:pointer; }
+@keyframes pet-grow-pop { 0% { transform:scale(.75) rotate(-6deg); } 65% { transform:scale(1.08) rotate(3deg); } 100% { transform:scale(1) rotate(0); } }
+.dark .pet-growth-feedback { background:#173d32; color:#edf9f3; }
+@media(max-width:600px) {
+  #pets-section { padding:12px; }
+  .pet-cards:not(.pet-compact) { grid-template-columns:1fr; }
+  .pet-growth-feedback { gap:8px; padding:10px; }
+  .pet-growth-feedback .pet-portrait { width:54px; height:64px; }
+  .pet-growth-feedback strong { font-size:16px; }
+  .pet-award-bar { gap:8px; }
+  #pets-section .pet-award-bar button { width:auto; flex:1; }
+  #pets-section .pet-award-bar select { order:3; }
+}
+@media(prefers-reduced-motion:reduce) { .pet-growth-feedback .pet-portrait { animation:none; } }
