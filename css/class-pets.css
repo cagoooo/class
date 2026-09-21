@@ -25,3 +25,10 @@
 .pet-rule span,.pet-history strong { flex:1; min-width:150px; }
 .dark #pets-section { background:#172033; color:#e2e8f0; }
 @media(max-width:600px) { #pets-section { padding:16px; } .pet-cards { grid-template-columns:1fr; } .pet-award-bar { padding:12px 12px max(12px,env(safe-area-inset-bottom)); } .pet-award-bar select { width:100%; } .pet-award-bar button { width:100%; } .pet-tools>input { width:100%; } }
+
+.pet-confirm { width:min(440px,calc(100vw - 32px)); box-sizing:border-box; border:0; border-radius:16px; padding:24px; color:#172033; background:white; box-shadow:0 20px 60px #0004; }
+.pet-confirm::backdrop { background:#0f172a88; }
+.pet-confirm h3 { font-size:20px; font-weight:700; }
+.pet-confirm p { white-space:pre-line; line-height:1.8; overflow-wrap:anywhere; }
+.pet-confirm button { min-height:46px; padding:10px 24px; border:1px solid #94a3b8; border-radius:10px; font-size:16px; cursor:pointer; }
+.pet-confirm .pet-primary { color:white; background:#4f46e5; }

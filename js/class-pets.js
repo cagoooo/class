@@ -126,6 +126,19 @@
         const e = document.createElement(tag); if (text !== undefined) e.textContent = text; if (cls) e.className = cls; return e;
     }
     function button(text, action, cls) { const b = el('button', text, cls); b.type = 'button'; b.addEventListener('click', action); return b; }
+    function confirmAction(message) {
+        return new Promise(resolve => {
+            const dialog = el('dialog', undefined, 'pet-confirm');
+            const title = el('h3', '確認獎勵操作'); title.id = 'pet-confirm-title';
+            dialog.setAttribute('aria-labelledby', title.id);
+            const finish = value => { dialog.close(); dialog.remove(); resolve(value); };
+            const actions = el('div', undefined, 'pet-tools');
+            actions.append(button('取消', () => finish(false)), button('確定', () => finish(true), 'pet-primary'));
+            dialog.append(title, el('p', message), actions);
+            dialog.addEventListener('cancel', e => { e.preventDefault(); finish(false); });
+            document.body.append(dialog); dialog.showModal(); actions.querySelector('button').focus();
+        });
+    }
     function saveSettings(config) {
         return change(() => {
             if (!SafeStorage.set(KEY, JSON.stringify(config), { context: '寵物獎勵設定' })) return false;
@@ -180,7 +193,7 @@
             const r = config.rules.find(r => r.id === ruleSelect.value); if (!r) return;
             const ids = [...selected].filter(id => window.students.some(s => String(s.id) === id));
             if (!ids.length) return fail('請先選取學生。');
-            if (!confirm(`發放「${r.name}」給 ${ids.length} 位學生？\n每人 ${r.points} 分、成長 +${config.enabled ? r.xp : 0}。`)) return;
+            if (!await confirmAction(`發放「${r.name}」給 ${ids.length} 位學生？\n每人 ${r.points} 分、成長 +${config.enabled ? r.xp : 0}。`)) return;
             give.disabled = true;
             await award(ids, r.points, r.name, r.xp);
             give.disabled = false;
@@ -218,9 +231,9 @@
                 const row = el('div', undefined, 'pet-history'); row.append(el('strong', `${r.studentName} · ${r.reason}`), el('span', `${r.points > 0 ? '+' : ''}${r.points} 分 · 成長 ${r.petXp >= 0 ? '+' : ''}${r.petXp}`), el('small', r.timestamp));
                 if (r.petReverses || reversed) row.append(el('span', r.petReverses ? '撤銷紀錄' : '已撤銷'));
                 else {
-                    row.append(button('撤銷這筆', () => { if (confirm(`撤銷 ${r.studentName} 的「${r.reason}」？`)) undo([r.id]); }));
+                    row.append(button('撤銷這筆', async () => { if (await confirmAction(`撤銷 ${r.studentName} 的「${r.reason}」？`)) undo([r.id]); }));
                     const batch = batches.get(r.petBatch) || [];
-                    if (batch.length > 1) row.append(button(`撤銷整批 ${batch.length} 人`, () => { if (confirm(`撤銷這批尚未撤銷的 ${batch.length} 筆獎勵？`)) undo(batch.map(x => x.id)); }));
+                    if (batch.length > 1) row.append(button(`撤銷整批 ${batch.length} 人`, async () => { if (await confirmAction(`撤銷這批尚未撤銷的 ${batch.length} 筆獎勵？`)) undo(batch.map(x => x.id)); }));
                 }
                 rows.append(row);
             });
