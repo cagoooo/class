@@ -24,6 +24,7 @@
 
     // 應該依班級隔離的 key（全域共用會造成跨班資料混淆的）
     const SHARED_KEYS = new Set([
+        'petSettings', // 班級寵物啟用與獎勵規則
         // 9 大功能區塊的核心資料
         'notebookEntries',          // 聯絡簿
         'homeworkList',             // 作業列表
@@ -248,6 +249,7 @@
             if (classId !== 'default') {
                 let migrated = 0;
                 SHARED_KEYS.forEach(key => {
+                    if (key === 'petSettings') return; // 不複製其他班級的新功能設定
                     const perClassKey = key + '-' + classId;
                     const existsPerClass = _origGet.call(localStorage, perClassKey);
                     const existsGlobal = _origGet.call(localStorage, key);

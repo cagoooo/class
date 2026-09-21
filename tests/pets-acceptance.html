@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-TW"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>班級寵物 · 獨立驗收</title>
+<link rel="stylesheet" href="../css/class-pets.css?v=3.29.0">
+<style>body{font:16px system-ui;margin:0;padding:16px;background:#f1f5f9;color:#172033}main{max-width:1200px;margin:auto}.hidden{display:none}.section{margin-top:16px}#test-tools{display:flex;gap:12px;flex-wrap:wrap}#test-tools button{padding:12px;font:inherit}#notice{padding:12px;background:#fff7ed}#toast{position:fixed;top:8px;right:8px;padding:12px;background:#dcfce7;z-index:100;max-width:85vw}</style>
+</head><body><main>
+<p id="notice">獨立驗收頁：48 位虛構學生。資料只保留在這個分頁的測試區，不讀取正式班級，不連線 Firebase。</p>
+<nav id="feature-menu-grid"></nav>
+<section id="grouping-section"></section>
+<div id="test-tools"><button id="legacy-add">原本加分流程：測試學生 01 +10</button><button id="reset-scores">模擬分數歸零（保留成長）</button></div>
+<p id="scores"></p><div id="pointsHistory"></div><p id="toast" role="status" hidden></p>
+</main>
+<script>
+// 隔離 adapter；功能模組與 SafeStorage 載入正式站相同檔案。
+const nativeSession = window.sessionStorage;
+class TestStorage {
+  constructor(){this.data=JSON.parse(nativeSession.getItem('class-pets-acceptance-v1')||'{}');}
+  getItem(k){return Object.prototype.hasOwnProperty.call(this.data,k)?this.data[k]:null;}
+  setItem(k,v){this.data[k]=String(v);this.flush();}
+  removeItem(k){delete this.data[k];this.flush();}
+  key(i){return Object.keys(this.data)[i]||null;}
+  get length(){return Object.keys(this.data).length;}
+  flush(){nativeSession.setItem('class-pets-acceptance-v1',JSON.stringify(this.data));}
+}
+Object.defineProperty(window,'Storage',{value:TestStorage});
+Object.defineProperty(window,'localStorage',{value:new TestStorage()});
+localStorage.setItem('currentClassId','default');
+window.STUDENTS_KEY='students';window.GROUPS_KEY='groups';window.POINTS_HISTORY_KEY='pointsHistory';
+window.students=JSON.parse(localStorage.getItem('students')||'null')||Array.from({length:48},(_,i)=>({id:i+1,name:'測試學生 '+String(i+1).padStart(2,'0'),number:i+1,points:0}));
+window.groups=JSON.parse(localStorage.getItem('groups')||'null')||Array.from({length:8},(_,i)=>({id:i+1,name:'第 '+(i+1)+' 組',score:0,members:students.filter((s,j)=>j%8===i)}));
+window.pointsHistory=JSON.parse(localStorage.getItem('pointsHistory')||'[]');
+for(const k of ['students','groups','pointsHistory'])localStorage.setItem(k,JSON.stringify(window[k]));
+window.ClassProfiles={currentProfile:()=>({name:'48 人驗收班'})};
+window.renderStudents=()=>{document.getElementById('scores').textContent='測試學生 01 分數：'+students[0].points;};
+window.renderGroups=()=>{};window.renderPointsHistory=()=>{};
+window.showSection=name=>{document.querySelectorAll('.section').forEach(e=>e.classList.add('hidden'));document.getElementById(name+'-section')?.classList.remove('hidden');};
+window.NotificationSystem={success:text=>{const el=document.getElementById('toast');el.textContent=text;el.hidden=false;setTimeout(()=>el.hidden=true,2500);}};
+window.PointsReset={lastResetId:hist=>Math.max(0,...hist.filter(r=>r.type==='reset').map(r=>Number(r.id)))};
+document.getElementById('legacy-add').onclick=()=>{ClassPets.prepare();ClassPets.award([1],10,'原本加分流程');};
+document.getElementById('reset-scores').onclick=()=>{students.forEach(s=>s.points=0);groups.forEach(g=>g.score=0);pointsHistory.unshift({id:Date.now(),type:'reset'});for(const k of ['students','groups','pointsHistory'])localStorage.setItem(k,JSON.stringify(window[k]));renderStudents();ClassPets.render();};
+renderStudents();
+</script>
+<script src="../js/class-aware-storage.js?v=3.29.0"></script><script src="../js/class-pets.js?v=3.29.0"></script>
+</body></html>

@@ -140,7 +140,7 @@ const SemesterArchive = (() => {
 
             // ── 3. 依選項清空本學期資料 ──
             if (options.clearScores) {
-                await _clearScores(base, students);
+                await _clearScores(base, students, pointsHistory);
                 console.log('[SemesterArchive] 分數已歸零（學生名單保留）');
             }
             if (options.clearHomework) {
@@ -157,7 +157,7 @@ const SemesterArchive = (() => {
     }
 
     // 將所有學生分數歸零（不刪除學生）
-    async function _clearScores(base, students) {
+    async function _clearScores(base, students, history = []) {
         const db = window.FirebaseConfig.getDb();
         let batch = db.batch();
         let count = 0;
@@ -166,7 +166,10 @@ const SemesterArchive = (() => {
             // ⚠️ 必須同時歸零 points。加扣分系統寫的是 student.points，
             //    舊版只改 score（另一個欄位），所以老師按了「封存並清空分數」之後
             //    學生卡片上的分數其實原封不動——實測王薇婷的班就是這樣。
-            batch.update(ref, { score: 0, points: 0 });
+            // 明細封存後移除時，把已累積成長轉成期初值，避免寵物回到蛋。
+            const petCarryXp = window.ClassPets ? ClassPets.xpFor(s.id, history, Number(s.petCarryXp) || 0) : (Number(s.petCarryXp) || 0);
+            s.petCarryXp = petCarryXp;
+            batch.update(ref, { score: 0, points: 0, petCarryXp });
             count++;
             if (count >= 490) {
                 await batch.commit();
@@ -182,7 +185,7 @@ const SemesterArchive = (() => {
         // 同步本地 localStorage
         // points 才是加扣分系統實際使用的欄位；records 是舊版遺留的重複副本，
         // 若尚未遷移就一併清掉，否則封存後匯出的統計會混入上學期的數字。
-        window.students?.forEach(s => { s.score = 0; s.points = 0; if (s.records) s.records = []; });
+        window.students?.forEach(s => { s.score = 0; s.points = 0; s.petCarryXp = students.find(x => String(x.id) === String(s.id))?.petCarryXp || 0; if (s.records) s.records = []; });
         window.SafeStorage.write([
             [window.STUDENTS_KEY || 'students', JSON.stringify(window.students || [])],
             [window.POINTS_HISTORY_KEY || 'pointsHistory', JSON.stringify([])]

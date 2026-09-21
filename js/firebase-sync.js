@@ -292,6 +292,7 @@ async function syncToCloud(silent = false) {
                 noRepeatLottery: noRepeat,
                 drawnStudentIds: drawnStudentIds
             }),
+            uploadSingleDoc(COLLECTIONS.APP_SETTINGS, 'pets', { data: safeLS('petSettings', null) }),
             uploadSingleDoc(COLLECTIONS.APP_SETTINGS, 'seating', { data: seatingConfig }),
             uploadSingleDoc(COLLECTIONS.APP_SETTINGS, 'uiPrefs', {
                 examLightMode, examAnalogClock, examSoundsEnabled, homeworkDashboardView, theme
@@ -359,7 +360,7 @@ async function syncFromCloud() {
             cloudNotebooks, cloudHomeworks, cloudLottery,
             cloudAnn,
             examSubjectsDoc, examRemindersDoc, examAttendDoc, examAbsenceDoc, examDayPresetsDoc,
-            clockDoc, lotterySettingDoc, seatingDoc, uiPrefsDoc
+            clockDoc, lotterySettingDoc, seatingDoc, uiPrefsDoc, petsDoc
         ] = await Promise.all([
             downloadCollection(COLLECTIONS.STUDENTS),
             downloadCollection(COLLECTIONS.POINTS_HISTORY),
@@ -377,6 +378,7 @@ async function syncFromCloud() {
             downloadSingleDoc(COLLECTIONS.APP_SETTINGS, 'lottery'),
             downloadSingleDoc(COLLECTIONS.APP_SETTINGS, 'seating'),
             downloadSingleDoc(COLLECTIONS.APP_SETTINGS, 'uiPrefs'),
+            downloadSingleDoc(COLLECTIONS.APP_SETTINGS, 'pets'),
         ]);
 
         // 作業繳交狀態 — 使用動態路徑（修正多班級漏洞）
@@ -416,6 +418,7 @@ async function syncFromCloud() {
             clockSettings: clockDoc ?? null,
             lotterySettings: lotterySettingDoc ?? null,         // 包含 noRepeatLottery + drawnStudentIds
             seatingConfig: seatingDoc?.data ?? null,            // 新增：座位表
+            petSettings: petsDoc?.data ?? null,
             uiPrefs: uiPrefsDoc ?? null,                        // 新增：UI 偏好（examLightMode/examAnalogClock 等）
             classProfiles: cloudProfiles,
         };
@@ -516,6 +519,7 @@ async function loadFromCloudData(cloudData) {
             await dbSave('drawnStudentIds', cloudData.lotterySettings.drawnStudentIds);
         }
         // 座位表（依班級隔離）
+        await dbSave('petSettings', cloudData.petSettings || { enabled: false, rules: [] });
         if (cloudData.seatingConfig) {
             await dbSave('seatingConfig', cloudData.seatingConfig);
         }
@@ -583,7 +587,7 @@ async function mergeWithCloud() {
         pointsHistory = [
             ...(pointsHistory || []),
             ...(cloudData.pointsHistory || []).filter(h => !localHistIds.has(h.id))
-        ].sort((a, b) => new Date(b.time || 0) - new Date(a.time || 0));
+        ].sort((a, b) => (Number(b.createdAtMs || b.id) || 0) - (Number(a.createdAtMs || a.id) || 0));
 
         // 公告：合併去重
         const localAnn = safeLS('classAnnouncements', []);
@@ -616,6 +620,7 @@ async function mergeWithCloud() {
             [window.GROUPS_KEY || 'groups', JSON.stringify(groups)],
             ['notebookEntries', JSON.stringify(notebookEntries)],
             ['homeworkList', JSON.stringify(homeworkList)],
+            ['petSettings', JSON.stringify(safeLS('petSettings', null) || cloudData.petSettings || { enabled: false, rules: [] })],
             ['lotteryHistory', JSON.stringify(lotteryHistory)]
         ], { context: '合併雲端與本機資料' })) return false;
 
@@ -891,6 +896,7 @@ function exportAllData() {
         announcements: safeLS('classAnnouncements', []),
         examSubjects: safeLS('examSubjects', []),
         clockSettings: safeLS('clockSettings', {}),
+        petSettings: safeLS('petSettings', null),
     };
 
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
@@ -1112,6 +1118,7 @@ async function syncAllClassesToCloud(onProgress) {
                                 drawnStudentIds: drawnStudentIds,
                                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                             });
+                            b.set(col.doc('pets'), { data: JSON.parse(_raw(_classKey('petSettings')) || 'null'), updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
                             b.set(col.doc('seating'), { data: seatingConfig, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
                             b.set(col.doc('uiPrefs'), {
                                 examLightMode, examAnalogClock, examSoundsEnabled, homeworkDashboardView, theme,
@@ -1630,12 +1637,14 @@ async function syncAllClassesFromCloud(onProgress) {
                 // App 設定
                 const colApp = getUserCollectionForClass(COLLECTIONS.APP_SETTINGS, classId);
                 if (colApp) {
-                    const [clockDoc, lotteryDoc, seatingDoc, uiPrefsDoc] = await Promise.all([
+                    const [clockDoc, lotteryDoc, seatingDoc, uiPrefsDoc, petsDoc] = await Promise.all([
                         colApp.doc('clock').get(),
                         colApp.doc('lottery').get(),
                         colApp.doc('seating').get(),
                         colApp.doc('uiPrefs').get(),
+                        colApp.doc('pets').get(),
                     ]);
+                    _rawSet(_classKey('petSettings'), JSON.stringify(petsDoc.exists && petsDoc.data().data || { enabled: false, rules: [] }));
                     // 時鐘設定（全域，最後一班會覆蓋；可接受因為是 UI 偏好）
                     if (clockDoc.exists) _rawSet('clockSettings', JSON.stringify(clockDoc.data()));
                     // 抽籤偏好 + 已抽 ID
