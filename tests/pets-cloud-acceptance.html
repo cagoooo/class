@@ -12,7 +12,7 @@ window.STUDENTS_KEY='students-'+testClass;window.GROUPS_KEY='groups-'+testClass;
 window.students=[];window.groups=[];window.pointsHistory=[];window.homeworkChecks={};window.notebookEntries=[];window.homeworkList=[];window.lotteryHistory=[];
 window.NotificationSystem={success(){},error(m){document.getElementById('result').textContent=m},warning(){}};
 </script>
-<script src="../js/class-aware-storage.js?v=3.30.2"></script><script src="../js/firebase-config.js?v=3.30.2"></script><script>FirebaseConfig.signIn=()=>new Promise(resolve=>FirebaseConfig.onAuthStateChanged(()=>{if(!FirebaseConfig.isGoogleUser())document.getElementById('account').textContent='請先在正式網站登入 Google，再重新整理本頁。';resolve(FirebaseConfig.getCurrentUserId());}));</script><script src="../js/firebase-sync.js?v=3.30.2"></script><script src="../js/class-pets.js?v=3.30.2"></script>
+<script src="../js/class-aware-storage.js?v=3.31.0"></script><script src="../js/firebase-config.js?v=3.31.0"></script><script>FirebaseConfig.signIn=()=>new Promise(resolve=>FirebaseConfig.onAuthStateChanged(()=>{if(!FirebaseConfig.isGoogleUser())document.getElementById('account').textContent='請先在正式網站登入 Google，再重新整理本頁。';resolve(FirebaseConfig.getCurrentUserId());}));</script><script src="../js/firebase-sync.js?v=3.31.0"></script><script src="../js/class-pets.js?v=3.31.0"></script>
 <script>
 // 使用正式同步 helper；不呼叫全班同步或名冊寫入。
 const ready=setInterval(()=>{if(!FirebaseConfig.isConnected()||!FirebaseConfig.isGoogleUser())return;clearInterval(ready);document.getElementById('account').textContent='已登入；僅測試虛構資料';document.getElementById('run').disabled=false;},500);
@@ -22,16 +22,16 @@ document.getElementById('run').onclick=async()=>{
  try{
  check(localStorage.getItem('currentClassId')===testClass && testClass.startsWith('pet-qa-'),'測試路徑不符');
  window.students=[{id:1,name:'虛構驗收學生',number:1,points:0,classPet:'panda'}];window.groups=[];window.pointsHistory=[];
- localStorage.setItem(STUDENTS_KEY,JSON.stringify(students));localStorage.setItem(GROUPS_KEY,'[]');localStorage.setItem(POINTS_HISTORY_KEY,'[]');localStorage.setItem('petSettings',JSON.stringify({enabled:true,rules:[{id:'qa-rule',name:'驗收任務',points:10,xp:10}]}));
- ClassPets.prepare();check(await ClassPets.award([1],10,'驗收任務'),'本機發放失敗');
+ localStorage.setItem(STUDENTS_KEY,JSON.stringify(students));localStorage.setItem(GROUPS_KEY,'[]');localStorage.setItem(POINTS_HISTORY_KEY,'[]');localStorage.setItem('petSettings',JSON.stringify({enabled:true,coinsEnabled:true,rules:[{id:'qa-rule',name:'驗收任務',points:10,xp:10,coins:7}]}));
+ ClassPets.prepare();check(await ClassPets.award([1],10,'驗收任務',10,undefined,7),'本機發放失敗');
  const results=await Promise.all([uploadCollection('students',students),uploadCollection('pointsHistory',pointsHistory),uploadSingleDoc('appSettings','pets',{data:ClassPets.settings()})]);check(results.every(Boolean),'雲端寫入失敗');
  const server=await getUserCollection('students').doc('1').get({source:'server'});check(server.exists&&server.data().classPet==='panda'&&server.data().points===10,'伺服器讀回不符');
  const restored={students:await downloadCollection('students'),pointsHistory:await downloadCollection('pointsHistory'),groups:[],petSettings:(await downloadSingleDoc('appSettings','pets')).data,notebookEntries:[],homeworkList:[],lotteryHistory:[],homeworkChecks:{}};
  window.students=[];window.pointsHistory=[];check(await loadFromCloudData(restored),'正式還原函式失敗');
- check(students[0].classPet==='panda'&&ClassPets.xpFor(1)===10&&ClassPets.settings().rules[0].name==='驗收任務','還原後寵物或規則不符');
+ check(students[0].classPet==='panda'&&ClassPets.xpFor(1)===10&&ClassPets.coinsFor(1)===7&&ClassPets.settings().coinsEnabled&&ClassPets.settings().rules[0].coins===7&&ClassPets.settings().rules[0].name==='驗收任務','還原後寵物或規則不符');
  const firstKey=localStorage.getItem('currentClassId');localStorage.setItem('currentClassId',testClass+'-other');check(localStorage.getItem('petSettings')===null,'另一班讀到設定');const other=await downloadCollection('pointsHistory');check(other.length===0,'另一班讀到紀錄');localStorage.setItem('currentClassId',firstKey);
- ClassPets.prepare();check(await ClassPets.undo([pointsHistory[0].id]),'撤銷失敗');check((await Promise.all([uploadCollection('pointsHistory',pointsHistory),uploadCollection('students',students)])).every(Boolean),'撤銷上傳失敗');const after=await downloadCollection('pointsHistory');check(ClassPets.xpFor(1,after)===0&&after.some(r=>r.petReverses),'雲端撤銷紀錄不符');
- out.textContent='通過：伺服器確認寫入、寵物與成長還原、自訂規則還原、另一班設定與紀錄隔離、撤銷紀錄雲端讀回。\n測試班 ID：'+testClass+'\n虛構學生：1 人；保留 2 筆獎勵／撤銷紀錄。正式班級未改動。';
+ ClassPets.prepare();check(await ClassPets.undo([pointsHistory[0].id]),'撤銷失敗');check((await Promise.all([uploadCollection('pointsHistory',pointsHistory),uploadCollection('students',students)])).every(Boolean),'撤銷上傳失敗');const after=await downloadCollection('pointsHistory');check(ClassPets.xpFor(1,after)===0&&ClassPets.coinsFor(1,after)===0&&after.some(r=>r.petReverses),'雲端撤銷紀錄不符');
+ out.textContent='通過：伺服器確認寫入、寵物、成長與獨立金幣還原、自訂規則金額還原、另一班設定與紀錄隔離、撤銷紀錄雲端讀回。\n測試班 ID：'+testClass+'\n虛構學生：1 人；保留 2 筆獎勵／撤銷紀錄。正式班級未改動。';
  }catch(e){out.textContent='未通過：'+e.message+'\n測試班 ID：'+testClass;}finally{button.disabled=false;}
 };
 </script></html>

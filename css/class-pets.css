@@ -73,3 +73,16 @@
 @media(prefers-reduced-motion:reduce) { .pet-growth-feedback .pet-portrait { animation:none; } }
 
 #pets-section .pet-student { min-height:44px; }
+.pet-wallet-status { display:flex; flex-wrap:wrap; align-items:center; gap:8px 16px; padding:12px 16px; margin:12px 0; border:1px solid #dbbe79; border-radius:12px; background:#fffaf0; color:#664913; }
+#pets-section .pet-wallet-status details { flex-basis:100%; border:0; padding:0; }
+#pets-section .pet-wallet-status summary { font-size:14px; padding:4px 0; min-height:44px; }
+.pet-coin-balance { align-self:flex-start; font-weight:700; color:#735011; background:#fff5d8; border-radius:8px; padding:4px 10px; font-size:14px; }
+.pet-compact .pet-coin-balance { grid-column:2; justify-self:start; }
+.pet-rule-editor { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; padding:16px; border:1px solid #cbd5e1; border-radius:12px; }
+.pet-rule-editor>strong,.pet-rule-editor>input,.pet-rule-editor>.pet-tools { grid-column:1/-1; }
+.pet-rule-editor label { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.pet-rule-editor input { width:100%; min-width:0; box-sizing:border-box; }
+.pet-rule-editor .pet-tools { margin:0; }
+.dark .pet-wallet-status { background:#3c321f; color:#ffe3a6; border-color:#967944; }
+.dark .pet-coin-balance { background:#3c321f; color:#ffe3a6; }
+@media(max-width:600px) { .pet-rule-editor { grid-template-columns:1fr; padding:12px; } .pet-rule-editor label { flex-direction:row; align-items:center; justify-content:space-between; } .pet-rule-editor label input { width:65%; } }

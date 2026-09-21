@@ -3,7 +3,7 @@
     'use strict';
     const KEY = 'petSettings';
     const pets = { cat: ['🐱', '小貓'], dog: ['🐶', '小狗'], rabbit: ['🐰', '小兔'], panda: ['🐼', '熊貓'] };
-    const defaults = () => ({ enabled: false, rules: [
+    const defaults = () => ({ enabled: false, coinsEnabled: false, rules: [
         { id: 'homework', name: '準時交作業', points: 2, xp: 2 },
         { id: 'help', name: '主動幫忙', points: 2, xp: 2 },
         { id: 'team', name: '小組合作', points: 3, xp: 3 },
@@ -18,6 +18,9 @@
     let selected = new Set();
     let query = '';
     let selectedRule = '';
+    let editingRuleId = null;
+    const blankRule = () => ({ name: '', points: '2', xp: '2', coins: '2' });
+    let ruleDraft = blankRule();
     let onlySelected = false;
     let viewMode = ['compact', 'cards'].includes(localStorage.getItem('petViewMode')) ? localStorage.getItem('petViewMode') : (window.matchMedia?.('(max-width: 600px)').matches ? 'compact' : 'cards');
     let feedbackTimer;
@@ -41,6 +44,15 @@
             seen.add(r.id);
             return sum + (Number.isFinite(r.petXp) ? r.petXp : 0);
         }, carry));
+    }
+    function coinsFor(id, history = window.pointsHistory || [], carry = Number(window.students?.find(s => String(s.id) === String(id))?.petCarryCoins) || 0) {
+        const seen = new Set();
+        // 金幣只讀獨立欄位；舊分數、成長值不會被換算成金幣。
+        return history.reduce((sum, r) => {
+            if (String(r.studentId) !== String(id) || !r.petEvent || seen.has(r.id)) return sum;
+            seen.add(r.id);
+            return sum + (Number.isSafeInteger(r.coinDelta) ? r.coinDelta : 0);
+        }, carry);
     }
     function stage(xp) {
         if (xp < 10) return { level: 0, label: '等待孵化', start: 0, next: 10 };
@@ -115,12 +127,14 @@
         remember(); redraw();
         return true;
     }
-    async function award(ids, points, reason, xpOverride, batchId = uid()) {
+    async function award(ids, points, reason, xpOverride, batchId = uid(), coinsOverride) {
         return change(() => {
             if (!Number.isInteger(points) || points === 0 || Math.abs(points) > 1000) return fail('分數請填寫 -1000 到 1000 的非零整數。');
             const config = settings();
             const xp = config.enabled && points > 0 ? (xpOverride ?? points) : 0;
+            const coins = config.coinsEnabled && points > 0 ? (coinsOverride ?? points) : 0;
             if (!Number.isInteger(xp) || xp < 0 || xp > 1000) return fail('成長值請填寫 0 到 1000 的整數。');
+            if (!Number.isInteger(coins) || coins < 0 || coins > 1000) return fail('金幣請填寫 0 到 1000 的整數。');
             if (window.pointsHistory.some(r => r.petBatch === batchId)) return false;
             const unique = [...new Set(ids.map(String))];
             if (!unique.length || unique.some(id => !window.students.some(s => String(s.id) === id))) return fail('請選擇目前班級的學生。');
@@ -134,13 +148,13 @@
                 if (g) g.score = (Number(g.score) || 0) + points;
                 hh.unshift({ id: uid(), createdAtMs: Math.max(now.getTime(), (window.PointsReset?.lastResetId(hh) || 0) + 1), studentId: s.id, studentName: s.name,
                     points, reason: String(reason || '自訂加扣分').slice(0, 80), date: now.toLocaleDateString('zh-TW'),
-                    timestamp: now.toLocaleString('zh-TW', { hour12: false }), petEvent: true, petXp: xp,
+                    timestamp: now.toLocaleString('zh-TW', { hour12: false }), petEvent: true, petXp: xp, coinDelta: coins,
                     petBatch: batchId, petGroupId: g?.id ?? null });
             });
             if (!commit(ss, gg, hh)) return false;
             selected.clear(); onlySelected = false; render();
             celebrate(events);
-            if (typeof NotificationSystem !== 'undefined') NotificationSystem.success(`已存本機 · ${unique.length} 人${xp ? `，每人成長 +${xp}` : ''}`);
+            if (typeof NotificationSystem !== 'undefined') NotificationSystem.success(`已存本機 · ${unique.length} 人${xp ? `，每人成長 +${xp}` : ''}${coins ? `、金幣 +${coins}` : ''}`);
             return true;
         });
     }
@@ -161,7 +175,7 @@
                 if (g) g.score = (Number(g.score) || 0) + points;
                 hh.unshift({ id: uid(), createdAtMs: now.getTime(), studentId: s.id, studentName: s.name,
                     points, reason: '撤銷：' + r.reason, date: now.toLocaleDateString('zh-TW'), timestamp: now.toLocaleString('zh-TW', { hour12: false }),
-                    petEvent: true, petXp: -r.petXp, petBatch: batch, petReverses: r.id, petGroupId: r.petGroupId });
+                    petEvent: true, petXp: -r.petXp, coinDelta: -(r.coinDelta || 0), petBatch: batch, petReverses: r.id, petGroupId: r.petGroupId });
             });
             return commit(ss, gg, hh);
         });
@@ -189,6 +203,23 @@
             remember(); render(); return true;
         });
     }
+    function setCoinsEnabled(enabled) {
+        const config = settings();
+        return saveSettings({ ...config, coinsEnabled: enabled,
+            ...(enabled && !config.coinsEnabledAt ? { coinsEnabledAt: new Date().toISOString() } : {}),
+            rules: config.rules.map(r => ({ ...r, coins: r.coins ?? Math.max(0, r.points) })) });
+    }
+    function saveRule(values, id = null) {
+        const name = String(values.name || '').trim();
+        const points = Number(values.points), xp = Number(values.xp), coins = Number(values.coins);
+        if (!name || name.length > 40 || !Number.isInteger(points) || !points || Math.abs(points) > 1000 ||
+            !Number.isInteger(xp) || xp < 0 || xp > 1000 || !Number.isInteger(coins) || coins < 0 || coins > 1000 ||
+            (points < 0 && (xp !== 0 || coins !== 0))) return Promise.resolve(fail('請填寫名稱與非零整數分數；成長值、金幣需為 0～1000 的整數，扣分規則請設為 0。'));
+        const config = settings();
+        if (id && !config.rules.some(r => r.id === id)) return Promise.resolve(fail('這項規則已不存在，請重新選取。'));
+        const rule = { id: id || uid(), name, points, xp, coins };
+        return saveSettings({ ...config, rules: id ? config.rules.map(r => r.id === id ? rule : r) : [...config.rules, rule] });
+    }
     function render() {
         const root = document.getElementById('pets-section'); if (!root) return;
         const scroll = window.scrollY || 0;
@@ -206,13 +237,20 @@
         if (!config.enabled) {
             root.append(el('p', '從今天的努力開始養一隻寵物。啟用後，原本的正向加分會同時獲得等量成長值；舊分數不換算，扣分不讓寵物退化。'));
             root.append(button('啟用本班寵物成長', () => saveSettings({ ...config, enabled: true, enabledAt: new Date().toISOString() }), 'pet-primary'));
-            if (!(window.pointsHistory || []).some(r => r.petEvent)) return;
+            if (!config.coinsEnabled && !(window.pointsHistory || []).some(r => r.petEvent)) return;
         }
         const guide = el('details', undefined, 'pet-guide'); guide.dataset.petKey = 'guide';
         guide.append(el('summary', '成長指南與同步說明'));
         guide.append(el('p', '10 成長值孵化，每增加 20 成長值升一級。Lv.1 幼年 → Lv.3 成長 → Lv.5 成熟。分數歸零不影響成長；撤銷誤加獎勵會回復成長。'));
         guide.append(el('p', '資料先存在本機，登入後沿用雲端同步。換裝置前請完成同步，同一班請避免兩台裝置同時加分。'));
         root.append(guide);
+        const wallet = el('div', undefined, 'pet-wallet-status');
+        wallet.append(el('strong', config.coinsEnabled ? '🪙 本班金幣累積中' : '🪙 本班金幣尚未啟用／已暫停'));
+        const coinGuide = el('details'); coinGuide.dataset.petKey = 'coins-guide'; coinGuide.append(el('summary', '金幣規則與使用說明'), el('p', '金幣與成長值分開記錄。啟用後，原本正向加分會獲得等量金幣；自訂規則可調整金額。舊分數不換算，一般扣分與分數歸零不扣金幣，撤銷獎勵會扣回該筆金幣。本階段先累積，兌換商店稍後加入。'));
+        wallet.append(button(config.coinsEnabled ? '暫停金幣累積' : '啟用本班金幣', async () => {
+            if (!await confirmAction(config.coinsEnabled ? '暫停本班金幣累積？現有金幣與紀錄會保留。' : '啟用後才開始累積金幣，舊分數不換算。\n原本正向加分會發放等量金幣；尚未設定金幣的規則將先使用相同數量，可在規則編輯中調整。')) return;
+            await setCoinsEnabled(!config.coinsEnabled);
+        })); wallet.append(coinGuide); root.append(wallet);
         const views = el('div', undefined, 'pet-view-tools'); views.setAttribute('aria-label', '寵物顯示方式');
         ['compact', 'cards'].forEach(mode => {
             const b = button(mode === 'compact' ? '精簡名單' : '成長卡片', () => { viewMode = mode; try { localStorage.setItem('petViewMode', mode); } catch {} render(); });
@@ -250,6 +288,7 @@
                 card.append(label, avatar, el('strong', `${pets[kind][1]} · ${appearance(xp).label}${growth.level ? ' · ' + growth.label : ''}`, 'pet-stage-label'));
                 const progress = el('progress'); progress.max = growth.next - growth.start; progress.value = xp - growth.start; progress.setAttribute('aria-label', `${s.name}成長進度`);
                 card.append(progress, el('p', `成長值 ${xp} · 距離${growth.level ? '升級' : '孵化'}還有 ${growth.next - xp}`));
+                card.append(el('span', `🪙 金幣 ${coinsFor(s.id)}`, 'pet-coin-balance'));
                 const choose = el('select'); choose.setAttribute('aria-label', `${s.name}的寵物`); choose.dataset.petFocus = 'kind-' + s.id; Object.entries(pets).forEach(([id, p]) => choose.add(new Option(p.join(' '), id))); choose.value = kind;
                 choose.addEventListener('change', async () => { const value = choose.value; const ok = await change(() => { const ss = clone(window.students); ss.find(x => x.id === s.id).classPet = value; return commit(ss, window.groups, window.pointsHistory); }); if (!ok) choose.value = kind; });
                 const options = el('details', undefined, 'pet-card-options'); options.dataset.petKey = 'options-' + s.id; options.append(el('summary', '更換寵物'), choose);
@@ -259,30 +298,49 @@
         const bar = el('div', undefined, 'pet-award-bar'); const count = el('span'); count.setAttribute('role', 'status');
         const ruleSelect = el('select'); ruleSelect.setAttribute('aria-label', '獎勵規則');
         ruleSelect.dataset.petFocus = 'rule';
-        config.rules.forEach(r => ruleSelect.add(new Option(`${r.name} · ${r.points > 0 ? '+' : ''}${r.points} 分 / 成長 +${config.enabled ? r.xp : 0}`, r.id)));
+        config.rules.forEach(r => ruleSelect.add(new Option(`${r.name} · ${r.points > 0 ? '+' : ''}${r.points} 分 / 成長 +${config.enabled ? r.xp : 0} / 金幣 +${config.coinsEnabled ? (r.coins || 0) : 0}`, r.id)));
         if (config.rules.some(r => r.id === selectedRule)) ruleSelect.value = selectedRule;
         ruleSelect.addEventListener('change', () => { selectedRule = ruleSelect.value; });
         const give = button('確認發放', async () => {
             const r = config.rules.find(r => r.id === ruleSelect.value); if (!r) return;
             const ids = [...selected].filter(id => window.students.some(s => String(s.id) === id));
             if (!ids.length) return fail('請先選取學生。');
-            if (!await confirmAction(`發放「${r.name}」給 ${ids.length} 位學生？\n每人 ${r.points} 分、成長 +${config.enabled ? r.xp : 0}。`)) return;
+            if (!await confirmAction(`發放「${r.name}」給 ${ids.length} 位學生？\n每人 ${r.points} 分、成長 +${config.enabled ? r.xp : 0}、金幣 +${config.coinsEnabled ? (r.coins || 0) : 0}。`)) return;
             give.disabled = true;
-            await award(ids, r.points, r.name, r.xp);
+            await award(ids, r.points, r.name, r.xp, undefined, r.coins || 0);
             give.disabled = false;
         }, 'pet-primary');
         give.dataset.petFocus = 'award';
         function updateCount() { const shown = visibleStudents().filter(s => selected.has(String(s.id))).length; count.textContent = `已選 ${selected.size} 人${selected.size > shown ? `（篩選外 ${selected.size - shown} 人）` : ''}`; give.disabled = !selected.size || busy; }
         bar.append(count, ruleSelect, give); root.append(bar); renderCards(); updateCount();
         const rules = el('details'); rules.dataset.petKey = 'rules'; rules.append(el('summary', '⚙️ 自訂獎勵規則與設定'));
-        const form = el('form', undefined, 'pet-tools');
+        rules.append(el('p', '規則修改只影響之後的發放；已發放的分數、成長值與金幣不會改動。'));
+        const form = el('form', undefined, 'pet-rule-editor');
+        form.append(el('strong', editingRuleId ? '編輯獎勵規則' : '新增獎勵規則'));
         const name = el('input'); name.required = true; name.maxLength = 40; name.placeholder = '規則名稱'; name.setAttribute('aria-label', '規則名稱');
+        name.value = ruleDraft.name; name.dataset.petFocus = 'rule-name'; name.addEventListener('input', () => { ruleDraft.name = name.value; });
         function number(label, value, min) { const wrapper = el('label', label); const input = el('input'); input.type = 'number'; input.value = value; input.required = true; input.min = min; input.max = 1000; input.step = 1; wrapper.append(input); return [wrapper, input]; }
-        const [pl, point] = number('分數', 2, -1000), [xl, xp] = number('成長值', 2, 0);
-        const submit = el('button', '新增規則'); submit.type = 'submit'; form.append(name, pl, xl, submit);
-        form.addEventListener('submit', async e => { e.preventDefault(); const p = Number(point.value), x = Number(xp.value); if (!name.value.trim() || p === 0 || (p < 0 && x !== 0)) return fail('請填寫名稱及非零分數；扣分規則的成長值需為 0。'); const ok = await saveSettings({ ...config, rules: [...config.rules, { id: uid(), name: name.value.trim(), points: p, xp: x }] }); if (ok) form.reset(); });
+        const [pl, point] = number('分數', ruleDraft.points, -1000), [xl, xp] = number('成長值', ruleDraft.xp, 0), [cl, coins] = number('金幣', ruleDraft.coins, 0);
+        [[point, 'points'], [xp, 'xp'], [coins, 'coins']].forEach(([input, key]) => { input.dataset.petFocus = 'rule-' + key; input.addEventListener('input', () => { ruleDraft[key] = input.value; }); });
+        const submit = el('button', editingRuleId ? '儲存規則' : '新增規則', 'pet-primary'); submit.type = 'submit';
+        const actions = el('div', undefined, 'pet-tools'); actions.append(submit);
+        if (editingRuleId) actions.append(button('取消編輯', () => { editingRuleId = null; ruleDraft = blankRule(); render(); }));
+        form.append(name, pl, xl, cl, actions);
+        form.addEventListener('submit', async e => {
+            e.preventDefault();
+            const ok = await saveRule({ name: name.value, points: point.value, xp: xp.value, coins: coins.value }, editingRuleId);
+            if (ok) { editingRuleId = null; ruleDraft = blankRule(); render(); if (typeof NotificationSystem !== 'undefined') NotificationSystem.success('規則已存本機'); }
+        });
         rules.append(form);
-        config.rules.forEach(r => { const row = el('div', undefined, 'pet-rule'); row.append(el('span', `${r.name} · ${r.points} 分 / 成長 ${r.xp}`), button('移除規則', () => saveSettings({ ...config, rules: config.rules.filter(x => x.id !== r.id) }))); rules.append(row); });
+        config.rules.forEach(r => {
+            const row = el('div', undefined, 'pet-rule');
+            const edit = button('編輯', () => { editingRuleId = r.id; ruleDraft = { name: r.name, points: String(r.points), xp: String(r.xp), coins: String(r.coins || 0) }; render(); document.querySelector('[data-pet-focus="rule-name"]')?.focus(); });
+            edit.setAttribute('aria-label', `編輯「${r.name}」規則`);
+            row.append(el('span', `${r.name} · ${r.points} 分 / 成長 ${r.xp} / 金幣 ${r.coins || 0}`), edit, button('移除規則', async () => {
+                const ok = await saveSettings({ ...config, rules: config.rules.filter(x => x.id !== r.id) });
+                if (ok && editingRuleId === r.id) { editingRuleId = null; ruleDraft = blankRule(); render(); }
+            })); rules.append(row);
+        });
         if (config.enabled) rules.append(button('暫停成長獎勵（保留寵物與紀錄）', () => saveSettings({ ...config, enabled: false })));
         root.append(rules);
         const history = el('details'); history.dataset.petKey = 'history'; history.append(el('summary', '📒 獎勵紀錄與撤銷'));
@@ -302,7 +360,7 @@
             rows.replaceChildren(); paging.replaceChildren();
             records.slice(page * 30, (page + 1) * 30).forEach(r => {
                 const reversed = reversedIds.has(r.id);
-                const row = el('div', undefined, 'pet-history'); row.append(el('strong', `${r.studentName} · ${r.reason}`), el('span', `${r.points > 0 ? '+' : ''}${r.points} 分 · 成長 ${r.petXp >= 0 ? '+' : ''}${r.petXp}`), el('small', r.timestamp));
+                const row = el('div', undefined, 'pet-history'); row.append(el('strong', `${r.studentName} · ${r.reason}`), el('span', `${r.points > 0 ? '+' : ''}${r.points} 分 · 成長 ${r.petXp >= 0 ? '+' : ''}${r.petXp} · 金幣 ${(r.coinDelta || 0) >= 0 ? '+' : ''}${r.coinDelta || 0}`), el('small', r.timestamp));
                 if (r.petReverses || reversed) row.append(el('span', r.petReverses ? '撤銷紀錄' : '已撤銷'));
                 else {
                     row.append(button('撤銷這筆', async () => { if (await confirmAction(`撤銷 ${r.studentName} 的「${r.reason}」？`)) undo([r.id]); }));
@@ -333,6 +391,6 @@
         render();
         if (location.hash === '#pets') window.showSection('pets');
     }
-    window.ClassPets = { award, undo, xpFor, stage, appearance, milestone, render, prepare, settings };
+    window.ClassPets = { award, undo, xpFor, coinsFor, setCoinsEnabled, saveRule, stage, appearance, milestone, render, prepare, settings };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

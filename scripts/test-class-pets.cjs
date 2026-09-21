@@ -87,5 +87,42 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
     await test('跨多級只產生一次里程碑，扣分、撤銷與同級不觸發',async()=>{
         const {pet}=setup();assert.equal(pet.milestone(9,10).type,'hatch');assert.equal(pet.milestone(0,90).level,5);assert.equal(pet.milestone(10,90).type,'level');for(const pair of [[10,11],[30,10],[0,0]])assert.equal(pet.milestone(...pair),null);
     });
+    await test('金幣需先啟用，不追溯舊分數或成長事件',async()=>{
+        const {pet,ctx}=setup(); await pet.award([1],10,'舊獎勵'); assert.equal(pet.coinsFor(1),0);
+        assert.equal(await pet.setCoinsEnabled(true),true); assert.equal(pet.coinsFor(1),0);
+        await pet.award([1],3,'新獎勵'); assert.equal(pet.coinsFor(1),3); assert.equal(pet.xpFor(1),13); assert.equal(ctx.students[0].points,18);
+    });
+    await test('規則可分別設定三種數值，修改不重算舊紀錄',async()=>{
+        const {pet,ctx}=setup();await pet.setCoinsEnabled(true);
+        assert.equal(await pet.saveRule({name:'合作',points:2,xp:5,coins:7}),true); const rule=pet.settings().rules[0];
+        await pet.award([1],rule.points,rule.name,rule.xp,'rule-batch',rule.coins); const original=JSON.stringify(ctx.pointsHistory);
+        assert.equal(await pet.saveRule({name:'合作新版',points:3,xp:0,coins:1},rule.id),true);
+        assert.equal(pet.settings().rules.length,1);assert.equal(JSON.stringify(ctx.pointsHistory),original);assert.equal(pet.coinsFor(1),7);assert.equal(pet.xpFor(1),5);
+        await pet.undo([ctx.pointsHistory[0].id]);assert.equal(pet.coinsFor(1),0);assert.equal(pet.xpFor(1),0);assert.equal(ctx.students[0].points,5);
+    });
+    await test('金幣與成長可分別暫停，重新啟用不補發',async()=>{
+        const {pet,storage}=setup();await pet.setCoinsEnabled(true);await pet.award([1],2,'努力');await pet.setCoinsEnabled(false);await pet.award([1],4,'努力');assert.equal(pet.coinsFor(1),2);assert.equal(pet.xpFor(1),6);
+        await pet.setCoinsEnabled(true);storage.setItem('petSettings',JSON.stringify({...pet.settings(),enabled:false}));pet.prepare();await pet.award([1],3,'努力');assert.equal(pet.coinsFor(1),5);assert.equal(pet.xpFor(1),6);
+    });
+    await test('批次金幣防重送，歸零後撤銷只回沖該筆金幣',async()=>{
+        const {pet,ctx,persist}=setup();await pet.setCoinsEnabled(true);await pet.award([1,1,2],2,'合作',5,'coins-batch',7);
+        assert.equal(await pet.award([1,2],2,'合作',5,'coins-batch',7),false);assert.equal(pet.coinsFor(2),7);
+        const ids=ctx.pointsHistory.filter(r=>r.petEvent).map(r=>r.id);ctx.pointsHistory.unshift({id:Date.now()+1,type:'reset'});ctx.students.forEach(s=>s.points=0);ctx.groups[0].score=0;persist();pet.prepare();
+        assert.equal(pet.coinsFor(1),7);await pet.undo(ids);assert.equal(pet.coinsFor(1),0);assert.equal(ctx.students[0].points,0);assert.equal(await pet.undo(ids),false);
+    });
+    for(const key of ['students','groups','pointsHistory']) await test('金幣發放 '+key+' 寫入失敗不留半筆獎勵',async()=>{
+        const {pet,ctx,storage}=setup();await pet.setCoinsEnabled(true);const before=JSON.stringify([ctx.students,ctx.groups,ctx.pointsHistory]);const disk=[...storage.data];storage.failKey=key;
+        assert.equal(await pet.award([1],2,'合作',3,undefined,8),false);assert.equal(pet.coinsFor(1),0);assert.equal(JSON.stringify([ctx.students,ctx.groups,ctx.pointsHistory]),before);assert.deepEqual([...storage.data],disk);
+    });
+    await test('金幣設定存檔失敗與非法規則不覆蓋原設定',async()=>{
+        const {pet,storage}=setup();const before=storage.getItem('petSettings');storage.failKey='petSettings';assert.equal(await pet.setCoinsEnabled(true),false);assert.equal(storage.getItem('petSettings'),before);
+        for(const coins of [-1,1.5,1001,NaN])assert.equal(await pet.saveRule({name:'測試',points:2,xp:2,coins}),false);
+        assert.equal(await pet.saveRule({name:'扣分',points:-1,xp:0,coins:1}),false);assert.equal(storage.getItem('petSettings'),before);
+    });
+    await test('金幣備份重建去重、班級隔離與期初餘額',async()=>{
+        const {pet,ctx,persist,storage}=setup('B');ctx.students[0].petCarryCoins=12;persist();pet.prepare();await pet.setCoinsEnabled(true);await pet.award([1],2,'努力',3,'carry',5);
+        const history=JSON.parse(storage.getItem(ctx.POINTS_HISTORY_KEY));assert.equal(pet.coinsFor(1,[...history,...history]),17);assert.equal(storage.data.has('petSettings'),false);
+        await pet.undo([ctx.pointsHistory[0].id]);assert.equal(pet.coinsFor(1),12);assert.equal(pet.xpFor(1),0);
+    });
     console.log(`${passed} checks passed`);
 })().catch(e=>{console.error(e);process.exitCode=1;});
