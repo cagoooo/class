@@ -11,3 +11,5 @@ Excel 的還原工作表使用 CHUNKS_V2：分段順序、長度與 CRC32 用來
 「下載還原前副本」提供此帳號此班最近一次還原前的 JSON。副本仍在同一瀏覽器，清除網站資料也會清除；重要成果仍需下載 Excel/JSON 留存。同步歸屬 Google 登入的 Firebase 使用者，不是 Google Drive 檔案。
 
 驗收：scripts/test-class-pets.cjs、scripts/test-data-safety.cjs、scripts/test-pet-sync.cjs。線上 tests/data-safety-acceptance.html 使用獨立 sessionStorage 與 safety-qa 測試班，僅寫入虛構資料，不更新正式班級目錄。
+
+班級收藏保存在 petSettings.collection，以種類去重；與孵化獎勵共同寫入，備份與雲端完整版本均包含。資料還原以選定備份為準，不合併不同班的收藏。

@@ -181,6 +181,7 @@ class DataBackup {
                     { label: '備份時間', value: data.exportDate && !isNaN(Date.parse(data.exportDate)) ? new Date(data.exportDate).toLocaleString('zh-TW') : '未記載' },
                     { label: '資料數量', value: `${(data.students || []).length} 位學生・${(data.groups || []).length} 個分組` },
                     { label: '成果紀錄', value: `${(data.pointsHistory || []).filter(r => r.petEvent).length} 筆寵物／金幣紀錄・${(data.petSettings?.products || []).length} 項商品` },
+                    { label: '已收集圖鑑', value: `${Object.keys(data.petSettings?.collection || {}).length} / 30 種` },
                     { label: '還原前保護', value: '確認後會先保存本機副本；存妥才開始還原' },
                     { label: '檔案名稱', value: file.name }
                 ],

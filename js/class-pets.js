@@ -173,7 +173,7 @@
             const kind = Object.hasOwn(pets, student.classPet) ? student.classPet : 'cat';
             if (!found[kind]) found[kind] = { discoveredAt: new Date().toISOString() };
         }
-        return found;
+        return Object.fromEntries(Object.keys(pets).filter(kind => found[kind]).map(kind => [kind, found[kind]]));
     }
     function preserveCollection() {
         const config = settings(), collection = collectionFor();
