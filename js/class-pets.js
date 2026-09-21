@@ -321,7 +321,10 @@
     function init() {
         remember();
         const menu = document.getElementById('feature-menu-grid') || document.querySelector('button[onclick="showSection(\'grouping\')"]')?.parentElement;
-        const nav = button('🐾 班級寵物', () => { render(); window.showSection('pets'); }, 'pet-nav'); menu?.append(nav);
+        const nav = button(undefined, () => { render(); window.showSection('pets'); }, 'bg-gradient-to-br from-amber-50 to-orange-50 p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-amber-500 active:scale-95');
+        nav.id = 'petsNavBtn';
+        nav.append(el('div', '🐾', 'text-2xl sm:text-3xl mb-1 sm:mb-2'), el('div', '班級寵物', 'font-semibold text-gray-700 text-sm sm:text-base'));
+        menu?.append(nav);
         const section = el('section', undefined, 'section hidden'); section.id = 'pets-section'; document.getElementById('grouping-section')?.after(section);
         const entry = button('🐾 寵物成長／批次獎勵', () => { render(); window.showSection('pets'); }, 'pet-nav'); document.getElementById('pointsHistory')?.before(entry);
         // 同頁正常操作也會改動共用資料；獎勵操作開始時仍檢查其他分頁造成的衝突。
