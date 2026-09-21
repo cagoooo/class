@@ -49,7 +49,7 @@
         return expectedClass === cid() && expected === fingerprint();
     }
     function redraw() {
-        window.renderStudents?.(); window.renderGroups?.(); window.renderPointsHistory?.();
+        window.renderStudents?.(); window.renderGroups?.(); window.renderPointsHistory?.(); window.renderPointsStudentList?.();
         render();
     }
     async function change(action) {
