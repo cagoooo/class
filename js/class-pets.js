@@ -16,6 +16,7 @@
         kind = Object.hasOwn(pets, kind) ? kind : 'cat';
         const image = el('img', undefined, 'pet-portrait pet-rendered');
         image.width = 320; image.height = 360; image.loading = 'lazy'; image.decoding = 'async';
+        if (xp >= 10) { image.classList.add('pet-breathing'); image.style.setProperty('--pet-breath-duration', mood === 'sleepy' ? '6s' : mood === 'happy' ? '3.8s' : '4.6s'); }
         image.alt = xp < 10 ? '神祕寵物蛋・等待隨機孵化' : `${pets[kind][1]}・${appearance(xp).label}・${moods[mood] || moods.normal}`;
         image.src = assetBase + assetName(kind, xp, mood);
         image.addEventListener('error', () => {

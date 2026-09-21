@@ -12,7 +12,7 @@ window.STUDENTS_KEY='students-'+testClass;window.GROUPS_KEY='groups-'+testClass;
 window.students=[];window.groups=[];window.pointsHistory=[];window.homeworkChecks={};window.notebookEntries=[];window.homeworkList=[];window.lotteryHistory=[];
 window.NotificationSystem={success(){},error(m){document.getElementById('result').textContent=m},warning(){}};
 </script>
-<script src="../js/class-aware-storage.js?v=3.34.0"></script><script src="../js/firebase-config.js?v=3.34.0"></script><script>FirebaseConfig.signIn=()=>new Promise(resolve=>FirebaseConfig.onAuthStateChanged(()=>{if(!FirebaseConfig.isGoogleUser())document.getElementById('account').textContent='請先在正式網站登入 Google，再重新整理本頁。';resolve(FirebaseConfig.getCurrentUserId());}));</script><script src="../js/firebase-sync.js?v=3.34.0"></script><script src="../js/class-pets.js?v=3.34.0"></script>
+<script src="../js/class-aware-storage.js?v=3.34.1"></script><script src="../js/firebase-config.js?v=3.34.1"></script><script>FirebaseConfig.signIn=()=>new Promise(resolve=>FirebaseConfig.onAuthStateChanged(()=>{if(!FirebaseConfig.isGoogleUser())document.getElementById('account').textContent='請先在正式網站登入 Google，再重新整理本頁。';resolve(FirebaseConfig.getCurrentUserId());}));</script><script src="../js/firebase-sync.js?v=3.34.1"></script><script src="../js/class-pets.js?v=3.34.1"></script>
 <script>
 // 使用正式同步 helper；不呼叫全班同步或名冊寫入。
 const ready=setInterval(()=>{if(!FirebaseConfig.isConnected()||!FirebaseConfig.isGoogleUser())return;clearInterval(ready);document.getElementById('account').textContent='已登入；僅測試虛構資料';document.getElementById('run').disabled=false;},500);

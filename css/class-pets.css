@@ -115,3 +115,10 @@
 .dark .pet-album button { background:#243347; }
 .dark .pet-album button[aria-pressed=true] { background:#254b41; border-color:#86cdb8; }
 @media(max-width:600px) { .pet-album { padding:16px; } .pet-album-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; } .pet-album-grid .pet-portrait { width:112px; height:126px; } }
+
+/* Transform-only breathing: hatched pets in cards/compact rows; eggs and reveal animation stay separate. */
+.pet-avatar .pet-breathing { transform-origin:50% 85%; animation:pet-breathe var(--pet-breath-duration,4.6s) ease-in-out infinite; }
+.pet-card:nth-child(3n+2) .pet-breathing { animation-delay:-1.4s; }
+.pet-card:nth-child(3n) .pet-breathing { animation-delay:-2.8s; }
+@keyframes pet-breathe { 0%,100% { transform:translateY(0) scale(1); } 50% { transform:translateY(-1px) scale(1.018,1.035); } }
+@media(prefers-reduced-motion:reduce) { .pet-avatar .pet-breathing { animation:none; transform:none; } }
