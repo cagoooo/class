@@ -128,7 +128,7 @@ async function downloadCollection(collectionName) {
         return data;
     } catch (error) {
         console.error(`下載 ${collectionName} 失敗:`, error);
-        return [];
+        throw error;
     }
 }
 
@@ -143,7 +143,7 @@ async function downloadSingleDoc(collectionName, docId) {
         return doc.exists ? doc.data() : null;
     } catch (error) {
         console.error(`下載 ${collectionName}/${docId} 失敗:`, error);
-        return null;
+        throw error;
     }
 }
 
@@ -272,7 +272,7 @@ async function syncToCloud(silent = false) {
         const theme = localStorage.getItem('theme');  // v3.1.6：深色/淺色模式偏好
 
         // ── 並行上傳全部集合 ──
-        await Promise.all([
+        const uploadResults = await Promise.all([
             uploadCollection(COLLECTIONS.STUDENTS, students || []),
             uploadCollection(COLLECTIONS.POINTS_HISTORY, pointsHistory || []),
             uploadCollection(COLLECTIONS.GROUPS, groups || []),
@@ -298,6 +298,8 @@ async function syncToCloud(silent = false) {
                 examLightMode, examAnalogClock, examSoundsEnabled, homeworkDashboardView, theme
             }),
         ]);
+
+        if (uploadResults.some(result => result !== true)) throw new Error('部分資料未上傳完成，請稍後重新同步；本機資料與待同步標記仍保留。');
 
         // 作業繳交狀態（特殊結構）— 使用動態路徑（修正多班級漏洞）
         if (homeworkChecks && Object.keys(homeworkChecks).length > 0) {
@@ -544,6 +546,7 @@ async function loadFromCloudData(cloudData) {
         if (typeof renderLotteryHistory === 'function') renderLotteryHistory();
         if (typeof updatePointsStudentSelect === 'function') updatePointsStudentSelect();
         if (typeof updateHomeworkSelect === 'function') updateHomeworkSelect();
+        window.ClassPets?.render();
 
         NotificationSystem && NotificationSystem.success('已從雲端完整還原資料 ✅');
         // 重大資料操作：本地資料被雲端覆蓋，不可逆
