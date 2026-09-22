@@ -645,7 +645,12 @@ async function syncAllClassesToCloud(onProgress) {
         for (const [i, cls] of all.entries()) {
             onProgress?.(i, all.length, cls.name, 'syncing');
             try {
-                await CloudSafety.publish(String(cls.id));
+                // 一鍵同步前已由老師確認「雲端舊資料將被覆蓋」。
+                // 以這次讀到的雲端版本作為 CAS 基準，允許新裝置／新增寵物功能
+                // 在沒有舊 cloudSafetyBase 時完成首次完整快照；若讀取後雲端又變動，
+                // publish 內的交易仍會拒絕覆蓋，保留衝突保護。
+                const remote = await CloudSafety.read(String(cls.id));
+                await CloudSafety.publish(String(cls.id), { expectedToken: remote.empty ? undefined : remote.token });
                 const count = CloudSafety.dataFor(CloudSafety.capture(String(cls.id))).students.length;
                 results.push({ name: cls.name, status: 'ok', count });
                 onProgress?.(i + 1, all.length, cls.name, 'ok', count);
