@@ -39,15 +39,23 @@ async function initializeFirebase() {
         firebaseAuth = firebase.auth();
         firebaseDb = firebase.firestore();
 
-        // 啟用離線持久化
+        // 啟用多分頁離線持久化：同一位老師開啟多個分頁時由 Firestore
+        // 協調快取，避免舊版單分頁 persistence 互相搶鎖而拋出內部斷言。
         try {
-            await firebaseDb.enablePersistence();
-            console.log('Firestore 離線持久化已啟用');
+            await firebaseDb.enablePersistence({ synchronizeTabs: true });
+            console.log('Firestore 多分頁離線持久化已啟用');
         } catch (err) {
             if (err.code === 'failed-precondition') {
-                console.warn('多個分頁開啟中，離線持久化僅在一個分頁中可用');
+                console.warn('Firestore 多分頁離線持久化無法啟用，改用記憶體快取');
             } else if (err.code === 'unimplemented') {
-                console.warn('當前瀏覽器不支援離線持久化');
+                console.warn('當前瀏覽器不支援 Firestore 離線持久化，改用記憶體快取');
+            } else if (/internal assertion failed|unexpected state/i.test(err?.message || '')) {
+                // Firebase 9 compat 在舊版／損壞 IndexedDB 快取上可能拋出
+                // INTERNAL ASSERTION FAILED。雲端同步仍可使用，讓 Firestore
+                // 自動改用記憶體快取即可，不應中斷班級小管家或觸發錯誤 webhook。
+                console.warn('Firestore 離線快取狀態不相容，改用記憶體快取');
+            } else {
+                console.warn('Firestore 離線持久化未啟用，改用記憶體快取:', err?.message || err);
             }
         }
 

@@ -178,6 +178,15 @@ const ErrorHandler = (function () {
         return mentionsServiceWorker && isFetchFailure;
     }
 
+    // Firebase 9 compat 的 Firestore 離線快取在多分頁、舊版資料庫版本
+    // 或瀏覽器剛切換分頁時，偶爾會拋出「Unexpected state」內部斷言。
+    // 這不是班級資料寫入失敗；Firestore 會退回記憶體快取，雲端讀寫仍可用。
+    function isFirestoreCacheAssertion(error, context = '') {
+        const text = `${error?.name || ''} ${error?.message || ''} ${context}`;
+        return /FIRESTORE\s*\(\d+\.\d+\.\d+\)\s*INTERNAL ASSERTION FAILED:\s*Unexpected state/i.test(text)
+            && /firestore(?:-compat)?\.js/i.test(text);
+    }
+
     function promiseRejectionContext(error) {
         const stack = formatStack(error);
         const frame = stack.split('\n').slice(1).find(line => /^\s*at\s/.test(line));
@@ -237,6 +246,13 @@ const ErrorHandler = (function () {
                 }
                 return;
             }
+            if (isFirestoreCacheAssertion(reason, context)) {
+                event.preventDefault();
+                if (config.logToConsole) {
+                    console.warn('[ErrorHandler] Firestore 離線快取狀態不相容，已改用記憶體快取');
+                }
+                return;
+            }
             ErrorHandler.handle(
                 reason,
                 ErrorTypes.UNKNOWN,
@@ -264,6 +280,14 @@ const ErrorHandler = (function () {
             if (isOpaqueCrossOriginError) {
                 if (config.logToConsole) {
                     console.warn('[ErrorHandler] 忽略無法定位的跨網域腳本錯誤');
+                }
+                return;
+            }
+
+            if (isFirestoreCacheAssertion(event.error || new Error(event.message), event.filename)) {
+                event.preventDefault();
+                if (config.logToConsole) {
+                    console.warn('[ErrorHandler] Firestore 離線快取狀態不相容，已改用記憶體快取');
                 }
                 return;
             }
@@ -331,6 +355,13 @@ const ErrorHandler = (function () {
             if (isServiceWorkerUpdateError(errorObj, context)) {
                 if (config.logToConsole) {
                     console.warn(`[ErrorHandler] 忽略 Service Worker 更新載入失敗: ${errorObj.message}`);
+                }
+                return;
+            }
+
+            if (isFirestoreCacheAssertion(errorObj, context)) {
+                if (config.logToConsole) {
+                    console.warn(`[ErrorHandler] 忽略 Firestore 離線快取內部斷言: ${errorObj.message}`);
                 }
                 return;
             }
