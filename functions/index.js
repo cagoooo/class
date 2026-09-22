@@ -27,6 +27,12 @@ const {
   normalizePetData,
   petEventSummary,
 } = require('./pet-notification');
+const {
+  buildDigestPayload,
+  canonicalizeFeatureStats,
+  isSyncConflictEvent,
+  summarizeEvents,
+} = require('./digest-summary');
 
 admin.initializeApp();
 
@@ -460,7 +466,10 @@ async function logUsageEvent(eventType, data, who, uid) {
       expireAt: expiryTimestamp(),
     };
 
-    if (eventType === 'class_create') doc.className = clip(data.className, 80);
+    if (eventType === 'class_create') {
+      doc.className = clip(data.className, 80);
+      if (data.classId) doc.classId = clip(data.classId, 80);
+    }
     if (eventType === 'data_action') {
       doc.action = clip(data.action, 80);
       doc.details = clip(data.details, 300);
@@ -491,14 +500,9 @@ async function logUsageEvent(eventType, data, who, uid) {
       if (data.failureStage) doc.failureStage = clip(data.failureStage, 80);
     }
     if (eventType === 'feature_summary') {
-      const stats = {};
       const raw = data.stats || {};
-      // 只收「字串 → 正整數」，擋掉惡意 payload 把統計汙染成怪東西
-      Object.keys(raw).slice(0, 40).forEach((k) => {
-        const n = Number(raw[k]);
-        if (Number.isFinite(n) && n > 0) stats[clip(k, 40)] = Math.min(Math.round(n), 99999);
-      });
-      doc.stats = stats;
+      // 新舊前端可能送出不同名稱；寫入時先合併，摘要彙整也會再次正規化歷史資料。
+      doc.stats = canonicalizeFeatureStats(raw);
       doc.deviceId = clip(data.deviceId, 40);
     }
 
@@ -632,223 +636,7 @@ exports.notifyUsage = onCall(
   }
 );
 
-/**
- * 把當日事件陣列彙整成戰報所需的數字。抽成純函式（不碰 Firestore / 網路）
- * 是為了能單獨驗證統計邏輯 —— 戰報一天只跑一次，算錯很難察覺。
- */
-function summarizeEvents(events) {
-  const activeUids = new Set();
-  const newTeachers = [];
-  const classesCreated = [];
-  const dataActions = [];
-  const errors = [];
-  const featureTotals = {};
-  const pet = {
-    rewards: 0,
-    hatches: 0,
-    levelUps: 0,
-    undos: 0,
-    redeems: 0,
-    refunds: 0,
-    settings: 0,
-    errors: 0,
-  };
-  let syncConflicts = 0;
-  let guestEvents = 0;
-
-  events.forEach((d) => {
-    if (d.uid) activeUids.add(d.uid);
-    else if (d.type === 'session_start') guestEvents++;
-
-    switch (d.type) {
-      case 'login_new':
-        newTeachers.push(d.label || d.email || '未具名老師');
-        break;
-      case 'class_create':
-        classesCreated.push({ name: d.className || '(未命名)', who: d.name || d.email || '' });
-        break;
-      case 'data_action':
-        dataActions.push({ action: d.action || '', details: d.details || '', who: d.name || d.email || '' });
-        break;
-      case 'error':
-        if (String(d.failureStage || '') === 'sync-conflict') {
-          syncConflicts++;
-          break;
-        }
-        errors.push({ message: d.message || '', context: d.context || '', who: d.name || d.email || '' });
-        if (d.feature === 'pet') pet.errors++;
-        break;
-      case 'sync_conflict':
-        syncConflicts++;
-        break;
-      case 'feature_summary':
-        Object.keys(d.stats || {}).forEach((k) => {
-          featureTotals[k] = (featureTotals[k] || 0) + (Number(d.stats[k]) || 0);
-        });
-        break;
-      default:
-        if (PET_EVENT_TYPES.has(d.type)) {
-          if (d.type === 'pet_reward') pet.rewards++;
-          if (d.type === 'pet_hatch') pet.hatches += Number(d.count) || 1;
-          if (d.type === 'pet_level_up') pet.levelUps += Number(d.count) || 1;
-          if (d.type === 'pet_undo') pet.undos += Number(d.count) || 1;
-          if (d.type === 'pet_shop_redeem') pet.redeems += Number(d.count) || 1;
-          if (d.type === 'pet_shop_refund') pet.refunds += Number(d.count) || 1;
-          if (d.type === 'pet_settings') pet.settings++;
-        }
-        break;
-    }
-  });
-
-  const hotFeatures = Object.keys(featureTotals)
-    .map((k) => ({ label: k, count: featureTotals[k] }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 6);
-
-  return {
-    activeTeachers: activeUids.size,
-    guestEvents,
-    newTeachers,
-    classesCreated,
-    dataActions,
-    errors,
-    syncConflicts,
-    pet,
-    hotFeatures,
-  };
-}
-
-/**
- * 把備份狀態變成戰報裡的一行。
- *
- * 備份平常靜默不推播（成功不吵人），所以戰報這一行是唯一的「它還活著」訊號。
- * 沒有紀錄也要明講，不能靜靜略過——那正是備份壞掉時最可能的樣子。
- */
-function backupLine(backup) {
-  if (!backup || !backup.day) return '🗄️ 備份：今日尚無紀錄 ⚠️';
-  const mb = backup.bytes ? (backup.bytes / 1048576).toFixed(1) + ' MB' : '';
-  const size = mb ? `${mb}／${backup.fileCount || 0} 檔` : '';
-  if (backup.status === 'ok') return `🗄️ 備份 ${size} ✅`;
-  if (backup.status === 'running') return '🗄️ 備份：仍在進行中 ⏳';
-  if (backup.status === 'incomplete') return `🗄️ 備份：${size}，缺少完成標記 ⚠️`;
-  return `🗄️ 備份失敗 ⚠️ ${clip(backup.error, 60)}`;
-}
-
-/** 由彙整結果組出 Google Chat 卡片（含手機推播用的純文字摘要）。 */
-function buildDigestPayload(day, dateLabel, sum, backup) {
-  const overviewLines = [`👥 活躍老師 ${sum.activeTeachers} 位`];
-  if (sum.newTeachers.length) {
-    overviewLines.push(`🎉 新加入 ${sum.newTeachers.length} 位：${sum.newTeachers.slice(0, 5).join('、')}`);
-  }
-  if (sum.guestEvents) overviewLines.push(`👤 訪客造訪 ${sum.guestEvents} 人次`);
-  overviewLines.push(`🏫 新建班級 ${sum.classesCreated.length} 個`);
-
-  const sections = [{
-    widgets: [{ decoratedText: { topLabel: '今日總覽', text: overviewLines.join('\n'), wrapText: true } }],
-  }];
-
-  if (sum.hotFeatures.length) {
-    sections.push({
-      header: '🔥 熱門功能',
-      widgets: [{
-        decoratedText: {
-          topLabel: '功能點擊次數',
-          text: sum.hotFeatures.map((f) => `• ${f.label} ${f.count} 次`).join('\n'),
-          wrapText: true,
-        },
-      }],
-    });
-  }
-
-  if (sum.classesCreated.length) {
-    sections.push({
-      header: '🏫 新建班級',
-      widgets: [{
-        decoratedText: {
-          topLabel: `共 ${sum.classesCreated.length} 個`,
-          text: sum.classesCreated.slice(0, 8)
-            .map((c) => `• ${c.name}${c.who ? `（${c.who}）` : ''}`).join('\n'),
-          wrapText: true,
-        },
-      }],
-    });
-  }
-
-  if (sum.dataActions.length) {
-    sections.push({
-      header: '⚙️ 重大資料操作',
-      widgets: [{
-        decoratedText: {
-          topLabel: `共 ${sum.dataActions.length} 次`,
-          text: sum.dataActions.slice(0, 8)
-            .map((a) => `• ${a.action}${a.who ? `（${a.who}）` : ''}`).join('\n'),
-          wrapText: true,
-        },
-      }],
-    });
-  }
-
-  const petLines = [
-    sum.pet.rewards && `🐾 獎勵 ${sum.pet.rewards} 批`,
-    sum.pet.hatches && `🥚 孵化 ${sum.pet.hatches} 隻`,
-    sum.pet.levelUps && `🌟 升級 ${sum.pet.levelUps} 隻`,
-    sum.pet.undos && `↩️ 撤銷 ${sum.pet.undos} 筆`,
-    sum.pet.redeems && `🛍️ 兌換 ${sum.pet.redeems} 筆`,
-    sum.pet.refunds && `💰 退幣 ${sum.pet.refunds} 筆`,
-    sum.pet.settings && `⚙️ 設定 ${sum.pet.settings} 次`,
-    sum.pet.errors && `🚨 失敗 ${sum.pet.errors} 則`,
-  ].filter(Boolean);
-  if (petLines.length) {
-    sections.push({
-      header: '🐾 寵物系統',
-      widgets: [{
-        decoratedText: {
-          topLabel: '今日寵物活動',
-          text: petLines.join('\n'),
-          wrapText: true,
-        },
-      }],
-    });
-  }
-
-  const healthLines = [
-    sum.syncConflicts
-      ? `⚠️ 雲端同步衝突 ${sum.syncConflicts} 次，請完成比較後再繼續`
-      : '⚠️ 雲端同步衝突 0 次',
-    sum.errors.length
-      ? `🐞 錯誤 ${sum.errors.length} 則：` + sum.errors.slice(0, 3).map((e) => clip(e.message, 60)).join('；')
-      : '🐞 錯誤 0 則，一切正常 ✅',
-    backupLine(backup),
-  ];
-  sections.push({
-    header: '🐞 系統健康',
-    widgets: [{
-      decoratedText: { topLabel: '今日狀態', text: healthLines.join('\n'), wrapText: true },
-    }],
-  });
-
-  // 手機推播摘要（沒有這段，Chat 只會顯示「傳送了一個附件檔案給你」）
-  let text = `📈 今日戰報 ${dateLabel}\n👥 活躍老師 ${sum.activeTeachers} 位`;
-  if (sum.newTeachers.length) text += ` · 🎉 新加入 ${sum.newTeachers.length} 位`;
-  if (sum.classesCreated.length) text += ` · 🏫 新班級 ${sum.classesCreated.length} 個`;
-  if (sum.hotFeatures.length) {
-    text += `\n🔥 ${sum.hotFeatures.slice(0, 3).map((f) => `${f.label} ${f.count}`).join(' · ')}`;
-  }
-  if (sum.syncConflicts) text += `\n⚠️ 雲端同步衝突 ${sum.syncConflicts} 次`;
-  if (petLines.length) text += `\n🐾 ${petLines.slice(0, 4).join(' · ')}`;
-  text += `\n🐞 錯誤 ${sum.errors.length} 則`;
-
-  return {
-    text,
-    cardsV2: [{
-      cardId: 'digest-' + day,
-      card: {
-        header: { title: `📈 今日戰報 ${dateLabel}`, subtitle: '班級小管家 · 使用情形彙整' },
-        sections,
-      },
-    }],
-  };
-}
+// 戰報純函式集中在 digest-summary.js，供排程與回歸檢查共用。
 
 // 備份狀態存放處。每日備份寫入、每日戰報讀出，讓戰報能報「備份還活著」。
 const BACKUP_STATUS_PATH = { col: '_systemStatus', doc: 'lastBackup' };
@@ -925,7 +713,7 @@ exports.dailyUsageDigest = onSchedule(
       logger.warn('[Digest] 讀取備份狀態失敗', e);
     }
 
-    const events = snap.docs.map((doc) => doc.data() || {});
+    const events = snap.docs.map((doc) => ({ ...(doc.data() || {}), _documentId: doc.id }));
     const sum = summarizeEvents(events);
     const dateLabel = new Date().toLocaleDateString('zh-TW', {
       timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit', weekday: 'short',
@@ -1684,11 +1472,11 @@ exports.getUsageAnalytics = onCall(
         dayMap[day].events++;
         if (d.uid) dayMap[day].uids[d.uid] = true;
         if (d.type === 'feature_summary') {
-          Object.keys(d.stats || {}).forEach((k) => {
-            featureTotals[k] = (featureTotals[k] || 0) + (Number(d.stats[k]) || 0);
+          Object.entries(canonicalizeFeatureStats(d.stats)).forEach(([label, count]) => {
+            featureTotals[label] = (featureTotals[label] || 0) + count;
           });
         }
-        if (d.type === 'error' && String(d.failureStage || '') !== 'sync-conflict') {
+        if (d.type === 'error' && !isSyncConflictEvent(d)) {
           const msg = clip(d.message, 200) || '(無訊息)';
           if (!errorMap[msg]) {
             errorMap[msg] = { message: msg, count: 0, uids: {}, contexts: {}, devices: {}, urls: {}, lastTs: '', firstDay: day };

@@ -40,6 +40,7 @@ jobs:
         run: |
           node scripts/test-class-pets.cjs
           node scripts/test-pet-notify.cjs
+          node scripts/test-usage-digest.cjs
           node scripts/test-data-safety.cjs
           node scripts/test-pet-sync.cjs
           node scripts/test-leave-sync-guard.cjs

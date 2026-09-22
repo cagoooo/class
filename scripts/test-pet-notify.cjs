@@ -48,8 +48,9 @@ test('UsageNotify.pet、petError 與同步衝突各自進入持久佇列', () =>
     ctx.UsageNotify.petError('設定寫入失敗', 'settings', { classId: '601', failureStage: 'storage' });
     ctx.UsageNotify.syncConflict('另一台裝置已更新此班', { classId: '601', feature: 'pet' });
     ctx.UsageNotify.syncConflict('不應重複送出', { classId: '601', feature: 'pet' });
+    ctx.UsageNotify.classCreate('502自然', 'class-502-1');
     const queue = JSON.parse(localStorage.getItem('un_queue_v1'));
-    assert.equal(queue.length, 3);
+    assert.equal(queue.length, 4);
     assert.equal(queue[0].type, 'pet_hatch');
     assert.equal(queue[0].count, 2);
     assert.equal(queue[0].studentName, undefined);
@@ -61,6 +62,8 @@ test('UsageNotify.pet、petError 與同步衝突各自進入持久佇列', () =>
     assert.equal(queue[2].message, '另一台裝置已更新此班');
     assert.equal(queue[2].failureStage, 'sync-conflict');
     assert.equal(queue[2].operation, 'cloud_sync');
+    assert.equal(queue[3].type, 'class_create');
+    assert.equal(queue[3].classId, 'class-502-1');
 });
 
 console.log(`✅ 寵物 webhook 通知測試通過：${passed} 項`);

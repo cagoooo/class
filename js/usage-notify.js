@@ -346,8 +346,11 @@
         },
 
         // 建立新班級：重要動作，必報（reload 也不漏，靠持久化佇列）
-        classCreate: function (className) {
-            enqueue('class_create', { className: className || '' });
+        classCreate: function (className, classId) {
+            enqueue('class_create', {
+                className: className || '',
+                classId: String(classId || '').slice(0, 80)
+            });
         },
 
         // 使用功能：累積今日統計，並在節流後回報當日累計值（不逐筆通知，只進戰報）
