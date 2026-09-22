@@ -198,9 +198,28 @@
         dialog.append(header, text, steps, backupTitle, backupActions, ackTitle, ack, decisionTitle, decisionHelp, actions, cancel, note); document.body.append(dialog); dialog.showModal(); dialog.addEventListener('cancel', () => dialog.remove());
     }
     function report(error, id, silent) {
-        // 寵物資料與一般班級資料共用同一份安全快照；若啟用寵物成長，
-        // 雲端衝突、離線或儲存失敗也要被標記成寵物系統錯誤，避免老師只看到
-        // 同步燈號而不知道寵物成果也尚未上傳。
+        // 多裝置衝突是完整快照的預期安全停車，不是寵物程式故障。
+        // 先送獨立的同步提醒，再顯示比較視窗；不可把它算進寵物錯誤配額。
+        if (error?.code === 'sync-conflict') {
+            try {
+                window.UsageNotify?.syncConflict?.(
+                    error?.message || '另一台裝置已更新此班，請比較兩份資料後再選擇。',
+                    {
+                        classId: id || current(),
+                        context: '班級資料/雲端同步',
+                        feature: 'pet',
+                        operation: 'cloud_sync'
+                    }
+                );
+            } catch (e) { /* 通知不能阻擋衝突保護 */ }
+            conflicts[recoveryKey(context(id))] = true;
+            window.SyncStatusIndicator?.setState('conflict');
+            if (!silent) return showConflict(id);
+            return;
+        }
+
+        // 寵物資料與一般班級資料共用同一份安全快照；真正的離線、儲存或
+        // 伺服器錯誤仍保留寵物錯誤通知，讓老師知道成果尚未上傳。
         try {
             const rawPet = raw(keyFor('petSettings', id || current()));
             const petConfig = rawPet ? JSON.parse(rawPet) : null;
@@ -212,11 +231,7 @@
                 );
             }
         } catch (e) { /* 通知不能阻擋同步錯誤呈現 */ }
-        if (error.code === 'sync-conflict') {
-            conflicts[recoveryKey(context(id))] = true;
-            window.SyncStatusIndicator?.setState('conflict');
-            if (!silent) return showConflict(id);
-        } else window.SyncStatusIndicator?.setState('error');
+        window.SyncStatusIndicator?.setState('error');
         if (!silent) window.NotificationSystem?.error(error.message);
     }
     async function downloadRecovery() {

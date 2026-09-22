@@ -28,7 +28,7 @@
  *   4. 功能統計是「當日累計值」而非增量，重複回報會被伺服端覆寫而不是累加，
  *      所以多送幾次不會把數字灌大；佇列裡也只保留同一天的最後一份。
  *
- * 對外：window.UsageNotify.{ init, login, classCreate, feature, error, pet, petError }
+ * 對外：window.UsageNotify.{ init, login, classCreate, feature, error, pet, petError, syncConflict }
  */
 (function () {
     'use strict';
@@ -420,6 +420,23 @@
                 petAction: operation || 'operation'
             });
             API.error(message, '寵物系統/' + String(operation || '操作').slice(0, 80), 'critical', extra);
+        },
+
+        // 多裝置同時編輯時，完整快照會安全停止上傳。這是需要老師處理的
+        // 同步提醒，不是寵物程式故障；獨立事件可避免錯誤統計與錯誤配額被污染。
+        // 同一班每天只提醒一次，避免自動同步反覆觸發時洗版。
+        syncConflict: function (message, details) {
+            details = details || {};
+            var classId = String(details.classId || 'default').slice(0, 80);
+            if (!dayOnce('sync_conflict_' + hash(classId))) return;
+            var clean = cleanPetDetails(Object.assign({}, details, {
+                operation: details.operation || 'cloud_sync',
+                petAction: details.petAction || 'cloud_sync',
+                failureStage: 'sync-conflict'
+            }));
+            clean.message = String(message == null ? '另一台裝置已更新此班，請比較後再選擇。' : message).slice(0, 300);
+            clean.context = String(details.context || '班級資料/雲端同步').slice(0, 160);
+            enqueue('sync_conflict', clean);
         }
     };
 

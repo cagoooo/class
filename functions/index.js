@@ -43,6 +43,7 @@ const EVENT_META = {
   feature_summary: { emoji: '📊', title: '功能使用統計彙整' },
   data_action:     { emoji: '⚙️', title: '重大資料操作' },
   error:           { emoji: '🐞', title: '系統發生錯誤' },
+  sync_conflict:  { emoji: '⚠️', title: '雲端同步衝突提醒' },
   ...PET_EVENT_META,
 };
 
@@ -169,6 +170,32 @@ function buildCard(type, data, who) {
     }
   }
 
+  if (type === 'sync_conflict') {
+    if (data.className || data.classId) {
+      contentWidgets.push({
+        decoratedText: {
+          topLabel: '班級',
+          text: [data.className, data.classId && `（${clip(data.classId, 80)}）`].filter(Boolean).join(' '),
+          wrapText: true,
+        },
+      });
+    }
+    contentWidgets.push({
+      decoratedText: {
+        topLabel: '同步狀態',
+        text: clip(data.message || '另一台裝置已更新此班，已暫停上傳並保留本機資料。', 300),
+        wrapText: true,
+      },
+    });
+    contentWidgets.push({
+      decoratedText: {
+        topLabel: '建議處理',
+        text: '請在班級小管家下載本機與雲端備份，確認後選擇要保留的版本。',
+        wrapText: true,
+      },
+    });
+  }
+
   if (PET_EVENT_TYPES.has(type)) {
     const pet = normalizePetData(data);
     if (pet.className || pet.classId) {
@@ -291,6 +318,8 @@ function buildCard(type, data, who) {
     }
   } else if (PET_EVENT_TYPES.has(type)) {
     notificationText += `\n${petEventSummary(type, normalizePetData(data))}`;
+  } else if (type === 'sync_conflict') {
+    notificationText += `\n⚠️ 同步提醒: ${clip(data.message || '另一台裝置已更新此班，請比較後再選擇。', 150)}`;
   } else if (type === 'error' && data.message) {
     notificationText += `\n${data.feature === 'pet' ? '🚨 寵物錯誤' : '🐞 錯誤'}: ${clip(data.message, 150)}`;
   } else if (type === 'feature_summary' && data.stats) {
@@ -342,6 +371,7 @@ const EVENT_RETENTION_DAYS = 180;
 // 值得即時推 Google Chat 的事件；其餘只留底，交給每日戰報彙整。
 const INSTANT_PUSH_TYPES = new Set([
   'login_new', 'class_create', 'data_action', 'error',
+  'sync_conflict',
   'pet_hatch', 'pet_level_up', 'pet_undo', 'pet_shop_redeem',
   'pet_shop_refund', 'pet_settings',
 ]);
@@ -437,6 +467,15 @@ async function logUsageEvent(eventType, data, who, uid) {
       doc.action = clip(data.action, 80);
       doc.details = clip(data.details, 300);
     }
+    if (eventType === 'sync_conflict') {
+      doc.message = clip(data.message, 300);
+      doc.context = clip(data.context, 160);
+      doc.classId = clip(data.classId, 80);
+      doc.className = clip(data.className, 80);
+      doc.operation = clip(data.operation || 'cloud_sync', 120);
+      doc.failureStage = 'sync-conflict';
+      if (data.feature) doc.feature = clip(data.feature, 40);
+    }
     if (PET_EVENT_TYPES.has(eventType)) {
       Object.assign(doc, normalizePetData(data));
     }
@@ -527,6 +566,11 @@ exports.notifyUsage = onCall(
     if (type === 'login' && data.isNewUser) {
       eventType = 'login_new';
     }
+    // 舊版前端會把同步衝突送成 pet error。後端保留相容轉換，避免
+    // 尚未更新頁面的老師仍收到「寵物系統操作失敗」的誤導通知。
+    if (type === 'error' && String(data.failureStage || '') === 'sync-conflict') {
+      eventType = 'sync_conflict';
+    }
 
     if (!EVENT_META[eventType]) {
       return { ok: false, reason: 'unknown-type' };
@@ -593,6 +637,7 @@ function summarizeEvents(events) {
     settings: 0,
     errors: 0,
   };
+  let syncConflicts = 0;
   let guestEvents = 0;
 
   events.forEach((d) => {
@@ -610,8 +655,15 @@ function summarizeEvents(events) {
         dataActions.push({ action: d.action || '', details: d.details || '', who: d.name || d.email || '' });
         break;
       case 'error':
+        if (String(d.failureStage || '') === 'sync-conflict') {
+          syncConflicts++;
+          break;
+        }
         errors.push({ message: d.message || '', context: d.context || '', who: d.name || d.email || '' });
         if (d.feature === 'pet') pet.errors++;
+        break;
+      case 'sync_conflict':
+        syncConflicts++;
         break;
       case 'feature_summary':
         Object.keys(d.stats || {}).forEach((k) => {
@@ -644,6 +696,7 @@ function summarizeEvents(events) {
     classesCreated,
     dataActions,
     errors,
+    syncConflicts,
     pet,
     hotFeatures,
   };
@@ -743,6 +796,9 @@ function buildDigestPayload(day, dateLabel, sum, backup) {
   }
 
   const healthLines = [
+    sum.syncConflicts
+      ? `⚠️ 雲端同步衝突 ${sum.syncConflicts} 次，請完成比較後再繼續`
+      : '⚠️ 雲端同步衝突 0 次',
     sum.errors.length
       ? `🐞 錯誤 ${sum.errors.length} 則：` + sum.errors.slice(0, 3).map((e) => clip(e.message, 60)).join('；')
       : '🐞 錯誤 0 則，一切正常 ✅',
@@ -762,6 +818,7 @@ function buildDigestPayload(day, dateLabel, sum, backup) {
   if (sum.hotFeatures.length) {
     text += `\n🔥 ${sum.hotFeatures.slice(0, 3).map((f) => `${f.label} ${f.count}`).join(' · ')}`;
   }
+  if (sum.syncConflicts) text += `\n⚠️ 雲端同步衝突 ${sum.syncConflicts} 次`;
   if (petLines.length) text += `\n🐾 ${petLines.slice(0, 4).join(' · ')}`;
   text += `\n🐞 錯誤 ${sum.errors.length} 則`;
 
@@ -1615,7 +1672,7 @@ exports.getUsageAnalytics = onCall(
             featureTotals[k] = (featureTotals[k] || 0) + (Number(d.stats[k]) || 0);
           });
         }
-        if (d.type === 'error') {
+        if (d.type === 'error' && String(d.failureStage || '') !== 'sync-conflict') {
           const msg = clip(d.message, 200) || '(無訊息)';
           if (!errorMap[msg]) {
             errorMap[msg] = { message: msg, count: 0, uids: {}, contexts: {}, devices: {}, urls: {}, lastTs: '', firstDay: day };
