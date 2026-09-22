@@ -144,9 +144,12 @@
         const ordered = values => JSON.stringify([...values].sort((a, b) => String(a.id).localeCompare(String(b.id))));
         return keys().every((key, i) => ordered(JSON.parse(localStorage.getItem(key) || '[]')) === ordered([window.students, window.groups, window.pointsHistory][i] || []));
     }
-    function prepare() {
+    function prepare({ persistCollection = true } = {}) {
         // 只接受與磁碟一致的記憶體，不能把其他分頁的新快照當作本頁舊資料。
-        if (cid() === expectedClass && memoryMatchesStorage()) { preserveCollection(); remember(); }
+        if (cid() === expectedClass && memoryMatchesStorage()) {
+            if (persistCollection) preserveCollection();
+            remember();
+        }
     }
     const fail = message => { window.alert(message); return false; };
     function xpFor(id, history = window.pointsHistory || [], carry = Number(window.students?.find(s => String(s.id) === String(id))?.petCarryXp) || 0) {
@@ -601,7 +604,9 @@
         if (!root.classList.contains('hidden')) window.scrollTo?.({ top: scroll, behavior: 'instant' });
     }
     function renderContent(root) {
-        prepare();
+        // render 只負責把目前資料畫出來；切班／重新載入時不要為了整理
+        // 圖鑑快取而寫回 petSettings，避免被同步偵測器誤判成老師編輯。
+        prepare({ persistCollection: false });
         const config = settings(); root.replaceChildren();
         root.append(el('h2', '🐾 班級寵物'), el('p', `目前班級：${window.ClassProfiles?.currentProfile()?.name || '預設班級'}`, 'class-context'));
         if (!config.enabled) {
@@ -751,7 +756,7 @@
         renderHistory(); history.append(rows, paging); root.append(history);
     }
     function init() {
-        preserveCollection(); remember();
+        remember();
         const menu = document.getElementById('feature-menu-grid') || document.querySelector('button[onclick="showSection(\'grouping\')"]')?.parentElement;
         const nav = button(undefined, () => { window.UsageNotify?.feature?.('pets'); render(); window.showSection('pets'); }, 'bg-gradient-to-br from-amber-50 to-orange-50 p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-amber-500 active:scale-95');
         nav.id = 'petsNavBtn';

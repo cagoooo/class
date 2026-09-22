@@ -392,9 +392,14 @@
         const isUserKey = (k) => USER_DATA_KEYS.some(uk => k === uk || k.startsWith(uk + '-'));
 
         proto.setItem = function (key, value) {
+            // 初始化與切班時，許多模組會把目前已存在的內容重新寫回
+            // localStorage。內容沒有改變就不應被當成老師的新操作，否則
+            // 只切換班級也會留下 cloudSafetyDirty 標記並跳出離開提醒。
+            let changed = true;
+            try { changed = this.getItem(key) !== String(value); } catch (e) { /* 寫入仍照常進行 */ }
             const result = orig.call(this, key, value);
             try {
-                if (isUserKey(key) && currentState !== 'offline') {
+                if (changed && this === localStorage && isUserKey(key) && currentState !== 'offline') {
                     const isOffline = !navigator.onLine || (window.OfflineDetector && window.OfflineDetector.isOffline());
                     if (isOffline) {
                         addPendingKey(key);
