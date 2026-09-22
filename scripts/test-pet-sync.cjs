@@ -4,9 +4,10 @@ function setup(fail=false){const notices=[],data=new Map([['pendingSyncKeys','["
 (async()=>{
  for(const silent of [true,false]){const a=setup(true);assert.equal(await a.c.FirebaseSync.syncToCloud(silent),false);assert.equal(a.c.syncStatus.isSyncing,false);assert.equal(a.data.get('lastSyncTime'),'before');assert.ok(a.data.has('pendingSyncKeys'));assert.equal(a.writes(),0);console.log('PASS incomplete upload preserves local pending',silent);}
  {const a=setup();assert.equal(await a.c.FirebaseSync.syncToCloud(),true);assert.ok(a.notices.some(m=>m.includes('仍待同步')));assert.ok(a.data.has('pendingSyncKeys'));console.log('PASS newer local edits are not cleared by sync wrapper');}
+ {const a=setup();assert.equal(await a.c.FirebaseSync.syncToCloud(),true);assert.equal(a.c.syncStatus.progress.percent,100);assert.equal(a.c.syncStatus.progress.phase,'done');assert.ok(a.c.syncStatus.progress.startedAt);console.log('PASS sync progress reaches completion state');}
  {const a=setup();a.c.syncStatus.isSyncing=true;assert.equal(await a.c.FirebaseSync.syncToCloud(),false);assert.equal(a.writes(),0);console.log('PASS duplicate sync blocked');}
  {const a=setup();assert.equal(await a.c.FirebaseSync.syncFromCloud(),null);console.log('PASS incomplete cloud read has no restore payload');}
  {const a=setup();assert.equal(await a.c.FirebaseSync.loadFromCloudData({students:[]}),false);console.log('PASS unverified restore payload rejected');}
  {const a=setup();assert.equal(await a.c.FirebaseSync.loadFromCloudData({__snapshot:{classId:'B'}}),false);assert.equal(a.c.syncStatus.isSyncing,false);console.log('PASS changed class cannot restore preview');}
- console.log('7 sync entry checks passed');
+ console.log('8 sync entry checks passed');
 })().catch(e=>{console.error(e);process.exitCode=1;});

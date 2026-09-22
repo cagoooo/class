@@ -50,6 +50,31 @@
         } catch (e) { return true; }
     }
 
+    function syncProgress() {
+        try {
+            if (!window.syncStatus?.isSyncing) return null;
+            const value = window.syncStatus?.progress;
+            return value && typeof value === 'object' ? value : null;
+        } catch (e) { return null; }
+    }
+
+    function elapsedText(startedAt) {
+        const seconds = Math.max(0, Math.round((Date.now() - Number(startedAt || Date.now())) / 1000));
+        return `已等待 ${seconds} 秒`;
+    }
+
+    function phaseText(progress) {
+        const labels = {
+            prepare: '正在準備安全同步',
+            snapshot: '正在上傳班級完整快照',
+            registry: '正在更新班級清單',
+            metadata: '正在寫入同步時間',
+            done: '同步即將完成',
+            error: '同步需要重新處理',
+        };
+        return progress?.detail || labels[progress?.phase] || '正在安全同步，請稍候';
+    }
+
     function meaningful(value) {
         if (value == null || value === '') return false;
         if (Array.isArray(value)) return value.length > 0;
@@ -88,9 +113,10 @@
             name: currentClassName(),
             status,
             syncing,
+            progress: syncing ? syncProgress() : null,
             active,
             offline: !isOnline(),
-            signature: `${currentClassId()}:${status}:${syncing ? 'syncing' : 'idle'}:${isOnline() ? 'online' : 'offline'}:${fingerprint}`,
+            signature: `${currentClassId()}:${status}:${syncing ? 'syncing' : 'idle'}:${isOnline() ? 'online' : 'offline'}:${fingerprint}:${syncProgress()?.percent || 0}:${syncProgress()?.phase || ''}`,
         };
     }
 
@@ -126,6 +152,14 @@
 #leave-sync-reminder .leave-sync-icon { font-size: 1.45rem; line-height: 1.2; }
 #leave-sync-reminder .leave-sync-title { margin: 0; color: #1d4ed8; font-size: 1rem; font-weight: 800; }
 #leave-sync-reminder .leave-sync-message { margin: 4px 0 0; color: #475569; }
+#leave-sync-reminder .leave-sync-progress { margin-top: 12px; padding: 10px 11px; border-radius: 11px; background: #eff6ff; border: 1px solid #dbeafe; }
+#leave-sync-reminder .leave-sync-progress[hidden] { display: none; }
+#leave-sync-reminder .leave-sync-progress-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #1e40af; font-size: .78rem; font-weight: 800; }
+#leave-sync-reminder .leave-sync-progress-percent { font-variant-numeric: tabular-nums; }
+#leave-sync-reminder .leave-sync-progress-track { height: 9px; margin-top: 7px; overflow: hidden; border-radius: 999px; background: #bfdbfe; }
+#leave-sync-reminder .leave-sync-progress-fill { height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, #2563eb, #06b6d4); transition: width .35s ease; }
+#leave-sync-reminder .leave-sync-progress-fill.is-indeterminate { width: 42%; animation: leaveSyncProgress 1.15s ease-in-out infinite; }
+#leave-sync-reminder .leave-sync-progress-note { margin: 6px 0 0; color: #475569; font-size: .76rem; }
 #leave-sync-reminder .leave-sync-actions { display: flex; gap: 8px; margin-top: 12px; }
 #leave-sync-reminder button { min-height: 40px; border-radius: 10px; padding: 8px 13px; font: inherit; font-weight: 700; cursor: pointer; }
 #leave-sync-reminder .leave-sync-primary { flex: 1; color: #fff; background: #2563eb; border: 1px solid #2563eb; }
@@ -134,7 +168,8 @@
 #leave-sync-reminder .leave-sync-secondary { color: #334155; background: #f8fafc; border: 1px solid #cbd5e1; }
 #leave-sync-reminder .leave-sync-secondary:hover { background: #f1f5f9; }
 @keyframes leaveSyncIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-@media (prefers-reduced-motion: reduce) { #leave-sync-reminder { animation: none; } }
+@keyframes leaveSyncProgress { 0%, 100% { transform: translateX(-85%); } 50% { transform: translateX(145%); } }
+@media (prefers-reduced-motion: reduce) { #leave-sync-reminder, #leave-sync-reminder .leave-sync-progress-fill { animation: none; } }
 @media (max-width: 640px) {
     #leave-sync-reminder {
         left: 12px;
@@ -154,6 +189,10 @@
 }
 .dark #leave-sync-reminder .leave-sync-title, body.dark #leave-sync-reminder .leave-sync-title { color: #93c5fd; }
 .dark #leave-sync-reminder .leave-sync-message, body.dark #leave-sync-reminder .leave-sync-message { color: #cbd5e1; }
+.dark #leave-sync-reminder .leave-sync-progress, body.dark #leave-sync-reminder .leave-sync-progress { background: #172554; border-color: #1e40af; }
+.dark #leave-sync-reminder .leave-sync-progress-head, body.dark #leave-sync-reminder .leave-sync-progress-head { color: #bfdbfe; }
+.dark #leave-sync-reminder .leave-sync-progress-note, body.dark #leave-sync-reminder .leave-sync-progress-note { color: #cbd5e1; }
+.dark #leave-sync-reminder .leave-sync-progress-track, body.dark #leave-sync-reminder .leave-sync-progress-track { background: #1e3a8a; }
 .dark #leave-sync-reminder .leave-sync-secondary, body.dark #leave-sync-reminder .leave-sync-secondary { color: #e2e8f0; background: #334155; border-color: #64748b; }
         `;
         document.head.appendChild(style);
@@ -173,6 +212,16 @@
                     <p class="leave-sync-title">離開前記得同步班級</p>
                     <p class="leave-sync-message"></p>
                 </div>
+            </div>
+            <div class="leave-sync-progress" hidden>
+                <div class="leave-sync-progress-head">
+                    <span>同步進度</span>
+                    <span class="leave-sync-progress-percent">0%</span>
+                </div>
+                <div class="leave-sync-progress-track">
+                    <div class="leave-sync-progress-fill" role="progressbar" aria-label="班級同步進度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+                </div>
+                <p class="leave-sync-progress-note"></p>
             </div>
             <div class="leave-sync-actions">
                 <button type="button" class="leave-sync-primary" data-action="sync">立即同步</button>
@@ -194,6 +243,10 @@
         if (!banner) return;
         const message = banner.querySelector('.leave-sync-message');
         const action = banner.querySelector('[data-action="sync"]');
+        const progressBox = banner.querySelector('.leave-sync-progress');
+        const progressFill = banner.querySelector('.leave-sync-progress-fill');
+        const progressPercent = banner.querySelector('.leave-sync-progress-percent');
+        const progressNote = banner.querySelector('.leave-sync-progress-note');
         if (info.offline) {
             message.textContent = `「${info.name}」班的變更已保留在本機；目前離線，恢復網路後請記得同步到 Google 雲端。`;
             action.textContent = '目前離線';
@@ -202,8 +255,17 @@
             message.textContent = `「${info.name}」班正在上傳雲端，請等同步完成再關閉頁面。`;
             action.textContent = '同步中…';
             action.disabled = true;
+            const progress = info.progress;
+            const percent = progress ? Math.max(0, Math.min(100, Number(progress.percent) || 0)) : 24;
+            progressBox.hidden = false;
+            progressFill.style.width = `${percent}%`;
+            progressFill.classList.toggle('is-indeterminate', !progress);
+            if (progress) progressFill.setAttribute('aria-valuenow', String(Math.round(percent)));
+            else progressFill.removeAttribute('aria-valuenow');
+            progressPercent.textContent = progress ? `${Math.round(percent)}%` : '處理中';
+            progressNote.textContent = `${phaseText(progress)} · ${elapsedText(progress?.startedAt)}` + (percent >= 90 ? ' · 即將完成' : ' · 通常還需要幾秒');
         } else if (info.status === 'conflict') {
-            message.textContent = `「${info.name}」班與另一台裝置有差異，請先比較資料，避免覆蓋成果。`;
+            message.textContent = `「${info.name}」班的雲端版本與本機資料不同，請先比較資料，避免覆蓋成果。`;
             action.textContent = '比較同步差異';
             action.disabled = false;
         } else {
@@ -211,6 +273,7 @@
             action.textContent = '立即同步';
             action.disabled = false;
         }
+        if (!info.syncing) progressBox.hidden = true;
         banner.hidden = false;
     }
 
@@ -269,6 +332,7 @@
         window.addEventListener('online', refresh);
         window.addEventListener('offline', refresh);
         window.addEventListener('storage', refresh);
+        window.addEventListener('class-sync-progress', refresh);
         document.addEventListener('visibilitychange', () => setTimeout(refresh, 80));
         state.timer = setInterval(refresh, 1500);
         refresh();

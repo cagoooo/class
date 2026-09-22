@@ -23,9 +23,30 @@ const COLLECTIONS = {
 window.syncStatus = window.syncStatus || {
     lastSyncTime: null,
     isSyncing: false,
-    pendingChanges: []
+    pendingChanges: [],
+    progress: null,
 };
 const syncStatus = window.syncStatus;
+
+/**
+ * 將同步階段提供給頁面內提醒與導覽列使用。CloudSafety.publish 本身是
+ * 一次完整交易，無法逐筆回報，因此以「準備／快照／班級索引／完成」四段
+ * 顯示可理解的進度，同時保留開始時間讓 UI 能告知已等待多久。
+ */
+function setSyncProgress(percent, phase, detail, classId) {
+    const previous = syncStatus.progress || {};
+    const value = {
+        percent: Math.max(0, Math.min(100, Math.round(Number(percent) || 0))),
+        phase: String(phase || 'syncing'),
+        detail: String(detail || ''),
+        classId: String(classId || CloudSafety?.current?.() || localStorage.getItem('currentClassId') || 'default'),
+        startedAt: previous.startedAt || Date.now(),
+        updatedAt: Date.now(),
+    };
+    syncStatus.progress = value;
+    try { window.dispatchEvent(new CustomEvent('class-sync-progress', { detail: value })); } catch (e) { /* 測試環境或舊瀏覽器沒有 CustomEvent */ }
+    return value;
+}
 
 /**
  * 取得用戶的資料集合參考
@@ -232,13 +253,20 @@ async function syncToCloud(silent = false) {
     if (syncStatus.isSyncing) return false;
     const id = CloudSafety.current();
     syncStatus.isSyncing = true;
+    syncStatus.progress = null;
+    setSyncProgress(8, 'prepare', '檢查本機成果', id);
     try {
+        setSyncProgress(18, 'snapshot', '上傳班級完整快照', id);
         await CloudSafety.publish(id);
+        setSyncProgress(76, 'registry', '更新班級清單', id);
         await uploadClassProfilesMerged();
+        setSyncProgress(92, 'metadata', '寫入同步時間', id);
         await writeCloudSyncInfo();
+        setSyncProgress(100, 'done', '同步完成', id);
         if (!silent) NotificationSystem.success(CloudSafety.status(id) === 'pending' ? '已同步；上傳期間新增的操作仍待同步' : '班級成果已完整同步 ☁️');
         return true;
     } catch (error) {
+        setSyncProgress(100, 'error', error?.message || '同步未完成', id);
         await CloudSafety.report(error, id, silent);
         return false;
     } finally { syncStatus.isSyncing = false; }
