@@ -68,8 +68,10 @@
         sameAccount(c);
         localStorage.setItem(baseKey(c), JSON.stringify({ token, fingerprint: fingerprint(values), at: new Date().toISOString() }));
     }
-    function conflict(message = '雲端版本與本機資料不同，已暫停上傳並保留本機資料。請比較兩份資料後再選擇。') {
-        const e = Error(message); e.code = 'sync-conflict'; return e;
+    function conflict(message = '雲端版本與本機資料不同，已暫停上傳並保留本機資料。請比較兩份資料後再選擇。', details = {}) {
+        const e = Error(message); e.code = 'sync-conflict';
+        Object.assign(e, details);
+        return e;
     }
     function syncBusy() {
         const e = Error('另一個分頁正在同步，已略過這次自動同步。');
@@ -177,7 +179,20 @@
             const expected = options.allowRemoteOverwrite
                 ? (remote.empty ? undefined : remote.token)
                 : (Object.hasOwn(options, 'expectedToken') ? options.expectedToken : (known?.token || (canAdoptLegacy ? remote.token : undefined)));
-            if (!remote.empty && expected !== remote.token) throw conflict();
+            if (!remote.empty && expected !== remote.token) {
+                // 沒有本機同步基準時，無法證明是另一台裝置改了雲端：
+                // 常見情境是舊版集合資料第一次升級，或新裝置首次拿到
+                // 既有班級。仍然停車並要求老師比較，但只留底不即時
+                // webhook，避免把正常的首次資料分歧當成系統錯誤。
+                const hasKnownBaseline = !!known?.token;
+                const explicitlyConfirmed = Object.hasOwn(options, 'expectedToken') || options.allowRemoteOverwrite === true;
+                throw conflict(undefined, {
+                    notify: hasKnownBaseline || explicitlyConfirmed,
+                    source: hasKnownBaseline || explicitlyConfirmed
+                        ? 'cloud-divergence'
+                        : (String(remote.token || '').startsWith('legacy:') ? 'legacy-divergence' : 'unverified-divergence')
+                });
+            }
             if (expected === remote.token && before === fingerprint(remote.values) && !canAdoptLegacy) { remember(c, remote.token, values); clearLocalChange(c, before); return true; }
             const token = crypto.randomUUID(), json = JSON.stringify({ schema: 1, classId: id, values });
             const parts = BackupIntegrity.split(json, 60000), count = parts.length;
@@ -192,7 +207,9 @@
             const ref = doc(c, 'appSettings/syncRevision');
             await c.db.runTransaction(async tx => {
                 const latest = await tx.get(ref);
-                if ((latest.exists ? latest.data().token : remote.token) !== remote.token) throw conflict();
+                if ((latest.exists ? latest.data().token : remote.token) !== remote.token) {
+                    throw conflict(undefined, { notify: true, source: 'cloud-divergence' });
+                }
                 tx.set(ref, { schema: 1, token, previous: latest.exists ? latest.data().token : null, count, checksum: BackupIntegrity.checksum(json), at: new Date().toISOString(), students: dataFor(values).students.length, pointsHistory: dataFor(values).pointsHistory.length });
             });
             remember(c, token, values);
@@ -282,8 +299,9 @@
     function report(error, id, silent) {
         // 同源分頁已在同步時，這次只是被鎖略過，不是需要老師處理的錯誤。
         if (error?.code === 'sync-busy') return;
-        // 多裝置衝突是完整快照的預期安全停車，不是寵物程式故障。
-        // 先送獨立的同步提醒，再顯示比較視窗；不可把它算進寵物錯誤配額。
+        // 完整快照差異是預期的安全停車，不是寵物程式故障。
+        // 仍保留同步事件與比較視窗；是否即時打擾由 publish 判斷
+        // 是否已有同步基準，避免首次升級的舊雲端差異洗版。
         if (error?.code === 'sync-conflict') {
             try {
                 window.UsageNotify?.syncConflict?.(
@@ -295,8 +313,8 @@
                         operation: 'cloud_sync',
                         // 目前只能確認雲端與本機快照不同，不能從瀏覽器端
                         // 證明一定是另一台實體裝置。
-                        source: 'cloud-divergence',
-                        notify: true
+                        source: error?.source || 'cloud-divergence',
+                        notify: error?.notify !== false
                     }
                 );
             } catch (e) { /* 通知不能阻擋衝突保護 */ }
