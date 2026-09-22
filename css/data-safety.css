@@ -3,10 +3,20 @@
 .cloud-conflict h2 { font-size:1.3rem; font-weight:700; margin:0 0 12px; }
 .cloud-conflict p { line-height:1.7; margin:12px 0; overflow-wrap:anywhere; }
 .cloud-conflict > div { display:flex; flex-wrap:wrap; gap:10px; }
+.cloud-conflict-steps { margin:14px 0 20px; padding:12px 16px 12px 38px; border:1px solid #d8e4eb; border-radius:12px; background:#f5f9fc; line-height:1.8; }
+.cloud-conflict-section-title { margin:18px 0 8px; font-size:1rem; font-weight:700; }
+.cloud-conflict-actions { display:flex; flex-wrap:wrap; gap:10px; }
+.cloud-conflict-actions button { flex:1 1 190px; }
+.cloud-conflict-ack { display:flex; align-items:flex-start; gap:10px; padding:12px; border:1px solid #d8e4eb; border-radius:10px; background:#fffdf3; line-height:1.6; }
+.cloud-conflict-help { margin:8px 0 !important; color:#64748b; font-size:.92rem; }
+.cloud-conflict-help.is-ready { color:#087f5b; font-weight:700; }
 .cloud-conflict button { min-height:48px; padding:10px 14px; border:1px solid #64748b; border-radius:8px; background:#eef4fa; color:#172033; font:inherit; cursor:pointer; }
-.cloud-conflict button:disabled { opacity:.6; }
-.cloud-conflict label { display:flex; align-items:flex-start; gap:10px; line-height:1.6; margin-top:18px; }
+.cloud-conflict button:disabled { opacity:.45; cursor:not-allowed; }
+.cloud-conflict button.is-done { border-color:#2f9e77; background:#e7f8ef; color:#176b4c; }
+.cloud-conflict button.cloud-conflict-cancel { margin-top:16px; background:transparent; }
+.cloud-conflict label { display:flex; align-items:flex-start; gap:10px; line-height:1.6; margin-top:8px; }
 .cloud-conflict input { width:22px; height:22px; flex-shrink:0; margin-top:3px; }
+.cloud-conflict-note { min-height:1.5em; color:#176b4c; font-weight:600; }
 .cloud-conflict button:focus-visible { outline:3px solid #6366f1; outline-offset:3px; }
 .dark .cloud-conflict { background:#172033; color:#eef4fa; }
-@media(max-width:600px) { .cloud-conflict { padding:16px; } .cloud-conflict button { width:100%; } }
+@media(max-width:600px) { .cloud-conflict { padding:16px; } .cloud-conflict button { width:100%; } .cloud-conflict-actions { flex-direction:column; } .cloud-conflict-actions button { flex-basis:auto; } }

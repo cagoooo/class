@@ -167,17 +167,31 @@
         const checkPreview = () => { sameAccount(c); if (current() !== id || fingerprint(capture(id)) !== previewFingerprint) throw Error('班級或本機資料已改變，請關閉後重新比較'); };
         const dialog = document.createElement('dialog'); dialog.className = 'cloud-conflict';
         const title = document.createElement('h2'); title.textContent = '先保留成果，再處理同步差異';
-        const text = document.createElement('p'); text.textContent = `本機：${local.students.length} 位學生、${local.pointsHistory.length} 筆紀錄；雲端：${dataFor(remote.values).students.length} 位學生、${dataFor(remote.values).pointsHistory.length} 筆紀錄。兩邊可能有不同的獎勵或兌換，系統不會自動合併金幣。請先下載兩份備份，再選擇要繼續使用的資料。`;
-        const note = document.createElement('p'); note.setAttribute('role', 'status');
-        const actions = document.createElement('div'); let backedUp = false;
+        const text = document.createElement('p'); text.textContent = `本機：${local.students.length} 位學生、${local.pointsHistory.length} 筆紀錄；雲端：${dataFor(remote.values).students.length} 位學生、${dataFor(remote.values).pointsHistory.length} 筆紀錄。兩邊可能有不同的獎勵或兌換，系統不會自動合併金幣。請依照下方 3 個步驟處理。`;
+        const note = document.createElement('p'); note.className = 'cloud-conflict-note'; note.setAttribute('role', 'status');
+        const steps = document.createElement('ol'); steps.className = 'cloud-conflict-steps';
+        const step1 = document.createElement('li'); step1.textContent = '下載兩份備份，先把成果留在電腦裡。';
+        const step2 = document.createElement('li'); step2.textContent = '勾選已下載，確認你要保留的版本。';
+        const step3 = document.createElement('li'); step3.textContent = '選擇本機或雲端版本繼續使用。';
+        steps.append(step1, step2, step3);
+        const backupTitle = document.createElement('h3'); backupTitle.textContent = '步驟 1｜先下載備份'; backupTitle.className = 'cloud-conflict-section-title';
+        const backupActions = document.createElement('div'); backupActions.className = 'cloud-conflict-actions cloud-conflict-backups';
+        const decisionTitle = document.createElement('h3'); decisionTitle.textContent = '步驟 3｜選擇要保留的版本'; decisionTitle.className = 'cloud-conflict-section-title';
+        const actions = document.createElement('div'); actions.className = 'cloud-conflict-actions cloud-conflict-decisions'; let localDownloaded = false, cloudDownloaded = false, backedUp = false;
         const button = (label, fn) => { const b = document.createElement('button'); b.textContent = label; b.onclick = async () => { b.disabled = true; try { await fn(); } catch (e) { note.textContent = e.message; } finally { b.disabled = false; } }; actions.append(b); return b; };
-        button('下載本機備份', () => download({ ...local, exportDate: new Date().toISOString() }, '班級成果_本機.json'));
-        button('下載雲端備份', () => { download({ ...dataFor(remote.values), exportDate: remote.at || new Date().toISOString() }, '班級成果_雲端.json'); });
-        const ack = document.createElement('label'), check = document.createElement('input'); check.type = 'checkbox'; check.onchange = () => { backedUp = check.checked; }; ack.append(check, ' 我已確認兩份備份已下載，並選好要保留的版本');
-        button('保留本機並上傳', async () => { checkPreview(); if (!backedUp) throw Error('請先下載並確認兩份備份'); await publish(id, { expectedToken: remote.token }); note.textContent = '已保留本機並同步'; });
-        button('使用雲端並保留本機副本', async () => { checkPreview(); if (!backedUp) throw Error('請先下載並確認兩份備份'); if (await restore(remote)) note.textContent = '已還原雲端；原本機資料已保留在還原前副本'; });
-        button('暫不處理', () => { dialog.close(); dialog.remove(); });
-        dialog.append(title, text, actions, ack, note); document.body.append(dialog); dialog.showModal(); dialog.addEventListener('cancel', () => dialog.remove());
+        const localButton = button('下載本機備份', () => { download({ ...local, exportDate: new Date().toISOString() }, '班級成果_本機.json'); localDownloaded = true; localButton.textContent = '✓ 本機備份已下載'; localButton.classList.add('is-done'); updateDecisions(); });
+        const cloudButton = button('下載雲端備份', () => { download({ ...dataFor(remote.values), exportDate: remote.at || new Date().toISOString() }, '班級成果_雲端.json'); cloudDownloaded = true; cloudButton.textContent = '✓ 雲端備份已下載'; cloudButton.classList.add('is-done'); updateDecisions(); });
+        backupActions.append(localButton, cloudButton);
+        const ackTitle = document.createElement('h3'); ackTitle.textContent = '步驟 2｜確認備份'; ackTitle.className = 'cloud-conflict-section-title';
+        const ack = document.createElement('label'); ack.className = 'cloud-conflict-ack'; const check = document.createElement('input'); check.type = 'checkbox'; check.onchange = () => { backedUp = check.checked; updateDecisions(); }; ack.append(check, ' 我已確認兩份備份已下載，並選好要保留的版本');
+        const decisionHelp = document.createElement('p'); decisionHelp.className = 'cloud-conflict-help'; decisionHelp.textContent = '完成前兩步後，下面的選項才會開啟。';
+        const keepLocal = button('保留本機並上傳', async () => { checkPreview(); await publish(id, { expectedToken: remote.token }); note.textContent = '已保留本機並同步'; dialog.close(); dialog.remove(); });
+        const keepCloud = button('使用雲端並保留本機副本', async () => { checkPreview(); if (await restore(remote)) { note.textContent = '已還原雲端；原本機資料已保留在還原前副本'; dialog.close(); dialog.remove(); } });
+        actions.append(keepLocal, keepCloud);
+        const updateDecisions = () => { const ready = localDownloaded && cloudDownloaded && backedUp; keepLocal.disabled = !ready; keepCloud.disabled = !ready; decisionHelp.textContent = ready ? '已完成確認，請選擇要繼續使用的版本。' : '請先下載本機與雲端備份，再勾選上方確認框。'; decisionHelp.classList.toggle('is-ready', ready); };
+        updateDecisions();
+        const cancel = button('稍後處理', () => { dialog.close(); dialog.remove(); }); cancel.className = 'cloud-conflict-cancel';
+        dialog.append(title, text, steps, backupTitle, backupActions, ackTitle, ack, decisionTitle, decisionHelp, actions, cancel, note); document.body.append(dialog); dialog.showModal(); dialog.addEventListener('cancel', () => dialog.remove());
     }
     function report(error, id, silent) {
         if (error.code === 'sync-conflict') {
