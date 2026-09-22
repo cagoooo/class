@@ -368,14 +368,10 @@ function buildCard(type, data, who) {
 const EVENT_LOG_COLLECTION = '_usageEvents';
 const EVENT_RETENTION_DAYS = 180;
 
-// 值得即時推 Google Chat 的事件；其餘只留底，交給每日戰報彙整。
+// 只有真正需要立即處理的錯誤才推 Google Chat；成功活動（含寵物）
+// 一律留底，交給每日戰報彙整，避免每次孵化／升級都造成手機噪音。
 const INSTANT_PUSH_TYPES = new Set([
-  'login_new', 'class_create', 'data_action', 'error',
-  // sync_conflict 只留在事件紀錄與每日戰報。它通常是同源分頁的
-  // compare-and-swap 競速，不值得每次即時打擾老師；真正的寵物錯誤
-  // 仍由 error 照常即時通知。
-  'pet_hatch', 'pet_level_up', 'pet_undo', 'pet_shop_redeem',
-  'pet_shop_refund', 'pet_settings',
+  'error',
 ]);
 
 // 每個身分每日上限：error 推播 5 則（沿用舊規則）、事件留底 200 筆（防呆用）。
@@ -613,7 +609,7 @@ exports.notifyUsage = onCall(
       return { ok: true, duplicate: true, pushed: false };
     }
 
-    // ② 打擾：只有重要事件才即時推 Chat；日常事件交給每日戰報。
+    // ② 打擾：只有真正錯誤才即時推 Chat；成功事件交給每日戰報。
     // 同步衝突只有在新版前端確認為跨裝置競速時才即時提醒；同源分頁
     // 的競速只留底，避免老師收到沒有行動價值的 webhook 噪音。
     const actionableSyncConflict = eventType === 'sync_conflict' && data.notify === true;
