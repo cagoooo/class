@@ -371,7 +371,9 @@ const EVENT_RETENTION_DAYS = 180;
 // 值得即時推 Google Chat 的事件；其餘只留底，交給每日戰報彙整。
 const INSTANT_PUSH_TYPES = new Set([
   'login_new', 'class_create', 'data_action', 'error',
-  'sync_conflict',
+  // sync_conflict 只留在事件紀錄與每日戰報。它通常是同源分頁的
+  // compare-and-swap 競速，不值得每次即時打擾老師；真正的寵物錯誤
+  // 仍由 error 照常即時通知。
   'pet_hatch', 'pet_level_up', 'pet_undo', 'pet_shop_redeem',
   'pet_shop_refund', 'pet_settings',
 ]);
@@ -474,6 +476,8 @@ async function logUsageEvent(eventType, data, who, uid) {
       doc.className = clip(data.className, 80);
       doc.operation = clip(data.operation || 'cloud_sync', 120);
       doc.failureStage = 'sync-conflict';
+      doc.source = clip(data.source || 'unknown', 40);
+      doc.notify = data.notify === true;
       if (data.feature) doc.feature = clip(data.feature, 40);
     }
     if (PET_EVENT_TYPES.has(eventType)) {
@@ -506,6 +510,16 @@ async function logUsageEvent(eventType, data, who, uid) {
       // 當日累計值，同裝置重送要覆寫而不是累加
       const device = doc.deviceId || 'unknown';
       const id = `feat_${day}_${uid || 'anon'}_${device}`;
+      await db.collection(EVENT_LOG_COLLECTION).doc(id).set(doc, { merge: true });
+      return 'ok';
+    }
+
+    if (eventType === 'sync_conflict') {
+      // 同一帳號同一天同一班級只留一筆衝突摘要。多個分頁可能同時
+      // 發現同一個 CAS 競速，固定文件鍵可避免每日戰報也被重複灌大。
+      const safe = (value, fallback) => String(value || fallback)
+        .replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 80);
+      const id = `sync_${day}_${safe(uid, 'anon')}_${safe(data.classId, 'default')}`;
       await db.collection(EVENT_LOG_COLLECTION).doc(id).set(doc, { merge: true });
       return 'ok';
     }
@@ -568,7 +582,10 @@ exports.notifyUsage = onCall(
     }
     // 舊版前端會把同步衝突送成 pet error。後端保留相容轉換，避免
     // 尚未更新頁面的老師仍收到「寵物系統操作失敗」的誤導通知。
-    if (type === 'error' && String(data.failureStage || '') === 'sync-conflict') {
+    // 也辨識舊版錯誤文字，讓尚未更新頁面的分頁不會繞過 digest-only
+    // 分流而再次洗版 webhook。
+    const legacySyncConflict = /另一台裝置已更新此班|資料已在其他分頁或同步中更新|雲端同步衝突/.test(String(data.message || ''));
+    if (type === 'error' && (String(data.failureStage || '') === 'sync-conflict' || legacySyncConflict)) {
       eventType = 'sync_conflict';
     }
 
@@ -596,8 +613,11 @@ exports.notifyUsage = onCall(
       return { ok: true, duplicate: true, pushed: false };
     }
 
-    // ② 打擾：只有重要事件才即時推 Chat；日常事件交給每日戰報
-    if (!INSTANT_PUSH_TYPES.has(eventType)) {
+    // ② 打擾：只有重要事件才即時推 Chat；日常事件交給每日戰報。
+    // 同步衝突只有在新版前端確認為跨裝置競速時才即時提醒；同源分頁
+    // 的競速只留底，避免老師收到沒有行動價值的 webhook 噪音。
+    const actionableSyncConflict = eventType === 'sync_conflict' && data.notify === true;
+    if (!INSTANT_PUSH_TYPES.has(eventType) && !actionableSyncConflict) {
       return { ok: true, logged: quota.log, pushed: false, reason: 'digest-only' };
     }
     if (isError && !quota.push) {

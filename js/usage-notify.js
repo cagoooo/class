@@ -284,7 +284,7 @@
         details = details || {};
         var out = {};
         ['feature', 'classId', 'className', 'action', 'reason', 'productName', 'kind', 'status',
-            'operation', 'petAction', 'failureStage'].forEach(function (key) {
+            'operation', 'petAction', 'failureStage', 'source'].forEach(function (key) {
             if (details[key] !== undefined && details[key] !== null && details[key] !== '') {
                 out[key] = String(details[key]).slice(0, key === 'className' ? 80 : 120);
             }
@@ -293,6 +293,7 @@
             var value = Number(details[key]);
             if (Number.isSafeInteger(value) && Math.abs(value) <= 100000) out[key] = value;
         });
+        if (details.notify === true) out.notify = true;
         if (Array.isArray(details.kinds)) {
             out.kinds = details.kinds.map(function (kind) { return String(kind).slice(0, 40); }).slice(0, 12).join('、');
         } else if (details.kinds) {
@@ -423,8 +424,9 @@
         },
 
         // 多裝置同時編輯時，完整快照會安全停止上傳。這是需要老師處理的
-        // 同步提醒，不是寵物程式故障；獨立事件可避免錯誤統計與錯誤配額被污染。
-        // 同一班每天只提醒一次，避免自動同步反覆觸發時洗版。
+        // 同步提醒，不是寵物程式故障；同一班每天只建立一筆事件，避免
+        // 自動同步反覆觸發時洗版。只有 CloudSafety 確認不是同源分頁競速
+        // 的衝突才會要求後端即時通知。
         syncConflict: function (message, details) {
             details = details || {};
             var classId = String(details.classId || 'default').slice(0, 80);

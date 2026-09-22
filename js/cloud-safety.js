@@ -6,6 +6,8 @@
     const core = ['students', 'groups', 'pointsHistory'];
     const current = () => localStorage.getItem('currentClassId') || 'default';
     const raw = k => window.ClassAwareStorage?.rawGet ? window.ClassAwareStorage.rawGet(k) : localStorage.getItem(k);
+    const rawSet = (k, v) => window.ClassAwareStorage?.rawSet ? window.ClassAwareStorage.rawSet(k, v) : localStorage.setItem(k, v);
+    const rawRemove = k => window.ClassAwareStorage?.rawRemove ? window.ClassAwareStorage.rawRemove(k) : localStorage.removeItem(k);
     const globalKeys = ['clockSettings', 'noRepeatLottery', 'examLightMode', 'examAnalogClock', 'examSoundsEnabled', 'homeworkDashboardView', 'theme'];
     const keyFor = (k, id) => id === 'default' || globalKeys.includes(k) ? k : `${k}-${id}`;
     const keys = () => [...new Set([...core, ...(window.ClassAwareStorage?.SHARED_KEYS || []), ...globalKeys])];
@@ -44,6 +46,44 @@
     }
     function conflict(message = '另一台裝置已更新此班，已暫停上傳並保留本機資料。請比較兩份資料後再選擇。') {
         const e = Error(message); e.code = 'sync-conflict'; return e;
+    }
+    function syncBusy() {
+        const e = Error('另一個分頁正在同步，已略過這次自動同步。');
+        e.code = 'sync-busy';
+        return e;
+    }
+    async function withSyncLock(c, task) {
+        const lockName = `class-manager-cloud-sync:${c.uid}:${c.id}`;
+        // Web Locks 可直接把同源分頁的完整快照上傳排成單列；不把
+        // 同一台主機的競速誤判成「另一台裝置」的資料衝突。
+        if (navigator.locks && typeof navigator.locks.request === 'function') {
+            return navigator.locks.request(lockName, { mode: 'exclusive', ifAvailable: true }, lock => {
+                if (!lock) throw syncBusy();
+                return task();
+            });
+        }
+        // Safari 舊版沒有 Web Locks 時，用短期 localStorage lease 作為
+        // 保底。lease 過期可自動接管，分頁關閉也不會永久卡住同步。
+        const key = `cloudSafetyLock:${c.uid}:${c.id}`;
+        const owner = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+        const now = Date.now();
+        try {
+            const currentLock = JSON.parse(raw(key) || 'null');
+            if (currentLock && currentLock.expiresAt > now) throw syncBusy();
+        } catch (e) {
+            if (e?.code === 'sync-busy') throw e;
+        }
+        rawSet(key, JSON.stringify({ owner, expiresAt: now + 120000 }));
+        try {
+            const claimed = JSON.parse(raw(key) || 'null');
+            if (!claimed || claimed.owner !== owner) throw syncBusy();
+            return await task();
+        } finally {
+            try {
+                const claimed = JSON.parse(raw(key) || 'null');
+                if (claimed?.owner === owner) rawRemove(key);
+            } catch { /* 儲存被封鎖時不影響同步結果 */ }
+        }
     }
     async function legacy(c) {
         const values = Object.fromEntries(keys().map(k => [k, null]));
@@ -94,34 +134,44 @@
     }
     async function publish(id = current(), options = {}) {
         if (navigator.onLine === false) throw Error('已存本機，恢復連線後再同步');
-        const c = context(id), values = capture(id); ensure(values);
-        const remote = options.remote || await read(id), known = base(c);
-        const expected = Object.hasOwn(options, 'expectedToken') ? options.expectedToken : known?.token;
-        if (!remote.empty && expected !== remote.token) throw conflict();
-        const before = fingerprint(values);
-        if (expected === remote.token && before === fingerprint(remote.values)) { remember(c, remote.token, values); return true; }
-        const token = crypto.randomUUID(), json = JSON.stringify({ schema: 1, classId: id, values });
-        const parts = BackupIntegrity.split(json, 60000), count = parts.length;
-        if (count > 200) throw Error('資料量超過單次同步範圍，請先匯出 Excel 保存');
-        // Stage immutable parts. Interrupted/conflicting attempts cannot replace the current head.
-        for (let start = 0; start < count; start += 20) {
-            const batch = c.db.batch();
-            for (let i = start; i < Math.min(start + 20, count); i++) batch.set(root(c).collection('syncSnapshots').doc(token).collection('parts').doc(String(i)), { index: i, text: parts[i] });
-            await batch.commit();
-        }
-        sameAccount(c);
-        const ref = doc(c, 'appSettings/syncRevision');
-        await c.db.runTransaction(async tx => {
-            const latest = await tx.get(ref);
-            if ((latest.exists ? latest.data().token : remote.token) !== remote.token) throw conflict();
-            tx.set(ref, { schema: 1, token, previous: latest.exists ? latest.data().token : null, count, checksum: BackupIntegrity.checksum(json), at: new Date().toISOString(), students: dataFor(values).students.length, pointsHistory: dataFor(values).pointsHistory.length });
+        const c = context(id);
+        return withSyncLock(c, async () => {
+            const values = capture(id); ensure(values);
+            const remote = options.allowRemoteOverwrite
+                ? await read(id)
+                : (options.remote || await read(id));
+            const known = base(c);
+            // 一鍵同步是在老師已確認覆蓋後執行；仍在同一個分頁鎖內
+            // 重新讀取雲端，避免另一個同源分頁的舊讀取造成假衝突。
+            const expected = options.allowRemoteOverwrite
+                ? (remote.empty ? undefined : remote.token)
+                : (Object.hasOwn(options, 'expectedToken') ? options.expectedToken : known?.token);
+            if (!remote.empty && expected !== remote.token) throw conflict();
+            const before = fingerprint(values);
+            if (expected === remote.token && before === fingerprint(remote.values)) { remember(c, remote.token, values); return true; }
+            const token = crypto.randomUUID(), json = JSON.stringify({ schema: 1, classId: id, values });
+            const parts = BackupIntegrity.split(json, 60000), count = parts.length;
+            if (count > 200) throw Error('資料量超過單次同步範圍，請先匯出 Excel 保存');
+            // Stage immutable parts. Interrupted/conflicting attempts cannot replace the current head.
+            for (let start = 0; start < count; start += 20) {
+                const batch = c.db.batch();
+                for (let i = start; i < Math.min(start + 20, count); i++) batch.set(root(c).collection('syncSnapshots').doc(token).collection('parts').doc(String(i)), { index: i, text: parts[i] });
+                await batch.commit();
+            }
+            sameAccount(c);
+            const ref = doc(c, 'appSettings/syncRevision');
+            await c.db.runTransaction(async tx => {
+                const latest = await tx.get(ref);
+                if ((latest.exists ? latest.data().token : remote.token) !== remote.token) throw conflict();
+                tx.set(ref, { schema: 1, token, previous: latest.exists ? latest.data().token : null, count, checksum: BackupIntegrity.checksum(json), at: new Date().toISOString(), students: dataFor(values).students.length, pointsHistory: dataFor(values).pointsHistory.length });
+            });
+            remember(c, token, values);
+            localStorage.setItem('lastSyncTime', new Date().toISOString());
+            delete conflicts[recoveryKey(c)];
+            // Changes made during upload retain a different fingerprint and remain pending.
+            window.SyncStatusIndicator?.updateStateBasedOnSync();
+            return true;
         });
-        remember(c, token, values);
-        localStorage.setItem('lastSyncTime', new Date().toISOString());
-        delete conflicts[recoveryKey(c)];
-        // Changes made during upload retain a different fingerprint and remain pending.
-        window.SyncStatusIndicator?.updateStateBasedOnSync();
-        return true;
     }
     async function checkpoint(id = current()) {
         const uid = window.FirebaseConfig?.getCurrentUserId() || 'local';
@@ -198,6 +248,8 @@
         dialog.append(header, text, steps, backupTitle, backupActions, ackTitle, ack, decisionTitle, decisionHelp, actions, cancel, note); document.body.append(dialog); dialog.showModal(); dialog.addEventListener('cancel', () => dialog.remove());
     }
     function report(error, id, silent) {
+        // 同源分頁已在同步時，這次只是被鎖略過，不是需要老師處理的錯誤。
+        if (error?.code === 'sync-busy') return;
         // 多裝置衝突是完整快照的預期安全停車，不是寵物程式故障。
         // 先送獨立的同步提醒，再顯示比較視窗；不可把它算進寵物錯誤配額。
         if (error?.code === 'sync-conflict') {
@@ -208,7 +260,9 @@
                         classId: id || current(),
                         context: '班級資料/雲端同步',
                         feature: 'pet',
-                        operation: 'cloud_sync'
+                        operation: 'cloud_sync',
+                        source: 'remote-device',
+                        notify: true
                     }
                 );
             } catch (e) { /* 通知不能阻擋衝突保護 */ }
