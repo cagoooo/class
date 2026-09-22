@@ -42,6 +42,7 @@ let passed=0;async function test(name,fn){await fn();console.log('PASS',name);pa
  await test('舊 Excel CHUNKS 保持相容但缺段仍阻擋',async()=>{const a=setup(),d=a.c.DataBackup.collectData();const rows=[['note'],['CHUNKS',1],['DATA',JSON.stringify(d)]];assert.equal(a.c.BackupIntegrity.decode(rows).students[0].classPet,'unicorn');rows[1][1]=2;assert.throws(()=>a.c.BackupIntegrity.decode(rows));});
  await test('格式驗證攔截空殼、重複 ID 與錯誤金幣型別',async()=>{const a=setup();for(const bad of [null,{version:'1.1'}, {version:'1.1',students:[],groups:[],pointsHistory:[{id:1,coinDelta:'10'}]}])assert.equal(a.c.BackupIntegrity.validate(bad),false);const d=a.c.DataBackup.collectData();d.students.push({...d.students[0]});assert.equal(a.c.BackupIntegrity.validate(d),false);});
  await test('自動同步只處理有異動的班級，其他班級基準不清除',async()=>{const a=setup();a.storage.setItem('classProfiles',JSON.stringify([{id:'A',name:'甲班'},{id:'B',name:'乙班'}]));await a.s.publish();assert.equal(await a.c.FirebaseSync.syncPendingClasses(),true);assert.equal(a.s.status(),'synced');});
+ await test('每班本機異動標記只在同步完成後清除',async()=>{const a=setup();assert.equal(a.s.hasBaseline(),false);a.s.markLocalChange();assert.equal(a.s.hasLocalChangeMarker(),true);await a.s.publish();assert.equal(a.s.hasBaseline(),true);assert.equal(a.s.hasLocalChangeMarker(),false);});
  await test('內容相同的舊雲端資料會安全升級成新快照',async()=>{const a=setup();
   // 模擬 v3.37.6 前的集合式雲端資料：沒有 syncRevision，只有舊集合與 pets 設定。
   a.c.students[0].id='1';

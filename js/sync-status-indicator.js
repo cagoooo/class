@@ -401,6 +401,7 @@
                         setState('disconnected');
                     } else if (currentState !== 'syncing') {
                         lastChangedAt = Date.now();
+                        window.CloudSafety?.markLocalChange?.(localStorage.getItem('currentClassId') || 'default');
                         if (currentState === 'synced' || currentState === 'disconnected') {
                             setState('pending');
                         }

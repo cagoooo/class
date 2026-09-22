@@ -3,16 +3,12 @@
  *
  * 瀏覽器關閉分頁時只能使用 beforeunload 的原生確認視窗，無法由網頁
  * 自訂視窗文字。本模組另外提供頁面內提醒卡，讓老師在按下關閉前就能
- * 立即同步；只有目前班級有未上傳成果時才會攔截離開，避免無變更時打擾。
+ * 立即同步；只有同步基準確認有差異、明確寫入待同步標記或正在同步時才會攔截離開，
+ * 避免單純切班／載入既有資料時打擾老師。
  */
 (function () {
     'use strict';
 
-    const ACTIVE_STATUSES = new Set(['pending', 'conflict']);
-    const NON_CLASS_KEYS = new Set([
-        'version', 'clockSettings', 'noRepeatLottery', 'examLightMode',
-        'examAnalogClock', 'examSoundsEnabled', 'homeworkDashboardView', 'theme',
-    ]);
     const state = {
         banner: null,
         lastSignal: '',
@@ -75,24 +71,14 @@
         return progress?.detail || labels[progress?.phase] || '正在安全同步，請稍候';
     }
 
-    function meaningful(value) {
-        if (value == null || value === '') return false;
-        if (Array.isArray(value)) return value.length > 0;
-        if (typeof value === 'object') return Object.keys(value).length > 0;
-        if (typeof value === 'string') return value !== '[]' && value !== '{}';
-        return true;
-    }
-
-    function hasLocalData() {
+    function hasPendingEvidence(id, status, syncing) {
+        if (syncing || status === 'conflict') return true;
+        if (status !== 'pending') return false;
         try {
-            const values = window.CloudSafety?.capture?.(currentClassId());
-            const data = values && window.CloudSafety?.dataFor?.(values);
-            if (!data) return false;
-            return Object.entries(data).some(([key, value]) => !NON_CLASS_KEYS.has(key) && meaningful(value));
-        } catch (e) {
-            // 讀取失敗時寧可提醒保存，避免老師以為資料已安全上雲。
-            return true;
-        }
+            // 有同步基準時，指紋不同就是可驗證的本機異動；沒有基準時，
+            // 必須有使用者資料寫入標記，避免單純切班／載入既有資料就跳提醒。
+            return !!window.CloudSafety?.hasBaseline?.(id) || !!window.CloudSafety?.hasLocalChangeMarker?.(id);
+        } catch (e) { return false; }
     }
 
     function localFingerprint() {
@@ -105,8 +91,7 @@
     function signal() {
         const status = cloudStatus();
         const syncing = !!window.syncStatus?.isSyncing;
-        const active = isGoogleUser() && (syncing || ACTIVE_STATUSES.has(status)) &&
-            (status === 'conflict' || syncing || hasLocalData());
+        const active = isGoogleUser() && hasPendingEvidence(currentClassId(), status, syncing);
         const fingerprint = active ? localFingerprint() : '';
         return {
             id: currentClassId(),

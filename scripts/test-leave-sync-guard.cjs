@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
-function setup({ google = true, status = 'pending', data = { students: [{ id: 1 }], pointsHistory: [] }, syncing = false, online = true } = {}) {
+function setup({ google = true, status = 'pending', data = { students: [{ id: 1 }], pointsHistory: [] }, syncing = false, online = true, baseline = status === 'pending' ? (data.students || []).length > 0 : true, dirty = false } = {}) {
     const storage = new Map([['currentClassId', '601']]);
     const context = {
         console: { log() {}, warn() {}, error() {} },
@@ -14,6 +14,8 @@ function setup({ google = true, status = 'pending', data = { students: [{ id: 1 
             capture: () => ({ students: JSON.stringify(data.students || []), pointsHistory: JSON.stringify(data.pointsHistory || []) }),
             dataFor: values => ({ version: '1.2', students: JSON.parse(values.students), pointsHistory: JSON.parse(values.pointsHistory) }),
             fingerprint: () => 'fingerprint',
+            hasBaseline: () => baseline,
+            hasLocalChangeMarker: () => dirty,
         },
         syncStatus: { isSyncing: syncing },
         navigator: { onLine: online },
@@ -66,7 +68,15 @@ try {
     assert.equal(syncing.LeaveSyncGuard.needsReminder(), true);
     console.log('PASS 上傳進行中提醒等待完成');
 
-    console.log('7 leave-sync-guard checks passed');
+    const switched = setup({ status: 'pending', baseline: false, dirty: false });
+    assert.equal(switched.LeaveSyncGuard.needsReminder(), false);
+    console.log('PASS 單純切換到既有班級不顯示提醒');
+
+    const firstEdit = setup({ status: 'pending', baseline: false, dirty: true });
+    assert.equal(firstEdit.LeaveSyncGuard.needsReminder(), true);
+    console.log('PASS 沒有同步基準但有明確異動仍顯示提醒');
+
+    console.log('9 leave-sync-guard checks passed');
 } catch (error) {
     console.error(error);
     process.exitCode = 1;

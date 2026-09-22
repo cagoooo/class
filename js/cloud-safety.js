@@ -21,6 +21,7 @@
     const root = c => c.id === 'default' ? c.db.collection('users').doc(c.uid) : c.db.collection('users').doc(c.uid).collection('classes').doc(c.id);
     const doc = (c, path) => { const [collection, id] = path.split('/'); return root(c).collection(collection).doc(id); };
     const baseKey = c => `cloudSafetyBase:${c.uid}:${c.id}`;
+    const dirtyKey = (uid, id) => `cloudSafetyDirty:${uid}:${id}`;
     const recoveryKey = c => `${c.uid || 'local'}:${c.id}`;
     const fingerprint = values => BackupIntegrity.checksum(JSON.stringify(Object.keys(values).sort().map(k => [k, values[k]])));
     function capture(id = current()) {
@@ -40,6 +41,29 @@
         if (!BackupIntegrity.validate(dataFor(values))) throw Error('班級資料不完整，已停止同步');
     }
     function base(c) { try { return JSON.parse(raw(baseKey(c)) || 'null'); } catch { return null; } }
+    function hasBaseline(id = current()) {
+        try {
+            const uid = window.FirebaseConfig?.getCurrentUserId?.();
+            return !!uid && !!JSON.parse(raw(`cloudSafetyBase:${uid}:${id}`) || 'null');
+        } catch { return false; }
+    }
+    function hasLocalChangeMarker(id = current()) {
+        try {
+            const uid = window.FirebaseConfig?.getCurrentUserId?.();
+            return !!uid && !!raw(dirtyKey(uid, id));
+        } catch { return false; }
+    }
+    function markLocalChange(id = current()) {
+        try {
+            const uid = window.FirebaseConfig?.getCurrentUserId?.();
+            if (uid) rawSet(dirtyKey(uid, id), new Date().toISOString());
+        } catch { /* 標記失敗不影響原本的本機寫入 */ }
+    }
+    function clearLocalChange(c, expectedFingerprint) {
+        try {
+            if (fingerprint(capture(c.id)) === expectedFingerprint) rawRemove(dirtyKey(c.uid, c.id));
+        } catch { /* 標記清理失敗不影響同步結果 */ }
+    }
     function remember(c, token, values) {
         sameAccount(c);
         localStorage.setItem(baseKey(c), JSON.stringify({ token, fingerprint: fingerprint(values), at: new Date().toISOString() }));
@@ -154,7 +178,7 @@
                 ? (remote.empty ? undefined : remote.token)
                 : (Object.hasOwn(options, 'expectedToken') ? options.expectedToken : (known?.token || (canAdoptLegacy ? remote.token : undefined)));
             if (!remote.empty && expected !== remote.token) throw conflict();
-            if (expected === remote.token && before === fingerprint(remote.values) && !canAdoptLegacy) { remember(c, remote.token, values); return true; }
+            if (expected === remote.token && before === fingerprint(remote.values) && !canAdoptLegacy) { remember(c, remote.token, values); clearLocalChange(c, before); return true; }
             const token = crypto.randomUUID(), json = JSON.stringify({ schema: 1, classId: id, values });
             const parts = BackupIntegrity.split(json, 60000), count = parts.length;
             if (count > 200) throw Error('資料量超過單次同步範圍，請先匯出 Excel 保存');
@@ -172,6 +196,7 @@
                 tx.set(ref, { schema: 1, token, previous: latest.exists ? latest.data().token : null, count, checksum: BackupIntegrity.checksum(json), at: new Date().toISOString(), students: dataFor(values).students.length, pointsHistory: dataFor(values).pointsHistory.length });
             });
             remember(c, token, values);
+            clearLocalChange(c, before);
             localStorage.setItem('lastSyncTime', new Date().toISOString());
             delete conflicts[recoveryKey(c)];
             // Changes made during upload retain a different fingerprint and remain pending.
@@ -195,6 +220,7 @@
         const ops = keys().map(k => [keyFor(k, c.id), remote.values[k] ?? null]);
         ops.push([baseKey(c), JSON.stringify({ token: remote.token, fingerprint: fingerprint(remote.values), at: new Date().toISOString() })]);
         if (!window.SafeStorage.writeRaw(ops, { context: '完整還原班級資料' })) return false;
+        clearLocalChange(c, fingerprint(remote.values));
         if (current() === c.id) {
             const data = dataFor(remote.values);
             for (const k of ['students', 'groups', 'pointsHistory', 'notebookEntries', 'homeworkList', 'lotteryHistory']) window[k] = data[k] || [];
@@ -304,7 +330,7 @@
             download(copy, '班級成果_還原前副本.json');
         } catch (e) { window.NotificationSystem?.error(e.message); }
     }
-    window.CloudSafety = { downloadRecovery, capture, dataFor, fingerprint, read, publish, restore, checkpoint, status, showConflict, report, current, download };
+    window.CloudSafety = { downloadRecovery, capture, dataFor, fingerprint, read, publish, restore, checkpoint, status, showConflict, report, current, download, hasBaseline, hasLocalChangeMarker, markLocalChange };
     // A separate IndexedDB keeps the rollback copy out of localStorage's small quota.
     window.LocalRecovery = {
         async access(mode, key, value) {
