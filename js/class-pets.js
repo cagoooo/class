@@ -111,6 +111,24 @@
     }
     function reportPetFailure(operation, error, details) {
         const errorObj = error instanceof Error ? error : new Error(String(error || '寵物操作失敗'));
+        const isSnapshotConflict = details?.failureStage === 'stale_snapshot' || /其他分頁|同步中更新/.test(errorObj.message || '');
+        if (isSnapshotConflict) {
+            const conflictDetails = petDetails({
+                ...(details || {}),
+                feature: 'pet',
+                operation: operation || 'operation',
+                petAction: operation || 'operation',
+                context: `班級寵物/${operation || '操作'}`
+            });
+            try {
+                if (window.UsageNotify?.syncConflict) {
+                    window.UsageNotify.syncConflict(errorObj.message, conflictDetails);
+                    return;
+                }
+            } catch (e) { /* fallback to legacy error path below */ }
+            // 尚未更新的頁面仍帶上標準衝突碼，後端會將舊版 error 轉成同步提醒。
+            details = { ...(details || {}), failureStage: 'sync-conflict' };
+        }
         try {
             if (window.ErrorHandler?.handle) {
                 window.ErrorHandler.handle(errorObj, 'STORAGE', `寵物系統/${operation || '操作'}`, {

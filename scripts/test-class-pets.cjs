@@ -18,10 +18,11 @@ function setup(classId = 'default') {
     const ctx = { Storage, localStorage: storage, sessionStorage: new Storage(), console: { log(){},warn(){},error(){} },
         navigator: {}, crypto: webcrypto, alert(){}, document: { readyState:'loading', addEventListener(){}, getElementById(){return null;} },
         addEventListener(){}, setTimeout, clearTimeout };
-    ctx.petEvents = []; ctx.petErrors = [];
+    ctx.petEvents = []; ctx.petErrors = []; ctx.syncConflicts = [];
     ctx.UsageNotify = {
         pet(event, details) { ctx.petEvents.push({ event, details }); },
-        petError(message, operation, details) { ctx.petErrors.push({ message, operation, details }); }
+        petError(message, operation, details) { ctx.petErrors.push({ message, operation, details }); },
+        syncConflict(message, details) { ctx.syncConflicts.push({ message, details }); }
     };
     ctx.ErrorHandler = { handle(error, type, context, options) { ctx.petErrors.push({ message: error.message, type, context, options }); } };
     ctx.window = ctx; vm.createContext(ctx);
@@ -82,7 +83,7 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
         assert.equal(await pet.award([1,2],4,'合作'),false); assert.equal(JSON.stringify([ctx.students,ctx.groups,ctx.pointsHistory]),before); assert.deepEqual([...storage.data],disk); assert.equal(pet.xpFor(1),0);
     });
     await test('其他分頁修改與切班時阻止覆蓋',async()=>{
-        const {pet,ctx,storage}=setup(); storage.setItem('students','[]'); pet.prepare(); assert.equal(await pet.award([1],2,'努力'),false); assert.equal(ctx.students[0].points,5);
+        const {pet,ctx,storage}=setup(); storage.setItem('students','[]'); pet.prepare(); assert.equal(await pet.award([1],2,'努力'),false); assert.equal(ctx.students[0].points,5); assert.equal(ctx.syncConflicts.length,1); assert.equal(ctx.petErrors.length,0);
         const b=setup(); b.storage.setItem('currentClassId','B'); b.pet.prepare(); assert.equal(await b.pet.award([1],2,'努力'),false);
     });
     await test('非預設班設定及獎勵使用獨立鍵，備份名單包含設定',async()=>{
