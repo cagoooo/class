@@ -77,9 +77,14 @@
         if (syncing || status === 'conflict') return true;
         if (status !== 'pending') return false;
         try {
-            // 有同步基準時，指紋不同就是可驗證的本機異動；沒有基準時，
-            // 必須有使用者資料寫入標記，避免單純切班／載入既有資料就跳提醒。
-            return !!window.CloudSafety?.hasBaseline?.(id) || !!window.CloudSafety?.hasLocalChangeMarker?.(id);
+            // 指紋差異也可能來自載入時的預設值整理、舊版資料轉換或
+            // IndexedDB 回填。只有同步偵測器留下明確的本機寫入標記，
+            // 才能確認是老師操作造成的待同步成果。
+            if (typeof window.CloudSafety?.hasLocalChangeMarker === 'function') {
+                return !!window.CloudSafety.hasLocalChangeMarker(id);
+            }
+            // 舊版沒有異動標記 API 時，才退回基準判斷，保留相容性。
+            return !!window.CloudSafety?.hasBaseline?.(id);
         } catch (e) { return false; }
     }
 

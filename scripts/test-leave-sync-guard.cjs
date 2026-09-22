@@ -39,7 +39,7 @@ function beforeUnload(context) {
 }
 
 try {
-    const pending = setup();
+    const pending = setup({ dirty: true });
     assert.equal(pending.LeaveSyncGuard.needsReminder(), true);
     assert.deepEqual(beforeUnload(pending), { prevented: true, result: '', returnValue: '' });
     console.log('PASS 有未同步成果時攔截關閉');
@@ -72,6 +72,10 @@ try {
     const switched = setup({ status: 'pending', baseline: false, dirty: false });
     assert.equal(switched.LeaveSyncGuard.needsReminder(), false);
     console.log('PASS 單純切換到既有班級不顯示提醒');
+
+    const hydrated = setup({ status: 'pending', baseline: true, dirty: false });
+    assert.equal(hydrated.LeaveSyncGuard.needsReminder(), false);
+    console.log('PASS 初始化造成的指紋差異不顯示提醒');
 
     const firstEdit = setup({ status: 'pending', baseline: false, dirty: true });
     assert.equal(firstEdit.LeaveSyncGuard.needsReminder(), true);
