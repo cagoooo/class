@@ -40,8 +40,13 @@ context.ErrorHandler.handle(firestoreError, 'UNKNOWN', 'Global Error at https://
 assert.equal(context.ErrorHandler.getHistory().length, 0, 'Firestore 快取斷言不得寫入錯誤紀錄');
 console.log('PASS Firestore 快取內部斷言不產生 webhook 錯誤');
 
+const compatibilityError = new Error('A newer version of the Firestore SDK was previously used and so the persisted data is not compatible with the version of the SDK you are now using. The SDK will operate with persistence disabled.');
+context.ErrorHandler.handle(compatibilityError, 'UNKNOWN', 'Unhandled Promise Rejection');
+assert.equal(context.ErrorHandler.getHistory().length, 0, 'Firestore 版本不相容訊息不得寫入錯誤紀錄');
+console.log('PASS Firestore 快取版本不相容不產生 webhook 錯誤');
+
 context.ErrorHandler.handle(new Error('真正的資料寫入失敗'), 'STORAGE', 'students/save');
 assert.equal(context.ErrorHandler.getHistory().length, 1, '真正錯誤仍應保留紀錄');
 console.log('PASS 真正資料錯誤仍保留紀錄');
 
-console.log('2 error-handler checks passed');
+console.log('3 error-handler checks passed');

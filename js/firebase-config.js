@@ -49,7 +49,7 @@ async function initializeFirebase() {
                 console.warn('Firestore 多分頁離線持久化無法啟用，改用記憶體快取');
             } else if (err.code === 'unimplemented') {
                 console.warn('當前瀏覽器不支援 Firestore 離線持久化，改用記憶體快取');
-            } else if (/internal assertion failed|unexpected state/i.test(err?.message || '')) {
+            } else if (/internal assertion failed|unexpected state|A newer version of the Firestore SDK was previously used|persisted data is not compatible/i.test(err?.message || '')) {
                 // Firebase 9 compat 在舊版／損壞 IndexedDB 快取上可能拋出
                 // INTERNAL ASSERTION FAILED。雲端同步仍可使用，讓 Firestore
                 // 自動改用記憶體快取即可，不應中斷班級小管家或觸發錯誤 webhook。

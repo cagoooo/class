@@ -1,3 +1,7 @@
+## v3.37.20（2026-09-22）
+
+- 將 Firestore 舊版 IndexedDB 快取不相容訊息納入安全降級與降噪，避免 `A newer version of the Firestore SDK was previously used` 持續產生 Webhook。
+
 ## v3.37.19（2026-09-22）
 
 - 修正 Firestore 9 compat 在多分頁或舊快取狀態下的 `INTERNAL ASSERTION FAILED: Unexpected state`：啟用多分頁快取協調，異常時安全退回記憶體快取，避免誤送系統錯誤 webhook。

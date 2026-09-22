@@ -179,12 +179,16 @@ const ErrorHandler = (function () {
     }
 
     // Firebase 9 compat 的 Firestore 離線快取在多分頁、舊版資料庫版本
-    // 或瀏覽器剛切換分頁時，偶爾會拋出「Unexpected state」內部斷言。
-    // 這不是班級資料寫入失敗；Firestore 會退回記憶體快取，雲端讀寫仍可用。
+    // 或瀏覽器剛切換分頁時，偶爾會拋出內部狀態錯誤。這不是班級資料寫入
+    // 失敗；Firestore 會退回記憶體快取，雲端讀寫仍可用。
     function isFirestoreCacheAssertion(error, context = '') {
         const text = `${error?.name || ''} ${error?.message || ''} ${context}`;
-        return /FIRESTORE\s*\(\d+\.\d+\.\d+\)\s*INTERNAL ASSERTION FAILED:\s*Unexpected state/i.test(text)
+        const internalAssertion = /FIRESTORE\s*\(\d+\.\d+\.\d+\)\s*INTERNAL ASSERTION FAILED:\s*Unexpected state/i.test(text)
             && /firestore(?:-compat)?\.js/i.test(text);
+        const incompatiblePersistence = /A newer version of the Firestore SDK was previously used/i.test(text)
+            && /persisted data is not compatible with the version of the SDK/i.test(text)
+            && /persistence disabled/i.test(text);
+        return internalAssertion || incompatiblePersistence;
     }
 
     function promiseRejectionContext(error) {
@@ -249,7 +253,7 @@ const ErrorHandler = (function () {
             if (isFirestoreCacheAssertion(reason, context)) {
                 event.preventDefault();
                 if (config.logToConsole) {
-                    console.warn('[ErrorHandler] Firestore 離線快取狀態不相容，已改用記憶體快取');
+                    console.warn('[ErrorHandler] Firestore 離線快取版本不相容，已改用記憶體快取');
                 }
                 return;
             }
@@ -287,7 +291,7 @@ const ErrorHandler = (function () {
             if (isFirestoreCacheAssertion(event.error || new Error(event.message), event.filename)) {
                 event.preventDefault();
                 if (config.logToConsole) {
-                    console.warn('[ErrorHandler] Firestore 離線快取狀態不相容，已改用記憶體快取');
+                    console.warn('[ErrorHandler] Firestore 離線快取版本不相容，已改用記憶體快取');
                 }
                 return;
             }
@@ -361,7 +365,7 @@ const ErrorHandler = (function () {
 
             if (isFirestoreCacheAssertion(errorObj, context)) {
                 if (config.logToConsole) {
-                    console.warn(`[ErrorHandler] 忽略 Firestore 離線快取內部斷言: ${errorObj.message}`);
+                    console.warn(`[ErrorHandler] 忽略 Firestore 離線快取相容性訊息: ${errorObj.message}`);
                 }
                 return;
             }
