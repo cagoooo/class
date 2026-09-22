@@ -42,6 +42,7 @@ jobs:
           node scripts/test-pet-notify.cjs
           node scripts/test-data-safety.cjs
           node scripts/test-pet-sync.cjs
+          node scripts/test-leave-sync-guard.cjs
 
       - name: Inject Secrets 💉
         run: python .github/inject.py
