@@ -458,7 +458,28 @@
         if ((shopPage + 1) * 20 < history.length) paging.append(button('下一頁兌換', () => { shopPage++; render(); }));
         shop.append(paging); root.append(shop);
     }
+    async function requestCoinsToggle() {
+        const config = settings();
+        if (!await confirmAction(config.coinsEnabled ? '暫停本班金幣累積？現有金幣與紀錄會保留。' : '啟用後才開始累積金幣，舊分數不換算。\n原本正向加分會發放等量金幣；尚未設定金幣的規則將先使用相同數量，可在規則編輯中調整。')) return;
+        await setCoinsEnabled(!config.coinsEnabled);
+    }
+    function renderPointsBridge() {
+        const section = document.getElementById('points-section'); if (!section) return;
+        let panel = document.getElementById('points-pet-bridge');
+        if (!panel) { panel = el('aside', undefined, 'points-pet-bridge'); panel.id = 'points-pet-bridge'; panel.setAttribute('aria-label', '加分與寵物連動設定'); section.querySelector('h2').after(panel); }
+        const config = settings(); panel.replaceChildren();
+        panel.append(el('strong', '🐾 加分，也能陪寵物一起成長'));
+        const state = el('p', `本班寵物成長：${config.enabled ? '累積中' : '未啟用／已暫停'}　｜　金幣：${config.coinsEnabled ? '累積中' : '未啟用／已暫停'}`); state.setAttribute('role', 'status'); panel.append(state);
+        const rewards = [config.enabled ? '寵物成長 ＋3' : '成長未啟用', config.coinsEnabled ? '金幣 ＋3' : '金幣未啟用'];
+        panel.append(el('p', `在這裡加 3 分 → ${rewards.join('、')}。一般扣分不扣成長或金幣；啟用前的舊分數不補發。`));
+        const actions = el('div', undefined, 'points-pet-actions');
+        if (!config.enabled) actions.append(button('啟用本班寵物成長', () => { prepare(); return saveSettings({ ...settings(), enabled: true, enabledAt: config.enabledAt || new Date().toISOString() }); }));
+        if (!config.coinsEnabled) actions.append(button('啟用本班金幣', () => { prepare(); return requestCoinsToggle(); }));
+        actions.append(button('查看寵物、圖鑑與商店 →', () => { prepare(); render(); window.showSection('pets'); }));
+        panel.append(actions);
+    }
     function render() {
+        renderPointsBridge();
         const root = document.getElementById('pets-section'); if (!root) return;
         const scroll = window.scrollY || 0;
         const opened = [...root.querySelectorAll('details[open][data-pet-key]')].map(d => d.dataset.petKey);
@@ -488,10 +509,7 @@
         const wallet = el('div', undefined, 'pet-wallet-status');
         wallet.append(el('strong', config.coinsEnabled ? '🪙 本班金幣累積中' : '🪙 本班金幣尚未啟用／已暫停'));
         const coinGuide = el('details'); coinGuide.dataset.petKey = 'coins-guide'; coinGuide.append(el('summary', '金幣規則與使用說明'), el('p', '金幣與成長值分開記錄。啟用後，原本正向加分會獲得等量金幣；自訂規則可調整金額。舊分數不換算，一般扣分與分數歸零不扣金幣，撤銷獎勵會扣回該筆金幣。可在兌換商店使用金幣；暫停累積後仍可使用餘額。'));
-        wallet.append(button(config.coinsEnabled ? '暫停金幣累積' : '啟用本班金幣', async () => {
-            if (!await confirmAction(config.coinsEnabled ? '暫停本班金幣累積？現有金幣與紀錄會保留。' : '啟用後才開始累積金幣，舊分數不換算。\n原本正向加分會發放等量金幣；尚未設定金幣的規則將先使用相同數量，可在規則編輯中調整。')) return;
-            await setCoinsEnabled(!config.coinsEnabled);
-        })); wallet.append(coinGuide); root.append(wallet);
+        wallet.append(button(config.coinsEnabled ? '暫停金幣累積' : '啟用本班金幣', requestCoinsToggle)); wallet.append(coinGuide); root.append(wallet);
         renderShop(root, config);
         const views = el('div', undefined, 'pet-view-tools'); views.setAttribute('aria-label', '寵物顯示方式');
         ['compact', 'cards'].forEach(mode => {

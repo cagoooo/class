@@ -141,3 +141,13 @@
 .pet-touch-reply[hidden] { display:none; }
 .pet-compact .pet-touch-reply { left:0; transform:none; max-width:140px; }
 #pets-section .pet-touch-hint { font-size:14px; color:var(--text-secondary,#64748b); margin:8px 0; }
+
+.points-pet-bridge { padding:16px; margin:0 0 20px; border:1px solid #b9d7ca; border-left:4px solid #399476; border-radius:12px; background:#f0faf6; color:#1e4035; line-height:1.65; }
+.points-pet-bridge strong { font-size:17px; }
+.points-pet-bridge p { margin:8px 0; font-size:14px; overflow-wrap:anywhere; }
+.points-pet-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.points-pet-actions button { min-height:46px; padding:10px 14px; border:1px solid #6d9b8b; border-radius:10px; background:#fff; color:#205b48; font-family:inherit; font-size:14px; font-weight:600; line-height:1.5; cursor:pointer; }
+.points-pet-actions button:focus-visible { outline:3px solid #6366f1; outline-offset:3px; }
+.dark .points-pet-bridge { background:#18332c; color:#e2f5ed; border-color:#507c6c; }
+.dark .points-pet-actions button { background:#23473b; color:#e2f5ed; }
+@media(max-width:600px) { .points-pet-bridge { padding:12px; } .points-pet-actions { flex-direction:column; } .points-pet-actions button { width:100%; } }
