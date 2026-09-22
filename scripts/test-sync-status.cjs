@@ -10,7 +10,7 @@ class Storage {
     removeItem(key) { this.data.delete(key); }
 }
 
-function setup() {
+function setup({ offline = false } = {}) {
     const localStorage = new Storage();
     const sessionStorage = new Storage();
     const elements = new Map();
@@ -24,8 +24,8 @@ function setup() {
     const context = {
         Storage, localStorage, sessionStorage,
         console: { log() {}, warn() {}, error() {} },
-        navigator: { onLine: true },
-        OfflineDetector: { isOffline: () => false },
+        navigator: { onLine: !offline },
+        OfflineDetector: { isOffline: () => offline },
         FirebaseConfig: {
             isGoogleUser: () => true,
             onAuthStateChanged: callback => callback({ uid: 'teacher' }, {}),
@@ -58,4 +58,9 @@ context.sessionStorage.setItem('students', '[2]');
 assert.equal(context.markers, 1, 'sessionStorage 不應被算成本機班級異動');
 context.localStorage.setItem('students', '[2]');
 assert.equal(context.markers, 2, '內容真的改變時仍應標記');
-console.log('4 sync-status checks passed');
+const offline = setup({ offline: true });
+offline.localStorage.setItem('students', '[1]');
+assert.equal(offline.markers, 1, '離線修改仍應留下待同步標記');
+console.log('PASS 離線修改留下待同步標記');
+
+console.log('5 sync-status checks passed');

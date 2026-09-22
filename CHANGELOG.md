@@ -1,3 +1,7 @@
+## v3.37.21（2026-09-22）
+
+- 修正切回班級小管家時無異動仍啟動同步動畫：背景同步現在只在有明確本機異動時執行，離線修改也會正確留下待同步標記。
+
 ## v3.37.20（2026-09-22）
 
 - 將 Firestore 舊版 IndexedDB 快取不相容訊息納入安全降級與降噪，避免 `A newer version of the Firestore SDK was previously used` 持續產生 Webhook。

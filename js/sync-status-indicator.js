@@ -403,6 +403,9 @@
                     const isOffline = !navigator.onLine || (window.OfflineDetector && window.OfflineDetector.isOffline());
                     if (isOffline) {
                         addPendingKey(key);
+                        // 離線時也留下班級異動標記，恢復連線或切回頁面後
+                        // 自動同步才能辨識這是老師剛剛的修改，而非初始化整理。
+                        window.CloudSafety?.markLocalChange?.(localStorage.getItem('currentClassId') || 'default');
                         setState('disconnected');
                     } else if (currentState !== 'syncing') {
                         lastChangedAt = Date.now();

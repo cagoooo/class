@@ -70,11 +70,32 @@
         } catch (e) { return 0; }
     }
 
+    /** 取得目前帳號可管理的班級 ID，供自動同步檢查異動標記。 */
+    function getTrackedClassIds() {
+        const ids = new Set(['default']);
+        try {
+            const profiles = JSON.parse(localStorage.getItem('classProfiles') || '[]');
+            if (Array.isArray(profiles)) profiles.forEach(profile => {
+                if (profile?.id != null) ids.add(String(profile.id));
+            });
+        } catch (e) { /* 名冊損壞時仍保留 default */ }
+        return [...ids];
+    }
+
+    /** 只有明確本機異動才需要背景同步；初始化指紋差異不應打擾老師。 */
+    function hasPendingLocalChanges() {
+        const safety = window.CloudSafety;
+        if (typeof safety?.hasLocalChangeMarker !== 'function') return true;
+        return getTrackedClassIds().some(id => {
+            try { return !!safety.hasLocalChangeMarker(id); } catch (e) { return false; }
+        });
+    }
+
     /**
      * 檢查是否需要同步（距上次同步是否超過間隔）
      */
     function needsSync() {
-        return Date.now() - getLastSyncMs() >= state.intervalMs;
+        return hasPendingLocalChanges() && Date.now() - getLastSyncMs() >= state.intervalMs;
     }
 
     /**
@@ -95,6 +116,10 @@
         // 離線 → 跳過
         if (!navigator.onLine) {
             console.log('[AutoSync] 裝置離線，跳過本次觸發');
+            return false;
+        }
+        if (!hasPendingLocalChanges()) {
+            console.log('[AutoSync] 沒有待同步的本機異動，跳過本次觸發');
             return false;
         }
 
