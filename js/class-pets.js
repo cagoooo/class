@@ -64,7 +64,7 @@
             if (!student) return fail('學生已不在目前班級。');
             student.classPetMood = mood;
             return commit(next, window.groups, window.pointsHistory);
-        });
+        }, 'mood');
     }
     function drawPet() {
         const kinds = Object.keys(pets), limit = Math.floor(4294967296 / kinds.length) * kinds.length;
@@ -98,6 +98,30 @@
     let expected = null;
     let expectedClass = cid();
     const fingerprint = () => JSON.stringify([...keys(), KEY].map(k => localStorage.getItem(k)));
+    function petDetails(details) {
+        const profile = window.ClassProfiles?.currentProfile?.();
+        return {
+            classId: cid(),
+            className: profile?.name || '',
+            ...(details || {})
+        };
+    }
+    function notifyPet(event, details) {
+        try { window.UsageNotify?.pet?.(event, petDetails(details)); } catch (e) { /* 通知不能阻擋主流程 */ }
+    }
+    function reportPetFailure(operation, error, details) {
+        const errorObj = error instanceof Error ? error : new Error(String(error || '寵物操作失敗'));
+        try {
+            if (window.ErrorHandler?.handle) {
+                window.ErrorHandler.handle(errorObj, 'STORAGE', `寵物系統/${operation || '操作'}`, {
+                    severity: 'critical', silent: true, feature: 'pet', petAction: operation || 'operation',
+                    ...petDetails(details)
+                });
+            } else {
+                window.UsageNotify?.petError?.(errorObj.message, operation, petDetails(details));
+            }
+        } catch (e) { /* 通知失敗不能阻擋主流程 */ }
+    }
     function memoryMatchesStorage() {
         const ordered = values => JSON.stringify([...values].sort((a, b) => String(a.id).localeCompare(String(b.id))));
         return keys().every((key, i) => ordered(JSON.parse(localStorage.getItem(key) || '[]')) === ordered([window.students, window.groups, window.pointsHistory][i] || []));
@@ -180,17 +204,22 @@
         window.renderStudents?.(); window.renderGroups?.(); window.renderPointsHistory?.(); window.renderPointsStudentList?.();
         render();
     }
-    async function change(action) {
+    async function change(action, operation = 'operation') {
         if (busy) return false;
         busy = true;
         try {
             const execute = () => {
-                if (!fresh()) return fail('資料已在其他分頁或同步中更新，請重新整理後再操作。');
+                if (!fresh()) {
+                    const error = new Error('資料已在其他分頁或同步中更新');
+                    reportPetFailure(operation, error, { failureStage: 'stale_snapshot' });
+                    return fail('資料已在其他分頁或同步中更新，請重新整理後再操作。');
+                }
                 return action();
             };
             return navigator.locks ? await navigator.locks.request('class-pets-' + expectedClass, execute) : execute();
         } catch (e) {
             console.error('[ClassPets]', e);
+            reportPetFailure(operation, e, { failureStage: 'exception' });
             return fail('這次操作未完成，請確認資料與儲存空間後再試。');
         } finally { busy = false; render(); }
     }
@@ -251,7 +280,10 @@
         const config = settings(), collection = collectionFor(nextStudents, nextHistory, config);
         const writes = keys().map((k, i) => [k, JSON.stringify(values[i])]);
         if (Object.keys(collection).length) writes.push([KEY, JSON.stringify({ ...config, collection })]);
-        if (!SafeStorage.write(writes, { context: '寵物獎勵與班級分數' })) return false;
+        if (!SafeStorage.write(writes, {
+            context: '寵物獎勵與班級分數', feature: 'pet', petAction: 'save',
+            classId: cid(), className: window.ClassProfiles?.currentProfile?.()?.name || ''
+        })) return false;
         window.students = nextStudents; window.groups = nextGroups; window.pointsHistory = nextHistory;
         remember(); redraw();
         return true;
@@ -294,9 +326,24 @@
             if (!commit(ss, gg, hh)) return false;
             selected.clear(); onlySelected = false; render();
             celebrate(events);
+            notifyPet('reward', {
+                count: unique.length, points, xp, coins,
+                reason: String(reason || '自訂加扣分').slice(0, 80),
+            });
+            const hatches = events.filter(e => e.type === 'hatch');
+            const levelUps = events.filter(e => e.type === 'level');
+            if (hatches.length) notifyPet('hatch', {
+                count: hatches.length,
+                kinds: hatches.map(e => pets[e.kind]?.[1]).filter(Boolean),
+                level: 1,
+            });
+            if (levelUps.length) notifyPet('level_up', {
+                count: levelUps.length,
+                level: Math.max(...levelUps.map(e => e.level)),
+            });
             if (typeof NotificationSystem !== 'undefined') NotificationSystem.success(`已存本機 · ${unique.length} 人${xp ? `，每人成長 +${xp}` : ''}${coins ? `、金幣 +${coins}` : ''}`);
             return true;
-        });
+        }, 'reward');
     }
     async function undo(ids) {
         return change(() => {
@@ -322,8 +369,15 @@
                     points, reason: '撤銷：' + r.reason, date: now.toLocaleDateString('zh-TW'), timestamp: now.toLocaleString('zh-TW', { hour12: false }),
                     petEvent: true, petXp: -r.petXp, coinDelta: -(r.coinDelta || 0), petBatch: batch, petReverses: r.id, petGroupId: r.petGroupId });
             });
-            return commit(ss, gg, hh);
-        });
+            const ok = commit(ss, gg, hh);
+            if (ok) notifyPet('undo', {
+                count: originals.length,
+                points: originals.reduce((sum, r) => sum + (Number(r.points) || 0), 0),
+                xp: originals.reduce((sum, r) => sum + (Number(r.petXp) || 0), 0),
+                coins: originals.reduce((sum, r) => sum + (Number(r.coinDelta) || 0), 0),
+            });
+            return ok;
+        }, 'undo');
     }
     function el(tag, text, cls) {
         const e = document.createElement(tag); if (text !== undefined) e.textContent = text; if (cls) e.className = cls; return e;
@@ -342,17 +396,23 @@
             document.body.append(dialog); dialog.showModal(); actions.querySelector('button').focus();
         });
     }
-    function saveSettings(config) {
+    function saveSettings(config, notification = {}) {
         return change(() => {
-            if (!SafeStorage.set(KEY, JSON.stringify(config), { context: '寵物獎勵設定' })) return false;
-            remember(); render(); return true;
-        });
+            if (!SafeStorage.set(KEY, JSON.stringify(config), {
+                context: '寵物獎勵設定', feature: 'pet', petAction: 'settings',
+                classId: cid(), className: window.ClassProfiles?.currentProfile?.()?.name || ''
+            })) return false;
+            remember(); render();
+            notifyPet('settings', notification);
+            return true;
+        }, 'settings');
     }
     function setCoinsEnabled(enabled) {
         const config = settings();
         return saveSettings({ ...config, coinsEnabled: enabled,
             ...(enabled && !config.coinsEnabledAt ? { coinsEnabledAt: new Date().toISOString() } : {}),
-            rules: config.rules.map(r => ({ ...r, coins: r.coins ?? Math.max(0, r.points) })) });
+            rules: config.rules.map(r => ({ ...r, coins: r.coins ?? Math.max(0, r.points) })) },
+            { action: enabled ? '啟用金幣' : '暫停金幣累積' });
     }
     function saveRule(values, id = null) {
         const name = String(values.name || '').trim();
@@ -363,7 +423,8 @@
         const config = settings();
         if (id && !config.rules.some(r => r.id === id)) return Promise.resolve(fail('這項規則已不存在，請重新選取。'));
         const rule = { id: id || uid(), name, points, xp, coins };
-        return saveSettings({ ...config, rules: id ? config.rules.map(r => r.id === id ? rule : r) : [...config.rules, rule] });
+        return saveSettings({ ...config, rules: id ? config.rules.map(r => r.id === id ? rule : r) : [...config.rules, rule] },
+            { action: id ? '更新獎勵規則' : '新增獎勵規則', reason: name });
     }
     function saveProduct(values, id = null) {
         const name = String(values.name || '').trim(), cost = Number(values.cost);
@@ -371,11 +432,13 @@
         const config = settings(), products = config.products || [];
         if (id && !products.some(p => p.id === id)) return Promise.resolve(fail('商品已不存在，請重新整理。'));
         const product = { id: id || uid(), name, cost, active: products.find(p => p.id === id)?.active ?? true };
-        return saveSettings({ ...config, products: id ? products.map(p => p.id === id ? product : p) : [...products, product] });
+        return saveSettings({ ...config, products: id ? products.map(p => p.id === id ? product : p) : [...products, product] },
+            { action: id ? '更新商店商品' : '新增商店商品', productName: name, cost });
     }
     function setProductActive(id, active) {
         const config = settings();
-        return saveSettings({ ...config, products: (config.products || []).map(p => p.id === id ? { ...p, active: !!active } : p) });
+        return saveSettings({ ...config, products: (config.products || []).map(p => p.id === id ? { ...p, active: !!active } : p) },
+            { action: active ? '商品上架' : '商品下架' });
     }
     async function redeem(studentId, productId, expectedCost, requestId = uid()) {
         return change(() => {
@@ -389,8 +452,10 @@
             const record = { id: uid(), studentId: student.id, studentName: student.name, points: 0, petXp: 0, petEvent: true,
                 coinDelta: -product.cost, petShopType: 'redeem', petShopRequest: requestId, productId, productName: product.name, productCost: product.cost,
                 reason: '兌換：' + product.name, createdAtMs: now.getTime(), date: now.toLocaleDateString('zh-TW'), timestamp: now.toLocaleString('zh-TW', { hour12: false }) };
-            return commit(window.students, window.groups, [record, ...window.pointsHistory]);
-        });
+            const ok = commit(window.students, window.groups, [record, ...window.pointsHistory]);
+            if (ok) notifyPet('redeem', { count: 1, cost: product.cost, productName: product.name, action: '兌換' });
+            return ok;
+        }, 'shop_redeem');
     }
     async function refund(id) {
         return change(() => {
@@ -401,8 +466,10 @@
             const now = new Date();
             const reversal = { ...record, id: uid(), coinDelta: record.productCost, petShopType: 'refund', petReverses: id,
                 petShopRequest: uid(), reason: '退幣：' + record.productName, createdAtMs: now.getTime(), date: now.toLocaleDateString('zh-TW'), timestamp: now.toLocaleString('zh-TW', { hour12: false }) };
-            return commit(window.students, window.groups, [reversal, ...window.pointsHistory]);
-        });
+            const ok = commit(window.students, window.groups, [reversal, ...window.pointsHistory]);
+            if (ok) notifyPet('refund', { count: 1, cost: record.productCost, productName: record.productName, action: '退幣' });
+            return ok;
+        }, 'shop_refund');
     }
     function renderShop(root, config) {
         const shop = el('details', undefined, 'pet-shop'); shop.dataset.petKey = 'shop'; shop.append(el('summary', '🛍️ 兌換商店與退幣'));
@@ -503,6 +570,7 @@
         guide.append(el('p', '10 成長值孵化，每增加 20 成長值升一級。Lv.1 幼年 → Lv.3 成長 → Lv.5 成熟。分數歸零不影響成長；撤銷誤加獎勵會回復成長。'));
         guide.append(el('p', `${Object.keys(pets).length} 種寵物藏在神祕蛋中，孵化才揭曉種類；各有幼年、成長、成熟造型。孵化後可選精神飽滿、開心歡呼或安心休息樣態。蛋會隨成長值變化：0–2 安靜孵育、3–5 出現裂紋、6–8 裂縫擴大、9 即將破殼。首次達到 10 才隨機揭曉，抽出後固定保留，撤銷再加分不重抽。表情只改外觀，不影響分數、成長或金幣。`));
         guide.append(el('p', '資料先存在本機，登入後沿用雲端同步。換裝置前請完成同步，同一班請避免兩台裝置同時加分。'));
+        guide.append(el('p', '通知會留在使用紀錄：孵化、升級、撤銷、商店兌換／退幣與設定變更即時送 webhook；一般獎勵併入每日戰報。寵物資料儲存、同步或設定失敗會標示為寵物系統錯誤並通知。'));
         root.append(guide);
         root.append(el('p', '輕點蛋或寵物，和牠打個招呼！互動不會增加成長值或金幣。', 'pet-touch-hint'));
         root.append(button(`全班收集圖鑑 · ${Object.keys(collectionFor()).length} / ${Object.keys(pets).length}`, openCollection, 'pet-collection-entry'));
@@ -641,12 +709,12 @@
     function init() {
         preserveCollection(); remember();
         const menu = document.getElementById('feature-menu-grid') || document.querySelector('button[onclick="showSection(\'grouping\')"]')?.parentElement;
-        const nav = button(undefined, () => { render(); window.showSection('pets'); }, 'bg-gradient-to-br from-amber-50 to-orange-50 p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-amber-500 active:scale-95');
+        const nav = button(undefined, () => { window.UsageNotify?.feature?.('pets'); render(); window.showSection('pets'); }, 'bg-gradient-to-br from-amber-50 to-orange-50 p-3 sm:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 border-l-4 border-amber-500 active:scale-95');
         nav.id = 'petsNavBtn';
         nav.append(el('div', '🐾', 'text-2xl sm:text-3xl mb-1 sm:mb-2'), el('div', '班級寵物', 'font-semibold text-gray-700 text-sm sm:text-base'));
         menu?.append(nav);
         const section = el('section', undefined, 'section hidden'); section.id = 'pets-section'; document.getElementById('grouping-section')?.after(section);
-        const entry = button('🐾 寵物成長／批次獎勵', () => { render(); window.showSection('pets'); }, 'pet-nav'); document.getElementById('pointsHistory')?.before(entry);
+        const entry = button('🐾 寵物成長／批次獎勵', () => { window.UsageNotify?.feature?.('pets'); render(); window.showSection('pets'); }, 'pet-nav'); document.getElementById('pointsHistory')?.before(entry);
         // 同頁正常操作也會改動共用資料；獎勵操作開始時仍檢查其他分頁造成的衝突。
         document.addEventListener('click', e => { if (!busy && !e.target.closest('#pets-section') && !e.target.closest('#points-section')) prepare(); });
         window.addEventListener('storage', () => { /* 保留快照，下一次操作會阻擋過期分頁。 */ });

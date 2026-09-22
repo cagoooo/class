@@ -340,8 +340,17 @@ const ErrorHandler = (function () {
                 severity = 'warning';
             }
 
-            // 使用情形通知：系統錯誤（同訊息每場一次、每場上限；通知失敗不可影響錯誤處理）
-            try { if (window.UsageNotify) UsageNotify.error(errorObj.message, context, severity); } catch (e) { /* ignore */ }
+            // 使用情形通知：系統錯誤（同訊息每場一次、每場上限；通知失敗不可影響錯誤處理）。
+            // 寵物模組會附上功能／操作標籤，讓 webhook 能和一般系統錯誤區分；
+            // skipUsageNotify 僅供需要自行送出專用事件的模組避免重複通知。
+            try {
+                if (window.UsageNotify && options.skipUsageNotify !== true) {
+                    const notifyDetails = {};
+                    ['feature', 'operation', 'petAction', 'classId', 'className', 'failureStage']
+                        .forEach(key => { if (options[key] != null) notifyDetails[key] = options[key]; });
+                    UsageNotify.error(errorObj.message, context, severity, notifyDetails);
+                }
+            } catch (e) { /* ignore */ }
 
             const errorInfo = {
                 type: errorType,

@@ -286,7 +286,7 @@
      *
      * @param {Array<[string,?string]>} pairs 要寫入的 [key, value] 陣列（value 必須已是字串；
      *        value 給 null 代表「刪除這個 key」，讓匯入／還原可以把刪除也納入同一次原子操作）
-     * @param {{context?:string, rollback?:Function, message?:string}} [opts]
+     * @param {{context?:string, rollback?:Function, message?:string, feature?:string, petAction?:string, classId?:string, className?:string}} [opts]
      *        context  — 出事時要顯示／通報的情境，例如「新增學生（王小明）」
      *        rollback — 還原記憶體狀態的函式（例如把剛 push 的項目 pop 回來）
      *        message  — 自訂給老師看的訊息；預設會用 context 組一句
@@ -321,9 +321,12 @@
             // 通報開發者：只有 ErrorHandler.handle 這條路會發 webhook
             try {
                 if (window.ErrorHandler && window.ErrorHandler.handle) {
+                    const errorOptions = { severity: 'critical' };
+                    ['feature', 'petAction', 'classId', 'className', 'failureStage']
+                        .forEach(key => { if (opts[key] != null) errorOptions[key] = opts[key]; });
                     window.ErrorHandler.handle(
                         new Error('資料寫入失敗：' + ((err && err.message) || err)),
-                        'STORAGE', context, { severity: 'critical' }
+                        'STORAGE', context, errorOptions
                     );
                 }
             } catch (e) { /* 通報失敗不能再擋住主流程 */ }

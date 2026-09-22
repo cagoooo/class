@@ -28,7 +28,7 @@
  *   4. 功能統計是「當日累計值」而非增量，重複回報會被伺服端覆寫而不是累加，
  *      所以多送幾次不會把數字灌大；佇列裡也只保留同一天的最後一份。
  *
- * 對外：window.UsageNotify.{ init, login, classCreate, feature, error }
+ * 對外：window.UsageNotify.{ init, login, classCreate, feature, error, pet, petError }
  */
 (function () {
     'use strict';
@@ -74,7 +74,7 @@
         students: '學生管理', points: '加扣分', grouping: '隨機分組', lottery: '號碼抽籤',
         timer: '計時器', notebook: '隨堂筆記', homework: '作業檢查', exam: '考試監考',
         zodiac: '開運拉霸', board: '班級經營工具板', brush: '潔牙勾選',
-        comment: '評語生成器', dialogue: '對話小學堂', backup: '資料備份', announcement: '班級公告'
+        comment: '評語生成器', dialogue: '對話小學堂', backup: '資料備份', announcement: '班級公告', pets: '班級寵物'
     };
 
     var started = false;
@@ -279,6 +279,28 @@
         return Math.abs(h).toString(36);
     }
 
+    // 寵物事件只回報不含學生姓名的摘要；原始名單與獎勵帳本仍留在班級資料中。
+    function cleanPetDetails(details) {
+        details = details || {};
+        var out = {};
+        ['feature', 'classId', 'className', 'action', 'reason', 'productName', 'kind', 'status',
+            'operation', 'petAction', 'failureStage'].forEach(function (key) {
+            if (details[key] !== undefined && details[key] !== null && details[key] !== '') {
+                out[key] = String(details[key]).slice(0, key === 'className' ? 80 : 120);
+            }
+        });
+        ['count', 'points', 'xp', 'coins', 'cost', 'level', 'hatchCount', 'levelUpCount', 'durationMs'].forEach(function (key) {
+            var value = Number(details[key]);
+            if (Number.isSafeInteger(value) && Math.abs(value) <= 100000) out[key] = value;
+        });
+        if (Array.isArray(details.kinds)) {
+            out.kinds = details.kinds.map(function (kind) { return String(kind).slice(0, 40); }).slice(0, 12).join('、');
+        } else if (details.kinds) {
+            out.kinds = String(details.kinds).slice(0, 120);
+        }
+        return out;
+    }
+
     // ───────── 對外 API ─────────
     var API = {
         init: function () {
@@ -354,13 +376,14 @@
                 ua = navigator.userAgent;
             } catch (e) {}
 
-            enqueue('error', { 
+            var details = arguments.length > 3 ? cleanPetDetails(arguments[3]) : {};
+            enqueue('error', Object.assign({
                 message: message, 
                 context: String(context == null ? '' : context).slice(0, 160),
                 severity: sev,
                 url: url,
                 ua: ua
-            });
+            }, details));
         },
 
         // 重大資料操作（刪除班級 / 雲端還原覆蓋 / 還原本機備份 / 學期封存）：
@@ -370,6 +393,33 @@
                 action: String(action || '').slice(0, 80),
                 details: String(details || '').slice(0, 300)
             });
+        },
+
+        // 寵物事件：所有事件都會留底；孵化、升級、撤銷、商店與設定由伺服端即時推播，
+        // 一般獎勵則併入每日戰報，避免批次加分時連續洗版。
+        pet: function (event, details) {
+            var type = {
+                reward: 'pet_reward',
+                hatch: 'pet_hatch',
+                level_up: 'pet_level_up',
+                undo: 'pet_undo',
+                redeem: 'pet_shop_redeem',
+                refund: 'pet_shop_refund',
+                settings: 'pet_settings'
+            }[String(event || '')];
+            if (!type) return;
+            enqueue(type, cleanPetDetails(details));
+        },
+
+        // 寵物儲存、同步或設定失敗沿用 error 配額與冪等佇列，
+        // 但加上功能標籤，Google Chat 會顯示為「寵物系統操作失敗」。
+        petError: function (message, operation, details) {
+            var extra = Object.assign({}, details || {}, {
+                feature: 'pet',
+                operation: operation || 'operation',
+                petAction: operation || 'operation'
+            });
+            API.error(message, '寵物系統/' + String(operation || '操作').slice(0, 80), 'critical', extra);
         }
     };
 

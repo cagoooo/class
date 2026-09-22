@@ -21,6 +21,12 @@ const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { defineSecret } = require('firebase-functions/params');
 const logger = require('firebase-functions/logger');
 const admin = require('firebase-admin');
+const {
+  PET_EVENT_META,
+  PET_EVENT_TYPES,
+  normalizePetData,
+  petEventSummary,
+} = require('./pet-notification');
 
 admin.initializeApp();
 
@@ -37,6 +43,7 @@ const EVENT_META = {
   feature_summary: { emoji: '📊', title: '功能使用統計彙整' },
   data_action:     { emoji: '⚙️', title: '重大資料操作' },
   error:           { emoji: '🐞', title: '系統發生錯誤' },
+  ...PET_EVENT_META,
 };
 
 /** 從 Auth token 取出可辨識的身分字串（Google 登入有 email / 姓名；匿名則標示訪客） */
@@ -78,7 +85,9 @@ function deviceLabel(ua) {
 
 /** 組 cardsV2 卡片 */
 function buildCard(type, data, who) {
-  const meta = EVENT_META[type] || { emoji: '🔔', title: '使用事件' };
+  const meta = type === 'error' && data.feature === 'pet'
+    ? { emoji: '🚨', title: '寵物系統操作失敗' }
+    : (EVENT_META[type] || { emoji: '🔔', title: '使用事件' });
   
   // 基礎資訊區塊 (使用者 & 時間)
   let timeText = '';
@@ -160,6 +169,46 @@ function buildCard(type, data, who) {
     }
   }
 
+  if (PET_EVENT_TYPES.has(type)) {
+    const pet = normalizePetData(data);
+    if (pet.className || pet.classId) {
+      contentWidgets.push({
+        decoratedText: {
+          topLabel: '班級',
+          text: [pet.className, pet.classId && `（${pet.classId}）`].filter(Boolean).join(' '),
+          wrapText: true,
+        },
+      });
+    }
+    contentWidgets.push({
+      decoratedText: {
+        topLabel: '寵物事件',
+        text: petEventSummary(type, pet),
+        wrapText: true,
+      },
+    });
+    const numeric = [
+      pet.points != null && `分數 ${pet.points >= 0 ? '+' : ''}${pet.points}`,
+      pet.xp != null && `成長 ${pet.xp >= 0 ? '+' : ''}${pet.xp}`,
+      pet.coins != null && `金幣 ${pet.coins >= 0 ? '+' : ''}${pet.coins}`,
+      pet.cost != null && `價格 ${pet.cost}`,
+    ].filter(Boolean);
+    if (numeric.length) {
+      contentWidgets.push({
+        decoratedText: { topLabel: '數值', text: numeric.join(' · '), wrapText: true },
+      });
+    }
+    if (pet.reason || pet.action || pet.productName) {
+      contentWidgets.push({
+        decoratedText: {
+          topLabel: '操作說明',
+          text: clip(pet.reason || pet.action || pet.productName, 120),
+          wrapText: true,
+        },
+      });
+    }
+  }
+
   if (type === 'error') {
     contentWidgets.push({
       decoratedText: {
@@ -175,6 +224,15 @@ function buildCard(type, data, who) {
           text: clip(data.context, 160),
           wrapText: true
         }
+      });
+    }
+    if (data.feature === 'pet' || data.petAction) {
+      contentWidgets.push({
+        decoratedText: {
+          topLabel: '功能／操作',
+          text: ['班級寵物', data.petAction || data.operation].filter(Boolean).join(' · '),
+          wrapText: true,
+        },
       });
     }
     if (data.url) {
@@ -231,8 +289,10 @@ function buildCard(type, data, who) {
     if (data.details) {
       notificationText += ` - ${clip(data.details, 100)}`;
     }
+  } else if (PET_EVENT_TYPES.has(type)) {
+    notificationText += `\n${petEventSummary(type, normalizePetData(data))}`;
   } else if (type === 'error' && data.message) {
-    notificationText += `\n🐞 錯誤: ${clip(data.message, 150)}`;
+    notificationText += `\n${data.feature === 'pet' ? '🚨 寵物錯誤' : '🐞 錯誤'}: ${clip(data.message, 150)}`;
   } else if (type === 'feature_summary' && data.stats) {
     const statsLines = [];
     for (const label in data.stats) {
@@ -280,7 +340,11 @@ const EVENT_LOG_COLLECTION = '_usageEvents';
 const EVENT_RETENTION_DAYS = 180;
 
 // 值得即時推 Google Chat 的事件；其餘只留底，交給每日戰報彙整。
-const INSTANT_PUSH_TYPES = new Set(['login_new', 'class_create', 'data_action', 'error']);
+const INSTANT_PUSH_TYPES = new Set([
+  'login_new', 'class_create', 'data_action', 'error',
+  'pet_hatch', 'pet_level_up', 'pet_undo', 'pet_shop_redeem',
+  'pet_shop_refund', 'pet_settings',
+]);
 
 // 每個身分每日上限：error 推播 5 則（沿用舊規則）、事件留底 200 筆（防呆用）。
 const MAX_ERROR_PUSH_PER_DAY = 5;
@@ -373,11 +437,19 @@ async function logUsageEvent(eventType, data, who, uid) {
       doc.action = clip(data.action, 80);
       doc.details = clip(data.details, 300);
     }
+    if (PET_EVENT_TYPES.has(eventType)) {
+      Object.assign(doc, normalizePetData(data));
+    }
     if (eventType === 'error') {
       doc.message = clip(data.message, 300);
       doc.context = clip(data.context, 160);
       doc.url = clip(data.url, 250);
       doc.ua = clip(data.ua, 250);
+      if (data.feature) doc.feature = clip(data.feature, 40);
+      if (data.operation || data.petAction) doc.operation = clip(data.operation || data.petAction, 120);
+      if (data.classId) doc.classId = clip(data.classId, 80);
+      if (data.className) doc.className = clip(data.className, 80);
+      if (data.failureStage) doc.failureStage = clip(data.failureStage, 80);
     }
     if (eventType === 'feature_summary') {
       const stats = {};
@@ -511,6 +583,16 @@ function summarizeEvents(events) {
   const dataActions = [];
   const errors = [];
   const featureTotals = {};
+  const pet = {
+    rewards: 0,
+    hatches: 0,
+    levelUps: 0,
+    undos: 0,
+    redeems: 0,
+    refunds: 0,
+    settings: 0,
+    errors: 0,
+  };
   let guestEvents = 0;
 
   events.forEach((d) => {
@@ -529,6 +611,7 @@ function summarizeEvents(events) {
         break;
       case 'error':
         errors.push({ message: d.message || '', context: d.context || '', who: d.name || d.email || '' });
+        if (d.feature === 'pet') pet.errors++;
         break;
       case 'feature_summary':
         Object.keys(d.stats || {}).forEach((k) => {
@@ -536,6 +619,15 @@ function summarizeEvents(events) {
         });
         break;
       default:
+        if (PET_EVENT_TYPES.has(d.type)) {
+          if (d.type === 'pet_reward') pet.rewards++;
+          if (d.type === 'pet_hatch') pet.hatches += Number(d.count) || 1;
+          if (d.type === 'pet_level_up') pet.levelUps += Number(d.count) || 1;
+          if (d.type === 'pet_undo') pet.undos += Number(d.count) || 1;
+          if (d.type === 'pet_shop_redeem') pet.redeems += Number(d.count) || 1;
+          if (d.type === 'pet_shop_refund') pet.refunds += Number(d.count) || 1;
+          if (d.type === 'pet_settings') pet.settings++;
+        }
         break;
     }
   });
@@ -552,6 +644,7 @@ function summarizeEvents(events) {
     classesCreated,
     dataActions,
     errors,
+    pet,
     hotFeatures,
   };
 }
@@ -626,6 +719,29 @@ function buildDigestPayload(day, dateLabel, sum, backup) {
     });
   }
 
+  const petLines = [
+    sum.pet.rewards && `🐾 獎勵 ${sum.pet.rewards} 批`,
+    sum.pet.hatches && `🥚 孵化 ${sum.pet.hatches} 隻`,
+    sum.pet.levelUps && `🌟 升級 ${sum.pet.levelUps} 隻`,
+    sum.pet.undos && `↩️ 撤銷 ${sum.pet.undos} 筆`,
+    sum.pet.redeems && `🛍️ 兌換 ${sum.pet.redeems} 筆`,
+    sum.pet.refunds && `💰 退幣 ${sum.pet.refunds} 筆`,
+    sum.pet.settings && `⚙️ 設定 ${sum.pet.settings} 次`,
+    sum.pet.errors && `🚨 失敗 ${sum.pet.errors} 則`,
+  ].filter(Boolean);
+  if (petLines.length) {
+    sections.push({
+      header: '🐾 寵物系統',
+      widgets: [{
+        decoratedText: {
+          topLabel: '今日寵物活動',
+          text: petLines.join('\n'),
+          wrapText: true,
+        },
+      }],
+    });
+  }
+
   const healthLines = [
     sum.errors.length
       ? `🐞 錯誤 ${sum.errors.length} 則：` + sum.errors.slice(0, 3).map((e) => clip(e.message, 60)).join('；')
@@ -646,6 +762,7 @@ function buildDigestPayload(day, dateLabel, sum, backup) {
   if (sum.hotFeatures.length) {
     text += `\n🔥 ${sum.hotFeatures.slice(0, 3).map((f) => `${f.label} ${f.count}`).join(' · ')}`;
   }
+  if (petLines.length) text += `\n🐾 ${petLines.slice(0, 4).join(' · ')}`;
   text += `\n🐞 錯誤 ${sum.errors.length} 則`;
 
   return {

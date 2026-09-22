@@ -18,6 +18,12 @@ function setup(classId = 'default') {
     const ctx = { Storage, localStorage: storage, sessionStorage: new Storage(), console: { log(){},warn(){},error(){} },
         navigator: {}, crypto: webcrypto, alert(){}, document: { readyState:'loading', addEventListener(){}, getElementById(){return null;} },
         addEventListener(){}, setTimeout, clearTimeout };
+    ctx.petEvents = []; ctx.petErrors = [];
+    ctx.UsageNotify = {
+        pet(event, details) { ctx.petEvents.push({ event, details }); },
+        petError(message, operation, details) { ctx.petErrors.push({ message, operation, details }); }
+    };
+    ctx.ErrorHandler = { handle(error, type, context, options) { ctx.petErrors.push({ message: error.message, type, context, options }); } };
     ctx.window = ctx; vm.createContext(ctx);
     vm.runInContext(fs.readFileSync('js/class-aware-storage.js','utf8'),ctx);
     const suffix = classId === 'default' ? '' : '-' + classId;
@@ -36,6 +42,20 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
         const {pet,ctx}=setup(); assert.equal(pet.xpFor(1),0);
         assert.equal(await pet.award([1],10,'完成約定'),true); assert.equal(ctx.students[0].points,15); assert.equal(pet.xpFor(1),10); assert.equal(pet.stage(10).level,1);
         await pet.award([1],20,'再接再厲'); assert.equal(pet.stage(pet.xpFor(1)).level,2);
+    });
+    await test('寵物獎勵、孵化與升級會留下 webhook 事件摘要',async()=>{
+        const {pet,ctx}=setup();
+        await pet.award([1],10,'完成約定');
+        await pet.award([1],20,'再接再厲');
+        assert.deepEqual(ctx.petEvents.map(e=>e.event),['reward','hatch','reward','level_up']);
+        assert.equal(ctx.petEvents[1].details.count,1);
+        assert.equal(ctx.petEvents[3].details.level,2);
+        assert.equal(ctx.petEvents.some(e=>e.details.studentName),false);
+    });
+    await test('寵物設定儲存失敗會標記 pet 功能錯誤',async()=>{
+        const {pet,ctx,storage}=setup(); storage.failKey='petSettings';
+        assert.equal(await pet.setCoinsEnabled(true),false);
+        assert.ok(ctx.petErrors.some(e=>e.options?.feature==='pet' && e.options?.petAction==='settings'));
     });
     await test('扣分不退化，暫停時不新增成長',async()=>{
         const {pet,storage}=setup(); await pet.award([1],10,'努力'); await pet.award([1],-3,'提醒'); assert.equal(pet.xpFor(1),10);

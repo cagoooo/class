@@ -39,6 +39,7 @@ jobs:
       - name: Check classroom data safety
         run: |
           node scripts/test-class-pets.cjs
+          node scripts/test-pet-notify.cjs
           node scripts/test-data-safety.cjs
           node scripts/test-pet-sync.cjs
 

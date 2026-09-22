@@ -198,6 +198,20 @@
         dialog.append(header, text, steps, backupTitle, backupActions, ackTitle, ack, decisionTitle, decisionHelp, actions, cancel, note); document.body.append(dialog); dialog.showModal(); dialog.addEventListener('cancel', () => dialog.remove());
     }
     function report(error, id, silent) {
+        // 寵物資料與一般班級資料共用同一份安全快照；若啟用寵物成長，
+        // 雲端衝突、離線或儲存失敗也要被標記成寵物系統錯誤，避免老師只看到
+        // 同步燈號而不知道寵物成果也尚未上傳。
+        try {
+            const rawPet = raw(keyFor('petSettings', id || current()));
+            const petConfig = rawPet ? JSON.parse(rawPet) : null;
+            if (petConfig?.enabled || petConfig?.coinsEnabled) {
+                window.UsageNotify?.petError?.(
+                    error?.message || '雲端同步失敗',
+                    'cloud_sync',
+                    { classId: id || current(), failureStage: error?.code || 'sync_failed' }
+                );
+            }
+        } catch (e) { /* 通知不能阻擋同步錯誤呈現 */ }
         if (error.code === 'sync-conflict') {
             conflicts[recoveryKey(context(id))] = true;
             window.SyncStatusIndicator?.setState('conflict');
