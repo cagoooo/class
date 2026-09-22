@@ -109,9 +109,26 @@
 
     // ==================== Firebase 同步前處理 ====================
 
+    /** 只有確實有待同步證據時，切班才需要先上傳。 */
+    function needsSyncBeforeSwitch() {
+        const safety = window.CloudSafety;
+        if (!safety?.status) return true; // 舊版模組仍沿用原本的保守流程
+        const id = safety.current?.() || getCurrentId();
+        const status = safety.status(id);
+        if (status === 'synced' || status === 'offline') return false;
+        // pending 但沒有明確本機異動標記，多半是初始化／舊版快取造成的
+        // 指紋差異；切班不應因此製造同步噪音。
+        if (status === 'pending' && typeof safety.hasLocalChangeMarker === 'function' && !safety.hasLocalChangeMarker(id)) return false;
+        return true;
+    }
+
     /** 在切換前，嘗試將目前資料同步到 Firebase */
     async function syncBeforeSwitch() {
         try {
+            if (!needsSyncBeforeSwitch()) {
+                console.log('[ClassProfiles] 切班前沒有待同步異動，略過同步');
+                return;
+            }
             if (window.FirebaseConfig?.isConnected?.() && window.FirebaseSync?.syncToCloud) {
                 const { syncToCloud } = window.FirebaseSync;
                 await syncToCloud();
