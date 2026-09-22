@@ -267,7 +267,9 @@
                         context: '班級資料/雲端同步',
                         feature: 'pet',
                         operation: 'cloud_sync',
-                        source: 'remote-device',
+                        // 目前只能確認雲端與本機快照不同，不能從瀏覽器端
+                        // 證明一定是另一台實體裝置。
+                        source: 'cloud-divergence',
                         notify: true
                     }
                 );
