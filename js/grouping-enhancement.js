@@ -240,7 +240,10 @@
             footer.className = 'ge-footer';
             footer.append(status, discardPrompt, actions);
             dialog.append(header, body, footer);
-            const warnUnload = e => { if (isDirty()) { e.preventDefault(); e.returnValue = ''; } };
+            const warnUnload = e => {
+                if (window.LeaveSyncGuard?.isInternalNavigation?.()) return;
+                if (isDirty()) { e.preventDefault(); e.returnValue = ''; }
+            };
             window.addEventListener('beforeunload', warnUnload);
             dialog.addEventListener('cancel', e => { e.preventDefault(); requestClose(); });
             dialog.addEventListener('close', () => { window.removeEventListener('beforeunload', warnUnload); dialog.remove(); openButton.focus(); });

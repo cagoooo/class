@@ -627,6 +627,7 @@
             console.log(`[ClassProfiles] 切換至班級 ID: ${id}`);
 
             // Reload
+            window.LeaveSyncGuard?.allowInternalNavigation?.();
             location.reload();
         },
 
@@ -724,6 +725,7 @@
 
             await syncBeforeSwitch();
             setCurrentId(id);
+            window.LeaveSyncGuard?.allowInternalNavigation?.();
             location.reload();
         },
 

@@ -15,6 +15,8 @@
         dismissed: false,
         initialized: false,
         timer: null,
+        allowInternalNavigation: false,
+        internalNavigationTimer: null,
     };
 
     function currentClassId() {
@@ -301,11 +303,25 @@
     }
 
     function handleBeforeUnload(event) {
+        // 班級切換／新增班級會由程式主動 reload，這是頁面內部導覽，
+        // 不應被當成老師關閉頁面而跳出瀏覽器原生確認視窗。
+        if (state.allowInternalNavigation) {
+            return undefined;
+        }
         if (!needsReminder()) return undefined;
         // Chrome / Edge / Safari 只會顯示瀏覽器自己的標準確認文字。
         event.preventDefault?.();
         event.returnValue = '';
         return '';
+    }
+
+    function allowInternalNavigation() {
+        state.allowInternalNavigation = true;
+        clearTimeout(state.internalNavigationTimer);
+        state.internalNavigationTimer = setTimeout(() => {
+            state.allowInternalNavigation = false;
+            state.internalNavigationTimer = null;
+        }, 5000);
     }
 
     function init() {
@@ -331,6 +347,8 @@
         beforeUnload: handleBeforeUnload,
         show: () => { state.dismissed = false; refresh(); },
         hide: () => { state.dismissed = true; hideBanner(); },
+        allowInternalNavigation,
+        isInternalNavigation: () => state.allowInternalNavigation,
     };
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

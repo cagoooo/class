@@ -22,6 +22,7 @@ function setup({ google = true, status = 'pending', data = { students: [{ id: 1 
         document: { readyState: 'loading', addEventListener() {} },
         setTimeout,
         setInterval,
+        clearTimeout,
         clearInterval,
     };
     context.window = context;
@@ -76,7 +77,13 @@ try {
     assert.equal(firstEdit.LeaveSyncGuard.needsReminder(), true);
     console.log('PASS 沒有同步基準但有明確異動仍顯示提醒');
 
-    console.log('9 leave-sync-guard checks passed');
+    const internalNavigation = setup();
+    internalNavigation.LeaveSyncGuard.allowInternalNavigation();
+    assert.deepEqual(beforeUnload(internalNavigation), { prevented: false, result: undefined, returnValue: undefined });
+    assert.equal(internalNavigation.LeaveSyncGuard.isInternalNavigation(), true);
+    console.log('PASS 班級內部切換 reload 不攔截瀏覽器確認');
+
+    console.log('10 leave-sync-guard checks passed');
 } catch (error) {
     console.error(error);
     process.exitCode = 1;
