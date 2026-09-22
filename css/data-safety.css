@@ -1,5 +1,6 @@
 .cloud-conflict { width:min(640px,calc(100vw - 24px)); max-height:85dvh; overflow:auto; box-sizing:border-box; padding:24px; border:1px solid #bccbd5; border-radius:16px; background:#fff; color:#172033; }
 .cloud-conflict::backdrop { background:#17203399; }
+.cloud-conflict-header { align-items:flex-start; justify-content:space-between; gap:16px; }
 .cloud-conflict h2 { font-size:1.3rem; font-weight:700; margin:0 0 12px; }
 .cloud-conflict p { line-height:1.7; margin:12px 0; overflow-wrap:anywhere; }
 .cloud-conflict > div { display:flex; flex-wrap:wrap; gap:10px; }
@@ -13,10 +14,12 @@
 .cloud-conflict button { min-height:48px; padding:10px 14px; border:1px solid #64748b; border-radius:8px; background:#eef4fa; color:#172033; font:inherit; cursor:pointer; }
 .cloud-conflict button:disabled { opacity:.45; cursor:not-allowed; }
 .cloud-conflict button.is-done { border-color:#2f9e77; background:#e7f8ef; color:#176b4c; }
+.cloud-conflict button.cloud-conflict-close { flex:0 0 auto; min-height:44px; padding:8px 14px; border-color:#94a3b8; background:#fff; font-weight:700; }
+.cloud-conflict button.cloud-conflict-close:hover { background:#eef4fa; }
 .cloud-conflict button.cloud-conflict-cancel { margin-top:16px; background:transparent; }
 .cloud-conflict label { display:flex; align-items:flex-start; gap:10px; line-height:1.6; margin-top:8px; }
 .cloud-conflict input { width:22px; height:22px; flex-shrink:0; margin-top:3px; }
 .cloud-conflict-note { min-height:1.5em; color:#176b4c; font-weight:600; }
 .cloud-conflict button:focus-visible { outline:3px solid #6366f1; outline-offset:3px; }
 .dark .cloud-conflict { background:#172033; color:#eef4fa; }
-@media(max-width:600px) { .cloud-conflict { padding:16px; } .cloud-conflict button { width:100%; } .cloud-conflict-actions { flex-direction:column; } .cloud-conflict-actions button { flex-basis:auto; } }
+@media(max-width:600px) { .cloud-conflict { padding:16px; } .cloud-conflict-header { gap:8px; } .cloud-conflict-header h2 { font-size:1.15rem; } .cloud-conflict button { width:100%; } .cloud-conflict button.cloud-conflict-close { width:auto; } .cloud-conflict-actions { flex-direction:column; } .cloud-conflict-actions button { flex-basis:auto; } }

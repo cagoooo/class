@@ -166,7 +166,11 @@
         const previewFingerprint = fingerprint(localValues);
         const checkPreview = () => { sameAccount(c); if (current() !== id || fingerprint(capture(id)) !== previewFingerprint) throw Error('班級或本機資料已改變，請關閉後重新比較'); };
         const dialog = document.createElement('dialog'); dialog.className = 'cloud-conflict';
+        const header = document.createElement('div'); header.className = 'cloud-conflict-header';
         const title = document.createElement('h2'); title.textContent = '先保留成果，再處理同步差異';
+        const dismiss = () => { dialog.close(); dialog.remove(); };
+        const closeButton = document.createElement('button'); closeButton.type = 'button'; closeButton.className = 'cloud-conflict-close'; closeButton.textContent = '關閉'; closeButton.setAttribute('aria-label', '關閉同步衝突視窗'); closeButton.title = '關閉視窗，稍後再處理'; closeButton.onclick = dismiss;
+        header.append(title, closeButton);
         const text = document.createElement('p'); text.textContent = `本機：${local.students.length} 位學生、${local.pointsHistory.length} 筆紀錄；雲端：${dataFor(remote.values).students.length} 位學生、${dataFor(remote.values).pointsHistory.length} 筆紀錄。兩邊可能有不同的獎勵或兌換，系統不會自動合併金幣。請依照下方 3 個步驟處理。`;
         const note = document.createElement('p'); note.className = 'cloud-conflict-note'; note.setAttribute('role', 'status');
         const steps = document.createElement('ol'); steps.className = 'cloud-conflict-steps';
@@ -190,8 +194,8 @@
         actions.append(keepLocal, keepCloud);
         const updateDecisions = () => { const ready = localDownloaded && cloudDownloaded && backedUp; keepLocal.disabled = !ready; keepCloud.disabled = !ready; decisionHelp.textContent = ready ? '已完成確認，請選擇要繼續使用的版本。' : '請先下載本機與雲端備份，再勾選上方確認框。'; decisionHelp.classList.toggle('is-ready', ready); };
         updateDecisions();
-        const cancel = button('稍後處理', () => { dialog.close(); dialog.remove(); }); cancel.className = 'cloud-conflict-cancel';
-        dialog.append(title, text, steps, backupTitle, backupActions, ackTitle, ack, decisionTitle, decisionHelp, actions, cancel, note); document.body.append(dialog); dialog.showModal(); dialog.addEventListener('cancel', () => dialog.remove());
+        const cancel = button('關閉，稍後處理', dismiss); cancel.className = 'cloud-conflict-cancel';
+        dialog.append(header, text, steps, backupTitle, backupActions, ackTitle, ack, decisionTitle, decisionHelp, actions, cancel, note); document.body.append(dialog); dialog.showModal(); dialog.addEventListener('cancel', () => dialog.remove());
     }
     function report(error, id, silent) {
         if (error.code === 'sync-conflict') {

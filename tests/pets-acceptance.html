@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh-TW"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>班級寵物 · 獨立驗收</title>
-<link rel="stylesheet" href="../css/class-pets.css?v=3.36.5">
+<link rel="stylesheet" href="../css/class-pets.css?v=3.36.6">
 <style>body{font:16px system-ui;margin:0;padding:16px;background:#f1f5f9;color:#172033}main{max-width:1200px;margin:auto}.hidden{display:none}.section{margin-top:16px}#test-tools{display:flex;gap:12px;flex-wrap:wrap}#test-tools button{padding:12px;font:inherit}#notice{padding:12px;background:#fff7ed}#toast{position:fixed;top:8px;right:8px;padding:12px;background:#dcfce7;z-index:100;max-width:85vw}</style>
 </head><body><main>
 <p id="notice">獨立驗收頁：48 位虛構學生。資料只保留在這個分頁的測試區，不讀取正式班級，不連線 Firebase。</p>
@@ -41,5 +41,5 @@ document.getElementById('legacy-add').onclick=()=>{ClassPets.prepare();ClassPets
 document.getElementById('reset-scores').onclick=()=>{students.forEach(s=>s.points=0);groups.forEach(g=>g.score=0);pointsHistory.unshift({id:Date.now(),type:'reset'});for(const k of ['students','groups','pointsHistory'])localStorage.setItem(k,JSON.stringify(window[k]));renderStudents();ClassPets.render();};
 renderStudents();
 </script>
-<script src="../js/class-aware-storage.js?v=3.36.5"></script><script src="../js/class-pets.js?v=3.36.5"></script>
+<script src="../js/class-aware-storage.js?v=3.36.6"></script><script src="../js/class-pets.js?v=3.36.6"></script>
 </body></html>
