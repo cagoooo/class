@@ -95,8 +95,8 @@
     async function publish(id = current(), options = {}) {
         if (navigator.onLine === false) throw Error('已存本機，恢復連線後再同步');
         const c = context(id), values = capture(id); ensure(values);
-        const remote = await read(id), known = base(c);
-        const expected = options.expectedToken ?? known?.token;
+        const remote = options.remote || await read(id), known = base(c);
+        const expected = Object.hasOwn(options, 'expectedToken') ? options.expectedToken : known?.token;
         if (!remote.empty && expected !== remote.token) throw conflict();
         const before = fingerprint(values);
         if (expected === remote.token && before === fingerprint(remote.values)) { remember(c, remote.token, values); return true; }
