@@ -183,7 +183,7 @@ function buildCard(type, data, who) {
     contentWidgets.push({
       decoratedText: {
         topLabel: '同步狀態',
-        text: clip(data.message || '另一台裝置已更新此班，已暫停上傳並保留本機資料。', 300),
+        text: clip(data.message || '雲端版本與本機資料不同，已暫停上傳並保留本機資料。', 300),
         wrapText: true,
       },
     });
@@ -319,7 +319,7 @@ function buildCard(type, data, who) {
   } else if (PET_EVENT_TYPES.has(type)) {
     notificationText += `\n${petEventSummary(type, normalizePetData(data))}`;
   } else if (type === 'sync_conflict') {
-    notificationText += `\n⚠️ 同步提醒: ${clip(data.message || '另一台裝置已更新此班，請比較後再選擇。', 150)}`;
+    notificationText += `\n⚠️ 同步提醒: ${clip(data.message || '雲端版本與本機資料不同，請比較後再選擇。', 150)}`;
   } else if (type === 'error' && data.message) {
     notificationText += `\n${data.feature === 'pet' ? '🚨 寵物錯誤' : '🐞 錯誤'}: ${clip(data.message, 150)}`;
   } else if (type === 'feature_summary' && data.stats) {

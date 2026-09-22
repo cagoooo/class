@@ -44,7 +44,7 @@
         sameAccount(c);
         localStorage.setItem(baseKey(c), JSON.stringify({ token, fingerprint: fingerprint(values), at: new Date().toISOString() }));
     }
-    function conflict(message = '另一台裝置已更新此班，已暫停上傳並保留本機資料。請比較兩份資料後再選擇。') {
+    function conflict(message = '雲端版本與本機資料不同，已暫停上傳並保留本機資料。請比較兩份資料後再選擇。') {
         const e = Error(message); e.code = 'sync-conflict'; return e;
     }
     function syncBusy() {
@@ -141,14 +141,20 @@
                 ? await read(id)
                 : (options.remote || await read(id));
             const known = base(c);
+            const before = fingerprint(values);
+            // 舊版客戶端把資料直接寫在 students/pointsHistory 等集合，尚未有
+            // syncRevision。只要本機內容與這份舊雲端快照完全相同，就能把它
+            // 安全升級成不可變快照；若內容不同，仍照原流程阻擋並要求比較。
+            const canAdoptLegacy = !remote.empty
+                && String(remote.token || '').startsWith('legacy:')
+                && before === fingerprint(remote.values);
             // 一鍵同步是在老師已確認覆蓋後執行；仍在同一個分頁鎖內
             // 重新讀取雲端，避免另一個同源分頁的舊讀取造成假衝突。
             const expected = options.allowRemoteOverwrite
                 ? (remote.empty ? undefined : remote.token)
-                : (Object.hasOwn(options, 'expectedToken') ? options.expectedToken : known?.token);
+                : (Object.hasOwn(options, 'expectedToken') ? options.expectedToken : (known?.token || (canAdoptLegacy ? remote.token : undefined)));
             if (!remote.empty && expected !== remote.token) throw conflict();
-            const before = fingerprint(values);
-            if (expected === remote.token && before === fingerprint(remote.values)) { remember(c, remote.token, values); return true; }
+            if (expected === remote.token && before === fingerprint(remote.values) && !canAdoptLegacy) { remember(c, remote.token, values); return true; }
             const token = crypto.randomUUID(), json = JSON.stringify({ schema: 1, classId: id, values });
             const parts = BackupIntegrity.split(json, 60000), count = parts.length;
             if (count > 200) throw Error('資料量超過單次同步範圍，請先匯出 Excel 保存');
@@ -255,7 +261,7 @@
         if (error?.code === 'sync-conflict') {
             try {
                 window.UsageNotify?.syncConflict?.(
-                    error?.message || '另一台裝置已更新此班，請比較兩份資料後再選擇。',
+                    error?.message || '雲端版本與本機資料不同，請比較兩份資料後再選擇。',
                     {
                         classId: id || current(),
                         context: '班級資料/雲端同步',

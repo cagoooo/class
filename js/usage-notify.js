@@ -435,7 +435,7 @@
                 petAction: details.petAction || 'cloud_sync',
                 failureStage: 'sync-conflict'
             }));
-            clean.message = String(message == null ? '另一台裝置已更新此班，請比較後再選擇。' : message).slice(0, 300);
+            clean.message = String(message == null ? '雲端版本與本機資料不同，請比較後再選擇。' : message).slice(0, 300);
             clean.context = String(details.context || '班級資料/雲端同步').slice(0, 160);
             enqueue('sync_conflict', clean);
         }

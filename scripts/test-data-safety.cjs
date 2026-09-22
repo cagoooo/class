@@ -42,6 +42,23 @@ let passed=0;async function test(name,fn){await fn();console.log('PASS',name);pa
  await test('舊 Excel CHUNKS 保持相容但缺段仍阻擋',async()=>{const a=setup(),d=a.c.DataBackup.collectData();const rows=[['note'],['CHUNKS',1],['DATA',JSON.stringify(d)]];assert.equal(a.c.BackupIntegrity.decode(rows).students[0].classPet,'unicorn');rows[1][1]=2;assert.throws(()=>a.c.BackupIntegrity.decode(rows));});
  await test('格式驗證攔截空殼、重複 ID 與錯誤金幣型別',async()=>{const a=setup();for(const bad of [null,{version:'1.1'}, {version:'1.1',students:[],groups:[],pointsHistory:[{id:1,coinDelta:'10'}]}])assert.equal(a.c.BackupIntegrity.validate(bad),false);const d=a.c.DataBackup.collectData();d.students.push({...d.students[0]});assert.equal(a.c.BackupIntegrity.validate(d),false);});
  await test('自動同步只處理有異動的班級，其他班級基準不清除',async()=>{const a=setup();a.storage.setItem('classProfiles',JSON.stringify([{id:'A',name:'甲班'},{id:'B',name:'乙班'}]));await a.s.publish();assert.equal(await a.c.FirebaseSync.syncPendingClasses(),true);assert.equal(a.s.status(),'synced');});
+ await test('內容相同的舊雲端資料會安全升級成新快照',async()=>{const a=setup();
+  // 模擬 v3.37.6 前的集合式雲端資料：沒有 syncRevision，只有舊集合與 pets 設定。
+  a.c.students[0].id='1';
+  a.save();
+  for(const key of ['notebookEntries','homeworkList','lotteryHistory','classAnnouncements'])a.c.ClassAwareStorage.rawSet(key+'-A','[]');
+  const data=a.s.dataFor(a.s.capture());
+  a.db.data.clear();
+  const prefix='users/teacher/classes/A';
+  for(const row of data.students){const {id,...item}=row;a.db.data.set(`${prefix}/students/${id}`,item);}
+  for(const row of data.pointsHistory){const {id,...item}=row;a.db.data.set(`${prefix}/pointsHistory/${id}`,item);}
+  a.db.data.set(`${prefix}/appSettings/pets`,{data:data.petSettings});
+  await a.s.publish();
+  const remote=await a.s.read();
+  assert.equal(remote.empty,false);
+  assert.ok(remote.token.length>=8 && !remote.token.startsWith('legacy:'));
+  assert.equal(a.db.data.has(`${prefix}/appSettings/syncRevision`),true);
+ });
  await test('從其他班還原預設班不污染目前班級設定',async()=>{const a=setup();const original=a.storage.getItem('petSettings');a.c.ClassAwareStorage.rawSet('students',JSON.stringify([{id:9,name:'預設學生',points:1}]));a.c.ClassAwareStorage.rawSet('groups','[]');a.c.ClassAwareStorage.rawSet('pointsHistory','[]');a.c.ClassAwareStorage.rawSet('petSettings',JSON.stringify({enabled:false,rules:[]}));await a.s.publish('default');const r=await a.s.read('default');a.c.ClassAwareStorage.rawSet('petSettings',JSON.stringify({enabled:true,rules:[]}));assert.equal(await a.s.restore(r),true);assert.equal(a.storage.getItem('petSettings'),original);assert.equal(JSON.parse(a.c.ClassAwareStorage.rawGet('petSettings')).enabled,false);assert.equal(a.c.students[0].id,1);});
  console.log(passed+' safety checks passed');
 })().catch(e=>{console.error(e);process.exitCode=1;});
