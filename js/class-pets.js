@@ -765,7 +765,13 @@
         const section = el('section', undefined, 'section hidden'); section.id = 'pets-section'; document.getElementById('grouping-section')?.after(section);
         const entry = button('🐾 寵物成長／批次獎勵', () => { window.UsageNotify?.feature?.('pets'); render(); window.showSection('pets'); }, 'pet-nav'); document.getElementById('pointsHistory')?.before(entry);
         // 同頁正常操作也會改動共用資料；獎勵操作開始時仍檢查其他分頁造成的衝突。
-        document.addEventListener('click', e => { if (!busy && !e.target.closest('#pets-section') && !e.target.closest('#points-section')) prepare(); });
+        document.addEventListener('click', e => {
+            // 班級選單、導航等頁面操作只需要刷新防覆蓋快照，
+            // 不應因為點一下畫面就把圖鑑快取寫回並製造同步異動。
+            if (!busy && !e.target.closest('#pets-section') && !e.target.closest('#points-section')) {
+                prepare({ persistCollection: false });
+            }
+        });
         window.addEventListener('storage', () => { /* 保留快照，下一次操作會阻擋過期分頁。 */ });
         render();
         if (location.hash === '#pets') window.showSection('pets');
