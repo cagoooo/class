@@ -242,5 +242,23 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
     await test('各班圖鑑獨立；舊版已孵化自動收錄且不暴露未孵化預選',async()=>{
         const {pet,ctx,storage,persist}=setup('A');ctx.students[0].classPet='unicorn';ctx.students[0].classPetRevealed=true;ctx.students[1].classPet='dragon';persist();pet.prepare();assert.ok(pet.settings().collection.unicorn);assert.equal(pet.collectionFor().dragon,undefined);storage.setItem('currentClassId','B');assert.equal(pet.settings().collection,undefined);
     });
+    await test('圖鑑進化階段依班級實際最高等級逐步解鎖',async()=>{
+        const {pet,ctx}=setup(); await pet.award([1],10,'孵化');
+        const kind=ctx.students[0].classPet;
+        assert.equal(pet.collectionFor()[kind].maxLevel,1);
+        assert.equal(JSON.stringify(pet.collectionStagesFor(kind).map(v=>v.unlocked)),JSON.stringify([true,false,false]));
+        await pet.award([1],40,'成長');
+        assert.equal(pet.collectionFor()[kind].maxLevel,3);
+        assert.equal(JSON.stringify(pet.collectionStagesFor(kind).map(v=>v.unlocked)),JSON.stringify([true,true,false]));
+        await pet.award([1],40,'成熟');
+        assert.equal(pet.collectionFor()[kind].maxLevel,5);
+        assert.equal(JSON.stringify(pet.collectionStagesFor(kind).map(v=>v.unlocked)),JSON.stringify([true,true,true]));
+    });
+    await test('進化階段解鎖紀錄不因扣分或學生離班消失',async()=>{
+        const {pet,ctx,persist}=setup(); await pet.award([1],50,'成長');
+        const kind=ctx.students[0].classPet; assert.equal(pet.collectionFor()[kind].maxLevel,3);
+        await pet.award([1],-100,'提醒'); assert.equal(pet.collectionFor()[kind].maxLevel,3);
+        ctx.students=[]; persist(); pet.prepare(); assert.equal(pet.collectionFor()[kind].maxLevel,3);
+    });
     console.log(`${passed} checks passed`);
 })().catch(e=>{console.error(e);process.exitCode=1;});

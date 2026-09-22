@@ -165,6 +165,11 @@
         const from = stage(before).level, to = stage(after).level;
         return to > from ? { type: from === 0 ? 'hatch' : 'level', level: to } : null;
     }
+    const COLLECTION_VARIANTS = [
+        { xp: 10, level: 1 },
+        { xp: 50, level: 3 },
+        { xp: 90, level: 5 },
+    ];
     // 固定向量圖形與白名單色彩；不將學生姓名或輸入文字插入 SVG。
     function vectorPortrait(kind, xp) {
         kind = pets[kind] ? kind : 'cat';
@@ -226,14 +231,28 @@
     function collectionFor(roster = window.students || [], history = window.pointsHistory || [], config = settings()) {
         const found = {};
         for (const kind of Object.keys(pets)) {
-            if (config.collection?.[kind]) found[kind] = { discoveredAt: config.collection[kind].discoveredAt || null };
+            if (config.collection?.[kind]) {
+                const saved = config.collection[kind];
+                // 舊版只記錄種類，視為至少解鎖孵化後的 Lv.1；之後的階段必須
+                // 由班級中實際達成過的寵物等級逐步留下紀錄。
+                found[kind] = {
+                    discoveredAt: saved.discoveredAt || null,
+                    maxLevel: Math.max(1, Number(saved.maxLevel) || 0),
+                };
+            }
         }
         for (const student of roster) {
-            if (!student.classPetRevealed && xpFor(student.id, history, Number(student.petCarryXp) || 0) < 10) continue;
+            const xp = xpFor(student.id, history, Number(student.petCarryXp) || 0);
+            if (!student.classPetRevealed && xp < 10) continue;
             const kind = Object.hasOwn(pets, student.classPet) ? student.classPet : 'cat';
-            if (!found[kind]) found[kind] = { discoveredAt: new Date().toISOString() };
+            if (!found[kind]) found[kind] = { discoveredAt: new Date().toISOString(), maxLevel: 0 };
+            found[kind].maxLevel = Math.max(found[kind].maxLevel || 0, stage(xp).level, 1);
         }
         return Object.fromEntries(Object.keys(pets).filter(kind => found[kind]).map(kind => [kind, found[kind]]));
+    }
+    function collectionStagesFor(kind, collection = collectionFor()) {
+        const maxLevel = Math.max(0, Number(collection[kind]?.maxLevel) || 0);
+        return COLLECTION_VARIANTS.map(variant => ({ ...variant, unlocked: maxLevel >= variant.level }));
     }
     function preserveCollection() {
         const config = settings(), collection = collectionFor();
@@ -261,15 +280,22 @@
             tile.setAttribute('aria-label', `查看已解鎖圖鑑：${name}`);
             tile.append(el('small', `No.${number}`), portrait(kind, 10), el('strong', name)); grid.append(tile);
         });
-        const intro = el('p', count === Object.keys(pets).length ? '全圖鑑收集完成！這是全班一起累積的成果。' : '任一位同學孵化成功，全班就解鎖一格！未發現的寵物保留神祕，等下一顆蛋揭曉。');
+        const intro = el('p', count === Object.keys(pets).length ? '全圖鑑收集完成！這是全班一起累積的成果。' : '任一位同學孵化成功，全班就解鎖一格！未發現的寵物保留神祕，等下一顆蛋揭曉；進化階段則要由班級實際達成後才會揭開。');
         function showGrid() { content.replaceChildren(progress, bar, intro, grid); }
         function showDetail(kind, number) {
             const holders = (window.students || []).filter(s => s.classPet === kind && (s.classPetRevealed || xpFor(s.id) >= 10)).length;
             const variants = el('div', undefined, 'pet-collection-variants');
-            for (const xp of [10, 50, 90]) { const figure = el('figure'); figure.append(interactivePortrait(kind, xp), el('figcaption', `${appearance(xp).label}・${stage(xp).label}`)); variants.append(figure); }
+            const unlocked = collectionStagesFor(kind, found);
+            unlocked.forEach(({ xp, level, unlocked: isUnlocked }) => {
+                const figure = el('figure', undefined, isUnlocked ? '' : 'pet-collection-stage-locked');
+                if (isUnlocked) figure.append(interactivePortrait(kind, xp), el('figcaption', `${appearance(xp).label}・Lv.${level}`));
+                else figure.append(el('div', '？', 'pet-collection-stage-mask'), el('figcaption', `Lv.${level}・達成後解鎖`));
+                variants.append(figure);
+            });
             const moodsRow = el('div', undefined, 'pet-collection-variants');
             for (const [mood, label] of Object.entries(moods)) { const figure = el('figure'); figure.append(interactivePortrait(kind, 10, mood), el('figcaption', label)); moodsRow.append(figure); }
-            content.replaceChildren(button('← 返回收集進度', showGrid), el('h3', `No.${number} ${pets[kind][1]}`), el('p', `全班已解鎖・目前 ${holders} 位同學擁有。已解鎖紀錄不因扣分或學生離班而消失。`), variants, el('h3', '表情樣態'), moodsRow);
+            const maxLevel = Math.max(...unlocked.filter(v => v.unlocked).map(v => v.level), 1);
+            content.replaceChildren(button('← 返回收集進度', showGrid), el('h3', `No.${number} ${pets[kind][1]}`), el('p', `全班已解鎖・目前 ${holders} 位同學擁有；最高已達 Lv.${maxLevel}。已解鎖紀錄不因扣分或學生離班而消失。`), variants, el('h3', '表情樣態（孵化後可查看）'), moodsRow);
             content.querySelector('button').focus();
         }
         showGrid(); dialog.append(header, content); document.body.append(dialog);
@@ -568,7 +594,7 @@
         const guide = el('details', undefined, 'pet-guide'); guide.dataset.petKey = 'guide';
         guide.append(el('summary', '成長指南與同步說明'));
         guide.append(el('p', '10 成長值孵化，每增加 20 成長值升一級。Lv.1 幼年 → Lv.3 成長 → Lv.5 成熟。分數歸零不影響成長；撤銷誤加獎勵會回復成長。'));
-        guide.append(el('p', `${Object.keys(pets).length} 種寵物藏在神祕蛋中，孵化才揭曉種類；各有幼年、成長、成熟造型。孵化後可選精神飽滿、開心歡呼或安心休息樣態。蛋會隨成長值變化：0–2 安靜孵育、3–5 出現裂紋、6–8 裂縫擴大、9 即將破殼。首次達到 10 才隨機揭曉，抽出後固定保留，撤銷再加分不重抽。表情只改外觀，不影響分數、成長或金幣。`));
+        guide.append(el('p', `${Object.keys(pets).length} 種寵物藏在神祕蛋中，孵化才揭曉種類；各有幼年、成長、成熟造型，圖鑑只會顯示班級中實際達成過的進化階段，未達成的階段會保持神秘。孵化後可選精神飽滿、開心歡呼或安心休息樣態。蛋會隨成長值變化：0–2 安靜孵育、3–5 出現裂紋、6–8 裂縫擴大、9 即將破殼。首次達到 10 才隨機揭曉，抽出後固定保留，撤銷再加分不重抽。表情只改外觀，不影響分數、成長或金幣。`));
         guide.append(el('p', '資料先存在本機，登入後沿用雲端同步。換裝置前請完成同步，同一班請避免兩台裝置同時加分。'));
         guide.append(el('p', '通知會留在使用紀錄：孵化、升級、撤銷、商店兌換／退幣與設定變更即時送 webhook；一般獎勵併入每日戰報。寵物資料儲存、同步或設定失敗會標示為寵物系統錯誤並通知。'));
         root.append(guide);
@@ -721,6 +747,6 @@
         render();
         if (location.hash === '#pets') window.showSection('pets');
     }
-    window.ClassPets = { award, undo, xpFor, coinsFor, setCoinsEnabled, saveRule, saveProduct, setProductActive, redeem, refund, setPetMood, assetName, stage, appearance, milestone, render, prepare, settings, collectionFor };
+    window.ClassPets = { award, undo, xpFor, coinsFor, setCoinsEnabled, saveRule, saveProduct, setProductActive, redeem, refund, setPetMood, assetName, stage, appearance, milestone, render, prepare, settings, collectionFor, collectionStagesFor };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

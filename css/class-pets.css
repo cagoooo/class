@@ -126,11 +126,13 @@
 .pet-collection-unlocked,.pet-collection-locked { display:flex; flex-direction:column; align-items:center; justify-content:center; min-width:0; min-height:160px; padding:10px; border-radius:10px; }
 .pet-collection-locked { border:1px dashed #bac9d4; background:#f1f5f9; color:#64748b; }
 .pet-collection-locked span { font-size:48px; line-height:1.8; }
+.pet-collection-stage-locked { display:flex; flex-direction:column; align-items:center; justify-content:center; min-width:0; min-height:160px; padding:10px; border:1px dashed #bac9d4; border-radius:10px; background:linear-gradient(145deg,#f8fafc,#e2e8f0); color:#64748b; }
+.pet-collection-stage-mask { display:grid; place-items:center; width:100%; max-width:160px; aspect-ratio:8/9; border-radius:12px; background:radial-gradient(circle at 50% 35%,#fff 0 8%,#cbd5e1 9% 12%,#94a3b8 13% 100%); color:#fff; font-size:54px; font-weight:800; text-shadow:0 2px 4px #33415588; }
 .pet-collection .pet-portrait { width:100%; max-width:160px; height:auto; aspect-ratio:8/9; object-fit:contain; }
 .pet-collection-variants { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; text-align:center; }
 .pet-collection figure { margin:0; min-width:0; }
 .dark .pet-collection { background:#172033; color:#f1f5f9; }
-.dark .pet-collection button,.dark .pet-collection-locked { background:#243247; color:#e2e8f0; }
+.dark .pet-collection button,.dark .pet-collection-locked,.dark .pet-collection-stage-locked { background:#243247; color:#e2e8f0; }
 @media(max-width:800px) { .pet-collection-grid { grid-template-columns:repeat(4,minmax(0,1fr)); } }
 @media(max-width:500px) { .pet-collection-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .pet-collection-variants { gap:6px; font-size:14px; } .pet-collection header { padding:12px; } .pet-collection header button { flex-shrink:0; } }
 
