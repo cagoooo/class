@@ -650,9 +650,10 @@ async function syncAllClassesToCloud(onProgress) {
                 results.push({ name: cls.name, status: 'ok', count });
                 onProgress?.(i + 1, all.length, cls.name, 'ok', count);
             } catch (error) {
+                console.error(`[AllSync] ${cls.id}（${cls.name}）同步失敗:`, error);
                 await CloudSafety.report(error, String(cls.id), true);
                 results.push({ name: cls.name, status: 'fail', error: error.message });
-                onProgress?.(i + 1, all.length, cls.name, 'fail');
+                onProgress?.(i + 1, all.length, cls.name, 'fail', 0, error.message);
             }
         }
         await uploadClassProfilesMerged();
@@ -744,7 +745,7 @@ async function showAllClassSyncModal() {
     document.body.appendChild(wrap);
 
     // 更新進度的回呼
-    const onProgress = (done, total, name, status, count) => {
+    const onProgress = (done, total, name, status, count, errorMessage) => {
         const bar = document.getElementById('acsm-bar');
         const label = document.getElementById('acsm-label');
         const counter = document.getElementById('acsm-counter');
@@ -771,7 +772,7 @@ async function showAllClassSyncModal() {
             const icon = document.getElementById(`acsm-icon-${rowIdx}`);
             const info = document.getElementById(`acsm-info-${rowIdx}`);
             if (icon) icon.textContent = '❌';
-            if (info) { info.textContent = '失敗'; info.style.color = '#ef4444'; }
+            if (info) { info.textContent = errorMessage ? `失敗：${String(errorMessage).slice(0, 42)}` : '失敗'; info.style.color = '#ef4444'; info.title = errorMessage || '同步失敗'; }
         }
     };
 
