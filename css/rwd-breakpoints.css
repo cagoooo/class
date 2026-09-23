@@ -3,6 +3,18 @@
  * P0 優化：響應式設計斷點補強
  */
 
+/* 保留原本版面高度，捲動時仍可操作班級、帳號與時鐘；低於對話框層級。 */
+#app-header {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    padding-top: env(safe-area-inset-top, 0px);
+}
+
+@media print {
+    #app-header { position: static; }
+}
+
 /* === 小螢幕手機 (360px 以下) === */
 @media (max-width: 360px) {
 
