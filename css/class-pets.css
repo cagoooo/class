@@ -94,6 +94,21 @@
 .pet-shop-controls select,.pet-product-editor input { width:100%; min-width:0; box-sizing:border-box; }
 .pet-product-editor>strong { grid-column:1/-1; }
 .pet-shop-sync { font-size:14px; overflow-wrap:anywhere; }
+.pet-shop-wallet { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px 16px; background:#fff5d8; color:#735011; border-radius:12px; }
+.pet-shop-wallet strong { font-size:24px; white-space:nowrap; }
+.pet-shop-catalog,.pet-shop-checkout,.pet-shop-receipt { grid-column:1/-1; min-width:0; }
+.pet-reward-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr)); gap:12px; }
+#pets-section .pet-reward-option { display:flex; flex-direction:column; align-items:flex-start; gap:8px; text-align:left; padding:16px; border:2px solid #cbd5e1; border-radius:12px; background:#fff; color:#334155; white-space:normal; overflow-wrap:anywhere; }
+#pets-section .pet-reward-option[aria-pressed="true"] { border-color:#2563eb; background:#eff6ff; color:#1e40af; }
+.pet-reward-affordable { color:#047857; font-weight:600; }
+.pet-shop-checkout { padding:16px; background:#f1f5f9; border-radius:12px; overflow-wrap:anywhere; }
+#pets-section .pet-shop-checkout button { width:100%; min-height:48px; white-space:normal; }
+.pet-shop-receipt { margin:0; padding:16px; background:#ecfdf5; color:#065f46; border:1px solid #6ee7b7; border-radius:12px; }
+.dark .pet-shop-wallet { background:#3c321f; color:#ffe3a6; }
+.dark #pets-section .pet-reward-option,.dark .pet-shop-checkout { background:#1e293b; color:#e2e8f0; border-color:#64748b; }
+.dark #pets-section .pet-reward-option[aria-pressed="true"] { background:#172554; color:#bfdbfe; border-color:#60a5fa; }
+.dark .pet-reward-affordable { color:#6ee7b7; }
+.dark .pet-shop-receipt { background:#064e3b; color:#d1fae5; }
 .pet-preset-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr)); gap:12px; margin:12px 0; }
 .pet-preset-card { display:flex; flex-direction:column; gap:8px; padding:16px; border:1px solid #cbd5e1; border-radius:12px; background:#f8fafc; min-width:0; overflow-wrap:anywhere; }
 .pet-preset-card button { margin-top:auto; min-height:44px; white-space:normal; }

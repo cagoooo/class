@@ -89,6 +89,7 @@
     let selectedRule = '';
     let editingRuleId = null;
     let shopStudent = '', shopProduct = '', editingProduct = null, shopPage = 0;
+    let shopReceipt = '';
     let productDraft = { name: '', cost: '10' };
     const PRODUCT_PRESETS = [
         { id: 'sticker', name: '獎勵貼紙一張', cost: 10, icon: '⭐', category: '小禮物' },
@@ -537,7 +538,7 @@
         }, 'shop_refund');
     }
     function openStudentShop(studentId) {
-        shopStudent = String(studentId); shopProduct = ''; shopPage = 0;
+        shopStudent = String(studentId); shopProduct = ''; shopPage = 0; shopReceipt = '';
         render();
         const shop = document.querySelector('.pet-shop');
         if (!shop) return;
@@ -573,21 +574,42 @@
         if (!(config.products || []).some(p => p.active)) shop.append(el('p', '本班尚無上架商品。先從預設獎勵庫挑選，或展開「管理商品」新增自己的獎勵。', 'pet-shop-empty'));
         const students = el('select'); students.setAttribute('aria-label', '兌換學生'); students.add(new Option('請選擇學生…', ''));
         window.students.forEach(s => students.add(new Option(`${s.number || ''} ${s.name} · 金幣 ${coinsFor(s.id)}`, String(s.id)))); students.value = shopStudent;
-        students.addEventListener('change', () => { shopStudent = students.value; shopPage = 0; render(); });
-        const products = el('select'); products.setAttribute('aria-label', '兌換商品'); products.add(new Option('請選擇商品…', ''));
-        (config.products || []).filter(p => p.active).forEach(p => products.add(new Option(`${p.name} · ${p.cost} 金幣`, p.id))); products.value = shopProduct;
-        products.addEventListener('change', () => { shopProduct = products.value; render(); });
+        students.dataset.petFocus = 'shop-student';
+        students.addEventListener('change', () => { shopStudent = students.value; shopProduct = ''; shopReceipt = ''; shopPage = 0; render(); });
         const product = (config.products || []).find(p => p.id === shopProduct && p.active);
         const student = window.students.find(s => String(s.id) === shopStudent);
         const balance = student ? coinsFor(student.id) : 0;
+        const wallet = el('div', undefined, 'pet-shop-wallet');
+        wallet.append(el('span', student ? `${student.name}的可用金幣` : '先選擇要兌換的學生'), el('strong', student ? `🪙 ${balance}` : '🪙 —'));
+        const products = el('div', undefined, 'pet-reward-grid'); products.setAttribute('role', 'group'); products.setAttribute('aria-label', '選擇兌換獎勵');
+        (config.products || []).filter(p => p.active).forEach(p => {
+            const chosen = shopProduct === p.id;
+            const reward = button('', () => { shopProduct = p.id; shopReceipt = ''; render(); }, 'pet-reward-option');
+            reward.dataset.petFocus = 'shop-product-' + p.id;
+            reward.setAttribute('aria-pressed', String(chosen));
+            reward.setAttribute('aria-label', `選擇${p.name}，${p.cost}金幣`);
+            reward.append(el('strong', `${chosen ? '✓ ' : ''}${p.name}`), el('span', `🪙 ${p.cost} 金幣`),
+                el('small', !student ? '選學生後查看是否足夠' : balance < p.cost ? `還差 ${p.cost - balance} 金幣` : '可兌換', balance >= p.cost && student ? 'pet-reward-affordable' : ''));
+            products.append(reward);
+        });
         const preview = el('p', !student ? '先選學生，即可查看金幣餘額與兌換紀錄。' : !product ? `可用金幣 ${balance}，請選擇商品。` : balance < product.cost ? `可用金幣 ${balance}，還差 ${product.cost - balance} 金幣。` : `可用金幣 ${balance} → 兌換後 ${balance - product.cost}`);
-        const buy = button('確認兌換', async () => {
+        preview.setAttribute('role', 'status');
+        const buy = button(!student ? '請先選學生' : !product ? '請點選獎勵' : balance < product.cost ? `還差 ${product.cost - balance} 金幣` : `兌換「${product.name}」`, async () => {
             if (!student || !product || !await confirmAction(`${student.name} 兌換「${product.name}」？\n扣除 ${product.cost} 金幣，餘額 ${balance - product.cost}。分數與成長值不變。`)) return;
-            if (await redeem(student.id, product.id, product.cost)) window.NotificationSystem?.success?.('兌換已存本機');
+            if (await redeem(student.id, product.id, product.cost)) {
+                shopProduct = '';
+                shopReceipt = `✓ ${student.name}已兌換「${product.name}」，扣除 ${product.cost} 金幣，剩餘 ${coinsFor(student.id)}。請老師交付獎勵；需要取消可到下方紀錄退幣。`;
+                render(); window.NotificationSystem?.success?.('兌換已存本機');
+            }
         }, 'pet-primary'); buy.disabled = !student || !product || balance < product.cost || busy;
-        const studentLabel = el('label', '① 選擇學生'), productLabel = el('label', '② 選擇兌換獎勵');
-        studentLabel.append(students); productLabel.append(products);
-        const controls = el('div', undefined, 'pet-shop-controls'); controls.append(studentLabel, productLabel, preview, buy); shop.append(controls, library);
+        const studentLabel = el('label', '① 選擇學生'); studentLabel.append(students);
+        const controls = el('div', undefined, 'pet-shop-controls'); controls.append(studentLabel, wallet);
+        const catalog = el('div', undefined, 'pet-shop-catalog'); catalog.append(el('h3', '② 點選想兌換的獎勵'), products);
+        const checkout = el('div', undefined, 'pet-shop-checkout');
+        checkout.append(el('strong', product ? `${student?.name || '尚未選學生'} · ${product.name}` : '③ 確認兌換'), preview, buy);
+        controls.append(catalog, checkout);
+        if (shopReceipt) { const receipt = el('p', shopReceipt, 'pet-shop-receipt'); receipt.setAttribute('role', 'status'); controls.append(receipt); }
+        shop.append(controls, library);
         const manage = el('details'); manage.dataset.petKey = 'products'; manage.append(el('summary', `管理商品（${(config.products || []).length} 項・自訂新增／編輯／上下架）`));
         const form = el('form', undefined, 'pet-product-editor');
         form.append(el('strong', editingProduct ? '編輯商品' : '新增商品'));
@@ -611,7 +633,7 @@
             const returned = window.pointsHistory.some(x => x.petReverses === r.id);
             const row = el('div', undefined, 'pet-history');
             row.append(el('strong', `${r.studentName} · ${r.productName}`), el('span', `${r.petShopType === 'refund' ? '退幣 +' : '兌換 -'}${r.productCost} 金幣`), el('small', r.timestamp));
-            if (r.petShopType === 'redeem' && !returned) row.append(button('退回金幣', async () => { if (await confirmAction(`取消 ${r.studentName} 的「${r.productName}」兌換，退回 ${r.productCost} 金幣？`)) { if (await refund(r.id)) window.NotificationSystem?.success?.('退幣已存本機'); } }));
+            if (r.petShopType === 'redeem' && !returned) row.append(button('退回金幣', async () => { if (await confirmAction(`取消 ${r.studentName} 的「${r.productName}」兌換，退回 ${r.productCost} 金幣？`)) { if (await refund(r.id)) { shopReceipt = ''; render(); window.NotificationSystem?.success?.('退幣已存本機'); } } }));
             else if (returned) row.append(el('span', '已退幣'));
             shop.append(row);
         });
