@@ -536,9 +536,20 @@
             return ok;
         }, 'shop_refund');
     }
+    function openStudentShop(studentId) {
+        shopStudent = String(studentId); shopProduct = ''; shopPage = 0;
+        render();
+        const shop = document.querySelector('.pet-shop');
+        if (!shop) return;
+        shop.open = true;
+        shop.querySelector('[aria-label="兌換學生"]')?.focus({ preventScroll: true });
+        const headerHeight = document.getElementById('app-header')?.offsetHeight || 0;
+        window.scrollTo({ top: Math.max(0, shop.getBoundingClientRect().top + window.scrollY - headerHeight - 16),
+            behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+    }
     function renderShop(root, config) {
         const shop = el('details', undefined, 'pet-shop'); shop.dataset.petKey = 'shop'; shop.append(el('summary', '🛍️ 兌換商店與退幣'));
-        shop.append(el('p', '老師代為兌換，每次一位學生、一件商品。只扣金幣，不扣分數或成長值。獎勵由老師安排交付；退幣會保留原始紀錄。'));
+        shop.append(el('p', '① 選學生 → ② 選獎勵 → ③ 確認兌換。每次兌換一件，只扣金幣，不扣分數或成長值；獎勵由老師交付。'));
         const account = window.FirebaseConfig?.getCurrentProfile?.();
         shop.append(el('p', window.FirebaseConfig?.isGoogleUser?.() ? `雲端歸屬：${account?.email || account?.displayName || '目前登入的 Google 帳號'}。商品與紀錄沿用本班雲端同步，換裝置前請確認同步成功。` : '目前先存本機。登入老師自己的 Google 帳號後，商品與紀錄會隨本班資料同步。', 'pet-shop-sync'));
         const library = el('details', undefined, 'pet-shop-library'); library.dataset.petKey = 'shop-presets';
@@ -558,7 +569,7 @@
             card.append(el('small', `${p.icon} ${p.category}`), el('strong', p.name), el('span', `建議 ${p.cost} 金幣`), add);
             presetGrid.append(card);
         });
-        library.append(presetGrid); shop.append(library);
+        library.append(presetGrid);
         if (!(config.products || []).some(p => p.active)) shop.append(el('p', '本班尚無上架商品。先從預設獎勵庫挑選，或展開「管理商品」新增自己的獎勵。', 'pet-shop-empty'));
         const students = el('select'); students.setAttribute('aria-label', '兌換學生'); students.add(new Option('請選擇學生…', ''));
         window.students.forEach(s => students.add(new Option(`${s.number || ''} ${s.name} · 金幣 ${coinsFor(s.id)}`, String(s.id)))); students.value = shopStudent;
@@ -574,7 +585,9 @@
             if (!student || !product || !await confirmAction(`${student.name} 兌換「${product.name}」？\n扣除 ${product.cost} 金幣，餘額 ${balance - product.cost}。分數與成長值不變。`)) return;
             if (await redeem(student.id, product.id, product.cost)) window.NotificationSystem?.success?.('兌換已存本機');
         }, 'pet-primary'); buy.disabled = !student || !product || balance < product.cost || busy;
-        const controls = el('div', undefined, 'pet-shop-controls'); controls.append(students, products, preview, buy); shop.append(controls);
+        const studentLabel = el('label', '① 選擇學生'), productLabel = el('label', '② 選擇兌換獎勵');
+        studentLabel.append(students); productLabel.append(products);
+        const controls = el('div', undefined, 'pet-shop-controls'); controls.append(studentLabel, productLabel, preview, buy); shop.append(controls, library);
         const manage = el('details'); manage.dataset.petKey = 'products'; manage.append(el('summary', `管理商品（${(config.products || []).length} 項・自訂新增／編輯／上下架）`));
         const form = el('form', undefined, 'pet-product-editor');
         form.append(el('strong', editingProduct ? '編輯商品' : '新增商品'));
@@ -702,7 +715,9 @@
                 card.append(label, avatar, el('strong', `${xp < 10 ? '神祕寵物蛋' : pets[kind][1]} · ${appearance(xp).label}${growth.level ? ' · ' + growth.label : ''}`, 'pet-stage-label'));
                 const progress = el('progress'); progress.max = growth.next - growth.start; progress.value = xp - growth.start; progress.setAttribute('aria-label', `${s.name}成長進度`);
                 card.append(progress, el('p', `成長值 ${xp} · 距離${growth.level ? '升級' : '孵化'}還有 ${growth.next - xp}`));
-                card.append(el('span', `🪙 金幣 ${coinsFor(s.id)}`, 'pet-coin-balance'));
+                const exchange = button(`🪙 金幣 ${coinsFor(s.id)} · 兌換 →`, () => openStudentShop(s.id), 'pet-coin-balance');
+                exchange.setAttribute('aria-label', `${s.name}，金幣 ${coinsFor(s.id)}，前往兌換獎勵`);
+                card.append(exchange);
                 const options = el('details', undefined, 'pet-card-options'); options.dataset.petKey = 'options-' + s.id; options.append(el('summary', '寵物表情'));
                 const mood = el('select'); mood.setAttribute('aria-label', `${s.name}的表情樣態`);
                 Object.entries(moods).forEach(([key, label]) => mood.add(new Option(label, key))); mood.value = s.classPetMood || 'normal';

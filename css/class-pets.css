@@ -78,6 +78,9 @@
 #pets-section .pet-wallet-status summary { font-size:14px; padding:4px 0; min-height:44px; }
 .pet-coin-balance { align-self:flex-start; font-weight:700; color:#735011; background:#fff5d8; border-radius:8px; padding:4px 10px; font-size:14px; }
 .pet-compact .pet-coin-balance { grid-column:2; justify-self:start; }
+#pets-section button.pet-coin-balance { min-height:44px; padding:8px 12px; border:1px solid #c99939; color:#735011; background:#fff5d8; white-space:normal; }
+#pets-section button.pet-coin-balance:hover { background:#ffedb5; }
+.pet-shop-controls label { display:flex; flex-direction:column; gap:8px; min-width:0; font-weight:600; }
 .pet-rule-editor { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; padding:16px; border:1px solid #cbd5e1; border-radius:12px; }
 .pet-rule-editor>strong,.pet-rule-editor>input,.pet-rule-editor>.pet-tools { grid-column:1/-1; }
 .pet-rule-editor label { display:flex; flex-direction:column; gap:6px; min-width:0; }
