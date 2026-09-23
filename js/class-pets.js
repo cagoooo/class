@@ -90,6 +90,16 @@
     let editingRuleId = null;
     let shopStudent = '', shopProduct = '', editingProduct = null, shopPage = 0;
     let productDraft = { name: '', cost: '10' };
+    const PRODUCT_PRESETS = [
+        { id: 'sticker', name: '獎勵貼紙一張', cost: 10, icon: '⭐', category: '小禮物' },
+        { id: 'bookmark', name: '精美書籤一張', cost: 20, icon: '🔖', category: '小禮物' },
+        { id: 'reading', name: '優先挑選班級閱讀書籍', cost: 15, icon: '📚', category: '閱讀時光' },
+        { id: 'story', name: '推薦一本故事給全班', cost: 20, icon: '📖', category: '閱讀時光' },
+        { id: 'helper', name: '擔任一日小助手', cost: 25, icon: '🙋', category: '課堂角色' },
+        { id: 'leader', name: '擔任一次活動主持人', cost: 30, icon: '🎤', category: '課堂角色' },
+        { id: 'art', name: '作品展示一週', cost: 30, icon: '🎨', category: '分享舞台' },
+        { id: 'sharing', name: '課堂才藝分享五分鐘', cost: 40, icon: '🌟', category: '分享舞台' }
+    ];
     const blankRule = () => ({ name: '', points: '2', xp: '2', coins: '2' });
     let ruleDraft = blankRule();
     let onlySelected = false;
@@ -482,6 +492,14 @@
         return saveSettings({ ...config, products: id ? products.map(p => p.id === id ? product : p) : [...products, product] },
             { action: id ? '更新商店商品' : '新增商店商品', productName: name, cost });
     }
+    function addPresetProduct(presetId) {
+        const preset = PRODUCT_PRESETS.find(p => p.id === presetId);
+        if (!preset) return Promise.resolve(fail('找不到這個預設獎勵。'));
+        if ((settings().products || []).some(p => p.name === preset.name)) {
+            return Promise.resolve(fail('本班已有同名商品，請到管理商品編輯或重新上架。'));
+        }
+        return saveProduct({ name: preset.name, cost: preset.cost });
+    }
     function setProductActive(id, active) {
         const config = settings();
         return saveSettings({ ...config, products: (config.products || []).map(p => p.id === id ? { ...p, active: !!active } : p) },
@@ -523,6 +541,25 @@
         shop.append(el('p', '老師代為兌換，每次一位學生、一件商品。只扣金幣，不扣分數或成長值。獎勵由老師安排交付；退幣會保留原始紀錄。'));
         const account = window.FirebaseConfig?.getCurrentProfile?.();
         shop.append(el('p', window.FirebaseConfig?.isGoogleUser?.() ? `雲端歸屬：${account?.email || account?.displayName || '目前登入的 Google 帳號'}。商品與紀錄沿用本班雲端同步，換裝置前請確認同步成功。` : '目前先存本機。登入老師自己的 Google 帳號後，商品與紀錄會隨本班資料同步。', 'pet-shop-sync'));
+        const library = el('details', undefined, 'pet-shop-library'); library.dataset.petKey = 'shop-presets';
+        library.open = !(config.products || []).length;
+        library.append(el('summary', '🎁 預設獎勵庫（挑選加入本班）'), el('p', '價格為建議金額。加入後可在下方「管理商品」修改名稱、調整價格或下架；各班可自行決定獎勵內容與交付時間。'));
+        const presetGrid = el('div', undefined, 'pet-preset-grid');
+        PRODUCT_PRESETS.forEach(p => {
+            const existing = (config.products || []).find(item => item.name === p.name);
+            const card = el('article', undefined, 'pet-preset-card');
+            const add = button(existing ? (existing.active ? '已加入本班' : '已下架・請至管理商品上架') : '加入本班', async () => {
+                add.disabled = true;
+                if (await addPresetProduct(p.id)) window.NotificationSystem?.success?.('已加入本班商店，可繼續編輯');
+                else add.disabled = false;
+            });
+            add.disabled = !!existing || busy;
+            add.setAttribute('aria-label', `${existing ? '本班已有' : '加入本班'}：${p.name}`);
+            card.append(el('small', `${p.icon} ${p.category}`), el('strong', p.name), el('span', `建議 ${p.cost} 金幣`), add);
+            presetGrid.append(card);
+        });
+        library.append(presetGrid); shop.append(library);
+        if (!(config.products || []).some(p => p.active)) shop.append(el('p', '本班尚無上架商品。先從預設獎勵庫挑選，或展開「管理商品」新增自己的獎勵。', 'pet-shop-empty'));
         const students = el('select'); students.setAttribute('aria-label', '兌換學生'); students.add(new Option('請選擇學生…', ''));
         window.students.forEach(s => students.add(new Option(`${s.number || ''} ${s.name} · 金幣 ${coinsFor(s.id)}`, String(s.id)))); students.value = shopStudent;
         students.addEventListener('change', () => { shopStudent = students.value; shopPage = 0; render(); });
@@ -538,7 +575,7 @@
             if (await redeem(student.id, product.id, product.cost)) window.NotificationSystem?.success?.('兌換已存本機');
         }, 'pet-primary'); buy.disabled = !student || !product || balance < product.cost || busy;
         const controls = el('div', undefined, 'pet-shop-controls'); controls.append(students, products, preview, buy); shop.append(controls);
-        const manage = el('details'); manage.dataset.petKey = 'products'; manage.append(el('summary', '管理商品（新增／改價／上下架）'));
+        const manage = el('details'); manage.dataset.petKey = 'products'; manage.append(el('summary', `管理商品（${(config.products || []).length} 項・自訂新增／編輯／上下架）`));
         const form = el('form', undefined, 'pet-product-editor');
         form.append(el('strong', editingProduct ? '編輯商品' : '新增商品'));
         const name = el('input'); name.required = true; name.maxLength = 40; name.value = productDraft.name; name.placeholder = '例如：優先選座位'; name.setAttribute('aria-label', '商品名稱'); name.dataset.petFocus = 'product-name'; name.addEventListener('input', () => productDraft.name = name.value);
@@ -776,6 +813,6 @@
         render();
         if (location.hash === '#pets') window.showSection('pets');
     }
-    window.ClassPets = { award, undo, xpFor, coinsFor, setCoinsEnabled, saveRule, saveProduct, setProductActive, redeem, refund, setPetMood, assetName, stage, appearance, milestone, render, prepare, settings, collectionFor, collectionStagesFor };
+    window.ClassPets = { award, undo, xpFor, coinsFor, setCoinsEnabled, saveRule, saveProduct, addPresetProduct, setProductActive, redeem, refund, setPetMood, assetName, stage, appearance, milestone, render, prepare, settings, collectionFor, collectionStagesFor };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

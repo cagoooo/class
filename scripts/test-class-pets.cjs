@@ -261,5 +261,35 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
         await pet.award([1],-100,'提醒'); assert.equal(pet.collectionFor()[kind].maxLevel,3);
         ctx.students=[]; persist(); pet.prepare(); assert.equal(pet.collectionFor()[kind].maxLevel,3);
     });
+    await test('預設商品需主動加入，重複加入與下架後再加入不覆蓋設定', async()=>{
+        const {pet,ctx}=setup(); assert.equal((pet.settings().products||[]).length,0);
+        assert.equal(await pet.addPresetProduct('sticker'),true);
+        const p=pet.settings().products[0]; assert.equal(p.cost,10);
+        await pet.saveProduct({name:p.name,cost:23},p.id);
+        assert.equal(await pet.addPresetProduct('sticker'),false);
+        await pet.setProductActive(p.id,false);
+        assert.equal(await pet.addPresetProduct('sticker'),false);
+        vm.runInContext(fs.readFileSync('js/class-pets.js','utf8'),ctx);ctx.ClassPets.prepare();
+        assert.equal(ctx.ClassPets.settings().products.length,1);
+        assert.equal(ctx.ClassPets.settings().products[0].cost,23);
+        assert.equal(ctx.ClassPets.settings().products[0].active,false);
+    });
+    await test('預設商品失敗可重試，與自訂商品共存且班級隔離', async()=>{
+        const {pet,storage}=setup('A'); await pet.saveProduct({name:'老師自訂獎勵',cost:8});
+        storage.failKey='petSettings-A'; assert.equal(await pet.addPresetProduct('story'),false);
+        assert.equal(pet.settings().products.length,1);
+        assert.equal(await pet.addPresetProduct('story'),true);
+        assert.equal(pet.settings().products.length,2);
+        assert.equal(await pet.addPresetProduct('missing'),false);
+        storage.setItem('currentClassId','B'); assert.equal(pet.settings().products,undefined);
+    });
+    await test('預設商品兌換與退幣保留原成交價及寵物成長', async()=>{
+        const {pet,ctx}=setup(); await pet.setCoinsEnabled(true); await pet.award([1],30,'努力');
+        await pet.addPresetProduct('sticker'); const p=pet.settings().products[0]; const xp=pet.xpFor(1);
+        assert.equal(await pet.redeem(1,p.id,10),true); const record=ctx.pointsHistory[0];
+        await pet.saveProduct({name:'老師改名貼紙',cost:20},p.id);
+        assert.equal(await pet.refund(record.id),true); assert.equal(pet.coinsFor(1),30); assert.equal(pet.xpFor(1),xp);
+        assert.equal(record.productName,'獎勵貼紙一張'); assert.equal(record.productCost,10);
+    });
     console.log(`${passed} checks passed`);
 })().catch(e=>{console.error(e);process.exitCode=1;});

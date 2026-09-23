@@ -91,6 +91,12 @@
 .pet-shop-controls select,.pet-product-editor input { width:100%; min-width:0; box-sizing:border-box; }
 .pet-product-editor>strong { grid-column:1/-1; }
 .pet-shop-sync { font-size:14px; overflow-wrap:anywhere; }
+.pet-preset-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr)); gap:12px; margin:12px 0; }
+.pet-preset-card { display:flex; flex-direction:column; gap:8px; padding:16px; border:1px solid #cbd5e1; border-radius:12px; background:#f8fafc; min-width:0; overflow-wrap:anywhere; }
+.pet-preset-card button { margin-top:auto; min-height:44px; white-space:normal; }
+.pet-shop-empty { padding:12px; border-radius:10px; background:#fff7df; color:#704b0c; }
+.dark .pet-preset-card { background:#1e293b; border-color:#475569; color:#e2e8f0; }
+.dark .pet-shop-empty { background:#3c321f; color:#ffe3a6; }
 @media(max-width:600px) { .pet-shop-controls,.pet-product-editor { grid-template-columns:1fr; padding:12px; } }
 
 .pet-award-bar.pet-award-active { position:sticky; }
