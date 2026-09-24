@@ -62,5 +62,17 @@ let passed=0;async function test(name,fn){await fn();console.log('PASS',name);pa
   assert.equal(a.db.data.has(`${prefix}/appSettings/syncRevision`),true);
  });
  await test('從其他班還原預設班不污染目前班級設定',async()=>{const a=setup();const original=a.storage.getItem('petSettings');a.c.ClassAwareStorage.rawSet('students',JSON.stringify([{id:9,name:'預設學生',points:1}]));a.c.ClassAwareStorage.rawSet('groups','[]');a.c.ClassAwareStorage.rawSet('pointsHistory','[]');a.c.ClassAwareStorage.rawSet('petSettings',JSON.stringify({enabled:false,rules:[]}));await a.s.publish('default');const r=await a.s.read('default');a.c.ClassAwareStorage.rawSet('petSettings',JSON.stringify({enabled:true,rules:[]}));assert.equal(await a.s.restore(r),true);assert.equal(a.storage.getItem('petSettings'),original);assert.equal(JSON.parse(a.c.ClassAwareStorage.rawGet('petSettings')).enabled,false);assert.equal(a.c.students[0].id,1);});
+ await test('離線與未登入不發寵物錯誤且保留資料',async()=>{
+  for(const offline of [true,false]) {
+   const a=setup(); const before=JSON.stringify(a.s.capture()); let state='';
+   a.c.SyncStatusIndicator={setState:v=>state=v};
+   if(offline)a.c.navigator.onLine=false;else a.c.FirebaseConfig.getCurrentUserId=()=>null;
+   let caught;try{await a.s.publish();}catch(e){caught=e;}
+   assert.equal(caught.code,offline?'sync-offline':'sync-auth-required');
+   await a.s.report(caught,true,'A');
+   assert.equal(a.petErrors.length,0);assert.equal(JSON.stringify(a.s.capture()),before);
+   assert.equal(state,offline?'disconnected':'offline');
+  }
+ });
  console.log(passed+' safety checks passed');
 })().catch(e=>{console.error(e);process.exitCode=1;});

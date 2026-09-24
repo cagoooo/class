@@ -30,6 +30,7 @@ const {
 const {
   buildDigestPayload,
   canonicalizeFeatureStats,
+  isExpectedSyncWait,
   isSyncConflictEvent,
   summarizeEvents,
 } = require('./digest-summary');
@@ -576,6 +577,10 @@ exports.notifyUsage = onCall(
     const data = request.data || {};
     const type = String(data.type || '').trim();
 
+    // 舊頁面暫存的登入／離線提示不消耗錯誤配額，也不推播。
+    if (isExpectedSyncWait({ ...data, type })) {
+      return { ok: true, pushed: false, reason: 'expected-sync-wait' };
+    }
     let eventType = type;
     if (type === 'login' && data.isNewUser) {
       eventType = 'login_new';
@@ -1476,7 +1481,7 @@ exports.getUsageAnalytics = onCall(
             featureTotals[label] = (featureTotals[label] || 0) + count;
           });
         }
-        if (d.type === 'error' && !isSyncConflictEvent(d)) {
+        if (d.type === 'error' && !isSyncConflictEvent(d) && !isExpectedSyncWait(d)) {
           const msg = clip(d.message, 200) || '(無訊息)';
           if (!errorMap[msg]) {
             errorMap[msg] = { message: msg, count: 0, uids: {}, contexts: {}, devices: {}, urls: {}, lastTs: '', firstDay: day };

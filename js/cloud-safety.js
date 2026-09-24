@@ -14,7 +14,7 @@
     const context = id => {
         const uid = window.FirebaseConfig?.getCurrentUserId();
         const db = window.FirebaseConfig?.getDb();
-        if (!uid || !db || !window.FirebaseConfig.isConnected()) throw Error('請先登入 Google 帳號');
+        if (!uid || !db || !window.FirebaseConfig.isConnected()) throw Object.assign(Error('請先登入 Google 帳號'), { code: 'sync-auth-required' });
         return { uid, db, id: id || current() };
     };
     const sameAccount = c => { if (window.FirebaseConfig.getCurrentUserId() !== c.uid) throw Error('登入帳號已改變，已停止同步'); };
@@ -159,7 +159,7 @@
         return { values: payload.values, token: head.token, uid: c.uid, classId: c.id, at: head.at, empty: false };
     }
     async function publish(id = current(), options = {}) {
-        if (navigator.onLine === false) throw Error('已存本機，恢復連線後再同步');
+        if (navigator.onLine === false) throw Object.assign(Error('已存本機，恢復連線後再同步'), { code: 'sync-offline' });
         const c = context(id);
         return withSyncLock(c, async () => {
             const values = capture(id); ensure(values);
@@ -299,6 +299,12 @@
     function report(error, id, silent) {
         // 同源分頁已在同步時，這次只是被鎖略過，不是需要老師處理的錯誤。
         if (error?.code === 'sync-busy') return;
+        // 可恢復的前置條件不代表寵物操作失敗；保留所有待同步資料。
+        if (error?.code === 'sync-auth-required' || error?.code === 'sync-offline') {
+            window.SyncStatusIndicator?.setState(error.code === 'sync-offline' ? 'disconnected' : 'offline');
+            if (!silent) window.NotificationSystem?.warning?.(error.message);
+            return;
+        }
         // 完整快照差異是預期的安全停車，不是寵物程式故障。
         // 仍保留同步事件與比較視窗；是否即時打擾由 publish 判斷
         // 是否已有同步基準，避免首次升級的舊雲端差異洗版。

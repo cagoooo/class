@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {
   buildDigestPayload,
   canonicalizeFeatureStats,
+  isExpectedSyncWait,
   isSyncConflictEvent,
   summarizeEvents,
 } = require('../functions/digest-summary');
@@ -71,3 +72,16 @@ test('同步戰報使用當日事件語氣，不把發生數寫成仍待處理�
 });
 
 console.log(`✅ 每日戰報彙整測試通過：${passed} 項`);
+
+test('登入與離線等待不誤報，但真正錯誤保留', () => {
+ const base={type:'error',feature:'pet',operation:'cloud_sync'};
+ for(const message of ['請先登入 Google 帳號','已存本機，恢復連線後再同步']) {
+  assert.equal(isExpectedSyncWait({...base,message}),true);
+  assert.equal(summarizeEvents([{...base,message}]).errors.length,0);
+ }
+ for(const message of ['permission-denied','雲端備份完整性檢查失敗','Failed to get document because the client is offline.']) {
+  assert.equal(isExpectedSyncWait({...base,message}),false);
+  assert.equal(summarizeEvents([{...base,message}]).errors.length,1);
+ }
+ assert.equal(isExpectedSyncWait({...base,operation:'reward',message:'請先登入 Google 帳號'}),false);
+});

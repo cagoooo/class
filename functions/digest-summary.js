@@ -26,6 +26,11 @@ function canonicalizeFeatureStats(raw) {
   return stats;
 }
 
+function isExpectedSyncWait(event) {
+  if (event?.type !== 'error' || event.feature !== 'pet' || event.operation !== 'cloud_sync') return false;
+  return ['請先登入 Google 帳號', '已存本機，恢復連線後再同步'].includes(String(event.message || '').trim());
+}
+
 function isSyncConflictEvent(event) {
   if (!event || typeof event !== 'object') return false;
   if (event.type === 'sync_conflict') return true;
@@ -84,6 +89,7 @@ function summarizeEvents(events) {
     if (d.uid) activeUids.add(d.uid);
     else if (d.type === 'session_start') guestEvents++;
 
+    if (isExpectedSyncWait(d)) return;
     if (isSyncConflictEvent(d)) {
       addSyncConflict(d);
       return;
@@ -308,6 +314,7 @@ module.exports = {
   buildDigestPayload,
   canonicalFeatureLabel,
   canonicalizeFeatureStats,
+  isExpectedSyncWait,
   isSyncConflictEvent,
   summarizeEvents,
 };
