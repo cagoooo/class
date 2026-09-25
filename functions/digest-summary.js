@@ -31,6 +31,14 @@ function isExpectedSyncWait(event) {
   return ['請先登入 Google 帳號', '已存本機，恢復連線後再同步'].includes(String(event.message || '').trim());
 }
 
+// Firestore 明確表示用戶端離線時，保留事件供診斷，但不當作程式故障。
+// 限定完整訊息與 unavailable 階段，避免隱藏其他暫時性伺服器錯誤。
+function isRecoverableOfflineSync(event) {
+  if (event?.type !== 'error' || event.feature !== 'pet' || event.operation !== 'cloud_sync') return false;
+  if (String(event.failureStage || '') !== 'unavailable') return false;
+  return /^Failed to get document because the client is offline\.?$/i.test(String(event.message || '').trim());
+}
+
 function isSyncConflictEvent(event) {
   if (!event || typeof event !== 'object') return false;
   if (event.type === 'sync_conflict') return true;
@@ -77,10 +85,15 @@ function summarizeEvents(events) {
     const dedupeKey = uid && classId
       ? `${event.day || ''}:${uid}:${classId}`
       : `event:${event._documentId || event.eventId || `${uid}:${event.ts || ''}:${event.message || ''}`}`;
-    const existing = syncConflictEvents.get(dedupeKey) || { cloudDivergence: false };
+    const existing = syncConflictEvents.get(dedupeKey) || {
+      cloudDivergence: false,
+      legacyBaselineDifference: false,
+    };
     // notify=true means there was a known baseline or a confirmed transaction race.
     // It still does not prove that the other writer was a separate physical device.
     existing.cloudDivergence = existing.cloudDivergence || event.type === 'sync_conflict' && event.notify === true;
+    existing.legacyBaselineDifference = existing.legacyBaselineDifference
+      || event.type === 'sync_conflict' && event.source === 'legacy-divergence';
     syncConflictEvents.set(dedupeKey, existing);
   }
 
@@ -111,6 +124,7 @@ function summarizeEvents(events) {
         dataActions.push({ action: d.action || '', details: d.details || '', who: d.name || d.email || '' });
         break;
       case 'error':
+        if (isRecoverableOfflineSync(d)) break;
         errors.push({ message: d.message || '', context: d.context || '', who: d.name || d.email || '' });
         if (d.feature === 'pet') pet.errors++;
         break;
@@ -154,7 +168,8 @@ function summarizeEvents(events) {
   const syncConflicts = {
     total: conflictRows.length,
     cloudDivergence: conflictRows.filter((event) => event.cloudDivergence).length,
-    sourceUnverified: conflictRows.filter((event) => !event.cloudDivergence).length,
+    legacyBaselineDifference: conflictRows.filter((event) => !event.cloudDivergence && event.legacyBaselineDifference).length,
+    sourceUnverified: conflictRows.filter((event) => !event.cloudDivergence && !event.legacyBaselineDifference).length,
   };
   const hotFeatures = Object.keys(featureTotals)
     .map((label) => ({ label, count: featureTotals[label] }))
@@ -198,7 +213,7 @@ function settingsSummary(settingsByAction) {
 }
 
 function buildDigestPayload(day, dateLabel, sum, backup) {
-  const conflict = sum.syncConflicts || { total: 0, cloudDivergence: 0, sourceUnverified: 0 };
+  const conflict = sum.syncConflicts || { total: 0, cloudDivergence: 0, legacyBaselineDifference: 0, sourceUnverified: 0 };
   const overviewLines = [`👥 當日有事件帳號 ${sum.activeTeachers} 個`];
   if (sum.newTeachers.length) {
     overviewLines.push(`🎉 新加入 ${sum.newTeachers.length} 位：${sum.newTeachers.slice(0, 5).join('、')}`);
@@ -270,8 +285,13 @@ function buildDigestPayload(day, dateLabel, sum, backup) {
     });
   }
 
+  const conflictDetails = [
+    `已確認雲端版本差異 ${conflict.cloudDivergence} 件`,
+    conflict.legacyBaselineDifference && `舊版雲端資料首次比對差異 ${conflict.legacyBaselineDifference} 件（當時已暫停上傳以保護資料）`,
+    conflict.sourceUnverified && `來源未能分類 ${conflict.sourceUnverified} 件`,
+  ].filter(Boolean);
   const conflictLine = conflict.total
-    ? `⚠️ 今日同步差異 ${conflict.total} 件：已確認雲端版本差異 ${conflict.cloudDivergence} 件、來源待確認 ${conflict.sourceUnverified} 件。是否已處理請查看目前班級同步狀態。`
+    ? `⚠️ 今日同步檢查（事件數）：${conflictDetails.join('；')}。請查看班級目前同步狀態，確認是否仍需處理。`
     : '⚠️ 今日雲端同步差異 0 件';
   const healthLines = [
     conflictLine,
@@ -292,7 +312,7 @@ function buildDigestPayload(day, dateLabel, sum, backup) {
     text += `\n🔥 ${sum.hotFeatures.slice(0, 3).map((feature) => `${feature.label} ${feature.count}`).join(' · ')}`;
   }
   if (conflict.total) {
-    text += `\n⚠️ 今日同步差異 ${conflict.total} 件（雲端版本差異 ${conflict.cloudDivergence}／來源待確認 ${conflict.sourceUnverified}）`;
+    text += `\n⚠️ 同步檢查事件 ${conflict.total} 件（版本差異 ${conflict.cloudDivergence}／舊版資料首次比對 ${conflict.legacyBaselineDifference}／來源未明 ${conflict.sourceUnverified}）`;
   }
   if (petLines.length) text += `\n🐾 ${petLines.slice(0, 4).join(' · ')}`;
   text += `\n🐞 錯誤 ${sum.errors.length} 則`;
@@ -314,6 +334,7 @@ module.exports = {
   buildDigestPayload,
   canonicalFeatureLabel,
   canonicalizeFeatureStats,
+  isRecoverableOfflineSync,
   isExpectedSyncWait,
   isSyncConflictEvent,
   summarizeEvents,

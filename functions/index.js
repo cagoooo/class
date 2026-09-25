@@ -31,6 +31,7 @@ const {
   buildDigestPayload,
   canonicalizeFeatureStats,
   isExpectedSyncWait,
+  isRecoverableOfflineSync,
   isSyncConflictEvent,
   summarizeEvents,
 } = require('./digest-summary');
@@ -601,9 +602,10 @@ exports.notifyUsage = onCall(
     const uid = (request.auth && request.auth.uid) || '';
     const who = identityOf(request.auth);
     const isError = eventType === 'error';
+    const recoverableOfflineSync = isRecoverableOfflineSync({ ...data, type: eventType });
 
-    // 配額：決定這筆能不能留底、error 能不能推播
-    const quota = await checkQuota(uid, isError);
+    // 離線事件仍留底，但不消耗真正錯誤的每日推播額度。
+    const quota = await checkQuota(uid, isError && !recoverableOfflineSync);
 
     // ① 留底（所有型別，含不推播的日常事件）
     let logStatus = 'skipped';
@@ -616,6 +618,10 @@ exports.notifyUsage = onCall(
     // 同一筆事件重送：已經留底也推播過了，這次什麼都不做
     if (logStatus === 'duplicate') {
       return { ok: true, duplicate: true, pushed: false };
+    }
+
+    if (recoverableOfflineSync) {
+      return { ok: true, logged: quota.log, pushed: false, reason: 'recoverable-offline-sync' };
     }
 
     // ② 打擾：只有真正錯誤才即時推 Chat；成功事件交給每日戰報。
@@ -1481,7 +1487,7 @@ exports.getUsageAnalytics = onCall(
             featureTotals[label] = (featureTotals[label] || 0) + count;
           });
         }
-        if (d.type === 'error' && !isSyncConflictEvent(d) && !isExpectedSyncWait(d)) {
+        if (d.type === 'error' && !isSyncConflictEvent(d) && !isExpectedSyncWait(d) && !isRecoverableOfflineSync(d)) {
           const msg = clip(d.message, 200) || '(無訊息)';
           if (!errorMap[msg]) {
             errorMap[msg] = { message: msg, count: 0, uids: {}, contexts: {}, devices: {}, urls: {}, lastTs: '', firstDay: day };
