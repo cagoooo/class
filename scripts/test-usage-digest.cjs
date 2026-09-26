@@ -4,6 +4,7 @@ const {
   buildDigestPayload,
   canonicalizeFeatureStats,
   isExpectedSyncWait,
+  isRecoverableOfflineSync,
   isSyncConflictEvent,
   summarizeEvents,
 } = require('../functions/digest-summary');
@@ -68,12 +69,10 @@ test('同步戰報使用當日事件語氣，不把發生數寫成仍待處理�
     { type: 'sync_conflict', uid: 'teacher-a', classId: '601', notify: false },
   ]);
   const payload = buildDigestPayload('2026-09-22', '09/22（週二）', summary, null);
-  assert.match(payload.text, /今日同步差異 1 件/);
-  assert.match(payload.text, /來源待確認 1/);
+  assert.match(payload.text, /同步檢查事件 1 件/);
+  assert.match(payload.text, /來源未明 1/);
   assert.doesNotMatch(payload.text, /請完成比較後再繼續/);
 });
-
-console.log(`✅ 每日戰報彙整測試通過：${passed} 項`);
 
 test('登入與離線等待不誤報，但真正錯誤保留', () => {
  const base={type:'error',feature:'pet',operation:'cloud_sync'};
@@ -87,3 +86,16 @@ test('登入與離線等待不誤報，但真正錯誤保留', () => {
  }
  assert.equal(isExpectedSyncWait({...base,operation:'reward',message:'請先登入 Google 帳號'}),false);
 });
+
+test('明確離線只限寵物同步 unavailable，不吞掉其他錯誤', () => {
+ const offline = {type:'error',feature:'pet',operation:'cloud_sync',failureStage:'unavailable',message:'Failed to get document because the client is offline.'};
+ assert.equal(isRecoverableOfflineSync(offline),true);
+ assert.equal(summarizeEvents([offline]).errors.length,0);
+ for (const change of [{operation:'reward'},{feature:'students'},{failureStage:'permission-denied'},{message:'Firestore service unavailable.'},{message:offline.message+' retry failed'}]) {
+  const event = {...offline,...change};
+  assert.equal(isRecoverableOfflineSync(event),false);
+  assert.equal(summarizeEvents([event]).errors.length,1);
+ }
+});
+
+console.log(`✅ 每日戰報彙整測試通過：${passed} 項`);
