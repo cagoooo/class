@@ -310,5 +310,63 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
         await pet.award([1],10,'孵化'); const milestones=pet.collectionProgress();
         assert.equal(milestones[0].reached,true); assert.equal(milestones[1].reached,false);
     });
+    await test('任務目標、日期及重送檢查；未開始與過期不累積',async()=>{
+        const {pet}=setup();
+        for(const values of [{name:'',target:2},{name:'x',target:0},{name:'x',target:1.5},{name:'x',target:101},{name:'x',target:1,startDate:'2026-02-30'},{name:'x',target:1,startDate:'2026-02-02',endDate:'2026-01-01'}]) assert.equal(await pet.createQuest(values),false);
+        assert.equal(await pet.createQuest({name:'合作',target:2},'q'),true);
+        assert.equal(await pet.createQuest({name:'合作',target:2},'q'),false);
+        await pet.createQuest({name:'未開始',target:1,startDate:'2999-01-01'},'future');
+        await pet.createQuest({name:'到期',target:1,endDate:'2000-01-01'},'past');
+        assert.equal(await pet.contributeQuest('future'),false); assert.equal(await pet.contributeQuest('past'),false);
+    });
+    await test('合作進度可撤銷、防重送；達標只領一次且不改學生帳本',async()=>{
+        const {pet,ctx}=setup(); const before=JSON.stringify([ctx.students,ctx.groups,ctx.pointsHistory]);
+        await pet.createQuest({name:'整理教室',target:2},'q');
+        assert.equal(await pet.claimQuest('q'),false);
+        assert.equal(await pet.contributeQuest('q','完成','e1'),true);
+        assert.equal(await pet.contributeQuest('q','完成','e1'),false);
+        assert.equal(await pet.undoQuestContribution('q','e1'),true);
+        assert.equal(await pet.undoQuestContribution('q','e1'),false);
+        await pet.contributeQuest('q'); await pet.contributeQuest('q');
+        assert.equal(pet.questProgress(pet.settings().quests[0]),2);
+        const results=await Promise.all([pet.claimQuest('q'),pet.claimQuest('q')]);
+        assert.equal(results.filter(Boolean).length,1); assert.equal(pet.settings().collectionEggs.length,1);
+        assert.equal(await pet.undoQuestContribution('q','e1'),false);
+        assert.equal(JSON.stringify([ctx.students,ctx.groups,ctx.pointsHistory]),before);
+    });
+    await test('收藏蛋揭曉後重載不重抽、只解鎖幼年且不扣金幣',async()=>{
+        const {pet,ctx}=setup(); const before=JSON.stringify([ctx.students,ctx.pointsHistory]);
+        ctx.crypto={randomUUID:()=>webcrypto.randomUUID(),getRandomValues:a=>{a[0]=0;return a;}};
+        await pet.createQuest({name:'合作',target:1},'q');await pet.contributeQuest('q');await pet.claimQuest('q');
+        assert.equal(await pet.hatchCollectionEgg('q'),true);assert.equal(await pet.hatchCollectionEgg('q'),false);
+        assert.equal(pet.settings().collectionEggs[0].kind,'cat');
+        assert.equal(JSON.stringify(pet.collectionStagesFor('cat').map(v=>v.unlocked)),JSON.stringify([true,false,false]));
+        vm.runInContext(fs.readFileSync('js/class-pets.js','utf8'),ctx);ctx.ClassPets.prepare();
+        assert.equal(await ctx.ClassPets.hatchCollectionEgg('q'),false);
+        assert.equal(ctx.ClassPets.settings().collectionEggs[0].kind,'cat');
+        assert.equal(JSON.stringify([ctx.students,ctx.pointsHistory]),before);
+    });
+    for(const operation of ['create','progress','claim','hatch']) await test('任務 '+operation+' 寫入失敗保留原資料且可重試',async()=>{
+        const {pet,storage}=setup();
+        if(operation!=='create') await pet.createQuest({name:'合作',target:1},'q');
+        if(['claim','hatch'].includes(operation)) await pet.contributeQuest('q');
+        if(operation==='hatch') await pet.claimQuest('q');
+        const action={create:()=>pet.createQuest({name:'合作',target:1},'q'),progress:()=>pet.contributeQuest('q'),claim:()=>pet.claimQuest('q'),hatch:()=>pet.hatchCollectionEgg('q')}[operation];
+        const before=[...storage.data];storage.failKey='petSettings';assert.equal(await action(),false);assert.deepEqual([...storage.data],before);assert.equal(await action(),true);
+    });
+    await test('任務班級隔離、過期已達標仍可領取及舊分頁不覆蓋',async()=>{
+        const {pet,storage}=setup('A');await pet.createQuest({name:'合作',target:1},'q');await pet.contributeQuest('q');
+        const config=pet.settings();config.quests[0].endDate='2000-01-01';storage.setItem('petSettings',JSON.stringify(config));
+        assert.equal(await pet.claimQuest('q'),false); // stale module must not overwrite external change
+        pet.prepare();assert.equal(await pet.claimQuest('q'),true);
+        storage.setItem('currentClassId','B');assert.equal(pet.settings().quests,undefined);assert.equal(await pet.claimQuest('q'),false);
+    });
+    await test('新檔案任務與收藏蛋完整備份還原；損壞與重複領獎資料被擋',async()=>{
+        const {pet,ctx}=setup();await pet.renamePet(1,'小豆');await pet.createQuest({name:'合作',target:1},'q');await pet.contributeQuest('q');await pet.claimQuest('q');await pet.hatchCollectionEgg('q');
+        vm.runInContext(fs.readFileSync('js/backup-integrity.js','utf8'),ctx);
+        const data=JSON.parse(JSON.stringify({version:'1.2',students:ctx.students,groups:ctx.groups,pointsHistory:ctx.pointsHistory,petSettings:pet.settings()}));
+        const codec=ctx.BackupIntegrity;assert.equal(JSON.stringify(codec.decode(codec.encode(data))),JSON.stringify(data));
+        for(const damage of [d=>d.petSettings.collectionEggs.push(d.petSettings.collectionEggs[0]),d=>d.petSettings.quests[0].events[0].amount=2,d=>d.petSettings.collectionEggs[0].kind='unknown',d=>d.petSettings.collectionEggs=[],d=>d.petSettings.quests[0].events.push({...d.petSettings.quests[0].events[0]})]) {const d=JSON.parse(JSON.stringify(data));damage(d);assert.equal(codec.validate(d),false);}
+    });
     console.log(`${passed} checks passed`);
 })().catch(e=>{console.error(e);process.exitCode=1;});

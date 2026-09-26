@@ -12,6 +12,37 @@
         }
         return ((crc ^ -1) >>> 0).toString(16).padStart(8, '0');
     }
+    function validateQuests(config) {
+        if (config.quests == null && config.collectionEggs == null) return true;
+        const quests = config.quests || [], eggs = config.collectionEggs || [];
+        if (!Array.isArray(quests) || !Array.isArray(eggs) || quests.length > 200 || eggs.length > 200) return false;
+        const date = v => typeof v === 'string' && Number.isFinite(Date.parse(v));
+        const day = v => v === '' || date(v) && /^\d{4}-\d{2}-\d{2}$/.test(v) && new Date(v).toISOString().slice(0,10) === v;
+        const ids = new Map();
+        for (const q of quests) {
+            if (!q || typeof q.id !== 'string' || !q.id || ids.has(q.id) || typeof q.name !== 'string' || !q.name.trim() || q.name.length > 40 || !Number.isSafeInteger(q.target) || q.target < 1 || q.target > 100 || !day(q.startDate) || !day(q.endDate) || q.startDate && q.endDate && q.startDate > q.endDate || !date(q.createdAt)) return false;
+            if (q.claimedAt != null && !date(q.claimedAt) || q.archivedAt != null && !date(q.archivedAt) || q.claimedAt && q.archivedAt || !Array.isArray(q.events) || q.events.length > 1000) return false;
+            const events = new Map(), reversed = new Set(); let total = 0;
+            for (const e of q.events) {
+                if (!e || typeof e.id !== 'string' || !e.id || events.has(e.id) || ![1,-1].includes(e.amount) || !date(e.at) || typeof e.note !== 'string' || e.note.length > 80) return false;
+                if (e.amount === -1) {
+                    if (events.get(e.reverses)?.amount !== 1 || reversed.has(e.reverses)) return false;
+                    reversed.add(e.reverses);
+                } else if (e.reverses != null) return false;
+                total += e.amount; if (total < 0 || total > q.target) return false;
+                events.set(e.id,e);
+            }
+            if (q.claimedAt && total !== q.target) return false;
+            ids.set(q.id,q);
+        }
+        const eggIds = new Set(), kinds = new Set('cat dog rabbit panda fox bear penguin owl turtle dragon capybara axolotl lion tiger elephant giraffe zebra monkey koala redpanda raccoon otter hedgehog squirrel sheep pig frog seal deer unicorn'.split(' '));
+        for (const e of eggs) {
+            if (!e || !ids.get(e.id)?.claimedAt || eggIds.has(e.id) || typeof e.questName !== 'string' || !e.questName || e.questName.length > 40 || !date(e.earnedAt)) return false;
+            if ((e.kind != null || e.openedAt != null) && (!kinds.has(e.kind) || !date(e.openedAt))) return false;
+            eggIds.add(e.id);
+        }
+        return quests.every(q => !q.claimedAt || eggIds.has(q.id));
+    }
     function validate(data) {
         if (!data || typeof data !== 'object' || Array.isArray(data) || !['1.0', '1.1', '1.2'].includes(String(data.version))) return false;
         for (const key of ['students', 'groups', 'pointsHistory']) {
@@ -34,6 +65,7 @@
             if (['points', 'petXp', 'coinDelta'].some(k => r[k] != null && !Number.isFinite(r[k]))) return false;
         }
         if (data.petSettings != null && (typeof data.petSettings !== 'object' || Array.isArray(data.petSettings) || !Array.isArray(data.petSettings.rules))) return false;
+        if (data.petSettings && !validateQuests(data.petSettings)) return false;
         return true;
     }
     function split(text, size) {

@@ -533,6 +533,156 @@
             return true;
         }, 'settings');
     }
+    function taipeiDay() { return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' }); }
+    function questProgress(quest) {
+        const seen = new Set();
+        return (quest.events || []).reduce((sum, event) => {
+            if (seen.has(event.id)) return sum;
+            seen.add(event.id); return sum + event.amount;
+        }, 0);
+    }
+    function questAvailable(quest) {
+        const today = taipeiDay();
+        return !quest.claimedAt && !quest.archivedAt && (!quest.startDate || quest.startDate <= today) && (!quest.endDate || quest.endDate >= today);
+    }
+    function saveQuestChange(mutator, action) {
+        return change(() => {
+            const config = clone(settings()), before = Object.keys(collectionFor()).length;
+            config.quests ||= []; config.collectionEggs ||= [];
+            if (!mutator(config)) return false;
+            if (!SafeStorage.set(KEY, JSON.stringify(config), { context: '班級任務與收藏蛋', feature: 'pet', petAction: 'quest', classId: cid() })) return false;
+            const after = Object.keys(collectionFor(window.students, window.pointsHistory, config)).length;
+            if (COLLECTION_MILESTONES.some(n => before < n && n <= after)) collectionCelebration = { classId: cid(), count: after };
+            remember(); render(); notifyPet('settings', { action });
+            return true;
+        }, 'quest');
+    }
+    function createQuest(values, id = uid()) {
+        return saveQuestChange(config => {
+            const name = String(values.name || '').trim(), target = Number(values.target);
+            const startDate = values.startDate || '', endDate = values.endDate || '';
+            const validDay = value => !value || /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
+            if (!name || name.length > 40 || !Number.isSafeInteger(target) || target < 1 || target > 100 || !validDay(startDate) || !validDay(endDate) || startDate && endDate && startDate > endDate) return fail('請填任務名稱、1～100 次目標及有效的起迄日期。');
+            if (config.quests.some(q => q.id === id)) return false;
+            if (config.quests.length >= 200) return fail('本班任務已達 200 筆，請先備份並聯絡管理者協助整理。');
+            config.quests.push({ id, name, target, startDate, endDate, createdAt: new Date().toISOString(), events: [] });
+            return true;
+        }, '新增全班任務');
+    }
+    function contributeQuest(id, note = '老師確認全班完成一次', requestId = uid()) {
+        return saveQuestChange(config => {
+            const quest = config.quests.find(q => q.id === id);
+            if (!quest || !questAvailable(quest)) return fail('任務未開始、已到期或已結束，未增加進度。');
+            if (quest.events.some(e => e.id === requestId)) return false;
+            if (questProgress(quest) >= quest.target) return false;
+            if (quest.events.length >= 500) return fail('任務紀錄已達上限，請保留紀錄並建立新任務。');
+            quest.events.push({ id: requestId, amount: 1, note: String(note).trim().slice(0, 80) || '老師確認全班完成一次', at: new Date().toISOString() });
+            return true;
+        }, '更新全班任務進度');
+    }
+    function undoQuestContribution(id, eventId) {
+        return saveQuestChange(config => {
+            const quest = config.quests.find(q => q.id === id);
+            if (!quest || quest.claimedAt || quest.archivedAt) return fail('任務已結案或領獎，不能撤銷進度；原紀錄保留。');
+            const event = quest.events.find(e => e.id === eventId && e.amount === 1);
+            if (!event || quest.events.some(e => e.reverses === eventId)) return false;
+            quest.events.push({ id: uid(), amount: -1, reverses: eventId, note: '老師撤銷一次誤記進度', at: new Date().toISOString() });
+            return true;
+        }, '撤銷全班任務進度');
+    }
+    function claimQuest(id) {
+        return saveQuestChange(config => {
+            const quest = config.quests.find(q => q.id === id);
+            if (!quest || quest.claimedAt || quest.archivedAt || questProgress(quest) < quest.target || config.collectionEggs.some(egg => egg.id === id)) return false;
+            const now = new Date().toISOString(); quest.claimedAt = now;
+            config.collectionEggs.push({ id, questName: quest.name, earnedAt: now });
+            return true;
+        }, '全班任務領取收藏蛋');
+    }
+    function archiveQuest(id) {
+        return saveQuestChange(config => {
+            const quest = config.quests.find(q => q.id === id);
+            if (!quest || quest.archivedAt || quest.claimedAt) return false;
+            quest.archivedAt = new Date().toISOString(); return true;
+        }, '結束全班任務');
+    }
+    async function hatchCollectionEgg(id) {
+        let kind;
+        const ok = await saveQuestChange(config => {
+            const egg = config.collectionEggs.find(e => e.id === id);
+            if (!egg || egg.kind) return false;
+            kind = drawPet(); const now = new Date().toISOString();
+            egg.kind = kind; egg.openedAt = now;
+            config.collection = collectionFor(window.students, window.pointsHistory, config);
+            if (!config.collection[kind]) config.collection[kind] = { discoveredAt: now, maxLevel: 1 };
+            return true;
+        }, '揭曉班級收藏蛋');
+        if (ok) {
+            notifyPet('hatch', { count: 1, kinds: [pets[kind][1]], level: 1, reason: '班級收藏蛋' });
+            window.NotificationSystem?.success?.(`班級收藏蛋開出了${pets[kind][1]}！已加入全班圖鑑。`);
+        }
+        return ok;
+    }
+    function renderQuests(root) {
+        const config = settings(), origin = cid(), snapshot = fingerprint();
+        const panel = el('details', undefined, 'pet-quests'); panel.dataset.petKey = 'quests';
+        panel.append(el('summary', '🤝 全班共同任務與收藏蛋'));
+        panel.append(el('p', '老師確認全班共同努力 → 達標領蛋 → 點蛋揭曉。收藏蛋屬於全班，不扣金幣、不替換學生寵物；30 種等機率，可能抽到已收集的種類。'));
+        panel.append(el('p', '任務以臺灣日期計算；截止日後停止累積，已達標可稍後領蛋。領蛋前可撤銷誤記進度，領蛋後結案保留紀錄。全班共同受益，不逐人派發金幣。'));
+        const guard = async (message, action) => {
+            if (!await confirmAction(message)) return;
+            if (origin !== cid() || snapshot !== fingerprint()) return fail('班級或資料已更新，請重新確認任務。');
+            await action();
+        };
+        const create = el('details'); create.dataset.petKey = 'quest-create'; create.append(el('summary', '＋ 建立全班任務'));
+        const form = el('form', undefined, 'pet-quest-form');
+        const fields = {};
+        for (const [key, text, type] of [['name','任務名稱','text'],['target','目標次數（1～100）','number'],['startDate','開始日期（可留白）','date'],['endDate','截止日期（可留白）','date']]) {
+            const label = el('label', text), input = el('input'); input.type = type; fields[key] = input;
+            if (key === 'name') { input.maxLength = 40; input.required = true; }
+            if (key === 'target') { input.min = 1; input.max = 100; input.step = 1; input.value = '5'; input.required = true; }
+            label.append(input); form.append(label);
+        }
+        form.append(el('p', '達標獎勵：1 顆班級收藏蛋（原寵物保留）'));
+        const submit = el('button','建立任務'); submit.type = 'submit'; form.append(submit);
+        form.addEventListener('submit', async e => {
+            e.preventDefault(); submit.disabled = true;
+            if (origin !== cid() || snapshot !== fingerprint()) { fail('班級或資料已更新，請重新填寫任務。'); submit.disabled = false; return; }
+            const ok = await createQuest(Object.fromEntries(Object.entries(fields).map(([key,input]) => [key,input.value])));
+            if (!ok) submit.disabled = false;
+        }); create.append(form); panel.append(create);
+        const active = el('div', undefined, 'pet-quest-list'), history = el('details'); history.dataset.petKey = 'quest-history'; history.append(el('summary','已領獎／已結束任務紀錄'));
+        for (const quest of [...(config.quests || [])].reverse()) {
+            const card = el('article', undefined, 'pet-quest-card'), progress = questProgress(quest), available = questAvailable(quest);
+            const status = quest.claimedAt ? '已領獎' : quest.archivedAt ? '已結束' : progress >= quest.target ? '已達標，待領蛋' : quest.startDate && quest.startDate > taipeiDay() ? '尚未開始' : quest.endDate && quest.endDate < taipeiDay() ? '已到期' : '一起努力中';
+            card.append(el('h3', quest.name), el('p', `${status} · ${progress} / ${quest.target} 次`), el('p', `${quest.startDate || '不限起日'} ～ ${quest.endDate || '無期限'} · 獎勵：班級收藏蛋 1 顆`));
+            const bar = el('progress'); bar.max = quest.target; bar.value = progress; bar.setAttribute('aria-label', quest.name+'進度'); card.append(bar);
+            const actions = el('div', undefined, 'pet-tools');
+            if (available && progress < quest.target) actions.append(button('確認完成一次 ＋1', () => guard(`確認全班完成「${quest.name}」一次？`, () => contributeQuest(quest.id))));
+            if (!quest.claimedAt && !quest.archivedAt && progress >= quest.target) actions.append(button('領取班級收藏蛋', () => guard(`確認「${quest.name}」已完成？領蛋後任務結案，不能撤銷進度。`, () => claimQuest(quest.id)), 'pet-primary'));
+            if (!quest.claimedAt && !quest.archivedAt) actions.append(button('結束任務', () => guard('結束任務並保留紀錄？不會發放收藏蛋。', () => archiveQuest(quest.id))));
+            card.append(actions);
+            const events = el('details'); events.append(el('summary', `查看進度紀錄（${quest.events.length} 筆）`));
+            for (const event of [...quest.events].reverse()) {
+                const row = el('div', undefined, 'pet-quest-event'); row.append(el('span', `${dateLabel(event.at)} · ${event.amount > 0 ? '+1' : '−1'} · ${event.note}`));
+                if (!quest.claimedAt && !quest.archivedAt && event.amount === 1 && !quest.events.some(e => e.reverses === event.id)) row.append(button('撤銷這次進度', () => guard('撤銷這次進度？原紀錄會保留。', () => undoQuestContribution(quest.id,event.id))));
+                events.append(row);
+            }
+            card.append(events); (quest.claimedAt || quest.archivedAt ? history : active).append(card);
+        }
+        if (!active.children.length) active.append(el('p', '目前沒有進行中的任務。從一個全班都能參與的小目標開始！'));
+        panel.append(active, history, el('h3','🥚 班級收藏蛋'));
+        const eggs = el('div',undefined,'pet-class-eggs');
+        for (const egg of [...(config.collectionEggs || [])].reverse()) {
+            const card = el('article',undefined,'pet-quest-card');
+            card.append(portrait(egg.kind || 'cat',egg.kind ? 10 : 9), el('strong',egg.kind ? pets[egg.kind][1] : '神祕班級收藏蛋'), el('p',`來自：${egg.questName}`));
+            if (!egg.kind) card.append(button('點我揭曉收藏蛋',() => guard('全班準備好了嗎？揭曉後種類固定保留。',() => hatchCollectionEgg(egg.id)),'pet-primary'));
+            else card.append(el('p',`已收錄圖鑑 · ${dateLabel(egg.openedAt)}`));
+            eggs.append(card);
+        }
+        if (!(config.collectionEggs || []).length) eggs.append(el('p','完成任務並領獎後，收藏蛋會出現在這裡。'));
+        panel.append(eggs); root.append(panel);
+    }
     function setCoinsEnabled(enabled) {
         const config = settings();
         return saveSettings({ ...config, coinsEnabled: enabled,
@@ -767,6 +917,7 @@
         }
         root.append(el('p', '輕點蛋或寵物，和牠打個招呼！互動不會增加成長值或金幣。', 'pet-touch-hint'));
         root.append(button(`全班收集圖鑑 · ${Object.keys(collectionFor()).length} / ${Object.keys(pets).length}`, openCollection, 'pet-collection-entry'));
+        renderQuests(root);
         const wallet = el('div', undefined, 'pet-wallet-status');
         wallet.append(el('strong', config.coinsEnabled ? '🪙 本班金幣累積中' : '🪙 本班金幣尚未啟用／已暫停'));
         const coinGuide = el('details'); coinGuide.dataset.petKey = 'coins-guide'; coinGuide.append(el('summary', '金幣規則與使用說明'), el('p', '金幣與成長值分開記錄。啟用後，原本正向加分會獲得等量金幣；自訂規則可調整金額。舊分數不換算，一般扣分與分數歸零不扣金幣，撤銷獎勵會扣回該筆金幣。可在兌換商店使用金幣；暫停累積後仍可使用餘額。'));
@@ -924,6 +1075,6 @@
         render();
         if (location.hash === '#pets') window.showSection('pets');
     }
-    window.ClassPets = { profileFor, renamePet, collectionProgress, award, undo, xpFor, coinsFor, setCoinsEnabled, saveRule, saveProduct, addPresetProduct, setProductActive, redeem, refund, setPetMood, assetName, stage, appearance, milestone, render, prepare, settings, collectionFor, collectionStagesFor };
+    window.ClassPets = { createQuest, contributeQuest, undoQuestContribution, claimQuest, archiveQuest, hatchCollectionEgg, questProgress, profileFor, renamePet, collectionProgress, award, undo, xpFor, coinsFor, setCoinsEnabled, saveRule, saveProduct, addPresetProduct, setProductActive, redeem, refund, setPetMood, assetName, stage, appearance, milestone, render, prepare, settings, collectionFor, collectionStagesFor };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
