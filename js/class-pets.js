@@ -374,7 +374,7 @@
             tile.setAttribute('aria-label', `查看已解鎖圖鑑：${name}`);
             tile.append(el('small', `No.${number}`), portrait(kind, 10), el('strong', name)); grid.append(tile);
         });
-        const intro = el('p', count === Object.keys(pets).length ? '全圖鑑收集完成！這是全班一起累積的成果。' : '任一位同學孵化成功，全班就解鎖一格！未發現的寵物保留神祕，等下一顆蛋揭曉；進化階段則要由班級實際達成後才會揭開。');
+        const intro = el('p', count === Object.keys(pets).length ? '全圖鑑收集完成！這是全班一起累積的成果。' : '同學孵化或班級收藏蛋發現新種類，就能解鎖一格！未發現的寵物保留神祕；進化造型仍須由同學的寵物達到對應等級才會揭開。');
         function showGrid() { content.replaceChildren(progress, bar, collectionBadges(found), intro, grid); }
         function showDetail(kind, number) {
             const holders = (window.students || []).filter(s => s.classPet === kind && (s.classPetRevealed || xpFor(s.id) >= 10)).length;
@@ -902,7 +902,7 @@
         if (!config.enabled) {
             root.append(el('p', '從今天的努力開始養一隻寵物。啟用後，原本的正向加分會同時獲得等量成長值；舊分數不換算，扣分不讓寵物退化。'));
             root.append(button('啟用本班寵物成長', () => saveSettings({ ...config, enabled: true, enabledAt: new Date().toISOString() }), 'pet-primary'));
-            if (!config.coinsEnabled && !(window.pointsHistory || []).some(r => r.petEvent)) return;
+            if (!config.coinsEnabled && !(window.pointsHistory || []).some(r => r.petEvent) && !config.quests?.length && !config.collectionEggs?.length) return;
         }
         const guide = el('details', undefined, 'pet-guide'); guide.dataset.petKey = 'guide';
         guide.append(el('summary', '成長指南與同步說明'));
