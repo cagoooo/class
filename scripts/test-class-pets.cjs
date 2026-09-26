@@ -291,5 +291,24 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
         assert.equal(await pet.refund(record.id),true); assert.equal(pet.coinsFor(1),30); assert.equal(pet.xpFor(1),xp);
         assert.equal(record.productName,'獎勵貼紙一張'); assert.equal(record.productCost,10);
     });
+    await test('成長檔案保留暱稱、孵化日期及最高等級；舊日期不捏造', async()=>{
+        const {pet,ctx}=setup(); assert.equal(pet.profileFor(1).hatchedAt,null);
+        await pet.renamePet(1,'小豆'); await pet.award([1],50,'共同努力');
+        const first=pet.profileFor(1); assert.equal(first.nickname,'小豆'); assert.equal(first.maxLevel,3);
+        assert.ok(Date.parse(first.hatchedAt)); assert.equal(first.recent[0].reason,'共同努力');
+        await pet.undo([ctx.pointsHistory[0].id]);
+        assert.equal(pet.profileFor(1).level,0); assert.equal(pet.profileFor(1).maxLevel,3);
+        assert.equal(pet.profileFor(1).hatchedAt,first.hatchedAt);
+        await pet.award([1],10,'重新達標'); assert.equal(pet.profileFor(1).hatchedAt,first.hatchedAt);
+        assert.equal(await pet.renamePet(1,'字'.repeat(21)),false);
+    });
+    await test('檔案唯讀不寫入、暱稱失敗回復、圖鑑里程碑不洩漏未知種類', async()=>{
+        const {pet,storage,ctx}=setup(); const before=[...storage.data];
+        pet.profileFor(1); pet.collectionProgress(); assert.deepEqual([...storage.data],before);
+        storage.failKey='students'; assert.equal(await pet.renamePet(1,'不應存入'),false); assert.equal(ctx.students[0].petNickname,undefined);
+        assert.equal(await pet.renamePet(1,'切班草稿','other'),false);
+        await pet.award([1],10,'孵化'); const milestones=pet.collectionProgress();
+        assert.equal(milestones[0].reached,true); assert.equal(milestones[1].reached,false);
+    });
     console.log(`${passed} checks passed`);
 })().catch(e=>{console.error(e);process.exitCode=1;});

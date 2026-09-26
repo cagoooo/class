@@ -90,6 +90,7 @@
     let editingRuleId = null;
     let shopStudent = '', shopProduct = '', editingProduct = null, shopPage = 0;
     let shopReceipt = '';
+    let collectionCelebration = null;
     let productDraft = { name: '', cost: '10' };
     const PRODUCT_PRESETS = [
         { id: 'sticker', name: '獎勵貼紙一張', cost: 10, icon: '⭐', category: '小禮物' },
@@ -202,6 +203,67 @@
         { xp: 50, level: 3 },
         { xp: 90, level: 5 },
     ];
+    const COLLECTION_MILESTONES = [1, 5, 10, 15, 20, 25, 30];
+    function profileFor(id) {
+        const student = window.students.find(s => String(s.id) === String(id));
+        if (!student) return null;
+        const xp = xpFor(id), growth = stage(xp), seen = new Set();
+        const recent = window.pointsHistory.filter(r => {
+            if (String(r.studentId) !== String(id) || !r.petEvent || !r.petXp || seen.has(r.id)) return false;
+            seen.add(r.id); return true;
+        }).sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0)).slice(0, 10);
+        return { name: student.name, nickname: student.petNickname || '', xp, level: growth.level,
+            maxLevel: Math.max(growth.level, student.petMaxLevel || 0), hatchedAt: student.petHatchedAt || null,
+            remaining: growth.next - xp, recent };
+    }
+    function renamePet(id, name, origin = cid(), snapshot = fingerprint()) {
+        return change(() => {
+            if (origin !== cid() || snapshot !== fingerprint()) return fail('資料已更新，請重新開啟成長檔案。');
+            name = String(name || '').trim();
+            if (name.length > 20) return fail('寵物暱稱最多 20 個字。');
+            const next = clone(window.students), student = next.find(s => String(s.id) === String(id));
+            if (!student) return false;
+            student.petNickname = name;
+            return commit(next, window.groups, window.pointsHistory);
+        }, 'nickname');
+    }
+    function dateLabel(value) {
+        return value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleDateString('zh-TW') : '尚未記錄';
+    }
+    function openProfile(id) {
+        const profile = profileFor(id); if (!profile) return;
+        const origin = cid(), snapshot = fingerprint();
+        const dialog = el('dialog', undefined, 'pet-collection pet-profile');
+        const close = () => { dialog.close(); dialog.remove(); document.querySelector(`[data-pet-focus="profile-${id}"]`)?.focus(); };
+        const title = el('h2', `${profile.name}的寵物成長檔案`); title.id = 'pet-profile-title';
+        dialog.setAttribute('aria-labelledby', title.id);
+        const header = el('header'); header.append(title, button('關閉檔案', close));
+        const body = el('div', undefined, 'pet-collection-body');
+        const student = window.students.find(s => String(s.id) === String(id));
+        body.append(portrait(student.classPet, profile.xp, student.classPetMood),
+            el('p', `${profile.level ? '目前 Lv.' + profile.level : '等待孵化'} · 成長 ${profile.xp} · 距離${profile.level ? '升級' : '孵化'}還有 ${profile.remaining}`),
+            el('p', `首次孵化：${dateLabel(profile.hatchedAt)} · 最高已記錄 Lv.${profile.maxLevel}`));
+        const form = el('form', undefined, 'pet-profile-form'), label = el('label', '寵物暱稱（留白使用原名稱）');
+        const input = el('input'); input.maxLength = 20; input.value = profile.nickname; label.append(input);
+        const save = el('button', '儲存暱稱'); save.type = 'submit';
+        form.append(label, save); form.addEventListener('submit', async e => { e.preventDefault(); save.disabled = true;
+            if (await renamePet(id, input.value, origin, snapshot)) close(); else save.disabled = false; });
+        body.append(form, el('h3', '成長里程碑'));
+        for (const entry of COLLECTION_VARIANTS) body.append(el('p', profile.maxLevel >= entry.level ? `✓ 已達 Lv.${entry.level} · ${appearance(entry.xp).label}` : `？ Lv.${entry.level} · 達成後揭曉`));
+        body.append(el('h3', '最近成長紀錄'));
+        if (!profile.recent.length) body.append(el('p', '尚無本期成長紀錄；封存前明細請查閱封存備份。'));
+        for (const record of profile.recent) body.append(el('p', `${record.timestamp || '日期未記錄'} · ${record.reason || '獎勵'} · 成長 ${record.petXp > 0 ? '+' : ''}${record.petXp}`));
+        dialog.append(header, body); dialog.addEventListener('cancel', e => { e.preventDefault(); close(); }); document.body.append(dialog); dialog.showModal();
+    }
+    function collectionProgress(found = collectionFor()) {
+        const count = Object.keys(found).length;
+        return COLLECTION_MILESTONES.map(target => ({ target, reached: count >= target }));
+    }
+    function collectionBadges(found) {
+        const badges = el('div', undefined, 'pet-milestones');
+        for (const {target, reached} of collectionProgress(found)) badges.append(el('span', `${reached ? '✓' : '○'} ${target} 種${target === 30 ? '全圖鑑' : ''}`, reached ? 'is-earned' : ''));
+        return badges;
+    }
     // 固定向量圖形與白名單色彩；不將學生姓名或輸入文字插入 SVG。
     function vectorPortrait(kind, xp) {
         kind = pets[kind] ? kind : 'cat';
@@ -277,7 +339,7 @@
             const xp = xpFor(student.id, history, Number(student.petCarryXp) || 0);
             if (!student.classPetRevealed && xp < 10) continue;
             const kind = Object.hasOwn(pets, student.classPet) ? student.classPet : 'cat';
-            if (!found[kind]) found[kind] = { discoveredAt: new Date().toISOString(), maxLevel: 0 };
+            if (!found[kind]) found[kind] = { discoveredAt: student.petHatchedAt || null, maxLevel: 0 };
             found[kind].maxLevel = Math.max(found[kind].maxLevel || 0, stage(xp).level, 1);
         }
         return Object.fromEntries(Object.keys(pets).filter(kind => found[kind]).map(kind => [kind, found[kind]]));
@@ -313,7 +375,7 @@
             tile.append(el('small', `No.${number}`), portrait(kind, 10), el('strong', name)); grid.append(tile);
         });
         const intro = el('p', count === Object.keys(pets).length ? '全圖鑑收集完成！這是全班一起累積的成果。' : '任一位同學孵化成功，全班就解鎖一格！未發現的寵物保留神祕，等下一顆蛋揭曉；進化階段則要由班級實際達成後才會揭開。');
-        function showGrid() { content.replaceChildren(progress, bar, intro, grid); }
+        function showGrid() { content.replaceChildren(progress, bar, collectionBadges(found), intro, grid); }
         function showDetail(kind, number) {
             const holders = (window.students || []).filter(s => s.classPet === kind && (s.classPetRevealed || xpFor(s.id) >= 10)).length;
             const variants = el('div', undefined, 'pet-collection-variants');
@@ -328,12 +390,15 @@
             for (const [mood, label] of Object.entries(moods)) { const figure = el('figure'); figure.append(interactivePortrait(kind, 10, mood), el('figcaption', label)); moodsRow.append(figure); }
             const maxLevel = Math.max(...unlocked.filter(v => v.unlocked).map(v => v.level), 1);
             content.replaceChildren(button('← 返回收集進度', showGrid), el('h3', `No.${number} ${pets[kind][1]}`), el('p', `全班已解鎖・目前 ${holders} 位同學擁有；最高已達 Lv.${maxLevel}。已解鎖紀錄不因扣分或學生離班而消失。`), variants, el('h3', '表情樣態（孵化後可查看）'), moodsRow);
+            content.append(el('p', `首次發現：${dateLabel(found[kind].discoveredAt)}`));
             content.querySelector('button').focus();
         }
         showGrid(); dialog.append(header, content); document.body.append(dialog);
         dialog.addEventListener('cancel', () => dialog.remove()); dialog.showModal();
     }
     function commit(nextStudents, nextGroups, nextHistory) {
+        const previousCount = Object.keys(collectionFor()).length;
+        nextStudents = nextStudents.map(s => ({ ...s, petMaxLevel: Math.max(s.petMaxLevel || 0, stage(xpFor(s.id, nextHistory, Number(s.petCarryXp) || 0)).level) }));
         const values = [nextStudents, nextGroups, nextHistory];
         const config = settings(), collection = collectionFor(nextStudents, nextHistory, config);
         const writes = keys().map((k, i) => [k, JSON.stringify(values[i])]);
@@ -343,6 +408,8 @@
             classId: cid(), className: window.ClassProfiles?.currentProfile?.()?.name || ''
         })) return false;
         window.students = nextStudents; window.groups = nextGroups; window.pointsHistory = nextHistory;
+        const newCount = Object.keys(collection).length;
+        if (COLLECTION_MILESTONES.some(n => previousCount < n && n <= newCount)) collectionCelebration = { classId: cid(), count: newCount };
         remember(); redraw();
         return true;
     }
@@ -370,6 +437,7 @@
                 }
                 if (!s.classPetRevealed && before < 10 && after >= 10) {
                     s.classPet = drawPet(); s.classPetRevealed = true; blindOpened = true;
+                    s.petHatchedAt = now.toISOString();
                 }
                 const event = milestone(before, after);
                 if (event) events.push({ ...event, name: s.name, kind: s.classPet, xp: after, blindOpened });
@@ -693,6 +761,10 @@
         guide.append(el('p', '資料先存在本機，登入後沿用雲端同步。換裝置前請完成同步，同一班請避免兩台裝置同時加分。'));
         guide.append(el('p', '通知會留在使用紀錄：孵化、升級、撤銷、商店兌換／退幣與設定變更會併入每日批次戰報；寵物資料儲存、同步或設定失敗才會即時送出寵物系統錯誤通知。'));
         root.append(guide);
+        if (collectionCelebration?.classId === cid()) {
+            const notice = el('aside', undefined, 'pet-collection-celebration'); notice.setAttribute('role', 'status');
+            notice.append(el('strong', `🎉 全班收集里程碑！已發現 ${collectionCelebration.count} / 30 種`), button('關閉慶祝', () => { collectionCelebration = null; render(); })); root.append(notice);
+        }
         root.append(el('p', '輕點蛋或寵物，和牠打個招呼！互動不會增加成長值或金幣。', 'pet-touch-hint'));
         root.append(button(`全班收集圖鑑 · ${Object.keys(collectionFor()).length} / ${Object.keys(pets).length}`, openCollection, 'pet-collection-entry'));
         const wallet = el('div', undefined, 'pet-wallet-status');
@@ -740,6 +812,8 @@
                 const exchange = button(`🪙 金幣 ${coinsFor(s.id)} · 兌換 →`, () => openStudentShop(s.id), 'pet-coin-balance');
                 exchange.setAttribute('aria-label', `${s.name}，金幣 ${coinsFor(s.id)}，前往兌換獎勵`);
                 card.append(exchange);
+                const profile = button(s.petNickname ? `📖 ${s.petNickname} · 成長檔案` : '📖 成長檔案與暱稱', () => openProfile(s.id));
+                profile.dataset.petFocus = 'profile-' + s.id; card.append(profile);
                 const options = el('details', undefined, 'pet-card-options'); options.dataset.petKey = 'options-' + s.id; options.append(el('summary', '寵物表情'));
                 const mood = el('select'); mood.setAttribute('aria-label', `${s.name}的表情樣態`);
                 Object.entries(moods).forEach(([key, label]) => mood.add(new Option(label, key))); mood.value = s.classPetMood || 'normal';
@@ -850,6 +924,6 @@
         render();
         if (location.hash === '#pets') window.showSection('pets');
     }
-    window.ClassPets = { award, undo, xpFor, coinsFor, setCoinsEnabled, saveRule, saveProduct, addPresetProduct, setProductActive, redeem, refund, setPetMood, assetName, stage, appearance, milestone, render, prepare, settings, collectionFor, collectionStagesFor };
+    window.ClassPets = { profileFor, renamePet, collectionProgress, award, undo, xpFor, coinsFor, setCoinsEnabled, saveRule, saveProduct, addPresetProduct, setProductActive, redeem, refund, setPetMood, assetName, stage, appearance, milestone, render, prepare, settings, collectionFor, collectionStagesFor };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

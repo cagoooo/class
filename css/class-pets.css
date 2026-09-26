@@ -8,6 +8,17 @@
 #pets-section button:disabled { opacity:.45; cursor:default; }
 .pet-nav { background:#eef2ff; color:#3730a3; font-weight:700; }
 .pet-tools { display:flex; gap:10px; flex-wrap:wrap; margin:16px 0; align-items:center; }
+.pet-milestones { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+.pet-milestones span { padding:6px 12px; border:1px solid #cbd5e1; border-radius:20px; background:#f1f5f9; color:#475569; }
+.pet-milestones .is-earned { background:#dcfce7; color:#166534; border-color:#86efac; }
+.pet-profile-form { display:flex; gap:12px; flex-wrap:wrap; align-items:end; }
+.pet-profile-form label { display:flex; flex-direction:column; gap:8px; flex:1; min-width:0; }
+.pet-profile-form input { box-sizing:border-box; width:100%; min-height:46px; padding:10px; border:1px solid #94a3b8; border-radius:8px; background:transparent; color:inherit; font:inherit; }
+.pet-profile p { overflow-wrap:anywhere; }
+.pet-collection-celebration { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding:16px; border:1px solid #86efac; border-radius:14px; background:#dcfce7; color:#166534; }
+.dark .pet-collection-celebration { background:#164e3b; color:#bbf7d0; }
+.dark .pet-milestones span { background:#243247; color:#e2e8f0; }
+.dark .pet-milestones .is-earned { background:#164e3b; color:#bbf7d0; }
 .pet-tools label { display:flex; align-items:center; gap:8px; }
 .pet-tools input[type=number] { width:100px; }
 .pet-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:16px; }

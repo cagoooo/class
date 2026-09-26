@@ -25,6 +25,9 @@
         for (const s of data.students) {
             if (typeof s.name !== 'string' || (s.points != null && !Number.isFinite(s.points))) return false;
             if (s.classPetRevealed != null && typeof s.classPetRevealed !== 'boolean') return false;
+            if (s.petNickname != null && (typeof s.petNickname !== 'string' || s.petNickname.length > 20)) return false;
+            if (s.petHatchedAt != null && (typeof s.petHatchedAt !== 'string' || !Number.isFinite(Date.parse(s.petHatchedAt)))) return false;
+            if (s.petMaxLevel != null && (!Number.isSafeInteger(s.petMaxLevel) || s.petMaxLevel < 0)) return false;
             if (['petCarryXp', 'petCarryCoins'].some(k => s[k] != null && !Number.isSafeInteger(s[k]))) return false;
         }
         for (const r of data.pointsHistory) {
