@@ -313,21 +313,35 @@
         const header = el('header'); header.append(title, button('關閉檔案', close));
         const body = el('div', undefined, 'pet-collection-body');
         const student = window.students.find(s => String(s.id) === String(id));
-        body.append(interactivePortrait(student.classPet, profile.xp, student.classPetMood),
-            el('p', `${profile.level ? '目前 Lv.' + profile.level : '等待孵化'} · 成長 ${profile.xp} · 距離${profile.level ? '升級' : '孵化'}還有 ${profile.remaining}`),
-            el('p', nextUnlockHint(profile.xp), 'pet-touch-hint'),
-            el('p', `首次孵化：${dateLabel(profile.hatchedAt)} · 最高已記錄 Lv.${profile.maxLevel}`));
-        const form = el('form', undefined, 'pet-profile-form'), label = el('label', '寵物暱稱（留白使用原名稱）');
-        const input = el('input'); input.maxLength = 20; input.value = profile.nickname; label.append(input);
-        const save = el('button', '儲存暱稱'); save.type = 'submit';
-        form.append(label, save); form.addEventListener('submit', async e => { e.preventDefault(); save.disabled = true;
-            if (await renamePet(id, input.value, origin, snapshot)) close(); else save.disabled = false; });
-        body.append(form, el('h3', '成長里程碑'));
-        for (const entry of COLLECTION_VARIANTS) body.append(el('p', profile.maxLevel >= entry.level ? `✓ 已達 Lv.${entry.level} · ${appearance(entry.xp).label}` : `？ Lv.${entry.level} · 達成後揭曉`));
-        body.append(el('p', stage(profile.xp).level < 3 ? '互動：基本搖晃與小跳。達到 Lv.3，解鎖新姿態與成長對話。' : stage(profile.xp).level < 5 ? '互動：已解鎖揮手與物種特色動作。達到 Lv.5，解鎖進階姿態與成熟對話。' : '互動：進階姿態、歪頭探索與成熟對話已解鎖。'));
-        body.append(el('h3', '最近成長紀錄'));
-        if (!profile.recent.length) body.append(el('p', '尚無本期成長紀錄；封存前明細請查閱封存備份。'));
-        for (const record of profile.recent) body.append(el('p', `${record.timestamp || '日期未記錄'} · ${record.reason || '獎勵'} · 成長 ${record.petXp > 0 ? '+' : ''}${record.petXp}`));
+        const hero = el('section', undefined, 'pet-profile-hero');
+        const displayName = profile.nickname || (profile.level ? pets[student.classPet]?.[1] || '我的寵物' : '神祕寵物蛋');
+        const showcase = el('div', undefined, 'pet-profile-showcase');
+        showcase.append(el('span', profile.level ? 'Lv.' + profile.level + ' · ' + appearance(profile.xp).label : '等待孵化', 'pet-profile-badge'), interactivePortrait(student.classPet, profile.xp, student.classPetMood), el('p', '輕點一下，和牠打個招呼', 'pet-profile-caption'));
+        const summary = el('div', undefined, 'pet-profile-summary');
+        summary.append(el('p', profile.name + '的成長夥伴', 'pet-profile-caption'), el('h3', displayName));
+        const stats = el('dl', undefined, 'pet-profile-stats');
+        for (const [label, value] of [['成長值', profile.xp], ['最高等級', profile.maxLevel ? 'Lv.' + profile.maxLevel : '尚未孵化']]) { const item=el('div');item.append(el('dt',label),el('dd',String(value)));stats.append(item); }
+        const growth = stage(profile.xp), progress = el('progress');progress.max=growth.next-growth.start;progress.value=profile.xp-growth.start;progress.setAttribute('aria-label',profile.level ? '距離下一等級的成長進度' : '孵化進度');
+        summary.append(stats, el('p', '距離' + (profile.level ? '下一級' : '孵化') + '還有 ' + profile.remaining + ' 成長值', 'pet-profile-progress-label'), progress, el('p', nextUnlockHint(profile.xp), 'pet-profile-next'), el('p', '首次孵化：' + dateLabel(profile.hatchedAt), 'pet-profile-caption'));
+        hero.append(showcase, summary);body.append(hero);
+        const form = el('form', undefined, 'pet-profile-form'), label = el('label', '替夥伴取個暱稱');
+        const input = el('input'); input.maxLength = 20; input.value = profile.nickname;input.placeholder='最多 20 個字，留白使用原名稱';label.append(input);
+        const save = el('button', '儲存暱稱'); save.type = 'submit';save.className='pet-profile-save';
+        const feedback=el('p', '', 'pet-profile-feedback');feedback.setAttribute('role','status');
+        let editSnapshot=snapshot;
+        form.append(label, save,feedback); form.addEventListener('submit', async e => { e.preventDefault(); save.disabled = true;save.textContent='儲存中…';feedback.textContent='';
+            if (await renamePet(id, input.value, origin, editSnapshot)) {editSnapshot=fingerprint();summary.querySelector('h3').textContent=input.value.trim() || (profile.level ? pets[student.classPet]?.[1] || '我的寵物' : '神祕寵物蛋');feedback.textContent='✓ 暱稱已儲存';} else feedback.textContent='尚未儲存，請確認提示後重試。';
+            save.disabled=false;save.textContent='儲存暱稱'; });
+        body.append(form);
+        const milestones=el('section',undefined,'pet-profile-section');milestones.append(el('h3','成長里程碑'),el('p','努力留下的足跡，達成後才揭曉新造型。','pet-profile-caption'));
+        const stages=el('div',undefined,'pet-profile-stages');
+        for (const entry of COLLECTION_VARIANTS) {const reached=profile.maxLevel>=entry.level;const tile=el('div',undefined,'pet-profile-stage'+(reached?' is-unlocked':''));tile.append(el('span',reached?'✓':'？','pet-profile-stage-icon'),el('strong','Lv.'+entry.level),el('span',reached?appearance(entry.xp).label:'達成後揭曉'));stages.append(tile);}
+        milestones.append(stages);body.append(milestones);
+        const history=el('section',undefined,'pet-profile-section');history.append(el('h3','最近成長紀錄'),el('p','最近 10 筆成長變動','pet-profile-caption'));
+        if (!profile.recent.length) history.append(el('p','每一次努力，都會成為成長的足跡。尚無本期紀錄；封存前明細請查閱備份。','pet-profile-empty'));
+        const list=el('ul',undefined,'pet-profile-history');
+        for(const record of profile.recent){const item=el('li'),detail=el('div');detail.append(el('strong',record.reason || '獎勵'),el('span',record.timestamp || '日期未記錄'));item.append(detail,el('strong',(record.petXp>0?'+':'')+record.petXp,record.petXp>0?'is-positive':'is-negative'));list.append(item);}
+        history.append(list);body.append(history);
         dialog.append(header, body); dialog.addEventListener('cancel', e => { e.preventDefault(); close(); }); document.body.append(dialog); dialog.showModal();
     }
     function collectionProgress(found = collectionFor()) {
