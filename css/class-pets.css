@@ -357,3 +357,7 @@
   #pets-section .pet-view-tools { gap:6px; }
   #pets-section .pet-view-tools button { flex:1; padding:9px 8px; font-size:14px; white-space:nowrap; }
 }
+
+.pet-touch.pet-outside .pet-portrait,.pet-touch.pet-page-hidden .pet-portrait{animation-play-state:paused!important}
+.pet-touch.pet-motion-reduced .pet-portrait{animation:none!important;transform:none!important}
+.pet-collection-next{display:block;margin-top:16px;color:#0f766e}.pet-recent-discoveries{margin-top:16px;padding:16px;border-radius:12px;background:#f0fdfa}.pet-recent-discoveries p{margin:8px 0}.dark .pet-recent-discoveries{background:#123d37}.dark .pet-collection-next{color:#5eead4}

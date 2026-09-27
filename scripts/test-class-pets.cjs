@@ -426,5 +426,9 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
         storage.failKey=ctx.POINTS_HISTORY_KEY;assert.equal(await pet.deliver(ids),false);assert.ok(ctx.pointsHistory.filter(r=>ids.includes(r.id)).every(r=>!r.petDeliveredAt));assert.equal(await pet.deliver(ids),true);assert.equal(pet.coinsFor(1),10);
         const saved=JSON.parse(storage.getItem(ctx.POINTS_HISTORY_KEY));assert.ok(saved.filter(r=>ids.includes(r.id)).every(r=>r.petDeliveredAt));
     });
+    await test('近期互動避開三次動作與四次對話，幼年仍維持等級限制',async()=>{
+        const {pet}=setup();let previous={actions:[],texts:[]};for(let i=0;i<40;i++){const r=pet.interactionFor('cat',90,previous);assert.ok(!previous.actions.includes(r.action));assert.ok(!previous.texts.includes(r.text));previous={actions:[...previous.actions,r.action].slice(-3),texts:[...previous.texts,r.text].slice(-4)};}
+        const r=pet.interactionFor('cat',10,{actions:['hop','wobble'],texts:[]});assert.equal(r.action,'hop');assert.ok(!['greet','peek'].includes(r.action));
+    });
     console.log(`${passed} checks passed`);
 })().catch(e=>{console.error(e);process.exitCode=1;});

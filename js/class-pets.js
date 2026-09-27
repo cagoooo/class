@@ -73,7 +73,10 @@
         unicorn:['送你一點彩虹魔法！','獨角亮晶晶，心情也亮晶晶！','你的努力就是小小魔法！']
     };
     function pickDifferent(values, previous) {
-        const choices = values.filter(value => value !== previous);
+        const recent = Array.isArray(previous) ? previous : [previous];
+        let choices = values.filter(value => !recent.includes(value));
+        if (!choices.length) choices = values.filter(value => value !== recent[recent.length - 1]);
+        if (!choices.length) choices = values;
         return choices[Math.floor(Math.random() * choices.length)];
     }
     function interactionFor(kind, xp, previous = {}) {
@@ -84,24 +87,41 @@
         const actions = ['wobble','hop'];
         if (level >= 3) actions.push(signature,'greet','nod');
         if (level >= 5) actions.push('peek','squish','pounce');
-        const action = pickDifferent(egg ? ['wobble','nod','squish','peek'] : [...new Set(actions)], previous.action);
+        const action = pickDifferent(egg ? ['wobble','nod','squish','peek'] : [...new Set(actions)], previous.actions || previous.action);
         const lines = egg ? ['咚咚！裡面有動靜～','我正在慢慢準備見面！','輕輕拍拍，我聽見你囉！','猜猜看？先保留小祕密！','每一點努力，都讓見面更接近！'] : [...petVoices[kind],'很高興又見到你！','今天也一起試試看吧！','謝謝你來和我打招呼！'];
         if (level >= 3) lines.push('我長大了！看我新學會的招呼！','和你一起努力，我更有精神了！');
         if (level >= 5) lines.push('一起走過好多挑戰，我會繼續陪你！','今天讓我帶你探索新發現！');
-        return { action, text: pickDifferent(lines,previous.text), mood: egg || action === 'wobble' ? 'normal' : action === 'peek' ? 'curious' : action === 'greet' ? 'wave' : action === 'squish' ? 'sleepy' : 'happy' };
+        return { action, text: pickDifferent(lines,previous.texts || previous.text), mood: egg || action === 'wobble' ? 'normal' : action === 'peek' ? 'curious' : action === 'greet' ? 'wave' : action === 'squish' ? 'sleepy' : 'happy' };
+    }
+    let reducePetMotion = false;
+    try { reducePetMotion = localStorage.getItem('petReduceMotion') === 'true'; } catch {}
+    const motionReduced = () => reducePetMotion || !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    let petVisibilityObserver;
+    const observedPets = new Set();
+    function trackPetVisibility(target) {
+        target.classList.toggle('pet-motion-reduced', motionReduced());
+        if (!window.IntersectionObserver) { target.classList.add('pet-outside'); return; }
+        if (!petVisibilityObserver) {
+            petVisibilityObserver = new IntersectionObserver(entries => {for (const entry of entries) entry.target.classList.toggle('pet-outside', !entry.isIntersecting);});
+            const prune = () => {for (const pet of observedPets) if (!pet.isConnected) {petVisibilityObserver.unobserve(pet);observedPets.delete(pet);}};
+            if (window.MutationObserver && document.body) new MutationObserver(prune).observe(document.body,{childList:true,subtree:true});
+            document.addEventListener('visibilitychange',()=>{for(const pet of observedPets)pet.classList.toggle('pet-page-hidden',document.hidden);});
+        }
+        target.classList.add('pet-outside'); target.classList.toggle('pet-page-hidden',document.hidden);
+        observedPets.add(target); petVisibilityObserver.observe(target);
     }
     function interactivePortrait(kind, xp, mood = 'normal') {
         const egg = xp < 10;
         kind = Object.hasOwn(pets, kind) ? kind : 'cat';
-        let previous = {}, timer, animation, generation = 0;
+        let previous = {actions:[],texts:[]}, timer, animation, generation = 0;
         const picture = portrait(kind,xp,mood), originalSrc = picture.src, originalAlt = picture.alt;
         const target = button(undefined, event => {
             event.stopPropagation();
-            const reaction = interactionFor(kind,xp,previous); previous = reaction;
+            const reaction = interactionFor(kind,xp,previous); previous = {actions:[...previous.actions,reaction.action].slice(-3),texts:[...previous.texts,reaction.text].slice(-4)};
             const token = ++generation; clearTimeout(timer); animation?.cancel();
             bubble.textContent = reaction.text; bubble.hidden = false;
             target.dataset.reacting = reaction.action;
-            if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches && target.animate) {
+            if (!motionReduced() && target.animate) {
                 animation = target.animate(reactionFrames[reaction.action].map(transform => ({transform})), {duration:850,easing:'cubic-bezier(.35,0,.2,1)'});
             }
             if (!egg) {
@@ -122,7 +142,7 @@
         target.setAttribute('aria-label',egg ? '和神祕寵物蛋互動' : '和'+pets[kind][1]+'互動');
         target.title = '點一下，隨機動作與悄悄話；Lv.3 與 Lv.5 解鎖更多互動';
         const bubble = el('span','','pet-touch-reply');bubble.hidden = true;bubble.setAttribute('role','status');bubble.setAttribute('aria-live','polite');bubble.setAttribute('aria-atomic','true');
-        target.append(picture,bubble);
+        target.append(picture,bubble); trackPetVisibility(target);
         return target;
     }
     function setPetMood(id, mood) {
@@ -468,6 +488,13 @@
         const intro = el('p', count === Object.keys(pets).length ? '全圖鑑收集完成！這是全班一起累積的成果。' : '同學孵化或班級收藏蛋發現新種類，就能解鎖一格！未發現的寵物保留神祕；進化造型仍須由同學的寵物達到對應等級才會揭開。');
         const overview=el('section',undefined,'pet-atlas-overview');
         overview.append(el('p','一起發現，慢慢集滿','pet-atlas-eyebrow'),el('h3','我們班的寵物收藏'),progress,bar,intro,collectionBadges(found));
+        const next = COLLECTION_MILESTONES.find(target => target > count);
+        overview.append(el('strong', next ? '再發現 '+(next-count)+' 種，就達成 '+next+' 種收藏里程碑！' : '30 種收藏里程碑已全部完成！','pet-collection-next'));
+        const recent = el('section',undefined,'pet-recent-discoveries'); recent.append(el('h3','最近發現'));
+        const discoveries = Object.entries(found).filter(([,value])=>value.discoveredAt && Number.isFinite(Date.parse(value.discoveredAt))).sort((a,b)=>Date.parse(b[1].discoveredAt)-Date.parse(a[1].discoveredAt)).slice(0,5);
+        for(const [kind,value] of discoveries) recent.append(el('p',pets[kind][1]+' · 首次發現 '+dateLabel(value.discoveredAt)));
+        if(!discoveries.length)recent.append(el('p',count ? '已有收藏，但舊紀錄沒有首次發現日期；不推測日期。' : '第一次孵化後，這裡會記下全班的新發現。'));
+        overview.append(recent);
         const filters=el('div',undefined,'pet-atlas-filters');filters.setAttribute('role','group');filters.setAttribute('aria-label','篩選圖鑑');
         const empty=el('p','還沒有發現寵物，第一次孵化就能點亮圖鑑！','pet-atlas-empty');empty.hidden=true;
         for(const [mode,label] of [['all','全部 30'],['found','已發現 '+count],['unknown','未發現 '+(30-count)]]) {
@@ -1044,6 +1071,7 @@
         const config = settings(); root.replaceChildren();
         root.classList.toggle('pet-projection',projectionMode);
         const projection=button(projectionMode?'退出上課投影':'上課投影模式',()=>{projectionMode=!projectionMode;render();},'pet-projection-toggle');projection.setAttribute('aria-pressed',String(projectionMode));root.append(projection);
+        const motion = button(reducePetMotion ? '減少動態：開啟' : '減少動態：關閉',()=>{reducePetMotion=!reducePetMotion;try{localStorage.setItem('petReduceMotion',String(reducePetMotion));}catch{} render();});motion.setAttribute('aria-pressed',String(reducePetMotion));root.append(motion);
         root.append(el('h2', '🐾 班級寵物'), el('p', `目前班級：${window.ClassProfiles?.currentProfile()?.name || '預設班級'}`, 'class-context'));
         if (!config.enabled) {
             root.append(el('p', '從今天的努力開始養一隻寵物。啟用後，原本的正向加分會同時獲得等量成長值；舊分數不換算，扣分不讓寵物退化。'));
