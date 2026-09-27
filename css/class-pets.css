@@ -262,3 +262,36 @@
 .pet-profile > .pet-collection-body { min-height:0; overflow-y:auto; overscroll-behavior:contain; }
 .pet-profile .pet-profile-showcase .pet-touch { padding:0; border:0; background:transparent; }
 .pet-profile .pet-profile-showcase .pet-portrait { width:100%; height:auto; max-width:none; }
+/* Class collection atlas */
+.pet-atlas[open] { display:flex; flex-direction:column; position:fixed; inset:0; margin:auto; height:min(920px,90dvh); width:min(980px,calc(100vw - 24px)); overflow:hidden; }
+.pet-atlas > header { flex-shrink:0; position:relative; background:inherit; }
+.pet-atlas > .pet-collection-body { overflow-y:auto; min-height:0; padding:24px; overscroll-behavior:contain; }
+.pet-atlas-overview { padding:22px; border-radius:20px; background:#edf8f4; border:1px solid #c5e6db; }
+.pet-atlas-eyebrow { margin:0; color:#0f766e; font-size:13px; font-weight:700; letter-spacing:.08em; }
+.pet-atlas-overview h3 { margin:4px 0 12px; font-size:26px; }
+.pet-atlas-overview p[role=status] { font-size:22px; font-weight:750; margin:10px 0; }
+.pet-atlas-overview > p:not([role=status]):not(.pet-atlas-eyebrow) { font-size:14px; color:#475569; }
+.pet-atlas .pet-milestones { margin-bottom:0; }
+.pet-atlas-filters { display:flex; gap:8px; padding:20px 0 4px; flex-wrap:wrap; }
+.pet-atlas-filters button[aria-pressed=true] { background:#0f766e; color:white; border-color:#0f766e; }
+.pet-atlas .pet-collection-grid { grid-template-columns:repeat(5,minmax(0,1fr)); }
+.pet-atlas .pet-collection-grid > [hidden] { display:none; }
+.pet-atlas .pet-collection-unlocked { background:#fff; border:1px solid #c3ded5; border-radius:18px; padding:14px 8px; transition:box-shadow .18s; }
+.pet-atlas .pet-collection-unlocked:hover { box-shadow:0 5px 16px #0f766e20; }
+.pet-atlas .pet-collection-locked { border-radius:18px; background:#f5f7fa; }
+.pet-atlas .pet-collection-grid small { align-self:flex-start; font-size:12px; color:#64748b; }
+.pet-atlas-card-hint { font-size:12px; color:#0f766e; margin-top:7px; }
+.pet-atlas-detail > h3 { font-size:22px; margin-top:24px; }
+.pet-atlas-detail > p { color:#64748b; font-size:14px; }
+.pet-atlas-detail .pet-collection-variants { margin:20px 0 28px; }
+.pet-atlas-detail figure { border:1px solid #dbe4ec; border-radius:16px; padding:12px; background:#f8fafc; }
+.pet-atlas-detail figcaption { font-size:14px; font-weight:600; padding:8px 0; }
+.pet-atlas-detail .pet-touch { background:transparent; border:0; padding:0; margin:12px auto 0; }
+.pet-atlas .pet-collection-stage-mask { background:#e2e8f0; color:#64748b; text-shadow:none; max-width:160px; }
+.pet-atlas-empty { padding:24px; text-align:center; }
+.dark .pet-atlas-overview { background:#193d36; border-color:#355f53; }
+.dark .pet-atlas-eyebrow,.dark .pet-atlas-card-hint { color:#6ee7b7; }
+.dark .pet-atlas-overview > p:not([role=status]):not(.pet-atlas-eyebrow),.dark .pet-atlas-detail > p,.dark .pet-atlas .pet-collection-grid small { color:#cbd5e1; }
+.dark .pet-atlas .pet-collection-unlocked,.dark .pet-atlas .pet-collection-locked,.dark .pet-atlas-detail figure { background:#243247; border-color:#475569; }
+@media(max-width:720px) { .pet-atlas .pet-collection-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media(max-width:480px) { .pet-atlas > .pet-collection-body { padding:14px; } .pet-atlas-overview { padding:16px; } .pet-atlas-overview h3 { font-size:22px; } .pet-atlas .pet-collection-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; } .pet-atlas-detail .pet-collection-variants { grid-template-columns:repeat(2,minmax(0,1fr)); } }

@@ -445,7 +445,7 @@
     }
     function openCollection() {
         const found = collectionFor(), count = Object.keys(found).length;
-        const dialog = el('dialog', undefined, 'pet-collection');
+        const dialog = el('dialog', undefined, 'pet-collection pet-atlas');
         const header = el('header'), title = el('h2', '全班收集圖鑑'); title.id = 'pet-collection-title';
         dialog.setAttribute('aria-labelledby', title.id);
         header.append(title, button('關閉圖鑑', () => { dialog.close(); dialog.remove(); }));
@@ -462,10 +462,18 @@
             }
             const tile = button(undefined, () => showDetail(kind, number), 'pet-collection-unlocked');
             tile.setAttribute('aria-label', `查看已解鎖圖鑑：${name}`);
-            tile.append(el('small', `No.${number}`), portrait(kind, 10), el('strong', name)); grid.append(tile);
+            tile.append(el('small', `No.${number} · 已發現`), portrait(kind, 10), el('strong', name),el('span','查看成長故事 →','pet-atlas-card-hint')); grid.append(tile);
         });
         const intro = el('p', count === Object.keys(pets).length ? '全圖鑑收集完成！這是全班一起累積的成果。' : '同學孵化或班級收藏蛋發現新種類，就能解鎖一格！未發現的寵物保留神祕；進化造型仍須由同學的寵物達到對應等級才會揭開。');
-        function showGrid() { content.replaceChildren(progress, bar, collectionBadges(found), intro, grid); }
+        const overview=el('section',undefined,'pet-atlas-overview');
+        overview.append(el('p','一起發現，慢慢集滿','pet-atlas-eyebrow'),el('h3','我們班的寵物收藏'),progress,bar,intro,collectionBadges(found));
+        const filters=el('div',undefined,'pet-atlas-filters');filters.setAttribute('role','group');filters.setAttribute('aria-label','篩選圖鑑');
+        const empty=el('p','還沒有發現寵物，第一次孵化就能點亮圖鑑！','pet-atlas-empty');empty.hidden=true;
+        for(const [mode,label] of [['all','全部 30'],['found','已發現 '+count],['unknown','未發現 '+(30-count)]]) {
+            const control=button(label,()=>{for(const b of filters.children)b.setAttribute('aria-pressed',String(b===control));for(const tile of grid.children)tile.hidden=mode==='found'?tile.classList.contains('pet-collection-locked'):mode==='unknown'?tile.classList.contains('pet-collection-unlocked'):false;empty.hidden=mode!=='found'||count!==0;},'');
+            control.setAttribute('aria-pressed',String(mode==='all'));filters.append(control);
+        }
+        function showGrid() { content.classList.remove('pet-atlas-detail');content.replaceChildren(overview, filters, empty, grid);content.scrollTop=0; }
         function showDetail(kind, number) {
             const holders = (window.students || []).filter(s => s.classPet === kind && (s.classPetRevealed || xpFor(s.id) >= 10)).length;
             const variants = el('div', undefined, 'pet-collection-variants');
@@ -485,8 +493,9 @@
                 else figure.append(el('div','？','pet-collection-stage-mask'),el('figcaption',`Lv.${level}・新姿態待解鎖`));
                 moodsRow.append(figure);
             }
-            content.replaceChildren(button('← 返回收集進度', showGrid), el('h3', `No.${number} ${pets[kind][1]}`), el('p', `全班已解鎖・目前 ${holders} 位同學擁有；最高已達 Lv.${maxLevel}。已解鎖紀錄不因扣分或學生離班而消失。`), variants, el('h3', '基本表情與等級姿態'), moodsRow);
-            content.append(el('p', `首次發現：${dateLabel(found[kind].discoveredAt)}`));
+            content.replaceChildren(button('← 返回收集進度', () => {showGrid();grid.querySelector('[aria-label="查看已解鎖圖鑑：'+pets[kind][1]+'"]').focus();}), el('h3', `No.${number} ${pets[kind][1]}`), el('p', `全班已解鎖・目前 ${holders} 位同學擁有；最高已達 Lv.${maxLevel}。已解鎖紀錄不因扣分或學生離班而消失。`), variants, el('h3', '基本表情與等級姿態'), moodsRow);
+            content.classList.add('pet-atlas-detail');
+            content.append(el('p', `首次發現：${dateLabel(found[kind].discoveredAt)}`, 'pet-atlas-date'));content.scrollTop=0;
             content.querySelector('button').focus();
         }
         showGrid(); dialog.append(header, content); document.body.append(dialog);
