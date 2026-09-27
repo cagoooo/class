@@ -62,6 +62,7 @@
             if (['petCarryXp', 'petCarryCoins'].some(k => s[k] != null && !Number.isSafeInteger(s[k]))) return false;
         }
         for (const r of data.pointsHistory) {
+            if (r.petDeliveredAt != null && (typeof r.petDeliveredAt !== 'string' || !Number.isFinite(Date.parse(r.petDeliveredAt)))) return false;
             if (['points', 'petXp', 'coinDelta'].some(k => r[k] != null && !Number.isFinite(r[k]))) return false;
         }
         if (data.petSettings != null && (typeof data.petSettings !== 'object' || Array.isArray(data.petSettings) || !Array.isArray(data.petSettings.rules))) return false;

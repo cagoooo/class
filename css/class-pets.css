@@ -326,3 +326,19 @@
 .dark .pet-guide-sync-note { background:#42351e; color:#fde4a7; }
 @media(max-width:760px) { .pet-guide-body { grid-template-columns:1fr; gap:22px; padding:16px; } .pet-guide-sync { border-left:0; border-top:1px solid #dbe4ec; padding:20px 0 0; } }
 @media(max-width:420px) { .pet-guide-path { grid-template-columns:1fr; } .pet-guide-path li { gap:3px; } }
+
+/* Classroom rewards and projection */
+.pet-ledger-dialog{width:min(680px,94vw);max-height:85dvh;padding:0;border:1px solid #cbd5e1;border-radius:20px;color:#172033;background:#fff}
+.pet-ledger-header{position:sticky;top:0;background:inherit;display:flex;align-items:center;justify-content:space-between;padding:16px;gap:12px;border-bottom:1px solid #cbd5e1}
+.pet-ledger-content{padding:20px}.pet-ledger-record{padding:14px 0;border-bottom:1px solid #cbd5e1;overflow-wrap:anywhere}.pet-ledger-record summary{cursor:pointer;min-height:44px}
+.pet-ledger-dialog::backdrop{background:#17203399}.pet-ledger-dialog button{min-height:44px;padding:8px 14px;border:1px solid #94a3b8;border-radius:10px}
+.pet-delivery-status,.pet-quest-next{display:block;color:#0f766e;font-weight:700;padding:8px 0}.pet-tools button[aria-pressed=true]{background:#1d4ed8;color:white}
+.pet-quest-card[data-state=ready]{border:2px solid #0f766e;background:#f0fdfa}.pet-quest-next{font-size:18px}.pet-quest-card progress{height:24px}
+.pet-projection-toggle{position:sticky;top:8px;z-index:3}
+#pets-section.pet-projection>details,#pets-section.pet-projection>.pet-wallet-status{display:none}
+.pet-projection .pet-cards{grid-template-columns:repeat(auto-fit,minmax(270px,1fr))}.pet-projection .pet-card{font-size:20px}.pet-projection .pet-avatar{min-height:220px}.pet-projection .pet-avatar img{width:220px;height:220px}
+.pet-projection .pet-coin-balance{display:none}.pet-projection-feedback{max-width:min(760px,94vw);font-size:24px}.pet-batch-names{max-height:160px;overflow:auto;font-size:18px}
+.dark .pet-ledger-dialog{background:#172033;color:#f1f5f9}.dark .pet-quest-card[data-state=ready]{background:#123d37}.dark .pet-quest-next,.dark .pet-delivery-status{color:#5eead4}
+
+.pet-projection .pet-card>details,.pet-projection .pet-card>button:not(.pet-coin-balance){display:none}
+@media(prefers-reduced-motion:no-preference){.pet-quest-card[data-state=ready] .pet-quest-next{animation:pet-goal-arrival .6s ease-out}@keyframes pet-goal-arrival{from{transform:translateY(6px);opacity:.3}to{transform:translateY(0);opacity:1}}}

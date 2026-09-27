@@ -29,7 +29,7 @@ let passed=0;async function test(name,fn){await fn();console.log('PASS',name);pa
   await a.s.publish();const b=setup(a.db);assert.equal(await b.s.restore(await b.s.read()),true);
   assert.equal(b.c.students[0].petMaxLevel,5);assert.equal(JSON.parse(b.storage.getItem('petSettings')).collection.unicorn.maxLevel,5);
   assert.deepEqual(JSON.parse(JSON.stringify(b.c.pointsHistory)),JSON.parse(JSON.stringify(a.c.pointsHistory)));
-  b.c.pointsHistory.push({id:'buy-device-b',studentId:1,points:0,petEvent:true,petXp:0,coinDelta:-3,petShopType:'purchase',productName:'獎勵'});b.save();await b.s.publish();
+  b.c.pointsHistory.push({id:'buy-device-b',petDeliveredAt:'2026-09-27T00:00:00.000Z',studentId:1,points:0,petEvent:true,petXp:0,coinDelta:-3,petShopType:'purchase',productName:'獎勵'});b.save();await b.s.publish();
   assert.equal(await a.s.restore(await a.s.read()),true);assert.ok(a.c.pointsHistory.some(r=>r.id==='buy-device-b'));
   a.c.pointsHistory.push({id:'refund-device-a',studentId:1,points:0,petEvent:true,petXp:0,coinDelta:3,petReverses:'buy-device-b'});a.save();await a.s.publish();
   assert.equal(await b.s.restore(await b.s.read()),true);

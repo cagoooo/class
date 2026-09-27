@@ -383,6 +383,7 @@
         const unlockedHint = events.length === 1 && events[0].level === 3 ? '新姿態與成長對話已解鎖，點寵物試試！' : events.length === 1 && events[0].level === 5 ? '進階姿態與成熟對話已解鎖，點寵物試試！' : '一起繼續成長！';
         message.append(el('strong', title), el('p', events.length === 1 ? `${appearance(events[0].xp).label} · Lv.${events[0].level}，${unlockedHint}` : '這次努力已存本機，到班級寵物查看新造型。'));
         box.append(portrait(events[0].kind, events[0].xp, 'happy'), message, button('關閉', () => { clearTimeout(feedbackTimer); box.remove(); }));
+        if(projectionMode && events.length>1) {const names=el('p',events.map(e=>e.name).join('、'),'pet-batch-names');box.append(names);box.classList.add('pet-projection-feedback');}
         document.body.append(box); feedbackTimer = setTimeout(() => box.remove(), 8000);
     }
     function remember() { expected = fingerprint(); expectedClass = cid(); }
@@ -760,8 +761,9 @@
         for (const quest of [...(config.quests || [])].reverse()) {
             const card = el('article', undefined, 'pet-quest-card'), progress = questProgress(quest), available = questAvailable(quest);
             const status = quest.claimedAt ? '已領獎' : quest.archivedAt ? '已結束' : progress >= quest.target ? '已達標，待領蛋' : quest.startDate && quest.startDate > taipeiDay() ? '尚未開始' : quest.endDate && quest.endDate < taipeiDay() ? '已到期' : '一起努力中';
+            card.dataset.state = quest.claimedAt ? 'done' : progress >= quest.target ? 'ready' : 'active';
             card.append(el('h3', quest.name), el('p', `${status} · ${progress} / ${quest.target} 次`), el('p', `${quest.startDate || '不限起日'} ～ ${quest.endDate || '無期限'} · 獎勵：班級收藏蛋 1 顆`));
-            const bar = el('progress'); bar.max = quest.target; bar.value = progress; bar.setAttribute('aria-label', quest.name+'進度'); card.append(bar);
+            const bar = el('progress'); bar.max = quest.target; bar.value = progress; bar.setAttribute('aria-label', quest.name+'進度'); card.append(bar, el('strong', progress >= quest.target ? '🎉 全班達標！' : '再完成 '+(quest.target-progress)+' 次，就能領取收藏蛋', 'pet-quest-next'));
             const actions = el('div', undefined, 'pet-tools');
             if (available && progress < quest.target) actions.append(button('確認完成一次 ＋1', () => guard(`確認全班完成「${quest.name}」一次？`, () => contributeQuest(quest.id))));
             if (!quest.claimedAt && !quest.archivedAt && progress >= quest.target) actions.append(button('領取班級收藏蛋', () => guard(`確認「${quest.name}」已完成？領蛋後任務結案，不能撤銷進度。`, () => claimQuest(quest.id)), 'pet-primary'));
@@ -828,6 +830,36 @@
         const config = settings();
         return saveSettings({ ...config, products: (config.products || []).map(p => p.id === id ? { ...p, active: !!active } : p) },
             { action: active ? '商品上架' : '商品下架' });
+    }
+    let deliveryFilter = 'all', projectionMode = false;
+    function deliveryStatus(record) {
+        if ((window.pointsHistory || []).some(r => r.petShopType === 'refund' && r.petReverses === record.id)) return 'refunded';
+        return record.petDeliveredAt ? 'delivered' : 'pending';
+    }
+    async function deliver(ids) {
+        return change(() => {
+            const chosen = new Set(ids);
+            const records = window.pointsHistory.filter(r => chosen.has(r.id));
+            if (!records.length || records.length !== chosen.size || records.some(r => r.petShopType !== 'redeem' || deliveryStatus(r) !== 'pending')) return fail('選取紀錄已變更或已處理，請重新確認。');
+            const at = new Date().toISOString();
+            return commit(window.students, window.groups, window.pointsHistory.map(r => chosen.has(r.id) ? {...r, petDeliveredAt: at} : r));
+        }, 'shop_deliver');
+    }
+    function showCoinLedger(studentId) {
+        const student = window.students.find(s => String(s.id) === String(studentId)); if (!student) return;
+        const dialog = el('dialog', undefined, 'pet-ledger-dialog'); dialog.setAttribute('aria-label', student.name+'的金幣明細');
+        const header = el('header', undefined, 'pet-ledger-header');
+        header.append(el('h2', student.name + '的金幣明細'), button('關閉', () => dialog.close())); dialog.append(header);
+        const content = el('div', undefined, 'pet-ledger-content');
+        content.append(el('h3', '目前可用：' + coinsFor(student.id) + ' 金幣'), el('p', '期初餘額：' + (Number(student.petCarryCoins) || 0)), button('前往兌換獎勵', () => {dialog.close(); openStudentShop(student.id);}));
+        const seen = new Set();
+        const rows = window.pointsHistory.filter(r => {if(String(r.studentId) !== String(student.id) || !r.coinDelta || seen.has(r.id)) return false; seen.add(r.id); return true;});
+        let page = 0; const list = el('div'), paging = el('div',undefined,'pet-tools');
+        const paint = () => {list.replaceChildren(); paging.replaceChildren();
+            for(const r of rows.slice(page*20,(page+1)*20)) {const detail=el('details',undefined,'pet-ledger-record');detail.append(el('summary',(r.coinDelta>0?'+':'')+r.coinDelta+' 金幣 · '+r.reason),el('p',r.timestamp || ''),el('p','原始紀錄：'+r.id));if(r.petReverses) {const original=window.pointsHistory.find(x=>x.id===r.petReverses);detail.append(el('p','對應原始紀錄：'+r.petReverses),el('p',original ? (original.reason+' · '+original.timestamp+' · '+original.coinDelta+' 金幣') : '原始紀錄不在本期帳本，請查看封存備份。'));}list.append(detail);}
+            if(!rows.length)list.append(el('p','尚無金幣收支紀錄。'));
+            if(page) paging.append(button('上一頁',()=>{page--;paint();}));paging.append(el('span',(page+1)+' / '+Math.max(1,Math.ceil(rows.length/20))));if((page+1)*20<rows.length)paging.append(button('下一頁',()=>{page++;paint();}));};
+        paint();content.append(list,paging);dialog.append(content);dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();
     }
     async function redeem(studentId, productId, expectedCost, requestId = uid()) {
         return change(() => {
@@ -951,13 +983,20 @@
         });
         shop.append(manage, el('h3', '兌換與退幣紀錄'));
         shop.append(el('p', '依上方所選學生篩選，每頁 20 筆。改價或下架不影響歷史成交金額；每筆僅能退幣一次。學期封存後請到封存備份查閱舊紀錄。'));
-        const history = window.pointsHistory.filter(r => r.petShopType && (!shopStudent || String(r.studentId) === shopStudent));
+        const filters = el('div', undefined, 'pet-tools');
+        for(const [value,label] of [['all','全部'],['pending','待交付'],['delivered','已交付'],['refunded','已退幣']]) {const control=button(label,()=>{deliveryFilter=value;shopPage=0;render();});control.setAttribute('aria-pressed',String(deliveryFilter===value));filters.append(control);} shop.append(filters);
+        const history = window.pointsHistory.filter(r => r.petShopType === 'redeem' && (!shopStudent || String(r.studentId) === shopStudent) && (deliveryFilter==='all' || deliveryStatus(r)===deliveryFilter));
+        shopPage=Math.min(shopPage,Math.max(0,Math.ceil(history.length/20)-1));
+        const selectedDeliveries=new Set();
+        const batch=button('交付勾選項目',async()=>{const ids=[...selectedDeliveries];if(ids.length && await confirmAction('確認已交付這 '+ids.length+' 筆獎勵？不會再次扣幣。')) {if(await deliver(ids)){shopReceipt="";render();}}});batch.disabled=true;shop.append(batch);
         history.slice(shopPage * 20, (shopPage + 1) * 20).forEach(r => {
-            const returned = window.pointsHistory.some(x => x.petReverses === r.id);
+            const returned = deliveryStatus(r) === 'refunded';
             const row = el('div', undefined, 'pet-history');
             row.append(el('strong', `${r.studentName} · ${r.productName}`), el('span', `${r.petShopType === 'refund' ? '退幣 +' : '兌換 -'}${r.productCost} 金幣`), el('small', r.timestamp));
             if (r.petShopType === 'redeem' && !returned) row.append(button('退回金幣', async () => { if (await confirmAction(`取消 ${r.studentName} 的「${r.productName}」兌換，退回 ${r.productCost} 金幣？`)) { if (await refund(r.id)) { shopReceipt = ''; render(); window.NotificationSystem?.success?.('退幣已存本機'); } } }));
-            else if (returned) row.append(el('span', '已退幣'));
+            row.append(el('span', {pending:'待交付',delivered:'已交付',refunded:'已退幣'}[deliveryStatus(r)], 'pet-delivery-status'));
+            if(r.petDeliveredAt) row.append(el('small','交付時間：'+dateLabel(r.petDeliveredAt)));
+            if(deliveryStatus(r)==='pending') {const label=el('label','選取交付');const check=el('input');check.type='checkbox';check.addEventListener('change',()=>{check.checked?selectedDeliveries.add(r.id):selectedDeliveries.delete(r.id);batch.disabled=!selectedDeliveries.size;batch.textContent='交付勾選項目（'+selectedDeliveries.size+'）';});label.prepend(check);row.append(label);}
             shop.append(row);
         });
         if (!history.length) shop.append(el('p', '尚無兌換紀錄。'));
@@ -1003,6 +1042,8 @@
         // 圖鑑快取而寫回 petSettings，避免被同步偵測器誤判成老師編輯。
         prepare({ persistCollection: false });
         const config = settings(); root.replaceChildren();
+        root.classList.toggle('pet-projection',projectionMode);
+        const projection=button(projectionMode?'退出上課投影':'上課投影模式',()=>{projectionMode=!projectionMode;render();},'pet-projection-toggle');projection.setAttribute('aria-pressed',String(projectionMode));root.append(projection);
         root.append(el('h2', '🐾 班級寵物'), el('p', `目前班級：${window.ClassProfiles?.currentProfile()?.name || '預設班級'}`, 'class-context'));
         if (!config.enabled) {
             root.append(el('p', '從今天的努力開始養一隻寵物。啟用後，原本的正向加分會同時獲得等量成長值；舊分數不換算，扣分不讓寵物退化。'));
@@ -1076,8 +1117,8 @@
                 card.append(label, avatar, el('strong', `${xp < 10 ? '神祕寵物蛋' : pets[kind][1]} · ${appearance(xp).label}${growth.level ? ' · ' + growth.label : ''}`, 'pet-stage-label'));
                 const progress = el('progress'); progress.max = growth.next - growth.start; progress.value = xp - growth.start; progress.setAttribute('aria-label', `${s.name}成長進度`);
                 card.append(progress, el('p', `成長值 ${xp} · 距離${growth.level ? '升級' : '孵化'}還有 ${growth.next - xp}`), el('p', nextUnlockHint(xp), 'pet-touch-hint'));
-                const exchange = button(`🪙 金幣 ${coinsFor(s.id)} · 兌換 →`, () => openStudentShop(s.id), 'pet-coin-balance');
-                exchange.setAttribute('aria-label', `${s.name}，金幣 ${coinsFor(s.id)}，前往兌換獎勵`);
+                const exchange = button(`🪙 金幣 ${coinsFor(s.id)} · 明細／兌換 →`, () => showCoinLedger(s.id), 'pet-coin-balance');
+                exchange.setAttribute('aria-label', `${s.name}，金幣 ${coinsFor(s.id)}，查看金幣明細與兌換獎勵`);
                 card.append(exchange);
                 const profile = button(s.petNickname ? `📖 ${s.petNickname} · 成長檔案` : '📖 成長檔案與暱稱', () => openProfile(s.id));
                 profile.dataset.petFocus = 'profile-' + s.id; card.append(profile);
@@ -1191,6 +1232,6 @@
         render();
         if (location.hash === '#pets') window.showSection('pets');
     }
-    window.ClassPets = { nextUnlockHint, interactionFor, createQuest, contributeQuest, undoQuestContribution, claimQuest, archiveQuest, hatchCollectionEgg, questProgress, profileFor, renamePet, collectionProgress, award, undo, xpFor, coinsFor, setCoinsEnabled, saveRule, saveProduct, addPresetProduct, setProductActive, redeem, refund, setPetMood, assetName, stage, appearance, milestone, render, prepare, settings, collectionFor, collectionStagesFor };
+    window.ClassPets = { deliver, deliveryStatus, nextUnlockHint, interactionFor, createQuest, contributeQuest, undoQuestContribution, claimQuest, archiveQuest, hatchCollectionEgg, questProgress, profileFor, renamePet, collectionProgress, award, undo, xpFor, coinsFor, setCoinsEnabled, saveRule, saveProduct, addPresetProduct, setProductActive, redeem, refund, setPetMood, assetName, stage, appearance, milestone, render, prepare, settings, collectionFor, collectionStagesFor };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

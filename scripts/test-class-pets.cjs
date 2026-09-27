@@ -416,5 +416,15 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
         for(const xp of [90,110,1000]) assert.ok(pet.nextUnlockHint(xp).includes('皆已解鎖'));
         assert.deepEqual([...storage.data],before);
     });
+    await test('交付不扣幣、防重複與退幣後禁止交付',async()=>{
+        const {pet,ctx}=setup();await pet.setCoinsEnabled(true);await pet.award([1],20,'努力');await pet.saveProduct({name:'獎勵',cost:5});const p=pet.settings().products[0];await pet.redeem(1,p.id,5);const id=ctx.pointsHistory[0].id;
+        assert.equal(await pet.deliver([id]),true);assert.equal(pet.coinsFor(1),15);assert.equal(pet.deliveryStatus(ctx.pointsHistory.find(r=>r.id===id)),'delivered');assert.equal(await pet.deliver([id]),false);
+        assert.equal(await pet.refund(id),true);assert.equal(pet.coinsFor(1),20);assert.equal(await pet.refund(id),false);assert.equal(await pet.deliver([id]),false);
+    });
+    await test('批次交付失敗整批保留，備份保留交付時間',async()=>{
+        const {pet,ctx,storage}=setup();await pet.setCoinsEnabled(true);await pet.award([1],20,'努力');await pet.saveProduct({name:'獎勵',cost:5});const p=pet.settings().products[0];await pet.redeem(1,p.id,5);await pet.redeem(1,p.id,5);const ids=ctx.pointsHistory.filter(r=>r.petShopType==='redeem').map(r=>r.id);
+        storage.failKey=ctx.POINTS_HISTORY_KEY;assert.equal(await pet.deliver(ids),false);assert.ok(ctx.pointsHistory.filter(r=>ids.includes(r.id)).every(r=>!r.petDeliveredAt));assert.equal(await pet.deliver(ids),true);assert.equal(pet.coinsFor(1),10);
+        const saved=JSON.parse(storage.getItem(ctx.POINTS_HISTORY_KEY));assert.ok(saved.filter(r=>ids.includes(r.id)).every(r=>r.petDeliveredAt));
+    });
     console.log(`${passed} checks passed`);
 })().catch(e=>{console.error(e);process.exitCode=1;});
