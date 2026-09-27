@@ -368,5 +368,25 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
         const codec=ctx.BackupIntegrity;assert.equal(JSON.stringify(codec.decode(codec.encode(data))),JSON.stringify(data));
         for(const damage of [d=>d.petSettings.collectionEggs.push(d.petSettings.collectionEggs[0]),d=>d.petSettings.quests[0].events[0].amount=2,d=>d.petSettings.collectionEggs[0].kind='unknown',d=>d.petSettings.collectionEggs=[],d=>d.petSettings.quests[0].events.push({...d.petSettings.quests[0].events[0]})]) {const d=JSON.parse(JSON.stringify(data));damage(d);assert.equal(codec.validate(d),false);}
     });
+    await test('30 種互動隨機不連續重複、不改帳本或呼叫獎勵亂數',async()=>{
+        const {pet,storage,ctx}=setup();const before=[...storage.data];let draws=0;
+        ctx.crypto={getRandomValues(){draws++;throw Error('互動不可抽寵物');}};
+        const kinds='cat dog rabbit panda fox bear penguin owl turtle dragon capybara axolotl lion tiger elephant giraffe zebra monkey koala redpanda raccoon otter hedgehog squirrel sheep pig frog seal deer unicorn'.split(' ');
+        for(const kind of kinds) {
+            let previous={}; const actions=new Set(),lines=new Set();
+            for(let i=0;i<80;i++) {const next=pet.interactionFor(kind,10,previous);assert.notEqual(next.action,previous.action);assert.notEqual(next.text,previous.text);assert.ok(['wave','curious','happy','sleepy'].includes(next.mood));assert.ok(next.text.length<40);actions.add(next.action);lines.add(next.text);previous=next;}
+            assert.ok(actions.size>=2);assert.ok(lines.size>=2);
+        }
+        assert.deepEqual([...storage.data],before);assert.equal(draws,0);assert.equal(ctx.petEvents.length,0);
+    });
+    await test('蛋互動不透露種類；新姿態素材沿用等級門檻及白名單',async()=>{
+        const {pet}=setup();let previous={};
+        for(let i=0;i<40;i++){const next=pet.interactionFor('dragon',9,previous);assert.equal(next.mood,'normal');assert.equal(pet.assetName('dragon',9,next.mood),'mystery-egg-hatching.webp');assert.ok(!next.text.includes('龍'));assert.notEqual(next.text,previous.text);previous=next;}
+        assert.equal(pet.assetName('cat',10,'wave'),'cat-baby-wave.webp');
+        assert.equal(pet.assetName('cat',49,'curious'),'cat-baby-curious.webp');
+        assert.equal(pet.assetName('cat',50,'curious'),'cat-junior-curious.webp');
+        assert.equal(pet.assetName('cat',90,'wave'),'cat-grown-wave.webp');
+        assert.equal(pet.assetName('../bad',10,'../../bad'),'cat-baby-normal.webp');
+    });
     console.log(`${passed} checks passed`);
 })().catch(e=>{console.error(e);process.exitCode=1;});

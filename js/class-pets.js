@@ -9,7 +9,7 @@
         kind = Object.hasOwn(pets, kind) ? kind : 'cat';
         const look = appearance(xp).id;
         if (look === 'egg') return `mystery-egg-${eggStage(xp).id}.webp`;
-        mood = look === 'egg' || !Object.hasOwn(moods, mood) ? 'normal' : mood;
+        mood = look === 'egg' || (!Object.hasOwn(moods, mood) && !Object.hasOwn(reactionMoods, mood)) ? 'normal' : mood;
         return `${kind}-${look}-${mood}.webp`;
     }
     function portrait(kind, xp, mood = 'normal') {
@@ -19,42 +19,102 @@
         if (xp < 10) { image.classList.add('pet-egg'); image.style.setProperty('--egg-duration', xp < 3 ? '5.6s' : xp < 6 ? '5s' : xp < 9 ? '4.6s' : '4.2s'); }
         if (xp >= 10) { image.classList.add('pet-breathing'); image.style.setProperty('--pet-breath-duration', mood === 'sleepy' ? '6s' : mood === 'happy' ? '3.8s' : '4.6s'); }
         image.alt = xp < 10 ? `神祕寵物蛋・${eggStage(xp).label}` : `${pets[kind][1]}・${appearance(xp).label}・${moods[mood] || moods.normal}`;
-        image.src = assetBase + assetName(kind, xp, mood) + (xp < 10 ? '?v=3.36.0' : '');
+        image.src = assetBase + assetName(kind, xp, mood) + (xp < 10 ? '?v=3.36.0' : '?v=3.40.0');
         image.addEventListener('error', () => {
             if (xp >= 10 && ['cat', 'dog', 'rabbit', 'panda'].includes(kind)) image.replaceWith(vectorPortrait(kind, xp));
             else { const fallback = el('span', appearance(xp).id === 'egg' ? '🥚' : pets[kind][0], 'pet-portrait pet-fallback'); fallback.setAttribute('role', 'img'); fallback.setAttribute('aria-label', image.alt + '（簡易備援圖示）'); image.replaceWith(fallback); }
         }, { once: true });
         return image;
     }
+    const reactionMoods = { wave: '開心揮手', curious: '好奇歪頭' };
+    const reactionFrames = {
+        wobble:['rotate(0)','rotate(-5deg)','rotate(5deg)','rotate(-2deg)','rotate(0)'],
+        hop:['translateY(0) scale(1)','translateY(2px) scale(1.04,.96)','translateY(-13px) scale(.98,1.02)','translateY(0) scale(1.04,.96)','scale(1)'],
+        float:['translateY(0)','translateY(-9px) rotate(-3deg)','translateY(-6px) rotate(3deg)','translateY(0)'],
+        nod:['rotate(0)','rotate(6deg) translateY(2px)','rotate(-3deg)','rotate(0)'],
+        swim:['translateX(0)','translateX(-7px) rotate(-5deg)','translateX(7px) rotate(5deg)','translateX(0)'],
+        pounce:['scale(1)','scale(1.04,.94) translateY(3px)','translateY(-7px) scale(1.03)','scale(1)'],
+        squish:['scale(1)','scale(1.06,.94)','scale(.98,1.025)','scale(1)'],
+        greet:['rotate(0)','rotate(-3deg) translateY(-2px)','rotate(3deg) translateY(-2px)','rotate(-2deg)','rotate(0)'],
+        peek:['translateX(0)','translateX(4px) rotate(7deg)','translateX(-3px) rotate(-4deg)','translateX(0)']
+    };
+    const petVoices = {
+        cat:['喵～蹭蹭你！','我的小鬍鬚也在打招呼！','一起伸個懶腰吧～'],
+        dog:['汪！看到你就好開心！','小爪子擊掌！','我準備好陪你學習了！'],
+        rabbit:['蹦蹦！今天也一起努力！','長耳朵聽見你來了！','送你一個小小兔跳！'],
+        panda:['竹子時間，慢慢來～','讓我伸個圓滾滾的懶腰！','熊貓式抱抱，接住！'],
+        fox:['嘿嘿，被你找到啦！','尾巴蓬鬆得像雲朵！','我有一個好奇的小問題～'],
+        bear:['給你一個小熊抱抱！','小熊掌和你擊掌！','陪你慢慢長大～'],
+        penguin:['搖搖擺擺，企鵝報到！','小翅膀也能打招呼！','一起排好隊出發！'],
+        owl:['咕咕～我在認真聽！','歪個頭，有新發現嗎？','小翅膀伸展一下！'],
+        turtle:['慢慢走，也能走很遠！','探出頭，跟你說你好！','一步一步就有進步～'],
+        dragon:['小龍展翅，準備出發！','呼～送你一口勇氣！','翅膀準備好迎接挑戰了！'],
+        capybara:['水豚陪你放輕鬆～','頭上的橘子也在搖！','慢一點，看看今天的美好！'],
+        axolotl:['六角小鰓，搖呀搖！','游過來和你打招呼～','水波裡藏著小小驚喜！'],
+        lion:['小獅子精神抖擻！','鬃毛整理好，一起出發！','勇敢試試看，我陪你！'],
+        tiger:['小老虎輕輕撲一下！','我的條紋是不是很帥？','準備好迎接新挑戰！'],
+        elephant:['長鼻子向你問好！','大耳朵正在聽你說～','踏踏步，穩穩向前走！'],
+        giraffe:['伸長脖子看看你！','高高的地方也有新發現！','斑點都在替你加油！'],
+        zebra:['斑馬小跑步，出發！','每一道條紋都不一樣喔！','跟著自己的步調走～'],
+        monkey:['吱吱！跳起來問好！','尾巴捲起一個小驚喜！','動動腦，想到好點子！'],
+        koala:['抱緊緊，慢慢來～','圓耳朵聽見你了！','休息一下，再一起努力！'],
+        redpanda:['小熊貓害羞揮揮手！','蓬鬆尾巴陪你轉個彎～','悄悄送你一個微笑！'],
+        raccoon:['探個頭，是你呀！','小手手準備好幫忙了！','今天又發現什麼呢？'],
+        otter:['小水獺游過來囉！','翻個身，心情亮晶晶！','牽著小手一起努力！'],
+        hedgehog:['小刺蝟輕輕縮一下！','放心，我會溫柔打招呼～','小小一步也是進步！'],
+        squirrel:['松鼠輕快跳跳！','蓬鬆尾巴也在歡呼！','把今天的好回憶收藏起來！'],
+        sheep:['咩～軟綿綿的抱抱！','捲捲毛也跟著搖呀搖～','一起輕輕跳一下！'],
+        pig:['小豬開心扭扭！','鼻子動一動，聞到好心情！','哼哼～今天也很期待！'],
+        frog:['呱！送你一個小跳躍！','池塘小隊準備好了！','蹲一下，再跳高一點！'],
+        seal:['小海豹滑過來囉！','小鰭拍拍，替你加油！','圓滾滾地向你問好！'],
+        deer:['小鹿輕輕躍起！','耳朵動一動，我在聽～','沿著小路，一起找新發現！'],
+        unicorn:['送你一點彩虹魔法！','獨角亮晶晶，心情也亮晶晶！','你的努力就是小小魔法！']
+    };
+    function pickDifferent(values, previous) {
+        const choices = values.filter(value => value !== previous);
+        return choices[Math.floor(Math.random() * choices.length)];
+    }
+    function interactionFor(kind, xp, previous = {}) {
+        const egg = xp < 10;
+        kind = Object.hasOwn(pets, kind) ? kind : 'cat';
+        const signature = ['rabbit','monkey','squirrel','sheep','frog','deer','unicorn'].includes(kind) ? 'hop' : ['dragon','owl'].includes(kind) ? 'float' : ['turtle','giraffe','raccoon','koala'].includes(kind) ? 'nod' : ['axolotl','otter','seal'].includes(kind) ? 'swim' : ['lion','tiger','elephant','zebra'].includes(kind) ? 'pounce' : ['panda','bear','hedgehog'].includes(kind) ? 'squish' : 'wobble';
+        const action = pickDifferent(egg ? ['wobble','nod','squish','peek'] : [...new Set([signature,'greet','peek','squish','hop'])], previous.action);
+        const lines = egg ? ['咚咚！裡面有動靜～','我正在慢慢準備見面！','輕輕拍拍，我聽見你囉！','猜猜看？先保留小祕密！','每一點努力，都讓見面更接近！'] : [...petVoices[kind],'很高興又見到你！','今天也一起試試看吧！','謝謝你來和我打招呼！'];
+        return { action, text: pickDifferent(lines,previous.text), mood: egg ? 'normal' : action === 'peek' || action === 'nod' ? 'curious' : action === 'greet' ? 'wave' : action === 'squish' ? 'sleepy' : 'happy' };
+    }
     function interactivePortrait(kind, xp, mood = 'normal') {
         const egg = xp < 10;
-        const names = { cat:'喵～蹭蹭你', dog:'汪！開心搖搖', rabbit:'蹦蹦跳！', panda:'伸個懶腰～', fox:'俏皮搖搖', bear:'給你一個抱抱', penguin:'搖搖擺擺', owl:'歪頭看看你', turtle:'慢慢點頭', dragon:'展翅飛一下', capybara:'悠閒晃一晃', axolotl:'水中游呀游', lion:'精神抖擻！', tiger:'輕輕撲一下', elephant:'踏踏步！', giraffe:'伸長脖子打招呼', zebra:'小跑步！', monkey:'跳起來打招呼', koala:'抱緊緊～', redpanda:'害羞晃晃', raccoon:'探頭看看', otter:'水中翻個身', hedgehog:'縮成小小球', squirrel:'輕快跳跳', sheep:'軟綿綿蹦一下', pig:'開心扭扭', frog:'呱！跳一下', seal:'滑呀滑', deer:'輕輕躍起', unicorn:'魔法跳躍！' };
-        const type = egg ? 'wobble' : ['rabbit','monkey','squirrel','sheep','frog','deer','unicorn'].includes(kind) ? 'hop' : ['dragon','owl'].includes(kind) ? 'float' : ['turtle','giraffe','raccoon','koala'].includes(kind) ? 'nod' : ['axolotl','otter','seal'].includes(kind) ? 'swim' : ['lion','tiger','elephant','zebra'].includes(kind) ? 'pounce' : ['panda','bear','hedgehog'].includes(kind) ? 'squish' : 'wobble';
-        const frames = {
-            wobble:['rotate(0)','rotate(-5deg)','rotate(5deg)','rotate(-3deg)','rotate(0)'],
-            hop:['translateY(0)','translateY(-12px) rotate(-3deg)','translateY(0)','translateY(-5px)','translateY(0)'],
-            float:['translateY(0) rotate(0)','translateY(-9px) rotate(-4deg)','translateY(-5px) rotate(4deg)','translateY(0) rotate(0)'],
-            nod:['rotate(0) scaleY(1)','rotate(5deg) scaleY(.94)','rotate(-4deg) scaleY(1.02)','rotate(0) scaleY(1)'],
-            swim:['translateX(0) rotate(0)','translateX(-5px) rotate(-6deg)','translateX(5px) rotate(6deg)','translateX(0) rotate(0)'],
-            pounce:['scale(1)','scale(.95,1.03)','translateY(-5px) scale(1.04,.96)','scale(1)'],
-            squish:['scale(1)','scale(1.05,.94)','scale(.97,1.03)','scale(1)']
-        };
-        let cooling = false;
+        kind = Object.hasOwn(pets, kind) ? kind : 'cat';
+        let previous = {}, timer, animation, generation = 0;
+        const picture = portrait(kind,xp,mood), originalSrc = picture.src, originalAlt = picture.alt;
         const target = button(undefined, event => {
             event.stopPropagation();
-            if (cooling) return;
-            cooling = true;
-            bubble.textContent = egg ? '咚咚！裡面有動靜～' : names[kind] || '你好呀！';
-            bubble.hidden = false;
+            const reaction = interactionFor(kind,xp,previous); previous = reaction;
+            const token = ++generation; clearTimeout(timer); animation?.cancel();
+            bubble.textContent = reaction.text; bubble.hidden = false;
+            target.dataset.reacting = reaction.action;
             if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches && target.animate) {
-                target.animate(frames[type].map(transform => ({ transform })), { duration:680, easing:'ease-in-out' });
+                animation = target.animate(reactionFrames[reaction.action].map(transform => ({transform})), {duration:850,easing:'cubic-bezier(.35,0,.2,1)'});
             }
-            setTimeout(() => { bubble.hidden = true; bubble.textContent = ''; cooling = false; }, 1100);
+            if (!egg) {
+                // Load only the clicked pet's unlocked stage; slow or failed images keep the current portrait.
+                const pose = new Image();
+                pose.onload = () => {
+                    if (token !== generation || !target.isConnected || !picture.isConnected) return;
+                    picture.src = pose.src;
+                    picture.alt = pets[kind][1] + '・' + appearance(xp).label + '・' + (reactionMoods[reaction.mood] || moods[reaction.mood]);
+                };
+                pose.src = assetBase + assetName(kind,xp,reaction.mood) + '?v=3.40.0';
+            }
+            timer = setTimeout(() => {
+                generation++; bubble.hidden = true; bubble.textContent = ''; delete target.dataset.reacting;
+                if (picture.isConnected) { picture.src = originalSrc; picture.alt = originalAlt; }
+            },3600);
         }, 'pet-touch');
-        target.setAttribute('aria-label', egg ? '和神祕寵物蛋互動' : `和${pets[kind][1]}互動`);
-        target.title = '點一下，打個招呼';
-        const bubble = el('span', '', 'pet-touch-reply'); bubble.hidden = true; bubble.setAttribute('role', 'status');
-        target.append(portrait(kind, xp, mood), bubble);
+        target.setAttribute('aria-label',egg ? '和神祕寵物蛋互動' : '和'+pets[kind][1]+'互動');
+        target.title = '點一下，隨機動作與悄悄話';
+        const bubble = el('span','','pet-touch-reply');bubble.hidden = true;bubble.setAttribute('role','status');bubble.setAttribute('aria-live','polite');bubble.setAttribute('aria-atomic','true');
+        target.append(picture,bubble);
         return target;
     }
     function setPetMood(id, mood) {
@@ -240,7 +300,7 @@
         const header = el('header'); header.append(title, button('關閉檔案', close));
         const body = el('div', undefined, 'pet-collection-body');
         const student = window.students.find(s => String(s.id) === String(id));
-        body.append(portrait(student.classPet, profile.xp, student.classPetMood),
+        body.append(interactivePortrait(student.classPet, profile.xp, student.classPetMood),
             el('p', `${profile.level ? '目前 Lv.' + profile.level : '等待孵化'} · 成長 ${profile.xp} · 距離${profile.level ? '升級' : '孵化'}還有 ${profile.remaining}`),
             el('p', `首次孵化：${dateLabel(profile.hatchedAt)} · 最高已記錄 Lv.${profile.maxLevel}`));
         const form = el('form', undefined, 'pet-profile-form'), label = el('label', '寵物暱稱（留白使用原名稱）');
@@ -675,7 +735,7 @@
         const eggs = el('div',undefined,'pet-class-eggs');
         for (const egg of [...(config.collectionEggs || [])].reverse()) {
             const card = el('article',undefined,'pet-quest-card');
-            card.append(portrait(egg.kind || 'cat',egg.kind ? 10 : 9), el('strong',egg.kind ? pets[egg.kind][1] : '神祕班級收藏蛋'), el('p',`來自：${egg.questName}`));
+            card.append(egg.kind ? interactivePortrait(egg.kind,10) : portrait('cat',9), el('strong',egg.kind ? pets[egg.kind][1] : '神祕班級收藏蛋'), el('p',`來自：${egg.questName}`));
             if (!egg.kind) card.append(button('點我揭曉收藏蛋',() => guard('全班準備好了嗎？揭曉後種類固定保留。',() => hatchCollectionEgg(egg.id)),'pet-primary'));
             else card.append(el('p',`已收錄圖鑑 · ${dateLabel(egg.openedAt)}`));
             eggs.append(card);
@@ -915,7 +975,7 @@
             const notice = el('aside', undefined, 'pet-collection-celebration'); notice.setAttribute('role', 'status');
             notice.append(el('strong', `🎉 全班收集里程碑！已發現 ${collectionCelebration.count} / 30 種`), button('關閉慶祝', () => { collectionCelebration = null; render(); })); root.append(notice);
         }
-        root.append(el('p', '輕點蛋或寵物，和牠打個招呼！互動不會增加成長值或金幣。', 'pet-touch-hint'));
+        root.append(el('p', '輕點蛋或寵物，每次都有不同動作與悄悄話！互動不會增加成長值或金幣。', 'pet-touch-hint'));
         root.append(button(`全班收集圖鑑 · ${Object.keys(collectionFor()).length} / ${Object.keys(pets).length}`, openCollection, 'pet-collection-entry'));
         renderQuests(root);
         const wallet = el('div', undefined, 'pet-wallet-status');
@@ -1075,6 +1135,6 @@
         render();
         if (location.hash === '#pets') window.showSection('pets');
     }
-    window.ClassPets = { createQuest, contributeQuest, undoQuestContribution, claimQuest, archiveQuest, hatchCollectionEgg, questProgress, profileFor, renamePet, collectionProgress, award, undo, xpFor, coinsFor, setCoinsEnabled, saveRule, saveProduct, addPresetProduct, setProductActive, redeem, refund, setPetMood, assetName, stage, appearance, milestone, render, prepare, settings, collectionFor, collectionStagesFor };
+    window.ClassPets = { interactionFor, createQuest, contributeQuest, undoQuestContribution, claimQuest, archiveQuest, hatchCollectionEgg, questProgress, profileFor, renamePet, collectionProgress, award, undo, xpFor, coinsFor, setCoinsEnabled, saveRule, saveProduct, addPresetProduct, setProductActive, redeem, refund, setPetMood, assetName, stage, appearance, milestone, render, prepare, settings, collectionFor, collectionStagesFor };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
