@@ -22,6 +22,20 @@ function setup(db=new FakeDb(),classId='A',uid='teacher'){
 }
 let passed=0;async function test(name,fn){await fn();console.log('PASS',name);passed++;}
 (async()=>{
+ await test('獨立客戶端往返保留 Lv.5、圖鑑與兌換退幣帳本',async()=>{
+  const a=setup();a.c.students[0].petMaxLevel=5;a.c.students[0].points=90;
+  a.c.pointsHistory.push({id:'growth',studentId:1,points:80,petEvent:true,petXp:80,coinDelta:80});a.save();
+  const config=JSON.parse(a.storage.getItem('petSettings'));config.collection.unicorn.maxLevel=5;a.storage.setItem('petSettings',JSON.stringify(config));
+  await a.s.publish();const b=setup(a.db);assert.equal(await b.s.restore(await b.s.read()),true);
+  assert.equal(b.c.students[0].petMaxLevel,5);assert.equal(JSON.parse(b.storage.getItem('petSettings')).collection.unicorn.maxLevel,5);
+  assert.deepEqual(JSON.parse(JSON.stringify(b.c.pointsHistory)),JSON.parse(JSON.stringify(a.c.pointsHistory)));
+  b.c.pointsHistory.push({id:'buy-device-b',studentId:1,points:0,petEvent:true,petXp:0,coinDelta:-3,petShopType:'purchase',productName:'獎勵'});b.save();await b.s.publish();
+  assert.equal(await a.s.restore(await a.s.read()),true);assert.ok(a.c.pointsHistory.some(r=>r.id==='buy-device-b'));
+  a.c.pointsHistory.push({id:'refund-device-a',studentId:1,points:0,petEvent:true,petXp:0,coinDelta:3,petReverses:'buy-device-b'});a.save();await a.s.publish();
+  assert.equal(await b.s.restore(await b.s.read()),true);
+  assert.deepEqual(JSON.parse(JSON.stringify(b.s.dataFor(b.s.capture()))),JSON.parse(JSON.stringify(a.s.dataFor(a.s.capture()))));
+  assert.equal(b.c.pointsHistory.filter(r=>r.id==='refund-device-a').length,1);
+ });
  await test('完整快照保留寵物、期初值、金幣、商品與退幣',async()=>{const a=setup();await a.s.publish();const remote=await a.s.read();assert.deepEqual(JSON.parse(JSON.stringify(a.s.dataFor(remote.values))),JSON.parse(JSON.stringify(a.s.dataFor(a.s.capture()))));assert.equal(a.s.status(),'synced');});
  await test('未知舊裝置不能覆蓋既有雲端',async()=>{const a=setup();await a.s.publish();const b=setup(a.db);await assert.rejects(b.s.publish(),e=>e.code==='sync-conflict');assert.equal((await a.s.read()).token,(await b.s.read()).token);});
  await test('沒有同步基準的舊雲端差異只留底不即時推播',async()=>{const a=setup();a.db.data.set('users/teacher/classes/A/students/1',{id:1,name:'雲端學生',points:4});a.c.students[0].points=42;a.save();await assert.rejects(a.s.publish(),e=>e.code==='sync-conflict'&&e.notify===false&&e.source==='legacy-divergence');await a.s.report(Object.assign(Error('雲端版本與本機資料不同'),{code:'sync-conflict',notify:false,source:'legacy-divergence'}),'A',true);assert.equal(a.syncConflicts.length,1);assert.equal(a.syncConflicts[0][1].notify,false);assert.equal(a.syncConflicts[0][1].source,'legacy-divergence');});

@@ -262,6 +262,11 @@
         const level = stage(xp).level;
         return level === 0 ? { id: 'egg', label: eggStage(xp).label } : level < 3 ? { id: 'baby', label: '幼年' } : level < 5 ? { id: 'junior', label: '成長' } : { id: 'grown', label: '成熟' };
     }
+    function nextUnlockHint(xp) {
+        const next = COLLECTION_VARIANTS.find(item => xp < item.xp);
+        if (!next) return '✓ 目前三階段造型與互動皆已解鎖，成長仍會繼續！';
+        return next.level === 1 ? `？ 再累積 ${next.xp - xp} 成長值，就能孵化並揭曉寵物！` : `？ 再累積 ${next.xp - xp} 成長值，達到 Lv.${next.level} 解鎖新造型與新姿態！`;
+    }
     function milestone(before, after) {
         const from = stage(before).level, to = stage(after).level;
         return to > from ? { type: from === 0 ? 'hatch' : 'level', level: to } : null;
@@ -310,6 +315,7 @@
         const student = window.students.find(s => String(s.id) === String(id));
         body.append(interactivePortrait(student.classPet, profile.xp, student.classPetMood),
             el('p', `${profile.level ? '目前 Lv.' + profile.level : '等待孵化'} · 成長 ${profile.xp} · 距離${profile.level ? '升級' : '孵化'}還有 ${profile.remaining}`),
+            el('p', nextUnlockHint(profile.xp), 'pet-touch-hint'),
             el('p', `首次孵化：${dateLabel(profile.hatchedAt)} · 最高已記錄 Lv.${profile.maxLevel}`));
         const form = el('form', undefined, 'pet-profile-form'), label = el('label', '寵物暱稱（留白使用原名稱）');
         const input = el('input'); input.maxLength = 20; input.value = profile.nickname; label.append(input);
@@ -1035,7 +1041,7 @@
                 const avatar = el('div', undefined, 'pet-avatar'); avatar.append(interactivePortrait(kind, xp, s.classPetMood || 'normal'));
                 card.append(label, avatar, el('strong', `${xp < 10 ? '神祕寵物蛋' : pets[kind][1]} · ${appearance(xp).label}${growth.level ? ' · ' + growth.label : ''}`, 'pet-stage-label'));
                 const progress = el('progress'); progress.max = growth.next - growth.start; progress.value = xp - growth.start; progress.setAttribute('aria-label', `${s.name}成長進度`);
-                card.append(progress, el('p', `成長值 ${xp} · 距離${growth.level ? '升級' : '孵化'}還有 ${growth.next - xp}`));
+                card.append(progress, el('p', `成長值 ${xp} · 距離${growth.level ? '升級' : '孵化'}還有 ${growth.next - xp}`), el('p', nextUnlockHint(xp), 'pet-touch-hint'));
                 const exchange = button(`🪙 金幣 ${coinsFor(s.id)} · 兌換 →`, () => openStudentShop(s.id), 'pet-coin-balance');
                 exchange.setAttribute('aria-label', `${s.name}，金幣 ${coinsFor(s.id)}，前往兌換獎勵`);
                 card.append(exchange);
@@ -1151,6 +1157,6 @@
         render();
         if (location.hash === '#pets') window.showSection('pets');
     }
-    window.ClassPets = { interactionFor, createQuest, contributeQuest, undoQuestContribution, claimQuest, archiveQuest, hatchCollectionEgg, questProgress, profileFor, renamePet, collectionProgress, award, undo, xpFor, coinsFor, setCoinsEnabled, saveRule, saveProduct, addPresetProduct, setProductActive, redeem, refund, setPetMood, assetName, stage, appearance, milestone, render, prepare, settings, collectionFor, collectionStagesFor };
+    window.ClassPets = { nextUnlockHint, interactionFor, createQuest, contributeQuest, undoQuestContribution, claimQuest, archiveQuest, hatchCollectionEgg, questProgress, profileFor, renamePet, collectionProgress, award, undo, xpFor, coinsFor, setCoinsEnabled, saveRule, saveProduct, addPresetProduct, setProductActive, redeem, refund, setPetMood, assetName, stage, appearance, milestone, render, prepare, settings, collectionFor, collectionStagesFor };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

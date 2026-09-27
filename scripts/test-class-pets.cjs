@@ -405,5 +405,16 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
         assert.equal(pet.assetName('cat',89,'curious'),'cat-junior-normal.webp');
         assert.equal(pet.assetName('cat',90,'curious'),'cat-grown-curious.webp');
     });
+    await test('下一姿態提示使用進化門檻且不預告不存在的新階段',async()=>{
+        const {pet,storage}=setup();const before=[...storage.data];
+        for(const [xp,remaining,level] of [[10,40,3],[30,20,3],[49,1,3],[50,40,5],[70,20,5],[89,1,5]]) {
+            assert.ok(pet.nextUnlockHint(xp).includes(remaining+' 成長值'));
+            assert.ok(pet.nextUnlockHint(xp).includes('Lv.'+level));
+        }
+        assert.ok(pet.nextUnlockHint(0).includes('10 成長值'));
+        assert.ok(pet.nextUnlockHint(9).includes('1 成長值'));
+        for(const xp of [90,110,1000]) assert.ok(pet.nextUnlockHint(xp).includes('皆已解鎖'));
+        assert.deepEqual([...storage.data],before);
+    });
     console.log(`${passed} checks passed`);
 })().catch(e=>{console.error(e);process.exitCode=1;});
