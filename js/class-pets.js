@@ -1010,11 +1010,22 @@
             if (!config.coinsEnabled && !(window.pointsHistory || []).some(r => r.petEvent) && !config.quests?.length && !config.collectionEggs?.length) return;
         }
         const guide = el('details', undefined, 'pet-guide'); guide.dataset.petKey = 'guide';
-        guide.append(el('summary', '成長指南與同步說明'));
-        guide.append(el('p', '10 成長值孵化，每增加 20 成長值升一級。Lv.1 幼年 → Lv.3 成長 → Lv.5 成熟。分數歸零不影響成長；撤銷誤加獎勵會回復成長。'));
-        guide.append(el('p', `${Object.keys(pets).length} 種寵物藏在神祕蛋中，孵化才揭曉種類；各有幼年、成長、成熟造型，圖鑑只會顯示班級中實際達成過的進化階段，未達成的階段會保持神秘。孵化後可選精神飽滿、開心歡呼或安心休息樣態。蛋會隨成長值變化：0–2 安靜孵育、3–5 出現裂紋、6–8 裂縫擴大、9 即將破殼。首次達到 10 才隨機揭曉，抽出後固定保留，撤銷再加分不重抽。表情只改外觀，不影響分數、成長或金幣。`));
-        guide.append(el('p', '資料先存在本機，登入後沿用雲端同步。換裝置前請完成同步，同一班請避免兩台裝置同時加分。'));
-        guide.append(el('p', '通知會留在使用紀錄：孵化、升級、撤銷、商店兌換／退幣與設定變更會併入每日批次戰報；寵物資料儲存、同步或設定失敗才會即時送出寵物系統錯誤通知。'));
+        const guideSummary=el('summary');guideSummary.append(el('strong','成長指南與同步說明'),el('span','孵化門檻・解鎖規則・換裝置三步驟','pet-guide-subtitle'));guide.append(guideSummary);
+        const guideBody=el('div',undefined,'pet-guide-body');
+        const growthGuide=el('section',undefined,'pet-guide-panel');growthGuide.append(el('h3','01　每一份努力，都讓牠長大'),el('p','啟用寵物成長後，正向加分會帶動成長；自訂獎勵依老師設定發放。'));
+        const path=el('ol',undefined,'pet-guide-path');
+        for(const [amount,title,description] of [['10','Lv.1 · 孵化','隨機揭曉你的成長夥伴'],['50','Lv.3 · 成長','解鎖新造型與新姿態'],['90','Lv.5 · 成熟','解鎖進階姿態與對話']]) {const step=el('li');step.append(el('strong',amount+' 成長值'),el('span',title),el('small',description));path.append(step);}
+        growthGuide.append(path,el('p','以上為累積成長值；孵化後每增加 20 成長值升一級。','pet-guide-note'));
+        const guideRules=el('div',undefined,'pet-guide-rules');
+        for(const [title,copy] of [['分數與成長分開','一般扣分、分數歸零與金幣兌換不會讓寵物退化；撤銷誤加獎勵會回復該筆成長。'],['驚喜，留到解鎖那天',Object.keys(pets).length+' 種寵物隨機孵化，揭曉後固定保留；撤銷再加分不重抽。圖鑑只公開班級已獲得的種類與達成過的進化階段。'],['輕點互動，不花金幣','點按寵物會出現隨機動作與對話；表情與互動不增加或消耗成長值、分數或金幣。']]) {const item=el('section');item.append(el('h4',title),el('p',copy));guideRules.append(item);}
+        growthGuide.append(guideRules);
+        const eggGuide=el('details',undefined,'pet-guide-extra');eggGuide.dataset.petKey='egg-guide';eggGuide.append(el('summary','蛋殼如何隨成長改變？'),el('p','0–2：安靜孵育 → 3–5：出現裂紋 → 6–8：裂縫擴大 → 9：即將破殼 → 10：孵化揭曉。'));growthGuide.append(eggGuide);
+        const syncGuide=el('section',undefined,'pet-guide-panel pet-guide-sync');syncGuide.append(el('h3','02　換裝置，記得帶上班級成果'),el('p','資料先儲存在本機，完成雲端同步後，另一台裝置才能取得最新成果。'));
+        const syncSteps=el('ol',undefined,'pet-guide-sync-steps');
+        for(const [title,copy] of [['離開前：上傳','登入老師的 Google 帳號，執行班級同步，確認顯示同步完成。'],['換裝置：下載','登入同一帳號，從雲端還原班級資料，確認班級與成果正確。'],['確認後：繼續操作','再進行加分或兌換；同一班請避免兩台裝置同時修改。']]){const item=el('li');item.append(el('strong',title),el('p',copy));syncSteps.append(item);}syncGuide.append(syncSteps);
+        syncGuide.append(el('p','離線或尚未登入時，請保留目前裝置的資料，恢復連線並登入後再同步。若出現版本差異，先備份與比較，再選擇要保留的版本。','pet-guide-sync-note'));
+        const notifications=el('details',undefined,'pet-guide-extra');notifications.dataset.petKey='notification-guide';notifications.append(el('summary','哪些活動會發送通知？'),el('p','孵化、升級、撤銷、兌換、退幣與設定變更彙整至每日戰報。真正的儲存或同步異常才依錯誤分類通知；單純未登入、離線等待不當作寵物故障。'));syncGuide.append(notifications);
+        guideBody.append(growthGuide,syncGuide);guide.append(guideBody);
         root.append(guide);
         if (collectionCelebration?.classId === cid()) {
             const notice = el('aside', undefined, 'pet-collection-celebration'); notice.setAttribute('role', 'status');

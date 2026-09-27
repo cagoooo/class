@@ -295,3 +295,34 @@
 .dark .pet-atlas .pet-collection-unlocked,.dark .pet-atlas .pet-collection-locked,.dark .pet-atlas-detail figure { background:#243247; border-color:#475569; }
 @media(max-width:720px) { .pet-atlas .pet-collection-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 @media(max-width:480px) { .pet-atlas > .pet-collection-body { padding:14px; } .pet-atlas-overview { padding:16px; } .pet-atlas-overview h3 { font-size:22px; } .pet-atlas .pet-collection-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; } .pet-atlas-detail .pet-collection-variants { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+#pets-section .pet-guide { margin:16px 0; border:1px solid #c8ddd8; border-radius:18px; background:#fff; overflow:hidden; }
+#pets-section .pet-guide > summary { padding:18px 20px; cursor:pointer; color:#164e46; background:#f0f8f5; min-height:48px; box-sizing:border-box; }
+.pet-guide-subtitle { display:block; margin:6px 0 0 18px; font-size:13px; color:#526b65; font-weight:400; }
+.pet-guide-body { padding:20px; display:grid; grid-template-columns:minmax(0,1.25fr) minmax(0,1fr); gap:28px; line-height:1.7; }
+.pet-guide-panel { min-width:0; }
+.pet-guide-panel h3 { margin:0 0 10px; font-size:18px; }
+.pet-guide-panel p { margin:8px 0; }
+.pet-guide-path { list-style:none; padding:0; margin:20px 0 12px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.pet-guide-path li { display:flex; flex-direction:column; gap:8px; padding:14px 10px; border:1px solid #c7e4da; border-radius:12px; background:#f1faf6; }
+.pet-guide-path strong { color:#0f766e; font-size:17px; }
+.pet-guide-path small,.pet-guide-note { color:#64748b; font-size:13px; }
+.pet-guide-rules { margin-top:20px; }
+.pet-guide-rules section { border-top:1px solid #e2e8f0; padding:12px 0; }
+.pet-guide-rules h4 { margin:0; font-size:15px; }
+.pet-guide-rules p { color:#475569; }
+.pet-guide-sync { border-left:1px solid #e2e8f0; padding-left:26px; }
+.pet-guide-sync-steps { padding-left:24px; margin:20px 0; }
+.pet-guide-sync-steps li { padding:0 0 16px 8px; }
+.pet-guide-sync-steps li::marker { color:#0f766e; font-weight:700; }
+.pet-guide-sync-steps p { color:#475569; margin:4px 0; }
+.pet-guide-sync-note { border-left:3px solid #d69c35; background:#fffbeb; color:#785520; padding:12px; border-radius:0 10px 10px 0; }
+.pet-guide-extra { margin-top:12px; border-top:1px solid #dbe4ec; padding-top:12px; }
+.pet-guide-extra summary { min-height:44px; cursor:pointer; font-weight:600; padding:8px 0; box-sizing:border-box; }
+.pet-guide summary:focus-visible { outline:3px solid #6366f1; outline-offset:-3px; }
+.dark #pets-section .pet-guide { background:#172033; border-color:#45605a; }
+.dark #pets-section .pet-guide > summary,.dark .pet-guide-path li { background:#1b3934; color:#def7ed; }
+.dark .pet-guide-subtitle,.dark .pet-guide-note,.dark .pet-guide-path small,.dark .pet-guide-rules p,.dark .pet-guide-sync-steps p { color:#cbd5e1; }
+.dark .pet-guide-path strong { color:#6ee7b7; }
+.dark .pet-guide-sync-note { background:#42351e; color:#fde4a7; }
+@media(max-width:760px) { .pet-guide-body { grid-template-columns:1fr; gap:22px; padding:16px; } .pet-guide-sync { border-left:0; border-top:1px solid #dbe4ec; padding:20px 0 0; } }
+@media(max-width:420px) { .pet-guide-path { grid-template-columns:1fr; } .pet-guide-path li { gap:3px; } }
