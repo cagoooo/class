@@ -9,5 +9,6 @@ function setup(fail=false){const notices=[],data=new Map([['pendingSyncKeys','["
  {const a=setup();assert.equal(await a.c.FirebaseSync.syncFromCloud(),null);console.log('PASS incomplete cloud read has no restore payload');}
  {const a=setup();assert.equal(await a.c.FirebaseSync.loadFromCloudData({students:[]}),false);console.log('PASS unverified restore payload rejected');}
  {const a=setup();assert.equal(await a.c.FirebaseSync.loadFromCloudData({__snapshot:{classId:'B'}}),false);assert.equal(a.c.syncStatus.isSyncing,false);console.log('PASS changed class cannot restore preview');}
- console.log('8 sync entry checks passed');
+ {const a=setup();let release,entered;const ready=new Promise(r=>{entered=r});const states=[];a.c.SyncStatusIndicator={updateStateBasedOnSync:()=>states.push(a.c.syncStatus.isSyncing)};a.c.uploadClassProfilesMerged=()=>new Promise(r=>{release=r;entered()});const pending=a.c.FirebaseSync.syncToCloud();await ready;assert.equal(a.c.syncStatus.isSyncing,true);assert.equal(a.c.syncStatus.progress.phase,'registry');release();assert.equal(await pending,true);assert.deepEqual(states,[true,false]);console.log('PASS registry wait keeps syncing until final status refresh');}
+ console.log('9 sync entry checks passed');
 })().catch(e=>{console.error(e);process.exitCode=1;});

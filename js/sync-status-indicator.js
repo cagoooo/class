@@ -359,6 +359,7 @@
             return;
         }
 
+        if (window.syncStatus?.isSyncing) { setState('syncing'); return; }
         if (window.CloudSafety) { setState(CloudSafety.status()); return; }
         const lastSync = localStorage.getItem('lastSyncTime');
         if (!lastSync) {

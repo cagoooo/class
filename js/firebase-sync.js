@@ -255,6 +255,7 @@ async function syncToCloud(silent = false) {
     syncStatus.isSyncing = true;
     syncStatus.progress = null;
     setSyncProgress(8, 'prepare', '檢查本機成果', id);
+    window.SyncStatusIndicator?.updateStateBasedOnSync();
     try {
         setSyncProgress(18, 'snapshot', '上傳班級完整快照', id);
         await CloudSafety.publish(id);
@@ -269,7 +270,7 @@ async function syncToCloud(silent = false) {
         setSyncProgress(100, 'error', error?.message || '同步未完成', id);
         await CloudSafety.report(error, id, silent);
         return false;
-    } finally { syncStatus.isSyncing = false; }
+    } finally { syncStatus.isSyncing = false; window.SyncStatusIndicator?.updateStateBasedOnSync(); }
 }
 
 async function syncFromCloud() {

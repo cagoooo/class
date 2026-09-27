@@ -63,4 +63,10 @@ offline.localStorage.setItem('students', '[1]');
 assert.equal(offline.markers, 1, '離線修改仍應留下待同步標記');
 console.log('PASS 離線修改留下待同步標記');
 
-console.log('5 sync-status checks passed');
+context.syncStatus = { isSyncing: true };
+context.SyncStatusIndicator.updateStateBasedOnSync();
+assert.equal(context.document.getElementById('sync-status-indicator').innerHTML, '☁️');
+context.syncStatus.isSyncing = false;
+context.SyncStatusIndicator.updateStateBasedOnSync();
+assert.equal(context.document.getElementById('sync-status-indicator').innerHTML, '✅');
+console.log('7 sync-status checks passed');
