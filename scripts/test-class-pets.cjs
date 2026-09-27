@@ -374,7 +374,7 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
         const kinds='cat dog rabbit panda fox bear penguin owl turtle dragon capybara axolotl lion tiger elephant giraffe zebra monkey koala redpanda raccoon otter hedgehog squirrel sheep pig frog seal deer unicorn'.split(' ');
         for(const kind of kinds) {
             let previous={}; const actions=new Set(),lines=new Set();
-            for(let i=0;i<80;i++) {const next=pet.interactionFor(kind,10,previous);assert.notEqual(next.action,previous.action);assert.notEqual(next.text,previous.text);assert.ok(['wave','curious','happy','sleepy'].includes(next.mood));assert.ok(next.text.length<40);actions.add(next.action);lines.add(next.text);previous=next;}
+            for(let i=0;i<80;i++) {const next=pet.interactionFor(kind,10,previous);assert.notEqual(next.action,previous.action);assert.notEqual(next.text,previous.text);assert.ok(['normal','wave','curious','happy','sleepy'].includes(next.mood));assert.ok(next.text.length<40);actions.add(next.action);lines.add(next.text);previous=next;}
             assert.ok(actions.size>=2);assert.ok(lines.size>=2);
         }
         assert.deepEqual([...storage.data],before);assert.equal(draws,0);assert.equal(ctx.petEvents.length,0);
@@ -382,11 +382,28 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
     await test('蛋互動不透露種類；新姿態素材沿用等級門檻及白名單',async()=>{
         const {pet}=setup();let previous={};
         for(let i=0;i<40;i++){const next=pet.interactionFor('dragon',9,previous);assert.equal(next.mood,'normal');assert.equal(pet.assetName('dragon',9,next.mood),'mystery-egg-hatching.webp');assert.ok(!next.text.includes('龍'));assert.notEqual(next.text,previous.text);previous=next;}
-        assert.equal(pet.assetName('cat',10,'wave'),'cat-baby-wave.webp');
-        assert.equal(pet.assetName('cat',49,'curious'),'cat-baby-curious.webp');
-        assert.equal(pet.assetName('cat',50,'curious'),'cat-junior-curious.webp');
+        assert.equal(pet.assetName('cat',10,'wave'),'cat-baby-normal.webp');
+        assert.equal(pet.assetName('cat',49,'curious'),'cat-baby-normal.webp');
+        assert.equal(pet.assetName('cat',50,'curious'),'cat-junior-normal.webp');
         assert.equal(pet.assetName('cat',90,'wave'),'cat-grown-wave.webp');
         assert.equal(pet.assetName('../bad',10,'../../bad'),'cat-baby-normal.webp');
+    });
+    await test('Lv.1/3/5 互動逐階段解鎖，未達門檻不載入新姿態',async()=>{
+        const {pet}=setup();
+        for (const xp of [10,49,50,89,90]) {
+            const seen=new Set();let previous={};
+            for(let i=0;i<250;i++) {
+                const next=pet.interactionFor('cat',xp,previous);seen.add(next.action);
+                if(xp<50) {assert.ok(['wobble','hop'].includes(next.action));assert.ok(!['wave','curious'].includes(next.mood));}
+                if(xp<90) {assert.notEqual(next.action,'peek');assert.notEqual(next.mood,'curious');}
+                assert.notEqual(next.action,previous.action);previous=next;
+            }
+            if(xp>=50) assert.ok(seen.has('greet'));
+            if(xp>=90) assert.ok(seen.has('peek'));
+        }
+        assert.equal(pet.assetName('cat',50,'wave'),'cat-junior-wave.webp');
+        assert.equal(pet.assetName('cat',89,'curious'),'cat-junior-normal.webp');
+        assert.equal(pet.assetName('cat',90,'curious'),'cat-grown-curious.webp');
     });
     console.log(`${passed} checks passed`);
 })().catch(e=>{console.error(e);process.exitCode=1;});

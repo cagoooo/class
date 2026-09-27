@@ -86,12 +86,14 @@ def build(kind, stage, mood):
                 arm.location.z=1.47;arm.rotation_euler[1]=-.95
                 ball('GreetingPaw',(.63,-.20,1.62),(.09,.035,.105),pink)
         line('WaveTrail',[(.86,-.1,1.49),(.98,-.1,1.64),(.91,-.1,1.83)],gold,.017)
+    headz = evolve_pet(scene,kind,stage,headz,fur,light,gold)
+    color_pet(scene,kind,stage)
     if mood=='curious':
         pivot=bpy.data.objects.new('CuriousHeadPivot',None);scene.collection.objects.link(pivot);pivot.location=(0,0,headz)
         bpy.context.view_layer.update()
         # Face, ears and head turn together; the body remains grounded.
         for obj in list(scene.objects):
-            if obj is pivot or obj.type not in ['MESH','CURVE'] or obj.name.startswith(('Arm','Wing','Scarf','Shoulder')): continue
+            if obj is pivot or obj.type not in ['MESH','CURVE'] or obj.name.startswith(('Arm','Wing','Scarf','Shoulder','EvolutionWing','EvolutionFin','EvolutionTail')): continue
             facial_curve = obj.type == 'CURVE' and obj.data.splines and obj.data.splines[0].bezier_points and min(p.co.z for p in obj.data.splines[0].bezier_points) > headz-.36
             if obj.location.z > headz-.36 or facial_curve:
                 obj.parent=pivot;obj.matrix_parent_inverse=pivot.matrix_world.inverted()
