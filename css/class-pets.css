@@ -342,3 +342,18 @@
 
 .pet-projection .pet-card>details,.pet-projection .pet-card>button:not(.pet-coin-balance){display:none}
 @media(prefers-reduced-motion:no-preference){.pet-quest-card[data-state=ready] .pet-quest-next{animation:pet-goal-arrival .6s ease-out}@keyframes pet-goal-arrival{from{transform:translateY(6px);opacity:.3}to{transform:translateY(0);opacity:1}}}
+
+/* Compact roster: keep profile actions out of the narrow portrait column. */
+#pets-section:not(.pet-projection) .pet-compact .pet-card > button[data-pet-focus^="profile-"] { grid-column:1 / -1; width:100%; min-width:0; box-sizing:border-box; margin-top:8px; display:flex; align-items:center; justify-content:space-between; gap:12px; text-align:left; padding:11px 14px; border-color:#c5dbd5; background:#edf5f1; color:#24594e; font-size:14px; font-weight:600; line-height:1.5; }
+#pets-section:not(.pet-projection) .pet-compact .pet-card > button[data-pet-focus^="profile-"]::after { content:"→"; flex:none; font-size:18px; }
+#pets-section:not(.pet-projection) .pet-compact .pet-card > button[data-pet-focus^="profile-"]:hover { background:#e0eeea; border-color:#6c9d90; }
+.dark #pets-section:not(.pet-projection) .pet-compact .pet-card > button[data-pet-focus^="profile-"] { background:#1b3934; color:#def7ed; border-color:#45605a; }
+@media(max-width:600px) {
+  .pet-compact .pet-card { grid-template-columns:60px minmax(0,1fr); gap:5px 10px; }
+  .pet-compact .pet-portrait { width:60px; height:70px; }
+  #pets-section .pet-compact .pet-coin-balance { font-size:14px; padding:8px 10px; }
+  #pets-section .pet-compact .pet-card-options summary { padding-left:0; }
+  #pets-section .pet-tools > input { box-sizing:border-box; min-width:0; }
+  #pets-section .pet-view-tools { gap:6px; }
+  #pets-section .pet-view-tools button { flex:1; padding:9px 8px; font-size:14px; white-space:nowrap; }
+}
