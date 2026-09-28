@@ -168,17 +168,28 @@
                 : (options.remote || await read(id));
             const known = base(c);
             const before = fingerprint(values);
+            const matchesRemote = !remote.empty && before === fingerprint(remote.values);
             // 舊版客戶端把資料直接寫在 students/pointsHistory 等集合，尚未有
             // syncRevision。只要本機內容與這份舊雲端快照完全相同，就能把它
             // 安全升級成不可變快照；若內容不同，仍照原流程阻擋並要求比較。
             const canAdoptLegacy = !remote.empty
                 && String(remote.token || '').startsWith('legacy:')
-                && before === fingerprint(remote.values);
+                && matchesRemote;
             // 一鍵同步是在老師已確認覆蓋後執行；仍在同一個分頁鎖內
             // 重新讀取雲端，避免另一個同源分頁的舊讀取造成假衝突。
             const expected = options.allowRemoteOverwrite
                 ? (remote.empty ? undefined : remote.token)
                 : (Object.hasOwn(options, 'expectedToken') ? options.expectedToken : (known?.token || (canAdoptLegacy ? remote.token : undefined)));
+            // revision token 可能因另一個分頁重送相同快照而改變；若完整內容
+            // 指紋一致，這不是資料衝突。直接採用最新 token，避免要求老師
+            // 比較兩份完全相同的資料。舊版集合升級仍須走下方發布流程。
+            if (matchesRemote && !canAdoptLegacy) {
+                remember(c, remote.token, values);
+                clearLocalChange(c, before);
+                localStorage.setItem('lastSyncTime', new Date().toISOString());
+                window.SyncStatusIndicator?.updateStateBasedOnSync();
+                return true;
+            }
             if (!remote.empty && expected !== remote.token) {
                 // 沒有本機同步基準時，無法證明是另一台裝置改了雲端：
                 // 常見情境是舊版集合資料第一次升級，或新裝置首次拿到
@@ -193,7 +204,7 @@
                         : (String(remote.token || '').startsWith('legacy:') ? 'legacy-divergence' : 'unverified-divergence')
                 });
             }
-            if (expected === remote.token && before === fingerprint(remote.values) && !canAdoptLegacy) { remember(c, remote.token, values); clearLocalChange(c, before); return true; }
+            if (expected === remote.token && matchesRemote && !canAdoptLegacy) { remember(c, remote.token, values); clearLocalChange(c, before); return true; }
             const token = crypto.randomUUID(), json = JSON.stringify({ schema: 1, classId: id, values });
             const parts = BackupIntegrity.split(json, 60000), count = parts.length;
             if (count > 200) throw Error('資料量超過單次同步範圍，請先匯出 Excel 保存');
