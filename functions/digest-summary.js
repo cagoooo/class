@@ -36,7 +36,9 @@ function isExpectedSyncWait(event) {
 function isRecoverableOfflineSync(event) {
   if (event?.type !== 'error' || event.feature !== 'pet' || event.operation !== 'cloud_sync') return false;
   if (String(event.failureStage || '') !== 'unavailable') return false;
-  return /^Failed to get document because the client is offline\.?$/i.test(String(event.message || '').trim());
+  const message = String(event.message || '').trim();
+  return /^Failed to get document because the client is offline\.?$/i.test(message)
+    || /^Failed to get documents? from server\.\s*\(However, these documents may exist in the local cache\.\s*Run again without setting source to ["']server["'] to retrieve the cached documents\.\)$/i.test(message);
 }
 
 function isSyncConflictEvent(event) {

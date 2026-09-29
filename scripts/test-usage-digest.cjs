@@ -28,6 +28,7 @@ test('舊版同步錯誤會歸入衝突，並按帳號與班級去重', () => {
     { type: 'error', uid: 'teacher-c', classId: '603', day: '2026-09-22', message: '另一台裝置已更新此班', _documentId: 'legacy-2' },
     { type: 'sync_conflict', uid: 'teacher-d', classId: '604', day: '2026-09-22', notify: false, source: 'legacy-divergence' },
     { type: 'error', uid: 'teacher-c', feature: 'pet', operation: 'cloud_sync', failureStage: 'unavailable', message: 'Failed to get document because the client is offline.' },
+    { type: 'error', uid: 'teacher-c', feature: 'pet', operation: 'cloud_sync', failureStage: 'unavailable', message: 'Failed to get documents from server. (However, these documents may exist in the local cache. Run again without setting source to "server" to retrieve the cached documents.)' },
     { type: 'error', uid: 'teacher-c', feature: 'pet', operation: 'cloud_sync', failureStage: 'unavailable', message: 'Firestore service unavailable.' },
   ]);
 
@@ -91,6 +92,9 @@ test('明確離線只限寵物同步 unavailable，不吞掉其他錯誤', () =>
  const offline = {type:'error',feature:'pet',operation:'cloud_sync',failureStage:'unavailable',message:'Failed to get document because the client is offline.'};
  assert.equal(isRecoverableOfflineSync(offline),true);
  assert.equal(summarizeEvents([offline]).errors.length,0);
+ const cachedQueryFailure = {...offline,message:'Failed to get documents from server. (However, these documents may exist in the local cache. Run again without setting source to "server" to retrieve the cached documents.)'};
+ assert.equal(isRecoverableOfflineSync(cachedQueryFailure),true);
+ assert.equal(summarizeEvents([cachedQueryFailure]).errors.length,0);
  for (const change of [{operation:'reward'},{feature:'students'},{failureStage:'permission-denied'},{message:'Firestore service unavailable.'},{message:offline.message+' retry failed'}]) {
   const event = {...offline,...change};
   assert.equal(isRecoverableOfflineSync(event),false);
