@@ -216,13 +216,33 @@
             }
             sameAccount(c);
             const ref = doc(c, 'appSettings/syncRevision');
-            await c.db.runTransaction(async tx => {
-                const latest = await tx.get(ref);
-                if ((latest.exists ? latest.data().token : remote.token) !== remote.token) {
-                    throw conflict(undefined, { notify: true, source: 'cloud-divergence' });
+            try {
+                await c.db.runTransaction(async tx => {
+                    const latest = await tx.get(ref);
+                    if ((latest.exists ? latest.data().token : remote.token) !== remote.token) {
+                        throw conflict(undefined, { notify: true, source: 'cloud-divergence' });
+                    }
+                    tx.set(ref, { schema: 1, token, previous: latest.exists ? latest.data().token : null, count, checksum: BackupIntegrity.checksum(json), at: new Date().toISOString(), students: dataFor(values).students.length, pointsHistory: dataFor(values).pointsHistory.length });
+                });
+            } catch (error) {
+                // 版本頭在讀取與提交之間改變時，再取一次完整快照比對。
+                // 其他分頁／裝置可能只是把完全相同的內容換成新 token；
+                // 這種競速可安全採用最新 token，避免誤報衝突。內容不同
+                // 或無法重新讀取時，仍維持原本的安全停車行為。
+                if (error?.code === 'sync-conflict') {
+                    try {
+                        const latest = await read(id);
+                        if (!latest.empty && fingerprint(latest.values) === before) {
+                            remember(c, latest.token, values);
+                            clearLocalChange(c, before);
+                            localStorage.setItem('lastSyncTime', new Date().toISOString());
+                            window.SyncStatusIndicator?.updateStateBasedOnSync();
+                            return true;
+                        }
+                    } catch { /* 讀取不完整或離線時不可推定資料相同 */ }
                 }
-                tx.set(ref, { schema: 1, token, previous: latest.exists ? latest.data().token : null, count, checksum: BackupIntegrity.checksum(json), at: new Date().toISOString(), students: dataFor(values).students.length, pointsHistory: dataFor(values).pointsHistory.length });
-            });
+                throw error;
+            }
             remember(c, token, values);
             clearLocalChange(c, before);
             localStorage.setItem('lastSyncTime', new Date().toISOString());
