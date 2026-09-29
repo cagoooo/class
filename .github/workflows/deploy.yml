@@ -44,6 +44,7 @@ jobs:
           node scripts/test-data-safety.cjs
           node scripts/test-pet-sync.cjs
           node scripts/test-leave-sync-guard.cjs
+          node scripts/test-exam-proctor-noop.cjs
 
       - name: Inject Secrets 💉
         run: python .github/inject.py

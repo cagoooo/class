@@ -2245,7 +2245,8 @@
 
         isLightMode = !isLightMode;
         modal.classList.toggle('light-mode', isLightMode);
-        saveData();
+        // 顯示模式是個人介面偏好，不要連帶重寫班級考試資料並觸發待同步提醒。
+        localStorage.setItem('examLightMode', JSON.stringify(isLightMode));
 
         // 更新按鈕圖示
         const btn = document.getElementById('examLightModeBtn');
@@ -2716,7 +2717,7 @@
         document.body.style.overflow = 'hidden';
 
         const noteInput = document.getElementById('examAbsentNote');
-        if (noteInput) noteInput.value = examAttendance.absentNote;
+        if (noteInput) noteInput.value = String(examAttendance.absentNote ?? '');
 
         // 更新淺色模式按鈕
         const lightBtn = document.getElementById('examLightModeBtn');
@@ -2820,8 +2821,12 @@
 
         const noteInput = document.getElementById('examAbsentNote');
         if (noteInput) {
-            examAttendance.absentNote = noteInput.value;
-            saveData();
+            const nextNote = String(noteInput.value ?? '');
+            const previousNote = String(examAttendance.absentNote ?? '');
+            if (nextNote !== previousNote) {
+                examAttendance.absentNote = nextNote;
+                localStorage.setItem('examAttendance', JSON.stringify(examAttendance));
+            }
         }
 
         modal.classList.remove('active');
