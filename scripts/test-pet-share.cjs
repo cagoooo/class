@@ -123,6 +123,27 @@ async function test(name, fn) { await fn(); passed++; console.log('PASS', name);
         storage.setItem('currentClassId', 'B');
         assert.equal(await share.publish({ force: true }), false); assert.equal(writes.length, 1);
     });
+    await test('在學生管理改名單會自動更新學生頁；與畫面不一致的寫入不送出', async () => {
+        const { share, writes, ctx, storage } = setup();
+        ctx.setTimeout = (fn, ms) => setTimeout(fn, ms / 100); // 縮短等待，不改變先後順序
+        const settle = () => new Promise(r => setTimeout(r, 120));
+        await share.refresh(); await share.create({ nameMode: 'full' }); await settle();
+        assert.equal(writes.length, 1);
+        // 學生管理的寫法：先改記憶體，再存檔
+        ctx.students[0].name = '王大明'; ctx.students.push({ id: 4, name: '新同學', number: '4', points: 0 });
+        storage.setItem(ctx.STUDENTS_KEY, JSON.stringify(ctx.students)); await settle();
+        assert.equal(writes.length, 2);
+        assert.deepEqual(JSON.parse(writes[1].data.payload).students.map(s => s.name), ['王大明', '陳美', '歐陽大同學', '新同學']);
+        // 內容沒變的重寫（初始化、切換畫面）不觸發更新
+        storage.setItem(ctx.STUDENTS_KEY, JSON.stringify(ctx.students)); await settle();
+        assert.equal(writes.length, 2);
+        // 其他分頁改了存檔、這個分頁的畫面還是舊的：不能把舊畫面送出去
+        storage.setItem(ctx.STUDENTS_KEY, JSON.stringify([{ id: 1, name: '別的分頁改的', points: 0 }])); await settle();
+        assert.equal(writes.length, 2);
+        // 其他班級的名單寫入與目前班級無關
+        storage.setItem('students-OTHER', JSON.stringify([{ id: 9, name: '別班' }])); await settle();
+        assert.equal(writes.length, 2);
+    });
     await test('登入還原前畫出的面板不要求再登入，還原後自動顯示分享設定', async () => {
         // 最小的假 DOM：只需能串出面板文字。
         const node = tag => ({ tagName: tag, children: [], dataset: {}, style: {}, isConnected: true, textContent: '', className: '',

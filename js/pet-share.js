@@ -412,7 +412,31 @@
         if (restoringLogin() && !authWaitTimer) authWaitTimer = setTimeout(() => { authWaitExpired = true; paint(); }, 10000);
     }
 
+    // 在學生管理改姓名、座號、增刪或排序學生時不會經過 ClassPets.render，所以另外留意
+    // 目前班級「學生／加扣分紀錄」的寫入（與同步狀態偵測相同的疊加攔截，不改變寫入結果）。
+    let rosterTimer;
+    function watchRoster() {
+        const proto = window.Storage?.prototype, original = proto?.setItem;
+        if (!original) return;
+        proto.setItem = function (key, value) {
+            let differs = false;
+            try {
+                differs = this === localStorage && (key === (window.STUDENTS_KEY || 'students') || key === (window.POINTS_HISTORY_KEY || 'pointsHistory'))
+                    && this.getItem(key) !== String(value);
+            } catch { /* 寫入照常進行 */ }
+            const result = original.call(this, key, value);
+            if (differs && current()) {
+                clearTimeout(rosterTimer);
+                // 等這次存檔（可能連寫數個鍵）結束，確認畫面資料與存檔一致後才比對快照；
+                // 其他分頁造成的不一致不會被送出。
+                rosterTimer = setTimeout(() => { if (window.ClassPets?.matchesStorage?.()) changed(); }, 300);
+            }
+            return result;
+        };
+    }
+
     watchAuth();
+    watchRoster();
     window.addEventListener?.('online', changed);
     window.PetShare = { renderPanel, changed, refresh, publish, create, buildPayload, maskName, shares, NAME_MODES };
 })();

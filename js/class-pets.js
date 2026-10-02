@@ -1264,7 +1264,7 @@
         if (location.hash === '#pets') window.showSection('pets');
     }
     window.ClassPets = { deliver, deliveryStatus, nextUnlockHint, interactionFor, createQuest, contributeQuest, undoQuestContribution, claimQuest, archiveQuest, hatchCollectionEgg, questProgress, profileFor, renamePet, collectionProgress, award, undo, xpFor, coinsFor, setCoinsEnabled, saveRule, saveProduct, addPresetProduct, setProductActive, redeem, refund, setPetMood, assetName, stage, appearance, milestone, render, prepare, settings, collectionFor, collectionStagesFor,
-        pets, moods, eggStage, portrait, interactivePortrait };
+        pets, moods, eggStage, portrait, interactivePortrait, matchesStorage: memoryMatchesStorage };
     // 學生分享頁（pets.html）只借用寵物圖像與互動，不建立老師端的選單與管理畫面。
     if (document.documentElement?.hasAttribute?.('data-pet-viewer')) return;
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
