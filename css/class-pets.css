@@ -374,6 +374,7 @@
 .pet-share-options .pet-share-check { flex-direction:row; align-items:center; gap:10px; min-height:46px; }
 #pets-section .pet-share-check input { width:24px; min-height:24px; height:24px; flex:none; }
 #pets-section .pet-share .pet-share-note { font-size:14px; color:var(--text-secondary,#64748b); margin:8px 0; }
+#pets-section .pet-share button.pet-share-refresh { min-height:32px; margin-left:6px; padding:4px 6px; border:0; background:none; color:inherit; font-size:inherit; text-decoration:underline; text-underline-offset:3px; }
 #pets-section .pet-share-status { padding:10px 14px; border-radius:10px; background:#fff; border:1px solid #b9d7ca; }
 #pets-section .pet-share-privacy { font-size:14px; }
 .pet-share-others h3 { margin-top:12px; font-weight:700; }

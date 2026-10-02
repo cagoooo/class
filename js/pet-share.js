@@ -375,11 +375,18 @@
                 row.append(field, button('複製連結', () => copy(field.value, '✓ 連結已複製，可貼到班級群組或聯絡簿。'), 'pet-primary'), button('顯示 QR Code', () => showQr(field.value, className())));
                 if (navigator.share) row.append(button('分享到 App', () => navigator.share({ title: className() + '的寵物樂園', text: '來看看我們班的寵物！', url: field.value }).catch(() => {})));
                 row.append(button('開啟學生頁', () => window.open(field.value, '_blank', 'noopener')));
-                body.append(row, el('p', share.updatedAt ? '學生頁最後更新：' + new Date(share.updatedAt).toLocaleString('zh-TW', { hour12: false }) + '。加分、孵化或升級後會自動更新。' : '學生頁正在建立中…', 'pet-share-note'));
+                const updated = el('p', share.updatedAt ? '學生頁最後更新：' + new Date(share.updatedAt).toLocaleString('zh-TW', { hour12: false }) + '。加分、孵化、升級或修改名單後會自動更新。' : '學生頁正在建立中…', 'pet-share-note');
+                if (share.updatedAt) {
+                    // 自動更新已涵蓋日常操作；手動更新只作備援（更新失敗後重送，或要以這台裝置的資料為準）。
+                    const manual = button('手動更新', () => run(async () => { if (await publish({ force: true })) notice = '✓ 學生頁已更新。'; }), 'pet-share-refresh');
+                    manual.disabled = working || !verified; manual.title = '通常不需要。學生頁沒有跟上時，可手動送出這台裝置目前的資料';
+                    updated.append(manual);
+                }
+                body.append(row, updated);
             }
             body.append(optionControls(share || draft));
             const actions = el('div', undefined, 'pet-tools');
-            if (share) actions.append(button('立即更新學生頁', () => run(async () => { if (await publish({ force: true })) notice = '✓ 學生頁已更新。'; })), button('重新產生連結', regenerate), button('停止分享', () => stop(cid())));
+            if (share) actions.append(button('重新產生連結', regenerate), button('停止分享', () => stop(cid())));
             else actions.append(button('建立本班分享連結', () => create(draft), 'pet-primary'));
             actions.append(button('預覽學生看到的畫面', preview));
             for (const control of actions.children) control.disabled = working || (!verified && control !== actions.lastChild);
