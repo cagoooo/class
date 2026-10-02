@@ -327,6 +327,12 @@
         const cancel = button('關閉，稍後處理', dismiss); cancel.className = 'cloud-conflict-cancel';
         dialog.append(header, text, steps, backupTitle, backupActions, ackTitle, ack, decisionTitle, decisionHelp, actions, cancel, note); document.body.append(dialog); dialog.showModal(); dialog.addEventListener('cancel', () => dialog.remove());
     }
+    function classNameFor(id) {
+        try {
+            const profile = JSON.parse(localStorage.getItem('classProfiles') || '[]').find(p => String(p.id) === String(id));
+            return profile?.name || '';
+        } catch { return ''; }
+    }
     function report(error, id, silent) {
         // 同源分頁已在同步時，這次只是被鎖略過，不是需要老師處理的錯誤。
         if (error?.code === 'sync-busy') return;
@@ -345,6 +351,8 @@
                     error?.message || '雲端版本與本機資料不同，請比較兩份資料後再選擇。',
                     {
                         classId: id || current(),
+                        // 通知卡片只看得到班級代碼時很難判斷是哪一班，補上名冊裡的名稱。
+                        className: classNameFor(id || current()),
                         context: '班級資料/雲端同步',
                         feature: 'pet',
                         operation: 'cloud_sync',
