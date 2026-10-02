@@ -148,7 +148,7 @@ async function test(name, fn) { await fn(); passed++; console.log('PASS', name);
         // 最小的假 DOM：只需能串出面板文字。
         const node = tag => ({ tagName: tag, children: [], dataset: {}, style: {}, isConnected: true, textContent: '', className: '',
             append(...items) { this.children.push(...items); }, replaceChildren(...items) { this.children = items; }, add(item) { this.children.push(item); },
-            setAttribute() {}, addEventListener() {},
+            setAttribute() {}, addEventListener() {}, querySelectorAll() { return []; },
             get text() { return [this.textContent, ...this.children.map(child => child.text ?? '')].join('|'); } });
         const open = ({ remembered }) => {
             const a = setup(), listeners = []; let signedIn = false;
