@@ -24,6 +24,12 @@
     const dirtyKey = (uid, id) => `cloudSafetyDirty:${uid}:${id}`;
     const recoveryKey = c => `${c.uid || 'local'}:${c.id}`;
     const fingerprint = values => BackupIntegrity.checksum(JSON.stringify(Object.keys(values).sort().map(k => [k, values[k]])));
+    // 有明確異動追蹤的班級資料（與 sync-status-indicator 的 USER_DATA_KEYS 相同）。白板文字、潔牙勾選、
+    // 主題等其餘鍵不會留下異動標記，所以「這台裝置有沒有未同步的變更」要以這組鍵的內容為準。
+    const tracked = ['students', 'pointsHistory', 'groups', 'petSettings', 'notebookEntries', 'homeworkList', 'homeworkChecks',
+        'lotteryHistory', 'classAnnouncements', 'examSubjects', 'examReminders', 'examAttendance', 'examAbsenceRecords', 'seatingConfig', 'drawnStudentIds'];
+    const trackedFingerprint = values => fingerprint(Object.fromEntries(tracked.map(k => [k, values[k] ?? null])));
+    const baseline = (token, values) => JSON.stringify({ token, fingerprint: fingerprint(values), tracked: trackedFingerprint(values), at: new Date().toISOString() });
     function capture(id = current()) {
         const values = {};
         for (const k of keys()) values[k] = raw(keyFor(k, id));
@@ -66,7 +72,7 @@
     }
     function remember(c, token, values) {
         sameAccount(c);
-        localStorage.setItem(baseKey(c), JSON.stringify({ token, fingerprint: fingerprint(values), at: new Date().toISOString() }));
+        localStorage.setItem(baseKey(c), baseline(token, values));
     }
     function conflict(message = '雲端版本與本機資料不同，已暫停上傳並保留本機資料。請比較兩份資料後再選擇。', details = {}) {
         const e = Error(message); e.code = 'sync-conflict';
@@ -266,18 +272,63 @@
         sameAccount(c);
         if (fingerprint(capture(c.id)) !== before) throw Error('備份期間本機資料已改變，請重新預覽還原');
         const ops = keys().map(k => [keyFor(k, c.id), remote.values[k] ?? null]);
-        ops.push([baseKey(c), JSON.stringify({ token: remote.token, fingerprint: fingerprint(remote.values), at: new Date().toISOString() })]);
+        ops.push([baseKey(c), baseline(remote.token, remote.values)]);
         if (!window.SafeStorage.writeRaw(ops, { context: '完整還原班級資料' })) return false;
         clearLocalChange(c, fingerprint(remote.values));
-        if (current() === c.id) {
-            const data = dataFor(remote.values);
-            for (const k of ['students', 'groups', 'pointsHistory', 'notebookEntries', 'homeworkList', 'lotteryHistory']) window[k] = data[k] || [];
-            window.homeworkChecks = data.homeworkChecks || {};
-            for (const fn of ['renderStudents', 'renderGroups', 'renderNotebook', 'renderHomework', 'renderLotteryHistory']) if (typeof window[fn] === 'function') window[fn]();
-            window.ClassPets?.prepare(); window.ClassPets?.render();
-        }
+        if (current() === c.id) refreshMemory(remote.values);
         delete conflicts[recoveryKey(c)];
         return true;
+    }
+    function refreshMemory(values) {
+        const data = dataFor(values);
+        for (const k of ['students', 'groups', 'pointsHistory', 'notebookEntries', 'homeworkList', 'lotteryHistory']) window[k] = data[k] || [];
+        window.homeworkChecks = data.homeworkChecks || {};
+        for (const fn of ['renderStudents', 'renderGroups', 'renderNotebook', 'renderHomework', 'renderLotteryHistory']) if (typeof window[fn] === 'function') window[fn]();
+        window.ClassPets?.prepare(); window.ClassPets?.render();
+    }
+    /**
+     * 自動快轉：這台裝置的班級資料自上次同步後沒有任何變更，而雲端已被其他裝置更新時，直接換成雲端版本，
+     * 讓老師換裝置後不必手動還原，也不會因為在舊資料上編輯而撞上同步衝突。
+     *
+     * 只在能「證明」本機沒有未同步變更時才動手：沒有異動標記，且內容與上次同步的指紋相同。未登入時所做的
+     * 編輯不會留下異動標記，所以一定要比對內容，不能只看標記。只要有任何變更就不動，交給既有的比較流程。
+     * 被換掉的本機內容與上次同步的雲端版本相同，沒有獨有資料，因此不覆寫「還原前副本」（那份可能更珍貴）。
+     *
+     * @param {string} [id] 班級
+     * @param {{dryRun?: boolean}} [options] dryRun 只回報雲端是否較新，不寫入
+     * @returns {Promise<'updated'|'newer'|'current'|'local-changes'|'no-baseline'|'skipped'>}
+     */
+    async function fastForward(id = current(), options = {}) {
+        if (navigator.onLine === false) return 'skipped';
+        const c = context(id), known = base(c);
+        if (!known?.token) return 'no-baseline';
+        // 整份內容都沒變 → 可以整份換成雲端版本；只有追蹤資料沒變（例如這台改過白板文字或主題）→ 只換追蹤資料，
+        // 其餘保留這台裝置的內容。舊版基準沒有 tracked 指紋，只能用整份內容判斷。
+        const cleanScope = () => {
+            if (raw(dirtyKey(c.uid, c.id))) return null;
+            const local = capture(c.id);
+            if (fingerprint(local) === known.fingerprint) return { local, scope: keys() };
+            if (known.tracked && trackedFingerprint(local) === known.tracked) return { local, scope: tracked };
+            return null;
+        };
+        if (!cleanScope()) return 'local-changes';
+        const head = await doc(c, 'appSettings/syncRevision').get({ source: 'server' });
+        if (!head.exists || head.data().token === known.token) return 'current';
+        if (options.dryRun) return 'newer';
+        return withSyncLock(c, async () => {
+            const remote = await read(c.id);
+            if (remote.empty || String(remote.token || '').startsWith('legacy:')) return 'skipped';
+            const state = cleanScope();   // 下載期間老師可能已經開始操作
+            if (!state || base(c)?.token !== known.token) return 'local-changes';
+            sameAccount(c);
+            const changed = state.scope.some(k => (remote.values[k] ?? null) !== (state.local[k] ?? null));
+            const ops = state.scope.map(k => [keyFor(k, c.id), remote.values[k] ?? null]);
+            ops.push([baseKey(c), baseline(remote.token, remote.values)]);
+            if (!window.SafeStorage.writeRaw(ops, { context: '自動更新為雲端最新版本' })) return 'skipped';
+            delete conflicts[recoveryKey(c)];
+            if (changed && current() === c.id) refreshMemory(capture(c.id));
+            return changed ? 'updated' : 'current';
+        });
     }
     const conflicts = {};
     function status(id = current()) {
@@ -393,7 +444,7 @@
             download(copy, '班級成果_還原前副本.json');
         } catch (e) { window.NotificationSystem?.error(e.message); }
     }
-    window.CloudSafety = { downloadRecovery, capture, dataFor, fingerprint, read, publish, restore, checkpoint, status, showConflict, report, current, download, hasBaseline, hasLocalChangeMarker, markLocalChange };
+    window.CloudSafety = { downloadRecovery, capture, dataFor, fingerprint, read, publish, restore, fastForward, checkpoint, status, showConflict, report, current, download, hasBaseline, hasLocalChangeMarker, markLocalChange };
     // A separate IndexedDB keeps the rollback copy out of localStorage's small quota.
     window.LocalRecovery = {
         async access(mode, key, value) {

@@ -43,6 +43,50 @@ let passed=0;async function test(name,fn){await fn();console.log('PASS',name);pa
  await test('沒有同步基準的舊雲端差異只留底不即時推播',async()=>{const a=setup();a.db.data.set('users/teacher/classes/A/students/1',{id:1,name:'雲端學生',points:4});a.c.students[0].points=42;a.save();await assert.rejects(a.s.publish(),e=>e.code==='sync-conflict'&&e.notify===false&&e.source==='legacy-divergence');await a.s.report(Object.assign(Error('雲端版本與本機資料不同'),{code:'sync-conflict',notify:false,source:'legacy-divergence'}),'A',true);assert.equal(a.syncConflicts.length,1);assert.equal(a.syncConflicts[0][1].notify,false);assert.equal(a.syncConflicts[0][1].source,'legacy-divergence');});
  await test('同步衝突只送同步提醒，不誤報寵物系統失敗',async()=>{const a=setup();await a.s.publish();const b=setup(a.db);b.c.students[0].points=42;b.save();await assert.rejects(b.s.publish(),e=>e.code==='sync-conflict');await b.s.report(Object.assign(Error('雲端資料與本機資料確實不同'),{code:'sync-conflict'}),'A',true);assert.equal(b.petErrors.length,0);assert.equal(b.syncConflicts.length,1);});
  await test('明確確認的一鍵同步可用最新雲端版本建立快照',async()=>{const a=setup();await a.s.publish();const b=setup(a.db);const remote=await b.s.read();b.c.students[0].points=42;b.save();await b.s.publish(undefined,{remote,expectedToken:remote.token});assert.equal(a.s.dataFor((await a.s.read()).values).students[0].points,42);});
+ // ── 自動快轉：換裝置後，沒有未同步變更的裝置自動換成雲端新版 ──
+ // 兩台裝置先同步到同一版，之後 a 再上傳新內容，回傳 b 供各測試驗證。
+ const twoDevices=async()=>{const a=setup();await a.s.publish();const b=setup(a.db);assert.equal(await b.s.restore(await b.s.read()),true);b.recovery.clear();a.c.students[0].points=77;a.c.pointsHistory.push({id:'later',studentId:1,points:67,petEvent:true,petXp:67,coinDelta:0});a.save();await a.s.publish();return {a,b};};
+ await test('另一台裝置上傳後，沒有變更的裝置自動快轉且之後編輯不再衝突',async()=>{
+  const {a,b}=await twoDevices();
+  assert.equal(await b.s.fastForward(undefined,{dryRun:true}),'newer');assert.equal(JSON.parse(b.storage.getItem('students-A'))[0].points,10);
+  assert.equal(await b.s.fastForward(),'updated');
+  assert.equal(JSON.parse(b.storage.getItem('students-A'))[0].points,77);assert.equal(b.c.students[0].points,77);assert.equal(b.c.pointsHistory.length,4);
+  assert.equal(b.s.status(),'synced');assert.equal(b.recovery.size,0);
+  assert.equal(await b.s.fastForward(),'current');
+  b.c.students[0].points=80;b.save();assert.equal(await b.s.publish(),true);assert.equal(a.s.dataFor((await a.s.read()).values).students[0].points,80);
+ });
+ await test('本機有未同步變更時不快轉，資料原封不動',async()=>{
+  // 未登入時的編輯不會留下異動標記，所以必須靠內容比對擋下
+  const {b}=await twoDevices();b.c.students[0].points=42;b.save();const before=[...b.storage.data];
+  assert.equal(await b.s.fastForward(),'local-changes');assert.deepEqual([...b.storage.data],before);
+  // 內容沒變但留有異動標記（例如改了又改回來、尚未同步）也不快轉
+  const second=(await twoDevices()).b;second.s.markLocalChange('A');const untouched=[...second.storage.data];
+  assert.equal(await second.s.fastForward(),'local-changes');assert.deepEqual([...second.storage.data],untouched);
+  await assert.rejects(b.s.publish(),e=>e.code==='sync-conflict');
+ });
+ await test('只改過白板或主題的裝置仍可快轉，並保留這台的白板與主題',async()=>{
+  const {b}=await twoDevices();b.storage.setItem('boardNote','這台教室的白板');b.storage.setItem('theme','dark');
+  assert.equal(await b.s.fastForward(),'updated');
+  assert.equal(JSON.parse(b.storage.getItem('students-A'))[0].points,77);
+  assert.equal(b.storage.getItem('boardNote'),'這台教室的白板');assert.equal(b.storage.getItem('theme'),'dark');
+  assert.equal(await b.s.fastForward(),'current');
+ });
+ await test('沒有同步基準、離線或舊版基準內容不符時不快轉',async()=>{
+  const a=setup();await a.s.publish();const fresh=setup(a.db);assert.equal(await fresh.s.fastForward(),'no-baseline');
+  const {b}=await twoDevices();b.c.navigator.onLine=false;assert.equal(await b.s.fastForward(),'skipped');b.c.navigator.onLine=true;
+  // 舊版基準沒有 tracked 指紋：只要整份內容有任何不同就不動
+  const key='cloudSafetyBase:teacher:A',old=JSON.parse(b.storage.getItem(key));delete old.tracked;b.storage.setItem(key,JSON.stringify(old));b.storage.setItem('theme','dark');
+  assert.equal(await b.s.fastForward(),'local-changes');assert.equal(JSON.parse(b.storage.getItem('students-A'))[0].points,10);
+  b.storage.removeItem('theme');assert.equal(await b.s.fastForward(),'updated');
+ });
+ await test('快轉下載期間老師開始編輯就放棄，不覆蓋剛做的變更',async()=>{
+  const {b}=await twoDevices();const read=b.s.read;let edited=false;
+  // 模擬：完整快照還在下載時，老師已經加了分
+  const headPath='users/teacher/classes/A/syncSnapshots/';const original=b.db.ref.bind(b.db);
+  b.db.ref=path=>{const ref=original(path);if(path.startsWith(headPath)&&!edited){const get=ref.get.bind(ref);ref.get=async()=>{if(!edited){edited=true;b.c.students[0].points=55;b.save();}return get();};}return ref;};
+  assert.equal(await b.s.fastForward(),'local-changes');assert.equal(JSON.parse(b.storage.getItem('students-A'))[0].points,55);assert.equal(typeof read,'function');
+  b.db.ref=original;
+ });
  await test('兩台同版本同時上傳僅一台成功',async()=>{const a=setup();await a.s.publish();const b=setup(a.db);await b.s.restore(await b.s.read());a.c.students[0].points=11;a.save();b.c.students[0].points=12;b.save();const r=await Promise.allSettled([a.s.publish(),b.s.publish()]);assert.equal(r.filter(x=>x.status==='fulfilled').length,1);assert.equal(r.filter(x=>x.status==='rejected'&&x.reason.code==='sync-conflict').length,1);});
  for(const flag of ['failStage','failHead'])await test('中途失敗保留完整舊版 '+flag,async()=>{const a=setup();await a.s.publish();const before=await a.s.read();a.c.students[0].points=20;a.save();a.db[flag]=true;await assert.rejects(a.s.publish());a.db[flag]=false;assert.equal((await a.s.read()).token,before.token);assert.equal(a.s.status(),'pending');await a.s.publish();assert.equal(a.s.status(),'synced');});
  await test('離線操作重載後恢復仍待同步且只發布一次',async()=>{const a=setup();await a.s.publish();a.c.navigator.onLine=false;a.c.students[0].points=15;a.save();await assert.rejects(a.s.publish(),/恢復連線/);vm.runInContext(fs.readFileSync('js/cloud-safety.js','utf8'),a.c);assert.equal(a.c.CloudSafety.status(),'pending');a.c.navigator.onLine=true;await a.c.CloudSafety.publish();const token=(await a.s.read()).token;await a.c.CloudSafety.publish();assert.equal((await a.s.read()).token,token);});

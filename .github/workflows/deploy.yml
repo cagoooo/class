@@ -43,6 +43,7 @@ jobs:
           node scripts/test-pet-notify.cjs
           node scripts/test-usage-digest.cjs
           node scripts/test-data-safety.cjs
+          node scripts/test-fast-forward.cjs
           node scripts/test-pet-sync.cjs
           node scripts/test-leave-sync-guard.cjs
           node scripts/test-exam-proctor-noop.cjs

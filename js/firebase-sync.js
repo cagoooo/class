@@ -665,8 +665,15 @@ async function uploadCollectionForClass(collectionName, dataArray, classId) {
  * 一鍵同步所有班級到雲端
  * @param {Function} onProgress - 進度回呼 (classIndex, total, className, status)
  */
+/** 等待進行中的同步結束（最多 limitMs）；回傳是否已可開始新的同步。 */
+async function waitUntilIdle(limitMs = 15000) {
+    const start = Date.now();
+    while (syncStatus.isSyncing && Date.now() - start < limitMs) await new Promise(resolve => setTimeout(resolve, 250));
+    return !syncStatus.isSyncing;
+}
+
 async function syncAllClassesToCloud(onProgress) {
-    if (syncStatus.isSyncing) return [];
+    if (!await waitUntilIdle()) return null;
     syncStatus.isSyncing = true;
     const results = [];
     try {
@@ -820,20 +827,26 @@ async function showAllClassSyncModal() {
     if (bar) bar.style.width = '100%';
     if (counter) counter.textContent = `${total} / ${total}`;
 
-    if (results) {
-        const failed = results.filter(r => r.status === 'fail').length;
-        if (label) {
-            label.textContent = failed === 0
-                ? `✅ 所有 ${total} 個班級同步完成！`
-                : `⚠️ ${total - failed} 班成功，${failed} 班失敗`;
-            label.style.color = failed === 0 ? '#16a34a' : '#d97706';
-        }
-        if (closeBtn) {
-            closeBtn.textContent = '完成';
-            closeBtn.style.background = failed === 0 ? '#16a34a' : '#d97706';
-        }
-        NotificationSystem && NotificationSystem.success(`所有班級同步完成 🌐`);
+    if (!results) {
+        // 另一個同步遲遲沒結束：這次沒有上傳任何班級，不能顯示成功。
+        if (bar) bar.style.width = '0%';
+        if (counter) counter.textContent = `0 / ${total}`;
+        if (label) { label.textContent = '⚠️ 另一個同步還在進行，這次沒有上傳。請稍候再按一次。'; label.style.color = '#d97706'; }
+        if (closeBtn) { closeBtn.textContent = '關閉'; closeBtn.style.background = '#d97706'; }
+        return;
     }
+    const failed = results.filter(r => r.status === 'fail').length;
+    if (label) {
+        label.textContent = failed === 0
+            ? `✅ 所有 ${total} 個班級同步完成！`
+            : `⚠️ ${total - failed} 班成功，${failed} 班失敗`;
+        label.style.color = failed === 0 ? '#16a34a' : '#d97706';
+    }
+    if (closeBtn) {
+        closeBtn.textContent = '完成';
+        closeBtn.style.background = failed === 0 ? '#16a34a' : '#d97706';
+    }
+    if (failed === 0) NotificationSystem && NotificationSystem.success(`所有班級同步完成 🌐`);
 }
 
 
@@ -1115,7 +1128,9 @@ async function deleteClassFromCloud(classId) {
  * @param {Function} onProgress - 進度回呼 (done, total, name, status, count)
  */
 async function syncAllClassesFromCloud(onProgress) {
-    if (syncStatus.isSyncing) return [];
+    // 自動同步剛好在跑時先等它結束；等不到就回傳 null，讓畫面如實顯示「這次沒有執行」，
+    // 不能回傳空陣列——那會被當成「全部成功」。
+    if (!await waitUntilIdle()) return null;
     syncStatus.isSyncing = true;
     const results = [];
     try {
@@ -1236,23 +1251,31 @@ async function showAllClassDownloadModal() {
     if (bar) bar.style.width = '100%';
     if (counter) counter.textContent = `${total} / ${total}`;
 
-    if (results) {
-        const failed = results.filter(r => r.status === 'fail').length;
-        if (label) {
-            label.textContent = failed === 0
-                ? `✅ 所有 ${total} 個班級已還原至本地！`
-                : `⚠️ ${total - failed} 班成功，${failed} 班失敗`;
-            label.style.color = failed === 0 ? '#16a34a' : '#d97706';
-        }
-        if (closeBtn) {
-            closeBtn.textContent = '完成';
-            closeBtn.style.background = failed === 0 ? '#16a34a' : '#d97706';
-        }
-        if (results.length) {
-            if (failed) window.NotificationSystem?.warning(`已還原 ${results.length - failed} 班，${failed} 班未完成；原資料已保留`);
-            else window.NotificationSystem?.success('所有班級已從雲端還原 📥');
-        }
+    if (!results) {
+        // 另一個同步遲遲沒結束：這次沒有還原任何班級，不能顯示成功。
+        if (bar) bar.style.width = '0%';
+        if (counter) counter.textContent = `0 / ${total}`;
+        if (label) { label.textContent = '⚠️ 另一個同步還在進行，這次沒有還原。請稍候再按一次。'; label.style.color = '#d97706'; }
+        if (closeBtn) { closeBtn.textContent = '關閉'; closeBtn.style.background = '#d97706'; }
+        return;
     }
+    const failed = results.filter(r => r.status === 'fail').length;
+    const restored = results.length - failed;
+    if (label) {
+        label.textContent = failed === 0
+            ? `✅ 所有 ${total} 個班級已還原至本地！`
+            : `⚠️ ${restored} 班成功，${failed} 班失敗`;
+        label.style.color = failed === 0 ? '#16a34a' : '#d97706';
+    }
+    if (closeBtn) {
+        closeBtn.textContent = restored ? '完成並重新整理畫面' : '完成';
+        closeBtn.style.background = failed === 0 ? '#16a34a' : '#d97706';
+        // 還原只會就地更新目前班級的名單與寵物；公告、考試、座位等模組仍握著舊資料。
+        // 重新載入讓整個畫面都以還原後的資料啟動（與首次登入的還原流程一致）。
+        if (restored) closeBtn.onclick = () => { document.getElementById(existId)?.remove(); location.reload(); };
+    }
+    if (failed) window.NotificationSystem?.warning(`已還原 ${restored} 班，${failed} 班未完成；原資料已保留`);
+    else if (restored) window.NotificationSystem?.success('所有班級已從雲端還原 📥');
 }
 
 
