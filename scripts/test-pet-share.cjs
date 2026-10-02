@@ -123,5 +123,16 @@ async function test(name, fn) { await fn(); passed++; console.log('PASS', name);
         storage.setItem('currentClassId', 'B');
         assert.equal(await share.publish({ force: true }), false); assert.equal(writes.length, 1);
     });
+    await test('隨專案提供的 QR 函式庫可將分享連結編成矩陣', async () => {
+        const ctx = {}; vm.createContext(ctx);
+        vm.runInContext(fs.readFileSync('js/vendor/qrcode-generator.js', 'utf8'), ctx);
+        const qr = ctx.qrcode(0, 'M'); qr.addData('https://cagoooo.github.io/class/pets.html?s=' + 'A'.repeat(24)); qr.make();
+        const count = qr.getModuleCount();
+        assert.ok(count >= 21 && count <= 57, '模組數應落在容易掃描的範圍');
+        // 三個定位圖案的外框為深色、內圈為淺色
+        for (const [row, col] of [[0, 0], [0, count - 1], [count - 1, 0]]) assert.equal(qr.isDark(row, col), true);
+        assert.equal(qr.isDark(1, 1), false); assert.equal(qr.isDark(3, 3), true);
+        assert.ok(fs.readFileSync('js/pet-share.js', 'utf8').includes("'qrcode-generator.js?v=1.4.4'"));
+    });
     console.log(`${passed} checks passed`);
 })().catch(e => { console.error(e); process.exitCode = 1; });

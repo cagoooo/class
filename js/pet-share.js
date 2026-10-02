@@ -10,6 +10,7 @@
     const COLLECTION = 'petShares', SCHEMA = 1, MAX_PAYLOAD = 180000;
     const INDEX_KEY = 'petShareIndex', PUBLISHED_KEY = 'petSharePublished', PREVIEW_KEY = 'petSharePreview';
     const NAME_MODES = { masked: '座號＋遮罩姓名（例：王○明）', full: '座號＋完整姓名', seat: '只顯示座號' };
+    const QR_SCRIPT = (document.currentScript?.src ? new URL('vendor/', document.currentScript.src).href : 'js/vendor/') + 'qrcode-generator.js?v=1.4.4';
 
     const el = (tag, text, cls) => { const e = document.createElement(tag); if (text !== undefined) e.textContent = text; if (cls) e.className = cls; return e; };
     const button = (text, action, cls) => { const b = el('button', text, cls); b.type = 'button'; b.addEventListener('click', action); return b; };
@@ -236,6 +237,75 @@
         }
         say(done);
     }
+    // QR Code 函式庫（qrcode-generator，MIT）只在老師第一次按下按鈕時才載入。
+    let qrLoading = null;
+    function loadQr() {
+        if (window.qrcode) return Promise.resolve(window.qrcode);
+        qrLoading ||= new Promise((resolve, reject) => {
+            const script = el('script'); script.src = QR_SCRIPT;
+            script.onload = () => window.qrcode ? resolve(window.qrcode) : reject(new Error('qrcode unavailable'));
+            script.onerror = () => { qrLoading = null; script.remove(); reject(new Error('qrcode load failed')); };
+            document.head.append(script);
+        });
+        return qrLoading;
+    }
+    /** 畫成一張可投影、下載或列印的卡片；一律白底黑碼，深色模式也不反轉，確保掃得到。 */
+    function drawQrCard(make, url, name) {
+        const qr = make(0, 'M'); qr.addData(url); qr.make();
+        const count = qr.getModuleCount(), quiet = 4, cell = Math.floor(720 / (count + quiet * 2)), size = cell * (count + quiet * 2);
+        const canvas = el('canvas'); canvas.width = 900; canvas.height = 1140;
+        const ctx = canvas.getContext('2d'), fonts = 'system-ui, "Microsoft JhengHei", "Noto Sans TC", sans-serif';
+        const line = (text, y, px, weight, color) => {
+            // 班級名稱長短不一，超出寬度就縮小字級。
+            do { ctx.font = `${weight} ${px}px ${fonts}`; px -= 2; } while (ctx.measureText(text).width > 800 && px > 18);
+            ctx.fillStyle = color; ctx.fillText(text, 450, y);
+        };
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        line(`${name}的寵物樂園`, 96, 60, 800, '#172033');
+        line('用手機或平板掃描，回家也能看全班的寵物', 176, 32, 500, '#475569');
+        const left = (canvas.width - size) / 2, top = 236;
+        ctx.fillStyle = '#000';
+        for (let row = 0; row < count; row++) for (let col = 0; col < count; col++) {
+            if (qr.isDark(row, col)) ctx.fillRect(left + (col + quiet) * cell, top + (row + quiet) * cell, cell, cell);
+        }
+        line('班級小管家 · 班級寵物', top + size + 60, 28, 500, '#64748b');
+        canvas.setAttribute('role', 'img'); canvas.setAttribute('aria-label', `${name}寵物分享連結的 QR Code`);
+        return canvas;
+    }
+    async function showQr(url, name) {
+        let make;
+        try { make = await loadQr(); } catch (error) { console.warn('[PetShare]', error); return say('QR Code 元件載入失敗，請確認網路連線後再試一次。'); }
+        const canvas = drawQrCard(make, url, name);
+        const dialog = el('dialog', undefined, 'pet-qr'), title = el('h3', `${name}・寵物分享 QR Code`);
+        title.id = 'pet-qr-title'; dialog.setAttribute('aria-labelledby', title.id);
+        const close = () => { dialog.close(); dialog.remove(); };
+        const download = () => canvas.toBlob(blob => {
+            const link = el('a'); link.href = URL.createObjectURL(blob);
+            link.download = `${name.replace(/[\\/:*?"<>|]/g, '')}-寵物分享QRCode.png`;
+            link.click(); setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+        }, 'image/png');
+        const print = () => {
+            // 用隱藏框架只列印這張卡片，不受主畫面版面影響。
+            const frame = el('iframe'); frame.style.cssText = 'position:fixed;width:0;height:0;border:0;visibility:hidden'; frame.setAttribute('aria-hidden', 'true');
+            document.body.append(frame);
+            const image = frame.contentDocument.createElement('img');
+            image.style.cssText = 'display:block;width:100%;max-width:150mm;margin:0 auto';
+            image.onload = () => { frame.contentWindow.onafterprint = () => frame.remove(); frame.contentWindow.focus(); frame.contentWindow.print(); };
+            frame.contentDocument.body.style.margin = '0'; frame.contentDocument.body.append(image);
+            image.src = canvas.toDataURL('image/png');
+        };
+        const zoom = button('放大投影', () => {
+            const projected = dialog.classList.toggle('is-projected');
+            zoom.textContent = projected ? '縮小' : '放大投影'; zoom.setAttribute('aria-pressed', String(projected));
+        });
+        zoom.setAttribute('aria-pressed', 'false');
+        const actions = el('div', undefined, 'pet-tools');
+        actions.append(button('下載圖片', download, 'pet-primary'), button('列印', print), zoom, button('關閉', close));
+        dialog.append(title, canvas, el('p', '投影在教室讓學生掃描，或下載後貼到聯絡簿、班級群組。重新產生連結後，舊的 QR Code 會跟著失效。'), actions);
+        dialog.addEventListener('cancel', e => { e.preventDefault(); close(); });
+        document.body.append(dialog); dialog.showModal(); actions.querySelector('button').focus();
+    }
     function confirmShare(message) {
         return new Promise(resolve => {
             const dialog = el('dialog', undefined, 'pet-confirm'), title = el('h3', '確認分享設定');
@@ -283,7 +353,7 @@
                 const row = el('div', undefined, 'pet-share-link'), field = el('input');
                 field.readOnly = true; field.value = shareUrl(share.id); field.setAttribute('aria-label', '本班寵物分享連結');
                 field.addEventListener('focus', () => field.select());
-                row.append(field, button('複製連結', () => copy(field.value, '✓ 連結已複製，可貼到班級群組或聯絡簿。'), 'pet-primary'));
+                row.append(field, button('複製連結', () => copy(field.value, '✓ 連結已複製，可貼到班級群組或聯絡簿。'), 'pet-primary'), button('顯示 QR Code', () => showQr(field.value, className())));
                 if (navigator.share) row.append(button('分享到 App', () => navigator.share({ title: className() + '的寵物樂園', text: '來看看我們班的寵物！', url: field.value }).catch(() => {})));
                 row.append(button('開啟學生頁', () => window.open(field.value, '_blank', 'noopener')));
                 body.append(row, el('p', share.updatedAt ? '學生頁最後更新：' + new Date(share.updatedAt).toLocaleString('zh-TW', { hour12: false }) + '。加分、孵化或升級後會自動更新。' : '學生頁正在建立中…', 'pet-share-note'));
@@ -305,7 +375,7 @@
                 const list = el('div', undefined, 'pet-share-others'); list.append(el('h3', '我分享中的其他班級'));
                 for (const [classId, other] of others) {
                     const row = el('div', undefined, 'pet-rule');
-                    row.append(el('span', other.className || '未命名班級'), button('複製連結', () => copy(shareUrl(other.id), `✓ 已複製「${other.className || '班級'}」的連結。`)), button('停止分享', () => stop(classId)));
+                    row.append(el('span', other.className || '未命名班級'), button('複製連結', () => copy(shareUrl(other.id), `✓ 已複製「${other.className || '班級'}」的連結。`)), button('QR Code', () => showQr(shareUrl(other.id), other.className || '班級')), button('停止分享', () => stop(classId)));
                     row.lastChild.disabled = working || !verified;
                     list.append(row);
                 }
