@@ -430,5 +430,25 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
         const {pet}=setup();let previous={actions:[],texts:[]};for(let i=0;i<40;i++){const r=pet.interactionFor('cat',90,previous);assert.ok(!previous.actions.includes(r.action));assert.ok(!previous.texts.includes(r.text));previous={actions:[...previous.actions,r.action].slice(-3),texts:[...previous.texts,r.text].slice(-4)};}
         const r=pet.interactionFor('cat',10,{actions:['hop','wobble'],texts:[]});assert.equal(r.action,'hop');assert.ok(!['greet','peek'].includes(r.action));
     });
+    await test('一次加入多項常用獎勵只寫入一次，已有同名的會略過',async()=>{
+        const {pet,ctx}=setup();await pet.setCoinsEnabled(true);await pet.addPresetProduct('sticker');const events=ctx.petEvents.length;
+        assert.equal(await pet.addPresetProducts(['sticker','bookmark','reading','missing']),true);
+        assert.deepEqual(Array.from(pet.settings().products,p=>p.name),['獎勵貼紙一張','精美書籤一張','優先挑選班級閱讀書籍']);
+        assert.equal(pet.settings().products.every(p=>p.active),true);assert.equal(new Set(pet.settings().products.map(p=>p.id)).size,3);
+        assert.equal(ctx.petEvents.length,events+1);assert.equal(ctx.petEvents.at(-1).details.count,2);
+        assert.equal(await pet.addPresetProducts(['sticker','bookmark']),false);assert.equal(pet.settings().products.length,3);
+    });
+    await test('刪除獎勵不影響已兌換的紀錄，仍可退幣',async()=>{
+        const {pet,ctx,storage}=setup();await pet.setCoinsEnabled(true);await pet.award([1],20,'努力');
+        await pet.saveProduct({name:'小禮物',cost:5});await pet.saveProduct({name:'留著的',cost:3});
+        const product=pet.settings().products[0];assert.equal(await pet.redeem(1,product.id,5),true);assert.equal(pet.coinsFor(1),15);
+        assert.equal(await pet.removeProduct(product.id),true);
+        assert.deepEqual(Array.from(pet.settings().products,p=>p.name),['留著的']);assert.equal(await pet.removeProduct(product.id),false);
+        const record=ctx.pointsHistory.find(r=>r.petShopType==='redeem');assert.equal(record.productName,'小禮物');assert.equal(record.productCost,5);
+        assert.equal(await pet.redeem(1,product.id,5),false);assert.equal(pet.coinsFor(1),15);
+        assert.equal(await pet.refund(record.id),true);assert.equal(pet.coinsFor(1),20);
+        // 存檔失敗時獎勵清單原封不動
+        const before=storage.getItem('petSettings');storage.failKey='petSettings';assert.equal(await pet.removeProduct(pet.settings().products[0].id),false);assert.equal(storage.getItem('petSettings'),before);
+    });
     console.log(`${passed} checks passed`);
 })().catch(e=>{console.error(e);process.exitCode=1;});
