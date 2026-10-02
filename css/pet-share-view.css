@@ -1,93 +1,135 @@
-/* 班級寵物分享（學生端 pets.html）。寵物圖像與互動動畫沿用 class-pets.css。 */
-:root { --psv-ink:#24413a; --psv-soft:#5d736c; --psv-line:#d9e6df; --psv-card:#fff; --psv-accent:#2f8f7b; --psv-accent-dark:#1f6b5b; --psv-sun:#fff3cf; }
+/* 班級寵物分享（學生端 pets.html）。寵物圖像與互動動畫沿用 class-pets.css。
+   版面隨螢幕寬度放大：容器最寬 2200px，字級、寵物圖與間距都用 clamp()，
+   大型觸控螢幕、桌機、平板與手機共用同一套規則；元件尺寸以 em 表示，跟著基準字級一起縮放。 */
+:root { --psv-ink:#24413a; --psv-soft:#5d736c; --psv-line:#d9e6df; --psv-card:#fff; --psv-accent:#2f8f7b; --psv-accent-dark:#1f6b5b; --psv-sun:#fff3cf; --psv-page:#f3f8f2; }
 * { box-sizing:border-box; }
-body { margin:0; background:#f3f8f2; color:var(--psv-ink); font:16px/1.7 system-ui,-apple-system,"Noto Sans TC","Microsoft JhengHei",sans-serif; overflow-x:clip; }
-.psv { max-width:1080px; margin:0 auto; padding:20px 16px 8px; display:flex; flex-direction:column; gap:20px; }
+body { margin:0; background:var(--psv-page); color:var(--psv-ink); font:16px/1.7 system-ui,-apple-system,"Noto Sans TC","Microsoft JhengHei",sans-serif; overflow-x:clip; }
+.psv {
+    --gutter:clamp(14px,2.6vw,56px);
+    --pet:clamp(104px,8.4vw,190px);        /* 全班卡片上的寵物 */
+    --pet-small:clamp(84px,6.2vw,136px);   /* 圖鑑 */
+    --pet-hero:clamp(192px,19vw,360px);    /* 我的寵物 */
+    width:min(2200px,100%); margin:0 auto; padding:clamp(14px,2vw,40px) var(--gutter) 8px;
+    display:flex; flex-direction:column; gap:clamp(16px,1.5vw,28px);
+    font-size:clamp(16px,.5vw + 10.5px,22px);
+}
 .psv h1, .psv h2, .psv h3, .psv p { margin:0; overflow-wrap:anywhere; }
-.psv h1 { font-size:clamp(26px,6vw,38px); line-height:1.3; font-weight:800; }
-.psv h2 { font-size:21px; font-weight:800; }
-.psv h3 { font-size:15px; font-weight:700; }
-.psv button, .psv select { min-height:46px; padding:10px 16px; border:1px solid #9db5ac; border-radius:12px; background:#fff; color:var(--psv-ink); font:inherit; cursor:pointer; }
+.psv h1 { font-size:clamp(1.65em,1.1em + 2.2vw,2.6em); line-height:1.25; font-weight:800; }
+.psv h2 { font-size:1.35em; line-height:1.4; font-weight:800; }
+.psv h3 { font-size:1em; font-weight:700; }
+.psv button, .psv select { min-height:max(46px,2.8em); padding:.5em 1em; border:1px solid #9db5ac; border-radius:.75em; background:#fff; color:var(--psv-ink); font:inherit; cursor:pointer; }
 .psv :is(button,select):focus-visible { outline:3px solid #f2a93b; outline-offset:3px; }
 .psv button.psv-primary { background:var(--psv-accent); border-color:var(--psv-accent); color:#fff; font-weight:700; }
-.psv button.psv-link { min-height:44px; padding:8px 4px; border:0; background:none; color:var(--psv-accent-dark); text-decoration:underline; text-underline-offset:4px; }
-.psv progress { width:100%; height:10px; accent-color:var(--psv-accent); }
+.psv button.psv-link { min-height:44px; padding:.4em .25em; border:0; background:none; color:var(--psv-accent-dark); text-decoration:underline; text-underline-offset:4px; }
+.psv progress { width:100%; height:.65em; accent-color:var(--psv-accent); }
 .psv-loading { padding:80px 0; text-align:center; color:var(--psv-soft); }
-.psv-eyebrow { font-size:14px; font-weight:700; color:var(--psv-accent-dark); }
+.psv-eyebrow { font-size:max(14px,.875em); font-weight:700; color:var(--psv-accent-dark); }
 
-.psv-header { padding:8px 4px 0; }
-.psv-meta { display:flex; flex-wrap:wrap; align-items:center; gap:4px 14px; color:var(--psv-soft); font-size:14px; }
-.psv-offline { margin-top:8px !important; padding:10px 14px; border-radius:12px; background:var(--psv-sun); color:#7a5a12; font-size:14px; }
+/* 頁首：左邊班級名稱，右邊全班概況；窄螢幕自動換行 */
+.psv-header { display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:.9em 2em; }
+.psv-title { flex:1 1 16em; min-width:0; }
+.psv-meta { display:flex; flex-wrap:wrap; align-items:center; gap:.2em 1em; color:var(--psv-soft); font-size:max(14px,.875em); }
+.psv-stats { display:flex; gap:.6em; margin:0; }
+.psv-stats div { display:flex; flex-direction:column-reverse; align-items:center; min-width:6.4em; padding:.5em .9em; border:1px solid var(--psv-line); border-radius:1em; background:#fff; line-height:1.35; }
+.psv-stats dd { margin:0; font-size:1.6em; font-weight:800; color:var(--psv-accent-dark); }
+.psv-stats dt { font-size:max(13px,.8em); color:var(--psv-soft); white-space:nowrap; }
+.psv-offline { flex-basis:100%; padding:.6em .9em; border-radius:.75em; background:var(--psv-sun); color:#7a5a12; font-size:max(14px,.875em); }
 
-.psv-news { display:flex; flex-wrap:wrap; align-items:center; gap:14px; padding:16px; border:2px solid #f3cf7a; border-radius:20px; background:var(--psv-sun); }
-.psv-news .pet-portrait { width:88px; height:99px; animation:pet-grow-pop .6s ease-out; }
-.psv-news > div { flex:1; min-width:180px; }
-.psv-news strong { display:block; font-size:18px; }
+/* 快速導覽：固定在頂端，手機可左右滑動 */
+.psv-nav { position:sticky; top:0; z-index:5; display:flex; gap:.5em; margin:0 calc(-1 * var(--gutter)); padding:.5em var(--gutter); overflow-x:auto; scrollbar-width:none; background:#f3f8f2ee; -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); }
+.psv-nav::-webkit-scrollbar { display:none; }
+.psv .psv-nav button { flex:none; min-height:max(44px,2.5em); padding:.3em 1.1em; border-radius:99px; font-weight:700; }
 
-.psv-mine, .psv-section { padding:20px; border:1px solid var(--psv-line); border-radius:24px; background:var(--psv-card); }
-.psv-mine { display:flex; flex-direction:column; gap:12px; }
-.psv-mine.has-pet { display:grid; grid-template-columns:minmax(0,260px) minmax(0,1fr); align-items:center; gap:8px 28px; background:linear-gradient(140deg,#e6f5ee,#fff8e3); border-color:#bfe0d2; }
-.psv-mine-stage { text-align:center; padding-top:32px; }
-.psv-mine-stage .pet-avatar .pet-portrait { width:224px; height:252px; }
-.psv-caption, .psv-taps { font-size:14px; color:var(--psv-soft); }
-.psv-mine-info { display:flex; flex-direction:column; align-items:flex-start; gap:6px; }
-.psv-mine-info h2 { font-size:clamp(24px,5vw,32px); }
+.psv-news { display:flex; flex-wrap:wrap; align-items:center; gap:.9em; padding:1em; border:2px solid #f3cf7a; border-radius:1.25em; background:var(--psv-sun); }
+.psv-news .pet-portrait { width:5.5em; height:6.2em; animation:pet-grow-pop .6s ease-out; }
+.psv-news > div { flex:1; min-width:11em; }
+.psv-news strong { display:block; font-size:1.15em; }
+
+.psv-mine, .psv-section { padding:clamp(16px,1.6vw,32px); border:1px solid var(--psv-line); border-radius:clamp(20px,1.6vw,30px); background:var(--psv-card); scroll-margin-top:4.6em; }
+/* 還沒選自己：說明與選單並排，窄螢幕自動上下排 */
+.psv-mine { display:flex; flex-wrap:wrap; align-items:center; gap:.8em 2em; }
+.psv-pick-copy { flex:1 1 18em; min-width:0; }
+.psv-pick-copy p { color:var(--psv-soft); }
+.psv-pick { flex:1 1 20em; display:flex; gap:.6em; max-width:36em; }
+.psv-pick select { flex:1; min-width:0; }
+.psv-pick button { flex:none; }
+/* 已選自己：大圖在左、成長資訊在右 */
+.psv-mine.has-pet { display:grid; grid-template-columns:auto minmax(0,40em); justify-content:center; align-items:center; gap:.5em clamp(1.2em,4vw,4.5em); background:linear-gradient(140deg,#e6f5ee,#fff8e3); border-color:#bfe0d2; }
+.psv-mine-stage { text-align:center; padding-top:2em; }
+.psv-mine-stage .pet-avatar .pet-portrait { width:var(--pet-hero); height:calc(var(--pet-hero) * 1.125); }
+.psv-caption, .psv-taps { font-size:max(14px,.875em); color:var(--psv-soft); }
+.psv-mine-info { display:flex; flex-direction:column; align-items:flex-start; gap:.4em; }
+.psv-mine-info h2 { font-size:clamp(1.5em,1em + 1.6vw,2.4em); }
+.psv-mine-info progress { height:.9em; }
 .psv-stage { font-weight:700; }
-.psv-hint { padding:8px 12px; border-radius:12px; background:#ffffffb8; font-size:14px; }
+.psv-hint { padding:.5em .75em; border-radius:.75em; background:#ffffffb8; font-size:max(14px,.9em); }
 .psv-coins { font-weight:700; color:#8a5a0a; }
-.psv-pick { display:flex; flex-wrap:wrap; gap:10px; }
-.psv-pick select { flex:1; min-width:180px; }
 
-.psv-section { display:flex; flex-direction:column; gap:12px; }
-.psv-section-head { display:flex; flex-wrap:wrap; align-items:center; gap:6px 16px; }
-.psv-section-head p { color:var(--psv-soft); font-size:14px; flex:1; min-width:180px; }
-.psv-sorter { display:flex; gap:8px; }
+.psv-section { display:flex; flex-direction:column; gap:.8em; }
+.psv-section-head { display:flex; flex-wrap:wrap; align-items:center; gap:.4em 1em; }
+.psv-section > p, .psv-section-head p { color:var(--psv-soft); font-size:max(14px,.9em); }
+.psv-section-head p { flex:1; min-width:11em; }
+.psv-sorter { display:flex; gap:.5em; }
 .psv-sorter button[aria-pressed=true] { background:#dff1e9; border-color:var(--psv-accent); color:var(--psv-accent-dark); font-weight:700; }
 
-.psv-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(158px,1fr)); gap:12px; }
-.psv-card { display:flex; flex-direction:column; align-items:center; gap:4px; min-width:0; padding:14px 10px; border:1px solid var(--psv-line); border-radius:18px; background:#fbfdfb; text-align:center; }
+/* 卡片網格：螢幕越寬欄數越多，寵物圖也跟著放大 */
+.psv-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(calc(var(--pet) + 3em),1fr)); gap:clamp(10px,1vw,18px); }
+.psv-card { display:flex; flex-direction:column; align-items:center; gap:.25em; min-width:0; padding:.9em .6em 1em; border:1px solid var(--psv-line); border-radius:1.1em; background:#fbfdfb; text-align:center; }
 .psv-card.is-me { border:2px solid var(--psv-accent); background:#e9f6f0; }
-.psv-card p { font-size:13px; color:var(--psv-soft); }
-.psv-card small { color:var(--psv-soft); }
-.psv-card .pet-avatar { margin-top:14px; }
-.psv .psv-card .pet-avatar .pet-portrait { width:112px; height:126px; }
+.psv-card > strong { font-size:1.05em; }
+.psv-card p { font-size:max(14px,.875em); color:var(--psv-soft); }
+.psv-card small { font-size:max(13px,.8em); color:var(--psv-soft); }
+/* class-pets.css 為備援 emoji 把 .pet-avatar 設成 64px；這裡還原，否則內部以 em 計算的泡泡與間距會被放大。 */
+.psv .pet-avatar { font-size:1em; }
+.psv-card .pet-avatar { margin-top:2.2em; }   /* 留位置給對話泡泡，不蓋住上方的名字 */
+.psv .psv-card .pet-avatar .pet-portrait { width:var(--pet); height:calc(var(--pet) * 1.125); }
 .psv-card:nth-child(3n+2) .pet-breathing { animation-delay:-1.4s; }
 .psv-card:nth-child(3n) .pet-breathing { animation-delay:-2.8s; }
 .psv-card.is-locked { border-style:dashed; background:#eef3f0; color:var(--psv-soft); }
-.psv-unknown { display:grid; place-items:center; width:112px; height:72px; font-size:40px; color:#a9bab3; }
-.psv-atlas { grid-template-columns:repeat(auto-fill,minmax(132px,1fr)); }
+.psv-atlas { grid-template-columns:repeat(auto-fill,minmax(calc(var(--pet-small) + 2em),1fr)); }
 .psv-atlas .psv-card { justify-content:space-between; }
-.psv-atlas .psv-card .pet-avatar { margin-top:6px; }
+.psv-atlas .psv-card .pet-avatar { margin-top:1.2em; }
+.psv .psv-atlas .pet-avatar .pet-portrait { width:var(--pet-small); height:calc(var(--pet-small) * 1.125); }
+.psv-unknown { display:grid; place-items:center; width:100%; height:calc(var(--pet-small) * .7); font-size:2.4em; line-height:1; color:#a9bab3; }
 
 /* 動畫作用在按鈕外框，寵物本身的呼吸動畫不受影響（與老師端相同）。 */
 .psv button.pet-touch { position:relative; display:inline-flex; justify-content:center; align-items:center; flex:none; max-width:100%; min-width:46px; min-height:46px; padding:0; border:0; background:transparent; border-radius:12px; line-height:0; touch-action:manipulation; transform-origin:50% 85%; -webkit-tap-highlight-color:transparent; }
+.psv .pet-touch-reply { font-size:max(13px,.8em); max-width:min(15em,72vw); padding:.6em .9em; }
 
-.psv-quest { padding:14px; border:1px solid var(--psv-line); border-radius:16px; background:#fbfdfb; display:flex; flex-direction:column; gap:6px; }
-.psv-quest p { font-size:14px; color:var(--psv-soft); }
-.psv-shop { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px; }
-.psv-shop li { display:flex; justify-content:space-between; gap:12px; padding:12px 14px; border:1px solid var(--psv-line); border-radius:14px; background:#fbfdfb; }
+/* 任務與獎勵在寬螢幕並排 */
+.psv-columns { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,26em),1fr)); gap:clamp(16px,1.5vw,28px); align-items:start; }
+.psv-quest-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,17em),1fr)); gap:.75em; }
+.psv-quest { padding:.9em; border:1px solid var(--psv-line); border-radius:1em; background:#fbfdfb; display:flex; flex-direction:column; gap:.4em; }
+.psv-quest p { font-size:max(14px,.875em); color:var(--psv-soft); }
+.psv-shop { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,14em),1fr)); gap:.6em; }
+.psv-shop li { display:flex; justify-content:space-between; align-items:center; gap:.75em; padding:.75em .9em; border:1px solid var(--psv-line); border-radius:.9em; background:#fbfdfb; }
 .psv-shop strong { flex:none; color:#8a5a0a; }
-.psv-footnote { text-align:center; font-size:14px; color:var(--psv-soft); }
+.psv-footnote { text-align:center; font-size:max(14px,.875em); color:var(--psv-soft); }
 
-.psv-problem { margin:48px auto; max-width:440px; padding:32px 24px; border:1px solid var(--psv-line); border-radius:24px; background:#fff; text-align:center; display:flex; flex-direction:column; align-items:center; gap:12px; }
-.psv-problem h1 { font-size:24px; }
-.psv-problem-icon { font-size:56px; line-height:1; }
+.psv-problem { margin:48px auto; max-width:28em; padding:2em 1.5em; border:1px solid var(--psv-line); border-radius:1.5em; background:#fff; text-align:center; display:flex; flex-direction:column; align-items:center; gap:.75em; }
+.psv .psv-problem h1 { font-size:1.5em; }
+.psv-problem-icon { font-size:3.5em; line-height:1; }
 
-.site-credit { display:flex; flex-wrap:wrap; justify-content:center; gap:4px 18px; padding:24px 16px 32px; font-size:13px; color:#24413a99; text-align:center; }
+.site-credit { display:flex; flex-wrap:wrap; justify-content:center; gap:4px 18px; padding:24px 16px 32px; font-size:clamp(13px,.3vw + 10px,16px); color:#24413a99; text-align:center; }
 .site-credit__heart { display:inline-block; margin:0 2px; filter:saturate(1.1); }
 .site-credit__author { color:inherit; text-decoration:none; border-bottom:1px dotted currentColor; padding-bottom:1px; transition:color .2s,border-color .2s; }
 .site-credit__author:hover { color:#c63; border-bottom-color:#c63; }
 
+/* 手機：固定兩欄卡片、三欄圖鑑，我的寵物上下排並置中 */
 @media(max-width:640px) {
+    .psv { --pet:min(112px,34vw); --pet-small:min(84px,23vw); --pet-hero:min(208px,60vw); }
+    .psv-stats { width:100%; }
+    .psv-stats div { flex:1; min-width:0; padding:.45em .3em; }
+    .psv-pick { flex-wrap:wrap; max-width:none; }
+    .psv-pick select { flex:1 1 100%; }
+    .psv-pick button { flex:1; }
     .psv-mine.has-pet { grid-template-columns:minmax(0,1fr); }
     .psv-mine-info { align-items:center; text-align:center; }
-    .psv-mine-stage .pet-avatar .pet-portrait { width:192px; height:216px; }
+    .psv-mine-stage { padding-top:.8em; }
     .psv-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
     .psv-atlas { grid-template-columns:repeat(3,minmax(0,1fr)); }
-    .psv .psv-atlas .pet-avatar .pet-portrait { width:84px; height:95px; }
-    .psv-atlas .psv-unknown { width:100%; height:56px; font-size:32px; }
-    .psv-atlas .psv-card { padding:10px 6px; }
-    .psv-mine-stage { padding-top:12px; }
-    .psv-mine, .psv-section { padding:16px; border-radius:20px; }
+    .psv-atlas .psv-card { padding:.6em .35em; }
+    .psv-sorter { width:100%; }
+    .psv-sorter button { flex:1; }
 }
 @media(prefers-reduced-motion:reduce) { .psv-news .pet-portrait { animation:none; } }

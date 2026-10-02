@@ -44,7 +44,8 @@
     }
     const label = s => state.nameMode === 'seat' || !s.name ? (s.seat ? s.seat + ' 號' : `第 ${s.order + 1} 位同學`) : `${s.seat ? s.seat + ' ' : ''}${s.name}`;
     const petName = s => s.nick || (s.kind ? P.pets[s.kind][1] : '神祕寵物蛋');
-    const stageLine = s => s.kind ? `${P.pets[s.kind][1]} · ${P.appearance(s.xp).label} · ${P.stage(s.xp).label}` : `神祕寵物蛋 · ${P.eggStage(s.xp).label}`;
+    // 卡片標題已是寵物名稱；只有取了暱稱時才在這行補上種類，避免同一個名字出現兩次。
+    const stageLine = s => s.kind ? `${s.nick ? P.pets[s.kind][1] + ' · ' : ''}${P.appearance(s.xp).label} · ${P.stage(s.xp).label}` : P.eggStage(s.xp).label;
     function avatar(s) { const box = el('div', undefined, 'pet-avatar'); box.append(P.interactivePortrait(s.kind || 'cat', s.xp, s.mood)); return box; }
     function progressBar(s) {
         const growth = P.stage(s.xp), bar = el('progress');
@@ -140,8 +141,11 @@
     }
     function renderMine() {
         const section = el('section', undefined, 'psv-mine'), me = state.students.find(s => s.key === memory.me);
+        section.id = 'psv-mine';
         if (!me) {
-            section.append(el('h2', '🔍 先找到你的寵物'), el('p', '選出你自己，下次打開就會直接看到牠。這個選擇只記在這台裝置上。'));
+            const copy = el('div', undefined, 'psv-pick-copy');
+            copy.append(el('h2', '🔍 先找到你的寵物'), el('p', '選出你自己，下次打開就會直接看到牠。這個選擇只記在這台裝置上。'));
+            section.append(copy);
             const form = el('form', undefined, 'psv-pick'), select = el('select'); select.setAttribute('aria-label', '選擇你的座號或姓名');
             select.add(new Option('請選擇…', ''));
             state.students.forEach(s => select.add(new Option(label(s), s.key)));
@@ -165,9 +169,9 @@
         return section;
     }
     function renderClass() {
-        const section = el('section', undefined, 'psv-section'), hatched = state.students.filter(s => s.kind).length;
+        const section = el('section', undefined, 'psv-section'); section.id = 'psv-class';
         const head = el('div', undefined, 'psv-section-head');
-        head.append(el('h2', '🐾 全班的寵物'), el('p', `已孵化 ${hatched} 隻 · 還有 ${state.students.length - hatched} 顆蛋等待孵化`));
+        head.append(el('h2', '🐾 全班的寵物'), el('p', '點一下蛋或寵物，牠會回應你！'));
         const sorter = el('div', undefined, 'psv-sorter'); sorter.setAttribute('role', 'group'); sorter.setAttribute('aria-label', '排列方式');
         for (const [mode, name] of [['seat', '依座號'], ['level', '依成長']]) {
             const control = button(name, () => { sortMode = mode; render(); }); control.setAttribute('aria-pressed', String(sortMode === mode)); sorter.append(control);
@@ -187,14 +191,16 @@
     }
     function renderQuests() {
         if (!state.quests.length && !state.eggs.length) return null;
-        const section = el('section', undefined, 'psv-section');
+        const section = el('section', undefined, 'psv-section'); section.id = 'psv-quests';
         section.append(el('h2', '🤝 全班共同任務'), el('p', `全班一起完成任務就能得到收藏蛋。${state.questsDone ? `已經完成 ${state.questsDone} 個任務！` : ''}`));
+        const quests = el('div', undefined, 'psv-quest-list');
         for (const quest of state.quests) {
             const card = el('article', undefined, 'psv-quest'), bar = el('progress'), left = quest.target - quest.progress;
             bar.max = quest.target; bar.value = Math.min(quest.target, quest.progress); bar.setAttribute('aria-label', quest.name + '進度');
             card.append(el('h3', quest.name), bar, el('p', `${Math.min(quest.target, quest.progress)} / ${quest.target} 次${left > 0 ? ` · 再 ${left} 次就達標` : ' · 🎉 達標了，等老師領蛋！'}${quest.endDate ? ` · ${quest.endDate} 截止` : ''}`));
-            section.append(card);
+            quests.append(card);
         }
+        if (state.quests.length) section.append(quests);
         if (state.eggs.length) {
             const eggs = el('div', undefined, 'psv-grid psv-eggs');
             for (const egg of state.eggs) {
@@ -209,7 +215,7 @@
     }
     function renderAtlas() {
         const kinds = Object.keys(P.pets), found = Object.keys(state.collection).length;
-        const section = el('section', undefined, 'psv-section'), bar = el('progress');
+        const section = el('section', undefined, 'psv-section'), bar = el('progress'); section.id = 'psv-atlas';
         bar.max = kinds.length; bar.value = found; bar.setAttribute('aria-label', '全班圖鑑收集進度');
         section.append(el('h2', `📖 全班圖鑑 ${found} / ${kinds.length}`), bar, el('p', '同學孵化出新種類，圖鑑就會點亮一格。還沒發現的寵物先保密！'));
         const grid = el('div', undefined, 'psv-grid psv-atlas');
@@ -229,7 +235,7 @@
     }
     function renderShop() {
         if (!state.products.length) return null;
-        const section = el('section', undefined, 'psv-section');
+        const section = el('section', undefined, 'psv-section'); section.id = 'psv-shop';
         section.append(el('h2', '🛍️ 金幣可以兌換的獎勵'), el('p', '存夠金幣後，到學校請老師幫你兌換。'));
         const list = el('ul', undefined, 'psv-shop');
         for (const product of state.products) { const item = el('li'); item.append(el('span', product.name), el('strong', `🪙 ${product.cost}`)); list.append(item); }
@@ -238,16 +244,35 @@
     }
     function render() {
         document.title = `${state.className}的寵物樂園｜班級小管家`;
-        const header = el('header', undefined, 'psv-header');
-        header.append(el('p', '班級小管家 · 班級寵物', 'psv-eyebrow'), el('h1', `${state.className}的寵物樂園`));
+        const header = el('header', undefined, 'psv-header'), title = el('div', undefined, 'psv-title');
+        title.append(el('p', '班級小管家 · 班級寵物', 'psv-eyebrow'), el('h1', `${state.className}的寵物樂園`));
         const meta = el('div', undefined, 'psv-meta');
         meta.append(el('span', previewing ? '這是預覽畫面，學生看到的就是這樣。' : `老師最後更新：${new Date(state.updatedAt).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}`));
         if (!previewing) meta.append(button('重新整理', load, 'psv-link'));
-        header.append(meta);
+        title.append(meta);
+        const hatched = state.students.filter(s => s.kind).length, stats = el('dl', undefined, 'psv-stats');
+        for (const [name, value] of [['隻已孵化', hatched], ['顆蛋等待中', state.students.length - hatched], ['圖鑑收集', `${Object.keys(state.collection).length}/${Object.keys(P.pets).length}`]]) {
+            const item = el('div'); item.append(el('dt', name), el('dd', String(value))); stats.append(item);
+        }
+        header.append(title, stats);
         if (state.stale) header.append(el('p', '目前連不上網路，先顯示上次看到的樣子。', 'psv-offline'));
-        const parts = [header, newsBanner(), renderMine(), renderClass(), renderQuests(), renderAtlas(), renderShop(),
+        const side = [renderQuests(), renderShop()].filter(Boolean), columns = el('div', undefined, 'psv-columns');
+        columns.append(...side);
+        const sections = [renderMine(), renderClass(), side.length ? columns : null, renderAtlas()];
+        const parts = [header, sectionNav(side), newsBanner(), ...sections,
             el('p', '在這裡可以看寵物、和牠互動；成長值與金幣要靠在學校的好表現，由老師發放喔！', 'psv-footnote')];
         root.replaceChildren(...parts.filter(Boolean));
+    }
+    /** 頁面很長（尤其手機），提供固定在頂端的快速導覽；只列出這一班實際有的區塊。 */
+    function sectionNav(side) {
+        const nav = el('nav', undefined, 'psv-nav'); nav.setAttribute('aria-label', '快速前往');
+        const links = [['psv-mine', memory.me ? '我的寵物' : '找我的寵物'], ['psv-class', '全班寵物'],
+            ...side.map(section => [section.id, section.id === 'psv-quests' ? '共同任務' : '兌換獎勵']), ['psv-atlas', '全班圖鑑']];
+        for (const [id, name] of links) {
+            nav.append(button(name, () => document.getElementById(id)?.scrollIntoView({
+                behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })));
+        }
+        return nav;
     }
 
     if (!P || !root) { if (root) root.textContent = '寵物頁載入失敗，請重新整理再試一次。'; return; }
