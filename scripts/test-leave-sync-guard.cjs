@@ -87,7 +87,48 @@ try {
     assert.equal(internalNavigation.LeaveSyncGuard.isInternalNavigation(), true);
     console.log('PASS 班級內部切換 reload 不攔截瀏覽器確認');
 
-    console.log('10 leave-sync-guard checks passed');
+    // ── 提醒卡的顯示時機：不能打斷課堂操作 ──
+    const { shouldShow, timing } = setup({ dirty: true }).LeaveSyncGuard;
+    const now = 10_000_000, minute = 60_000;
+    const pendingInfo = { active: true, syncing: false, status: 'pending' };
+    // 預設狀態：變更已 10 分鐘沒上傳、老師已停下 1 分鐘、沒按過稍後提醒
+    const view = overrides => ({ visible: false, userSyncing: false, snoozeUntil: 0, exitIntentAt: 0, lastInputAt: now - minute, pendingSince: now - 10 * minute, ...overrides });
+
+    assert.equal(shouldShow(pendingInfo, view({ lastInputAt: now - 1000 }), now), false);
+    assert.equal(shouldShow(pendingInfo, view({ lastInputAt: now - timing.QUIET_MS + 1 }), now), false);
+    console.log('PASS 老師正在操作時不跳出提醒');
+
+    assert.equal(shouldShow(pendingInfo, view({ pendingSince: now - 30_000 }), now), false);
+    assert.equal(shouldShow(pendingInfo, view(), now), true);
+    console.log('PASS 停下操作且變更已一陣子沒上傳才提醒');
+
+    const snoozed = view({ snoozeUntil: now + timing.SNOOZE_MS });
+    assert.equal(shouldShow(pendingInfo, snoozed, now), false);
+    // 稍後提醒期間即使又加分（剛操作完、又停下來）、甚至滑鼠移向關閉分頁，也不出現
+    assert.equal(shouldShow(pendingInfo, { ...snoozed, pendingSince: now - 20 * minute, exitIntentAt: now }, now), false);
+    assert.equal(shouldShow(pendingInfo, snoozed, now + timing.SNOOZE_MS + 1), true);
+    assert.equal(timing.SNOOZE_MS, 15 * minute);
+    console.log('PASS 按稍後提醒後 15 分鐘內不再出現，時間到才恢復');
+
+    assert.equal(shouldShow({ ...pendingInfo, syncing: true }, view(), now), false);
+    assert.equal(shouldShow({ ...pendingInfo, syncing: true }, view({ visible: true }), now), true);
+    assert.equal(shouldShow({ ...pendingInfo, syncing: true }, view({ userSyncing: true, snoozeUntil: now + minute }), now), true);
+    console.log('PASS 背景自動同步不叫出卡片，老師自己按同步才顯示進度');
+
+    assert.equal(shouldShow(pendingInfo, view({ lastInputAt: now - 1000, pendingSince: now - 1000, exitIntentAt: now - 1000 }), now), true);
+    assert.equal(shouldShow(pendingInfo, view({ lastInputAt: now - 1000, exitIntentAt: now - timing.EXIT_INTENT_MS - 1 }), now), false);
+    console.log('PASS 滑鼠移向關閉分頁時立即提醒');
+
+    const conflictInfo = { active: true, syncing: false, status: 'conflict' };
+    assert.equal(shouldShow(conflictInfo, view({ pendingSince: now }), now), true);
+    assert.equal(shouldShow(conflictInfo, view({ lastInputAt: now - 1000 }), now), false);
+    console.log('PASS 同步衝突在老師停下時就提醒，操作中仍不打斷');
+
+    assert.equal(shouldShow({ active: false, syncing: false, status: 'synced' }, view({ visible: true, userSyncing: true }), now), false);
+    assert.equal(shouldShow(pendingInfo, view({ visible: true, lastInputAt: now }), now), true);
+    console.log('PASS 已同步就收起；已顯示的卡片在老師處理前不會自己消失');
+
+    console.log('17 leave-sync-guard checks passed');
 } catch (error) {
     console.error(error);
     process.exitCode = 1;

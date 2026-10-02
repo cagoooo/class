@@ -1,23 +1,58 @@
 /**
- * 離開前雲端同步提醒 v1.0
+ * 離開前雲端同步提醒 v2.0
  *
  * 瀏覽器關閉分頁時只能使用 beforeunload 的原生確認視窗，無法由網頁
  * 自訂視窗文字。本模組另外提供頁面內提醒卡，讓老師在按下關閉前就能
  * 立即同步；只有同步基準確認有差異、明確寫入待同步標記或正在同步時才會攔截離開，
  * 避免單純切班／載入既有資料時打擾老師。
+ *
+ * 提醒卡不能打斷課堂操作（v2.0）：
+ * - 老師正在操作時不出現；停下來一段時間、且變更已經一陣子沒上傳才提醒
+ *   （自動同步通常會先處理掉，根本不需要提醒）。
+ * - 卡片出現後老師直接繼續操作，卡片自己收起來，一段時間內不再出現。
+ * - 按「稍後提醒」就安靜 15 分鐘，期間再怎麼加分都不會跳出來。
+ * - 背景自動同步不會把卡片叫出來；只有老師自己按「立即同步」才顯示進度。
+ * 關閉分頁時的原生確認視窗不受以上規則影響，仍是最後一道保險。
  */
 (function () {
     'use strict';
 
+    const QUIET_MS = 30 * 1000;             // 老師停下操作多久後才可能顯示
+    const MIN_PENDING_MS = 2 * 60 * 1000;   // 變更至少多久沒上傳才提醒
+    const SNOOZE_MS = 15 * 60 * 1000;       // 按「稍後提醒」後安靜多久
+    const SOFT_SNOOZE_MS = 5 * 60 * 1000;   // 沒按按鈕、直接繼續操作後安靜多久
+    const EXIT_INTENT_MS = 8 * 1000;        // 滑鼠移出視窗上緣（準備關閉分頁）後的顯示時間
+    const SNOOZE_KEY = 'leaveSyncSnoozeUntil';
+
     const state = {
         banner: null,
-        lastSignal: '',
-        dismissed: false,
         initialized: false,
         timer: null,
         allowInternalNavigation: false,
         internalNavigationTimer: null,
+        lastInputAt: Date.now(),
+        pendingSince: 0,
+        snoozeUntil: 0,
+        exitIntentAt: 0,
+        userSyncing: false,
     };
+
+    /**
+     * 純函式：此刻要不要顯示提醒卡。
+     * @param {{active:boolean, syncing:boolean, status:string}} info 同步狀態
+     * @param {{visible:boolean, userSyncing:boolean, snoozeUntil:number, exitIntentAt:number, lastInputAt:number, pendingSince:number}} view 互動狀態
+     */
+    function shouldShow(info, view, now) {
+        if (!info.active) return false;
+        if (view.userSyncing) return true;               // 老師自己按了同步：顯示進度到結束
+        if (info.syncing) return view.visible;           // 背景自動同步不主動跳出來
+        if (now < view.snoozeUntil) return false;
+        if (view.visible) return true;                   // 已顯示的卡片留著，直到老師繼續操作或按按鈕
+        if (now - view.exitIntentAt < EXIT_INTENT_MS) return true;
+        if (now - view.lastInputAt < QUIET_MS) return false;
+        // 同步衝突需要老師決定，停下來就提醒；一般待上傳則先給自動同步一點時間。
+        return info.status === 'conflict' || now - view.pendingSince >= MIN_PENDING_MS;
+    }
 
     function currentClassId() {
         try { return String(localStorage.getItem('currentClassId') || 'default'); }
@@ -88,18 +123,10 @@
         } catch (e) { return false; }
     }
 
-    function localFingerprint() {
-        try {
-            const values = window.CloudSafety?.capture?.(currentClassId());
-            return values && window.CloudSafety?.fingerprint?.(values) || '';
-        } catch (e) { return ''; }
-    }
-
     function signal() {
         const status = cloudStatus();
         const syncing = !!window.syncStatus?.isSyncing;
         const active = isGoogleUser() && hasPendingEvidence(currentClassId(), status, syncing);
-        const fingerprint = active ? localFingerprint() : '';
         return {
             id: currentClassId(),
             name: currentClassName(),
@@ -108,9 +135,18 @@
             progress: syncing ? syncProgress() : null,
             active,
             offline: !isOnline(),
-            signature: `${currentClassId()}:${status}:${syncing ? 'syncing' : 'idle'}:${isOnline() ? 'online' : 'offline'}:${fingerprint}:${syncProgress()?.percent || 0}:${syncProgress()?.phase || ''}`,
         };
     }
+
+    // 「稍後提醒」記在 sessionStorage：切換班級或套用更新造成的重新載入不會讓它失效。
+    function loadSnooze() {
+        try { return Number(sessionStorage.getItem(SNOOZE_KEY)) || 0; } catch (e) { return 0; }
+    }
+    function snooze(duration) {
+        state.snoozeUntil = Math.max(state.snoozeUntil, Date.now() + duration);
+        try { sessionStorage.setItem(SNOOZE_KEY, String(state.snoozeUntil)); } catch (e) { /* 存不了就只在本頁有效 */ }
+    }
+    function bannerVisible() { return !!state.banner && !state.banner.hidden; }
 
     function needsReminder() {
         const info = signal();
@@ -217,12 +253,12 @@
             </div>
             <div class="leave-sync-actions">
                 <button type="button" class="leave-sync-primary" data-action="sync">立即同步</button>
-                <button type="button" class="leave-sync-secondary" data-action="snooze">稍後提醒</button>
+                <button type="button" class="leave-sync-secondary" data-action="snooze" title="15 分鐘內不再顯示這個提醒">15 分鐘後再提醒</button>
             </div>
         `;
         banner.querySelector('[data-action="sync"]').addEventListener('click', handlePrimary);
         banner.querySelector('[data-action="snooze"]').addEventListener('click', () => {
-            state.dismissed = true;
+            snooze(SNOOZE_MS);
             hideBanner();
         });
         document.body.appendChild(banner);
@@ -277,6 +313,7 @@
         const info = signal();
         const button = event.currentTarget;
         button.disabled = true;
+        state.userSyncing = true;
         try {
             if (info.status === 'conflict') {
                 await window.CloudSafety?.showConflict?.(info.id);
@@ -286,25 +323,44 @@
         } catch (error) {
             window.NotificationSystem?.error?.(`同步未完成：${error.message || '請稍後再試'}`);
         } finally {
+            state.userSyncing = false;
             button.disabled = false;
             refresh();
         }
     }
 
     function refresh() {
-        const info = signal();
+        const info = signal(), now = Date.now();
         if (!info.active) {
-            state.dismissed = false;
-            state.lastSignal = '';
+            state.pendingSince = 0;
             hideBanner();
             return info;
         }
-        if (info.signature !== state.lastSignal) {
-            state.lastSignal = info.signature;
-            state.dismissed = false;
-        }
-        if (!state.dismissed) updateBanner(info);
+        if (!state.pendingSince) state.pendingSince = now;
+        const view = {
+            visible: bannerVisible(), userSyncing: state.userSyncing, snoozeUntil: state.snoozeUntil,
+            exitIntentAt: state.exitIntentAt, lastInputAt: state.lastInputAt, pendingSince: state.pendingSince,
+        };
+        if (shouldShow(info, view, now)) updateBanner(info);
+        else hideBanner();
         return info;
+    }
+
+    /** 老師繼續操作課堂：記下時間；卡片若在畫面上就自己收起來，一段時間內不再出現。 */
+    function handleInput(event) {
+        state.lastInputAt = Date.now();
+        if (!bannerVisible() || state.userSyncing) return;
+        if (state.banner.contains(event.target)) return;   // 正在按卡片上的按鈕
+        if (window.syncStatus?.isSyncing) return;            // 進度顯示中，讓老師看完
+        snooze(SOFT_SNOOZE_MS);
+        hideBanner();
+    }
+
+    /** 滑鼠從視窗上緣移出，多半是要關閉或切換分頁：這是提醒同步最有用的時機。 */
+    function handleExitIntent(event) {
+        if (event.relatedTarget || event.clientY > 0) return;
+        state.exitIntentAt = Date.now();
+        refresh();
     }
 
     function handleBeforeUnload(event) {
@@ -334,6 +390,10 @@
         state.initialized = true;
         injectCSS();
         createBanner();
+        state.snoozeUntil = loadSnooze();
+        state.lastInputAt = Date.now();
+        for (const type of ['pointerdown', 'keydown']) document.addEventListener(type, handleInput, true);
+        document.documentElement?.addEventListener?.('mouseleave', handleExitIntent);
         window.addEventListener('beforeunload', handleBeforeUnload);
         window.addEventListener('online', refresh);
         window.addEventListener('offline', refresh);
@@ -350,8 +410,10 @@
         refresh,
         needsReminder,
         beforeUnload: handleBeforeUnload,
-        show: () => { state.dismissed = false; refresh(); },
-        hide: () => { state.dismissed = true; hideBanner(); },
+        show: () => { state.snoozeUntil = 0; state.exitIntentAt = Date.now(); refresh(); },
+        hide: () => { snooze(SOFT_SNOOZE_MS); hideBanner(); },
+        shouldShow,
+        timing: { QUIET_MS, MIN_PENDING_MS, SNOOZE_MS, SOFT_SNOOZE_MS, EXIT_INTENT_MS },
         allowInternalNavigation,
         isInternalNavigation: () => state.allowInternalNavigation,
     };
