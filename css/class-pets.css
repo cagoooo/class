@@ -361,3 +361,23 @@
 .pet-touch.pet-outside .pet-portrait,.pet-touch.pet-page-hidden .pet-portrait{animation-play-state:paused!important}
 .pet-touch.pet-motion-reduced .pet-portrait{animation:none!important;transform:none!important}
 .pet-collection-next{display:block;margin-top:16px;color:#0f766e}.pet-recent-discoveries{margin-top:16px;padding:16px;border-radius:12px;background:#f0fdfa}.pet-recent-discoveries p{margin:8px 0}.dark .pet-recent-discoveries{background:#123d37}.dark .pet-collection-next{color:#5eead4}
+
+/* 分享給學生：連結、顯示設定與其他班級清單 */
+#pets-section .pet-share { margin:16px 0; padding:4px 16px; border:1px solid #b9d7ca; border-left:4px solid #399476; border-radius:12px; background:#f0faf6; }
+#pets-section .pet-share > summary { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; }
+.pet-share-state { padding:2px 12px; border-radius:20px; background:#e2e8f0; color:#475569; font-size:13px; font-weight:700; }
+.pet-share-state.is-on { background:#dcfce7; color:#166534; }
+.pet-share-link { display:flex; flex-wrap:wrap; gap:10px; }
+.pet-share-link input { flex:1; min-width:min(260px,100%); }
+.pet-share-options { display:flex; flex-wrap:wrap; align-items:end; gap:12px 24px; margin:12px 0; }
+.pet-share-options label { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.pet-share-options .pet-share-check { flex-direction:row; align-items:center; gap:10px; min-height:46px; }
+#pets-section .pet-share-check input { width:24px; min-height:24px; height:24px; flex:none; }
+#pets-section .pet-share .pet-share-note { font-size:14px; color:var(--text-secondary,#64748b); margin:8px 0; }
+#pets-section .pet-share-status { padding:10px 14px; border-radius:10px; background:#fff; border:1px solid #b9d7ca; }
+#pets-section .pet-share-privacy { font-size:14px; }
+.pet-share-others h3 { margin-top:12px; font-weight:700; }
+.dark #pets-section .pet-share { background:#18332c; border-color:#507c6c; }
+.dark .pet-share-state { background:#243247; color:#e2e8f0; }
+.dark .pet-share-state.is-on { background:#164e3b; color:#bbf7d0; }
+.dark #pets-section .pet-share-status { background:#1e293b; border-color:#507c6c; }

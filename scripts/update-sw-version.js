@@ -110,6 +110,21 @@ if (htmlChanged) {
     console.log(`ℹ️  classnew.html 無需更新（已是 v${version}）`);
 }
 
+// ─────────────── 更新 pets.html（學生寵物分享頁）───────────────
+// 學生頁不註冊 SW，但老師裝置上的 SW 仍會 cacheFirst 它的 js/css，所以 ?v= 要一起換。
+const SHARE_PATH = path.join(ROOT, 'pets.html');
+if (fs.existsSync(SHARE_PATH)) {
+    const share = fs.readFileSync(SHARE_PATH, 'utf8');
+    const updated = share.replace(
+        /((?:\.\/)?(?:js|css)\/[\w.\-]+\.(?:js|css))\?v=[\d.]+/g,
+        `$1?v=${version}`
+    );
+    if (updated !== share) {
+        fs.writeFileSync(SHARE_PATH, updated, 'utf8');
+        console.log(`✅ pets.html 本地 js/css ?v= → ${version}`);
+    }
+}
+
 console.log(`\n🎯 總結：`);
 console.log(`   - CACHE_NAME / STATIC_CACHE / DYNAMIC_CACHE = 'class-manager-v${version}'`);
 console.log(`   - <title> / window.APP_VERSION / 版本徽章 = v${version}`);

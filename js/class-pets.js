@@ -1063,6 +1063,8 @@
         opened.forEach(key => { const d = [...root.querySelectorAll('details[data-pet-key]')].find(d => d.dataset.petKey === key); if (d) d.open = true; });
         if (focusKey) [...root.querySelectorAll('[data-pet-focus]')].find(e => e.dataset.petFocus === focusKey)?.focus({ preventScroll: true });
         if (!root.classList.contains('hidden')) window.scrollTo?.({ top: scroll, behavior: 'instant' });
+        // 分享快照只在資料與目前班級一致時才交給分享模組比對，是否送出由它判斷。
+        if (cid() === expectedClass && memoryMatchesStorage()) window.PetShare?.changed?.();
     }
     function renderContent(root) {
         // render 只負責把目前資料畫出來；切班／重新載入時不要為了整理
@@ -1102,6 +1104,7 @@
         }
         root.append(el('p', '輕點蛋或寵物，隨機動作與悄悄話！Lv.1 基本互動 → Lv.3 新姿態 → Lv.5 進階互動。尚未達到的造型保留驚喜；互動不增加成長值或金幣。', 'pet-touch-hint'));
         root.append(button(`全班收集圖鑑 · ${Object.keys(collectionFor()).length} / ${Object.keys(pets).length}`, openCollection, 'pet-collection-entry'));
+        window.PetShare?.renderPanel?.(root);
         renderQuests(root);
         const wallet = el('div', undefined, 'pet-wallet-status');
         wallet.append(el('strong', config.coinsEnabled ? '🪙 本班金幣累積中' : '🪙 本班金幣尚未啟用／已暫停'));
@@ -1260,6 +1263,9 @@
         render();
         if (location.hash === '#pets') window.showSection('pets');
     }
-    window.ClassPets = { deliver, deliveryStatus, nextUnlockHint, interactionFor, createQuest, contributeQuest, undoQuestContribution, claimQuest, archiveQuest, hatchCollectionEgg, questProgress, profileFor, renamePet, collectionProgress, award, undo, xpFor, coinsFor, setCoinsEnabled, saveRule, saveProduct, addPresetProduct, setProductActive, redeem, refund, setPetMood, assetName, stage, appearance, milestone, render, prepare, settings, collectionFor, collectionStagesFor };
+    window.ClassPets = { deliver, deliveryStatus, nextUnlockHint, interactionFor, createQuest, contributeQuest, undoQuestContribution, claimQuest, archiveQuest, hatchCollectionEgg, questProgress, profileFor, renamePet, collectionProgress, award, undo, xpFor, coinsFor, setCoinsEnabled, saveRule, saveProduct, addPresetProduct, setProductActive, redeem, refund, setPetMood, assetName, stage, appearance, milestone, render, prepare, settings, collectionFor, collectionStagesFor,
+        pets, moods, eggStage, portrait, interactivePortrait };
+    // 學生分享頁（pets.html）只借用寵物圖像與互動，不建立老師端的選單與管理畫面。
+    if (document.documentElement?.hasAttribute?.('data-pet-viewer')) return;
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

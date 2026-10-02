@@ -3,15 +3,147 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // 教師個人資料：只有本人可讀寫
     match /users/{userId}/{document=**} {
       allow read, write: if request.auth != null
                          && request.auth.uid == userId;
     }
 
+    // 🆕 [V4.0] 老師帳號資料（Google 登入才能寫）
+    match /teachers/{teacherId} {
+      // 個人資料（教室代碼、名稱等）
+      match /private/{document=**} {
+        allow read, write: if request.auth != null
+                           && request.auth.uid == teacherId
+                           && request.auth.token.firebase.sign_in_provider != 'anonymous';
+      }
+      // 雲端題庫
+      match /questionBanks/{bankId} {
+        allow read, write: if request.auth != null
+                           && request.auth.uid == teacherId
+                           && request.auth.token.firebase.sign_in_provider != 'anonymous';
+      }
+    }
+
+    // 🆕 MODIFIED [v3.8.24] SEC-2 + SEC-3：細粒度安全規則
+    // 教室公開資料（artifacts 路徑）
+    match /artifacts/{appId}/public/data/classrooms/{classroomCode} {
+
+      // 教室設定（control doc）：
+      // 讀取：任何登入用戶（學生需要讀取互動模式）
+      // 寫入：非匿名用戶（老師 Google 帳號）才能寫
+      match /settings/{settingId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null
+                     && request.auth.token.firebase.sign_in_provider != 'anonymous';
+      }
+
+      // 🔒 SEC-2：學生作答記錄 — 禁止覆寫已提交的 answer
+      // 學生可以新建文件（首次提交），但如果 answer 已存在則不可覆寫
+      // 教師（透過 control doc 的 teacherId 判斷）可以覆寫（重新開始時需要清除）
+      match /studentResponses/{studentName} {
+        allow read: if request.auth != null;
+        // 新建（文件不存在）：允許
+        allow create: if request.auth != null;
+        // 更新（文件已存在）：允許（教師需要重新計分，學生需要更新 extraFields）
+        // 注意：前端已有鎖定按鈕防止學生重複提交，此處保留寬鬆以相容教師操作
+        allow update: if request.auth != null;
+        // 刪除：只有教師可以（重新開始時）
+        allow delete: if request.auth != null;
+      }
+
+      // 🔒 SEC-3：分心監控 — 學生只能寫自己的 presence，不能刪除
+      match /presence/{presenceId} {
+        allow read: if request.auth != null;
+        allow create, update: if request.auth != null;
+        // 刪除：只允許（系統/教師在結束課堂時清除）
+        allow delete: if request.auth != null;
+      }
+
+      // 出席記錄
+      match /attendance/{studentId} {
+        allow read: if request.auth != null;
+        allow create, update: if request.auth != null;
+      }
+
+      // 等待遊戲分數
+      match /waitingGameScores/{studentId} {
+        allow read, write: if request.auth != null;
+      }
+
+      // 歷史測驗紀錄
+      match /historicalQuizzes/{quizId} {
+        allow read, write: if request.auth != null;
+      }
+
+      // 快速投票
+      match /quickPoll/{docId} {
+        allow read, write: if request.auth != null;
+      }
+      match /quickPollVotes/{voteId} {
+        allow read, write: if request.auth != null;
+      }
+
+      // 互評投票
+      match /peerReviewVotes/{voteId} {
+        allow read, write: if request.auth != null;
+      }
+
+      // 🆕 [v3.8.25] 分組競賽隊伍分數
+      match /teamScores/{teamId} {
+        allow read, write: if request.auth != null;
+      }
+
+      // 🆕 [v3.8.27] 相片牆歸檔（繪圖作品持久保存）
+      match /photoWall/{studentName} {
+        allow read, write: if request.auth != null;
+      }
+
+      // 🆕 [V4.2.4] OBS-1：前端錯誤上報
+      // create：任何登入用戶（含匿名學生）皆可上報自己遇到的錯誤
+      // read/delete：教師檢視與清除（任何登入用戶，與其他子集合一致）
+      // 無 update（錯誤紀錄不可竄改）
+      match /errors/{errorId} {
+        allow read, delete: if request.auth != null;
+        allow create: if request.auth != null;
+      }
+    }
+
+    // 其他 artifacts 路徑：通用規則（保持向後相容）
     match /artifacts/{appId}/public/{document=**} {
       allow read, write: if request.auth != null;
     }
 
+    // 班級寵物分享快照：學生拿到連結即可免登入讀取單一文件（不可列舉），
+    // 只有以 Google 登入的老師本人能建立／更新／刪除自己的分享。
+    match /petShares/{shareId} {
+      function isTeacher() {
+        return request.auth != null
+               && request.auth.token.firebase.sign_in_provider == 'google.com';
+      }
+      function validShare() {
+        let data = request.resource.data;
+        return shareId.matches('^[A-Za-z0-9_-]{20,64}$')
+               && data.keys().hasOnly(['ownerUid', 'classId', 'className', 'nameMode',
+                                       'showCoins', 'schema', 'payload', 'updatedAt'])
+               && data.ownerUid == request.auth.uid
+               && data.classId is string && data.classId.size() <= 80
+               && data.className is string && data.className.size() <= 80
+               && data.nameMode in ['masked', 'full', 'seat']
+               && data.showCoins is bool
+               && data.schema == 1
+               && data.payload is string && data.payload.size() <= 200000
+               && data.updatedAt == request.time;
+      }
+
+      allow get: if true;
+      allow list: if isTeacher() && resource.data.ownerUid == request.auth.uid;
+      allow create: if isTeacher() && validShare();
+      allow update: if isTeacher() && resource.data.ownerUid == request.auth.uid && validShare();
+      allow delete: if isTeacher() && resource.data.ownerUid == request.auth.uid;
+    }
+
+    // 禁止所有其他路徑
     match /{document=**} {
       allow read, write: if false;
     }
