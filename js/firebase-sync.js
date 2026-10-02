@@ -929,16 +929,23 @@ async function discoverCloudClasses() {
  * @returns {Promise<Array>} 合併後的班級陣列（一定含 default）
  */
 async function syncClassProfilesFromCloud() {
-    const [cloudProfiles, discovered] = await Promise.all([
-        fetchCloudClassProfiles(),
+    const [registry, discoveredAll] = await Promise.all([
+        fetchCloudClassRegistry(),
         discoverCloudClasses(),
     ]);
+    const cloudProfiles = registry.profiles;
     let localProfiles = [];
     try { localProfiles = JSON.parse(localStorage.getItem('classProfiles') || '[]'); } catch { localProfiles = []; }
+    // 已刪除的班級不因為 marker 殘留或這台還留著就被找回來；雲端名冊裡還在的班級一律算存在。
+    const cloudIds = new Set(cloudProfiles.filter(p => p && p.id != null).map(p => String(p.id)));
+    const localDeleted = readLocalClassTombstones();
+    const gone = id => !!localDeleted[id] || (!!registry.deleted[id] && !cloudIds.has(id));
+    const discovered = discoveredAll.filter(m => !gone(String(m.id)));
+    localProfiles = localProfiles.filter(p => p && p.id != null && !gone(String(p.id)));
 
     // 以 id 為鍵合併三來源：_meta 名冊 → classes/ marker 補名稱 → 本地獨有附加
     const byId = new Map();
-    cloudProfiles.forEach(p => { if (p && p.id != null) byId.set(String(p.id), { ...p }); });
+    cloudProfiles.forEach(p => { if (p && p.id != null && !localDeleted[String(p.id)]) byId.set(String(p.id), { ...p }); });
     // marker 補進「名冊裡沒有」的班；名冊裡已有的，只在缺名稱時用 marker 名稱補
     discovered.forEach(m => {
         const k = String(m.id);
@@ -979,33 +986,169 @@ async function syncClassProfilesFromCloud() {
  */
 async function uploadClassProfilesMerged() {
     try {
-        const db = window.FirebaseConfig.getDb();
-        const userId = window.FirebaseConfig.getCurrentUserId();
-        let localProfiles = [];
-        try { localProfiles = JSON.parse(localStorage.getItem('classProfiles') || '[]'); } catch { localProfiles = []; }
-
-        const ref = db.collection('users').doc(userId).collection('_meta').doc('classProfiles');
-        const merged = await db.runTransaction(async tx => {
-            const snap = await tx.get(ref);
-            const byId = new Map((snap.exists ? snap.data().profiles || [] : []).map(p => [String(p.id), p]));
-            localProfiles.forEach(p => { if (p?.id != null) byId.set(String(p.id), { ...byId.get(String(p.id)), ...p }); });
-            const result = [...byId.values()];
-            tx.set(ref, { profiles: result, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-            return result;
-        });
+        // 同一班兩邊內容不同、又都沒有修改時間時，上傳以這台為準（維持原本行為）。
+        const result = await reconcileClassRegistry({ prefer: 'local' });
+        if (!result) return;
 
         // R-A1：同時為每個「本地有的」非 default 班級寫 classes/{id} marker，達成名冊自我修復
         //   （只為本地 profile 寫，避免把雲端獨有的也亂寫；雲端獨有者其資料本就在、discover 也找得到）
+        //   已在別處刪除的班級不寫，否則 marker 會讓它被重新找回來。
         await Promise.all(
-            localProfiles
+            result.uploaded
                 .filter(p => p && p.id != null && String(p.id) !== 'default')
                 .map(p => writeClassMarker(p.id, p))
         );
 
-        console.log(`[MultiClass] classProfiles 已合併同步至雲端（${merged.length} 個班級，不洗掉雲端既有）+ 寫入班級 marker`);
+        console.log(`[MultiClass] classProfiles 已合併同步至雲端（${result.cloudCount} 個班級，不洗掉雲端既有）+ 寫入班級 marker`);
     } catch (e) {
         console.warn('[MultiClass] classProfiles 合併同步失敗（非致命）:', e);
     }
+}
+
+// ─────────────────────────────────────────────────────
+// 班級名冊雙向對齊（含刪除紀錄）
+// ─────────────────────────────────────────────────────
+const CLASS_TOMBSTONES_KEY = 'classProfilesDeleted';
+const CLASS_TOMBSTONE_TTL_MS = 180 * 24 * 60 * 60 * 1000;
+
+/** 這台裝置刪除、尚未送上雲端的班級：{ [classId]: 刪除時間 }。送出成功後就清掉。 */
+function readLocalClassTombstones() {
+    try {
+        const value = JSON.parse(localStorage.getItem(CLASS_TOMBSTONES_KEY) || '{}');
+        return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    } catch { return {}; }
+}
+function writeLocalClassTombstones(map) {
+    try {
+        if (Object.keys(map).length) localStorage.setItem(CLASS_TOMBSTONES_KEY, JSON.stringify(map));
+        else localStorage.removeItem(CLASS_TOMBSTONES_KEY);
+    } catch (e) { /* 存不進去時，最壞情況是這次刪除要等連線時才生效 */ }
+}
+/** 刪除班級時先在本機記下，即使當下離線，下次連線也會把刪除帶上雲端。 */
+function rememberClassDeletion(classId) {
+    if (!classId || String(classId) === 'default') return;
+    const map = readLocalClassTombstones();
+    map[String(classId)] = new Date().toISOString();
+    writeLocalClassTombstones(map);
+}
+function forgetClassDeletions(ids) {
+    const map = readLocalClassTombstones();
+    ids.forEach(id => delete map[String(id)]);
+    writeLocalClassTombstones(map);
+}
+
+/** 讀取雲端名冊與刪除紀錄（不寫入本地）。 */
+async function fetchCloudClassRegistry() {
+    try {
+        if (window.FirebaseConfig.isConnected()) {
+            const snap = await window.FirebaseConfig.getDb().collection('users').doc(window.FirebaseConfig.getCurrentUserId())
+                .collection('_meta').doc('classProfiles').get();
+            const data = snap.exists ? snap.data() : {};
+            return { profiles: Array.isArray(data.profiles) ? data.profiles : [], deleted: data.deleted && typeof data.deleted === 'object' ? data.deleted : {} };
+        }
+    } catch (e) { console.warn('[MultiClass] 讀取雲端名冊失敗:', e); }
+    return { profiles: [], deleted: {} };
+}
+
+/**
+ * 合併班級名冊（純函式，方便測試）。
+ * - 雲端名冊裡還在的班級一律算存在：後台救回的班級優先於舊的刪除紀錄。
+ * - 這台剛刪除、尚未送出的班級（localDeleted）會從雲端名冊移除並留下刪除紀錄。
+ * - 已在別處刪除的班級（cloudDeleted）不會因為這台還留著就被加回去——這是「刪掉的班級又跑回來」的根因。
+ * - 沒有刪除紀錄的本機獨有班級視為新建，會被加進雲端；所以空白或過時的裝置不可能洗掉雲端名冊。
+ * - 同一班兩邊內容不同時取 updatedAt 較新者；都沒有時間就依 prefer。
+ */
+function mergeClassRegistry({ cloudProfiles = [], cloudDeleted = {}, localProfiles = [], localDeleted = {}, prefer = 'cloud', now = Date.now() }) {
+    const cloudIds = new Set(cloudProfiles.filter(p => p && p.id != null).map(p => String(p.id)));
+    const deleted = {};
+    for (const [id, at] of Object.entries(cloudDeleted || {})) {
+        if (!cloudIds.has(id) && now - Date.parse(at) < CLASS_TOMBSTONE_TTL_MS) deleted[id] = at;
+    }
+    for (const [id, at] of Object.entries(localDeleted || {})) if (id !== 'default') deleted[id] = at;
+    const stamp = p => Date.parse(p?.updatedAt || '') || 0;
+    const byId = new Map();
+    for (const p of cloudProfiles) {
+        if (p && p.id != null && !deleted[String(p.id)]) byId.set(String(p.id), { ...p });
+    }
+    for (const p of localProfiles) {
+        if (!p || p.id == null || deleted[String(p.id)]) continue;
+        const id = String(p.id), cloud = byId.get(id);
+        if (!cloud) { byId.set(id, { ...p }); continue; }
+        const localWins = stamp(p) !== stamp(cloud) ? stamp(p) > stamp(cloud) : prefer === 'local';
+        byId.set(id, localWins ? { ...cloud, ...p } : { ...p, ...cloud });
+    }
+    return { profiles: [...byId.values()], deleted };
+}
+
+/**
+ * 班級名冊雙向對齊：把其他裝置新增、改名、刪除的班級帶進這台，也把這台的新增與刪除送上雲端。
+ * 開啟頁面、切回分頁與每次同步後都會執行；雲端內容沒變時不寫入。
+ *
+ * 仍留在這台的例外：目前正在使用的班級，以及有未同步變更的班級，即使已在別處刪除也先不從本機清單移除，
+ * 避免老師正在操作的班級憑空消失；它們不會再被加回雲端。
+ *
+ * @returns {Promise<null|{profiles: Array, uploaded: Array, cloudCount: number, added: string[], removed: string[], changed: boolean}>}
+ */
+async function reconcileClassRegistry({ prefer = 'cloud' } = {}) {
+    if (!window.FirebaseConfig?.isConnected?.()) return null;
+    const db = window.FirebaseConfig.getDb(), userId = window.FirebaseConfig.getCurrentUserId();
+    if (!db || !userId) return null;
+    const readLocal = () => { try { const v = JSON.parse(localStorage.getItem('classProfiles') || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
+    const localRaw = localStorage.getItem('classProfiles'), localBefore = readLocal(), localDeleted = readLocalClassTombstones();
+    const ref = db.collection('users').doc(userId).collection('_meta').doc('classProfiles');
+
+    const outcome = await db.runTransaction(async tx => {
+        const snap = await tx.get(ref), data = snap.exists ? snap.data() : {};
+        const cloudProfiles = Array.isArray(data.profiles) ? data.profiles : [];
+        const cloudDeleted = data.deleted && typeof data.deleted === 'object' ? data.deleted : {};
+        const merged = mergeClassRegistry({ cloudProfiles, cloudDeleted, localProfiles: localBefore, localDeleted, prefer });
+        if (JSON.stringify([merged.profiles, merged.deleted]) !== JSON.stringify([cloudProfiles, cloudDeleted])) {
+            tx.set(ref, { profiles: merged.profiles, deleted: merged.deleted, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+        }
+        return merged;
+    });
+    if (window.FirebaseConfig.getCurrentUserId() !== userId) return null;   // 途中換了帳號，不把結果寫進這台
+
+    // 這台的刪除已送上雲端：清掉本機紀錄，並移除對應的 marker（避免被重新列舉出來）
+    const pushed = Object.keys(localDeleted);
+    if (pushed.length) {
+        forgetClassDeletions(pushed);
+        await Promise.all(pushed.map(id => db.collection('users').doc(userId).collection('classes').doc(id).delete().catch(() => {})));
+    }
+
+    // 對齊這台的清單：沿用原本的順序，其他裝置新增的班級接在後面
+    const current = localStorage.getItem('currentClassId') || 'default';
+    const mergedById = new Map(outcome.profiles.map(p => [String(p.id), p]));
+    const keepLocally = id => id === current || !!window.CloudSafety?.hasLocalChangeMarker?.(id);
+    const next = [], placed = new Set();
+    for (const p of localBefore) {
+        if (!p || p.id == null) continue;
+        const id = String(p.id);
+        if (mergedById.has(id)) next.push(mergedById.get(id));
+        else if (keepLocally(id)) next.push(p);
+        else continue;
+        placed.add(id);
+    }
+    for (const p of outcome.profiles) if (!placed.has(String(p.id))) next.push(p);
+    const defaultAt = next.findIndex(p => String(p.id) === 'default');
+    if (defaultAt > 0) next.unshift(next.splice(defaultAt, 1)[0]);
+    if (defaultAt === -1) next.unshift({ id: 'default', name: '預設班級', isDefault: true, createdAt: new Date().toISOString() });
+
+    const before = new Map(localBefore.filter(p => p && p.id != null).map(p => [String(p.id), p]));
+    const after = new Map(next.map(p => [String(p.id), p]));
+    const added = next.filter(p => !before.has(String(p.id)) && String(p.id) !== 'default').map(p => p.name || String(p.id));
+    const removed = localBefore.filter(p => p && p.id != null && !after.has(String(p.id))).map(p => p.name || String(p.id));
+    const changed = JSON.stringify(next) !== JSON.stringify(localBefore);
+    // 等待雲端期間老師若剛好新增或改名班級，這次就不覆寫，留給下一次對齊
+    if (changed && localStorage.getItem('classProfiles') === localRaw) {
+        try { localStorage.setItem('classProfiles', JSON.stringify(next)); }
+        catch (e) { console.warn('[MultiClass] 寫入班級清單失敗:', e); }
+    }
+    return {
+        profiles: next, cloudCount: outcome.profiles.length, added, removed, changed,
+        // 這台有、而且沒被刪除的班級（要補寫 marker 的對象）
+        uploaded: localBefore.filter(p => p && p.id != null && mergedById.has(String(p.id))),
+    };
 }
 
 /**
@@ -1092,15 +1235,20 @@ async function deleteClassFromCloud(classId) {
         const db = window.FirebaseConfig.getDb();
         const userId = window.FirebaseConfig.getCurrentUserId();
 
-        // 1) 從 _meta/classProfiles 移除該班
-        const cloud = await fetchCloudClassProfiles();
-        const removed = cloud.find(p => String(p.id) === String(classId));
-        const filtered = cloud.filter(p => String(p.id) !== String(classId));
-        if (filtered.length !== cloud.length) {
-            await db.collection('users').doc(userId)
-                .collection('_meta').doc('classProfiles')
-                .set({ profiles: filtered, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-        }
+        // 1) 從 _meta/classProfiles 移除該班，並留下刪除紀錄：其他裝置的清單裡還有這個班，
+        //    沒有這筆紀錄的話，它們下次同步會把班級又加回雲端（跨裝置的殭屍班）。
+        const ref = db.collection('users').doc(userId).collection('_meta').doc('classProfiles');
+        let removed = null;
+        const filtered = await db.runTransaction(async tx => {
+            const snap = await tx.get(ref), data = snap.exists ? snap.data() : {};
+            const profiles = Array.isArray(data.profiles) ? data.profiles : [];
+            removed = profiles.find(p => String(p.id) === String(classId)) || null;
+            const remaining = profiles.filter(p => String(p.id) !== String(classId));
+            const deleted = { ...(data.deleted && typeof data.deleted === 'object' ? data.deleted : {}), [String(classId)]: new Date().toISOString() };
+            tx.set(ref, { profiles: remaining, deleted, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+            return remaining;
+        });
+        forgetClassDeletions([classId]);
         // 2) 刪除 classes/{id} marker 文件（避免 discover 又把它找回來）
         await db.collection('users').doc(userId).collection('classes').doc(String(classId)).delete();
 
@@ -1294,6 +1442,8 @@ window.FirebaseSync = {
     fetchCloudClassProfiles,     // 讀取雲端班級清單（不寫本地）
     discoverCloudClasses,        // R-A1：列舉 classes/ marker
     syncClassProfilesFromCloud,  // 雲端班級清單合併進本地（含 marker）
+    reconcileClassRegistry,      // 名冊雙向對齊（含其他裝置的新增、改名與刪除）
+    rememberClassDeletion,       // 刪班時先在本機記下，離線刪除也能在連線後送出
     syncAllClassesFromCloud,     // 還原所有班級（雲端→本地，無 Modal）
     deleteClassFromCloud,        // R-A2：刪班時從雲端移除名冊+marker
     repairClassRegistry,         // R-A4：班級健檢與修復

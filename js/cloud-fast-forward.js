@@ -56,6 +56,18 @@
         location.reload();
         return result;
     }
+    /** 先對齊班級清單：把其他裝置新增、改名、刪除的班級帶進來，老師才不會因為看不到而重複建立。 */
+    async function syncRegistry() {
+        try {
+            const result = await window.FirebaseSync?.reconcileClassRegistry?.();
+            if (!result?.changed) return;
+            window.ClassProfiles?.refresh?.();
+            const parts = [];
+            if (result.added.length) parts.push(`新增「${result.added.join('」「')}」`);
+            if (result.removed.length) parts.push(`移除已在其他裝置刪除的「${result.removed.join('」「')}」`);
+            if (parts.length) say('☁️ 班級清單已更新：' + parts.join('；'));
+        } catch (error) { console.warn('[CloudFastForward] 班級清單對齊未完成', error?.message || error); }
+    }
     /**
      * @param {{auto?: boolean}} [options] auto：允許在老師尚未操作時直接更新；否則一律只提示
      */
@@ -63,6 +75,7 @@
         if (checking || !ready() || window.syncStatus?.isSyncing) return 'skipped';
         checking = true; lastCheck = Date.now();
         try {
+            await syncRegistry();
             const state = await window.CloudSafety.fastForward(undefined, { dryRun: true });
             if (state !== 'newer') { hideBanner(); return state; }
             if (options.auto && !interacted) return await apply();

@@ -580,6 +580,8 @@
 
     const ClassProfiles = {
         list: loadProfiles,
+        /** 名冊被跨裝置對齊更新後，重畫頁首的班級選擇器。 */
+        refresh: () => injectUI(),
         current: getCurrentId,
         currentProfile: () => loadProfiles().find(p => p.id === getCurrentId()),
         getDbName,
@@ -664,6 +666,7 @@
                 id,
                 name,
                 createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),   // 名冊跨裝置對齊時，用來判斷哪一邊較新
                 isDefault: false,
                 icon: assigned.icon,
                 color: assigned.color,
@@ -679,6 +682,7 @@
             const p = profiles.find(x => x.id === id);
             if (p) {
                 p.name = name;
+                p.updatedAt = new Date().toISOString();
                 saveProfiles(profiles);
                 // 更新目前顯示的名稱
                 const el = document.getElementById('cs-current-name');
@@ -702,6 +706,9 @@
 
             profiles.splice(idx, 1);
             saveProfiles(profiles);
+            // 先在本機記下這次刪除：即使現在離線或未登入，下次名冊對齊時也會把刪除帶上雲端，
+            // 不會因為雲端還留著這個班，就又被帶回這台。
+            try { window.FirebaseSync?.rememberClassDeletion?.(id); } catch (e) { /* 記不下來時維持原本行為 */ }
 
             // R-A2：同步從雲端移除名冊項 + marker，否則「只增不減」的合併上傳會把它加回來（殭屍班）
             try {
@@ -728,6 +735,23 @@
                 '輸入新班級名稱（如「502班」、「英文B組」）'
             );
             if (!name) return;
+
+            // 另一台裝置可能已經建立過這個班級：先把雲端名冊帶進來再檢查，避免重複建立同名班級。
+            const overlay = document.getElementById('cs-switch-overlay'), overlayMsg = document.getElementById('cs-switch-msg');
+            if (overlayMsg) overlayMsg.textContent = '正在確認班級清單...';
+            if (overlay) overlay.classList.add('show');
+            try {
+                await Promise.race([
+                    Promise.resolve(window.FirebaseSync?.reconcileClassRegistry?.()),
+                    new Promise(resolve => setTimeout(resolve, 4000)),
+                ]);
+            } catch (e) { /* 離線或讀取失敗時仍可建立 */ }
+            if (overlay) overlay.classList.remove('show');
+            const same = loadProfiles().find(p => String(p.name || '').trim() === String(name).trim());
+            if (same && !window.confirm(`已經有一個「${same.name}」了。\n\n如果只是這台裝置上還沒看到它的資料，請按「取消」，再從班級選單切換過去。\n\n仍要另外建立一個同名的新班級嗎？`)) {
+                injectUI();
+                return;
+            }
 
             const id = await this.add(name);
 

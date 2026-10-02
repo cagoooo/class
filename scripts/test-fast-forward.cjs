@@ -60,6 +60,21 @@ async function test(name, fn) { await fn(); passed++; console.log('PASS', name);
         const env = setup({ applied: 'local-changes' }); await env.auth();
         assert.deepEqual(env.calls, ['dry', 'apply']); assert.equal(env.session.has('cloudFastForwardNotice'), false);
     });
+    await test('檢查前先對齊班級清單，有新增或移除時重畫選單並提示', async () => {
+        const env = setup({ dry: 'current' }); let refreshed = 0; const order = [];
+        env.ctx.ClassProfiles = { refresh: () => { refreshed++; } };
+        env.ctx.FirebaseSync = { reconcileClassRegistry: async () => { order.push('registry'); return { changed: true, added: ['501自然'], removed: ['604'] }; } };
+        const fastForward = env.ctx.CloudSafety.fastForward;
+        env.ctx.CloudSafety.fastForward = async (...args) => { order.push('data'); return fastForward(...args); };
+        await env.auth();
+        assert.deepEqual(order, ['registry', 'data']); assert.equal(refreshed, 1);
+        assert.equal(env.notices.length, 1); assert.match(env.notices[0], /新增「501自然」/); assert.match(env.notices[0], /移除已在其他裝置刪除的「604」/);
+        // 清單沒變就不打擾；對齊失敗也不影響後面的資料檢查
+        const quiet = setup({ dry: 'current' }); quiet.ctx.FirebaseSync = { reconcileClassRegistry: async () => ({ changed: false, added: [], removed: [] }) };
+        await quiet.auth(); assert.equal(quiet.notices.length, 0);
+        const broken = setup({ dry: 'current' }); broken.ctx.FirebaseSync = { reconcileClassRegistry: async () => { throw new Error('offline'); } };
+        await broken.auth(); assert.deepEqual(broken.calls, ['dry']);
+    });
     await test('短時間內不重複重新載入', async () => {
         const env = setup(); env.session.set('cloudFastForwardReloadAt', String(Date.now())); await env.auth();
         assert.deepEqual(env.calls, ['dry', 'apply']); assert.equal(env.notices.length, 1);

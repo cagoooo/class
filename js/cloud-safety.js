@@ -301,25 +301,29 @@
     async function fastForward(id = current(), options = {}) {
         if (navigator.onLine === false) return 'skipped';
         const c = context(id), known = base(c);
-        if (!known?.token) return 'no-baseline';
+        const blank = values => tracked.every(k => values[k] == null || ['', '[]', '{}', 'null'].includes(values[k]));
         // 整份內容都沒變 → 可以整份換成雲端版本；只有追蹤資料沒變（例如這台改過白板文字或主題）→ 只換追蹤資料，
         // 其餘保留這台裝置的內容。舊版基準沒有 tracked 指紋，只能用整份內容判斷。
         const cleanScope = () => {
             if (raw(dirtyKey(c.uid, c.id))) return null;
             const local = capture(c.id);
+            // 沒有同步基準：只有這台完全沒有這個班的資料時（名冊剛從雲端帶進來、從沒開過）才接手雲端版本；
+            // 主題、時鐘等裝置偏好維持這台的設定。
+            if (!known?.token) return blank(local) ? { local, scope: keys().filter(k => !globalKeys.includes(k)) } : null;
             if (fingerprint(local) === known.fingerprint) return { local, scope: keys() };
             if (known.tracked && trackedFingerprint(local) === known.tracked) return { local, scope: tracked };
             return null;
         };
-        if (!cleanScope()) return 'local-changes';
+        if (!cleanScope()) return known?.token ? 'local-changes' : 'no-baseline';
         const head = await doc(c, 'appSettings/syncRevision').get({ source: 'server' });
-        if (!head.exists || head.data().token === known.token) return 'current';
+        if (!head.exists) return known?.token ? 'current' : 'no-baseline';
+        if (head.data().token === known?.token) return 'current';
         if (options.dryRun) return 'newer';
         return withSyncLock(c, async () => {
             const remote = await read(c.id);
             if (remote.empty || String(remote.token || '').startsWith('legacy:')) return 'skipped';
             const state = cleanScope();   // 下載期間老師可能已經開始操作
-            if (!state || base(c)?.token !== known.token) return 'local-changes';
+            if (!state || base(c)?.token !== known?.token) return 'local-changes';
             sameAccount(c);
             const changed = state.scope.some(k => (remote.values[k] ?? null) !== (state.local[k] ?? null));
             const ops = state.scope.map(k => [keyFor(k, c.id), remote.values[k] ?? null]);

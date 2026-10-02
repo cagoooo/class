@@ -6,6 +6,9 @@ class FakeDb {
  batch(){const ops=[];return{set:(r,d)=>ops.push([r.path,d]),commit:async()=>{if(this.failStage)throw Error('stage failed');for(const[p,d]of ops)this.data.set(p,structuredClone(d));if(this.afterStage){const f=this.afterStage;this.afterStage=null;f();}}};}
  async runTransaction(fn){const previous=this.tail;let unlock;this.tail=new Promise(r=>unlock=r);await previous;try{if(this.failHead)throw Error('transaction failed');const ops=[];const result=await fn({get:r=>r.get(),set:(r,d)=>ops.push([r.path,d])});for(const[p,d]of ops)this.data.set(p,structuredClone(d));return result;}finally{unlock();}}
 }
+// 名冊與 marker 會直接對文件 set / delete（不經 batch 或 transaction）。
+const baseRef=FakeDb.prototype.ref;
+FakeDb.prototype.ref=function(path){const r=baseRef.call(this,path),db=this;r.set=async(d,o)=>{db.data.set(path,o&&o.merge?{...(db.data.get(path)||{}),...structuredClone(d)}:structuredClone(d));};r.delete=async()=>{db.data.delete(path);};return r;};
 // Collection snapshots for the production legacy adapter.
 const originalRef=FakeDb.prototype.ref;
 FakeDb.prototype.ref=function(path){const r=originalRef.call(this,path),db=this;if(path.split('/').length%2===1)r.get=async()=>{if(db.offline)throw Error('network');const docs=[...db.data].filter(([p])=>p.startsWith(path+'/')&&p.split('/').length===path.split('/').length+1).map(([p,d])=>({id:p.split('/').at(-1),data:()=>structuredClone(d)}));return{docs,empty:!docs.length,size:docs.length,forEach:f=>docs.forEach(f)};};return r;};
@@ -86,6 +89,78 @@ let passed=0;async function test(name,fn){await fn();console.log('PASS',name);pa
   b.db.ref=path=>{const ref=original(path);if(path.startsWith(headPath)&&!edited){const get=ref.get.bind(ref);ref.get=async()=>{if(!edited){edited=true;b.c.students[0].points=55;b.save();}return get();};}return ref;};
   assert.equal(await b.s.fastForward(),'local-changes');assert.equal(JSON.parse(b.storage.getItem('students-A'))[0].points,55);assert.equal(typeof read,'function');
   b.db.ref=original;
+ });
+ await test('從沒開過的班級（名冊剛帶進來）自動接手雲端資料，並保留這台的主題',async()=>{
+  const a=setup();await a.s.publish();const b=setup(a.db);
+  for(const k of ['students-A','groups-A','pointsHistory-A','petSettings-A'])b.storage.removeItem(k);b.c.students=[];b.c.groups=[];b.c.pointsHistory=[];b.storage.setItem('theme','dark');
+  assert.equal(await b.s.fastForward(undefined,{dryRun:true}),'newer');assert.equal(await b.s.fastForward(),'updated');
+  assert.equal(JSON.parse(b.storage.getItem('students-A'))[0].name,'虛構學生 🦄');assert.equal(b.c.students.length,1);assert.equal(b.storage.getItem('theme'),'dark');
+  assert.equal(await b.s.fastForward(),'current');b.c.students[0].points=11;b.save();assert.equal(await b.s.publish(),true);
+  // 雲端也沒有這個班（剛在這台新建）時不動
+  const fresh=setup(new FakeDb());for(const k of ['students-A','groups-A','pointsHistory-A','petSettings-A'])fresh.storage.removeItem(k);assert.equal(await fresh.s.fastForward(),'no-baseline');
+ });
+ // ── 班級名冊跨裝置對齊 ──
+ const registryPath='users/teacher/_meta/classProfiles';
+ const names=list=>Array.from(list,p=>p.name);   // vm 內的陣列原型與外層不同，轉成外層陣列再比對
+ await test('名冊合併：別處刪除的班級不復活、這台刪除的會送出、救回的班級優先',async()=>{
+  const merge=setup().c.mergeClassRegistry,now=Date.parse('2026-10-02T04:00:00Z'),at='2026-10-02T03:00:00Z';
+  const X={id:'X',name:'502自然'},Y={id:'Y',name:'604'},D={id:'default',name:'預設班級'};
+  // 這台還留著 Y，但 Y 已在別處刪除 → 不加回雲端
+  let r=merge({cloudProfiles:[D,X],cloudDeleted:{Y:at},localProfiles:[D,X,Y],now});assert.deepEqual(names(r.profiles),['預設班級','502自然']);assert.equal(r.deleted.Y,at);
+  // 這台剛刪了 Y（尚未送出）→ 從雲端移除並留下紀錄
+  r=merge({cloudProfiles:[D,X,Y],localProfiles:[D,X],localDeleted:{Y:at},now});assert.deepEqual(names(r.profiles),['預設班級','502自然']);assert.equal(r.deleted.Y,at);
+  // 後台把 Y 救回雲端名冊 → 舊的刪除紀錄失效
+  r=merge({cloudProfiles:[D,X,Y],cloudDeleted:{Y:at},localProfiles:[D,X],now});assert.deepEqual(names(r.profiles),['預設班級','502自然','604']);assert.equal(r.deleted.Y,undefined);
+  // 這台新建、雲端沒有也沒有刪除紀錄 → 視為新增；空白裝置不會洗掉雲端
+  r=merge({cloudProfiles:[D,X],localProfiles:[D,{id:'N',name:'新班'}],now});assert.deepEqual(names(r.profiles),['預設班級','502自然','新班']);
+  r=merge({cloudProfiles:[D,X,Y],localProfiles:[D],now});assert.deepEqual(names(r.profiles),['預設班級','502自然','604']);
+  // 改名：修改時間較新的一邊贏；都沒有時間時依 prefer
+  r=merge({cloudProfiles:[{id:'X',name:'舊名',updatedAt:'2026-10-01T00:00:00Z'}],localProfiles:[{id:'X',name:'新名',updatedAt:'2026-10-02T00:00:00Z'}],now});assert.equal(r.profiles[0].name,'新名');
+  r=merge({cloudProfiles:[{id:'X',name:'雲端'}],localProfiles:[{id:'X',name:'本機'}],now});assert.equal(r.profiles[0].name,'雲端');
+  r=merge({cloudProfiles:[{id:'X',name:'雲端'}],localProfiles:[{id:'X',name:'本機'}],prefer:'local',now});assert.equal(r.profiles[0].name,'本機');
+  // 預設班級不能被刪；過期的刪除紀錄會清掉
+  r=merge({cloudProfiles:[D],localProfiles:[D],localDeleted:{default:at},cloudDeleted:{old:'2025-01-01T00:00:00Z'},now});assert.deepEqual(names(r.profiles),['預設班級']);assert.deepEqual(Object.keys(r.deleted),[]);
+ });
+ const registryDevices=async()=>{
+  const profiles=[{id:'default',name:'預設班級',isDefault:true},{id:'A',name:'502自然'},{id:'Y',name:'604'}];
+  const a=setup();a.storage.setItem('classProfiles',JSON.stringify(profiles));await a.c.uploadClassProfilesMerged();
+  const b=setup(a.db);b.storage.setItem('classProfiles',JSON.stringify(profiles));return {a,b};
+ };
+ const localNames=x=>names(JSON.parse(x.storage.getItem('classProfiles')));
+ await test('一台刪除班級後，另一台同步不會把它加回雲端，名冊也跟著移除',async()=>{
+  const {a,b}=await registryDevices();
+  a.storage.setItem('classProfiles',JSON.stringify(JSON.parse(a.storage.getItem('classProfiles')).filter(p=>p.id!=='Y')));assert.equal(await a.c.deleteClassFromCloud('Y'),true);
+  assert.deepEqual(names(a.db.data.get(registryPath).profiles),['預設班級','502自然']);assert.ok(a.db.data.get(registryPath).deleted.Y);
+  // b 還留著 Y：修正前這次上傳會把 Y 加回雲端（跨裝置殭屍班）
+  await b.c.uploadClassProfilesMerged();
+  assert.deepEqual(names(b.db.data.get(registryPath).profiles),['預設班級','502自然']);assert.equal(b.db.data.has('users/teacher/classes/Y'),false);
+  assert.deepEqual(localNames(b),['預設班級','502自然']);
+ });
+ await test('其他裝置新增與改名的班級會帶進這台；空白裝置不會洗掉雲端名冊',async()=>{
+  const {a,b}=await registryDevices();
+  const list=JSON.parse(a.storage.getItem('classProfiles'));list.push({id:'N',name:'501自然',updatedAt:new Date().toISOString()});list[1].name='502自然（新）';list[1].updatedAt=new Date().toISOString();
+  a.storage.setItem('classProfiles',JSON.stringify(list));await a.c.uploadClassProfilesMerged();
+  const result=await b.c.FirebaseSync.reconcileClassRegistry();
+  assert.deepEqual(localNames(b),['預設班級','502自然（新）','604','501自然']);assert.deepEqual([...result.added],['501自然']);assert.equal(result.changed,true);
+  assert.equal((await b.c.FirebaseSync.reconcileClassRegistry()).changed,false);
+  const blank=setup(a.db);blank.storage.removeItem('classProfiles');const before=JSON.stringify(a.db.data.get(registryPath).profiles);
+  await blank.c.FirebaseSync.reconcileClassRegistry();await blank.c.uploadClassProfilesMerged();
+  assert.equal(JSON.stringify(a.db.data.get(registryPath).profiles),before);assert.deepEqual(localNames(blank),['預設班級','502自然（新）','604','501自然']);
+ });
+ await test('離線時刪除的班級，連線後才送出刪除，不會被雲端帶回來',async()=>{
+  const {a,b}=await registryDevices();
+  b.storage.setItem('classProfiles',JSON.stringify(JSON.parse(b.storage.getItem('classProfiles')).filter(p=>p.id!=='Y')));b.c.FirebaseSync.rememberClassDeletion('Y');
+  await b.c.FirebaseSync.reconcileClassRegistry();
+  assert.deepEqual(localNames(b),['預設班級','502自然']);assert.deepEqual(names(a.db.data.get(registryPath).profiles),['預設班級','502自然']);
+  assert.ok(a.db.data.get(registryPath).deleted.Y);assert.equal(b.storage.getItem('classProfilesDeleted'),null);
+  await a.c.FirebaseSync.reconcileClassRegistry();assert.deepEqual(localNames(a),['預設班級','502自然']);
+ });
+ await test('正在使用或有未同步變更的班級，即使已在別處刪除也先留在這台，但不加回雲端',async()=>{
+  const {a,b}=await registryDevices();
+  await a.c.deleteClassFromCloud('A');await a.c.deleteClassFromCloud('Y');b.s.markLocalChange('Y');   // b 目前班級是 A，Y 有未同步變更
+  const result=await b.c.FirebaseSync.reconcileClassRegistry();
+  assert.deepEqual(localNames(b),['預設班級','502自然','604']);assert.deepEqual([...result.removed],[]);
+  await b.c.uploadClassProfilesMerged();assert.deepEqual(names(b.db.data.get(registryPath).profiles),['預設班級']);
  });
  await test('兩台同版本同時上傳僅一台成功',async()=>{const a=setup();await a.s.publish();const b=setup(a.db);await b.s.restore(await b.s.read());a.c.students[0].points=11;a.save();b.c.students[0].points=12;b.save();const r=await Promise.allSettled([a.s.publish(),b.s.publish()]);assert.equal(r.filter(x=>x.status==='fulfilled').length,1);assert.equal(r.filter(x=>x.status==='rejected'&&x.reason.code==='sync-conflict').length,1);});
  for(const flag of ['failStage','failHead'])await test('中途失敗保留完整舊版 '+flag,async()=>{const a=setup();await a.s.publish();const before=await a.s.read();a.c.students[0].points=20;a.save();a.db[flag]=true;await assert.rejects(a.s.publish());a.db[flag]=false;assert.equal((await a.s.read()).token,before.token);assert.equal(a.s.status(),'pending');await a.s.publish();assert.equal(a.s.status(),'synced');});
