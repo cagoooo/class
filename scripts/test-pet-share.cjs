@@ -123,6 +123,30 @@ async function test(name, fn) { await fn(); passed++; console.log('PASS', name);
         storage.setItem('currentClassId', 'B');
         assert.equal(await share.publish({ force: true }), false); assert.equal(writes.length, 1);
     });
+    await test('登入還原前畫出的面板不要求再登入，還原後自動顯示分享設定', async () => {
+        // 最小的假 DOM：只需能串出面板文字。
+        const node = tag => ({ tagName: tag, children: [], dataset: {}, style: {}, isConnected: true, textContent: '', className: '',
+            append(...items) { this.children.push(...items); }, replaceChildren(...items) { this.children = items; }, add(item) { this.children.push(item); },
+            setAttribute() {}, addEventListener() {},
+            get text() { return [this.textContent, ...this.children.map(child => child.text ?? '')].join('|'); } });
+        const open = ({ remembered }) => {
+            const a = setup(), listeners = []; let signedIn = false;
+            a.ctx.document.createElement = node; a.ctx.Option = function (label) { this.text = label; };
+            a.ctx.setTimeout = (fn, ms) => { const timer = setTimeout(fn, ms); timer.unref(); return timer; };
+            if (remembered) a.storage.setItem('firebaseUserProfile', JSON.stringify({ uid: 'teacher-1', isAnonymous: false }));
+            Object.assign(a.ctx.FirebaseConfig, { isGoogleUser: () => signedIn, onAuthStateChanged: fn => listeners.push(fn) });
+            // 重新載入模組，讓它在「Firebase 已初始化、登入尚未還原」的狀態下掛上監聽。
+            vm.runInContext(fs.readFileSync('js/pet-share.js', 'utf8'), a.ctx);
+            const root = node('section'); a.ctx.PetShare.renderPanel(root);
+            return { ...a, root, restore: async () => { signedIn = true; listeners.forEach(fn => fn()); await new Promise(r => setTimeout(r, 0)); } };
+        };
+        const teacher = open({ remembered: true });
+        assert.ok(teacher.root.text.includes('確認登入中')); assert.equal(teacher.root.text.includes('用 Google 帳號登入'), false); assert.equal(teacher.root.text.includes('登入後可用'), false);
+        await teacher.restore();
+        assert.ok(teacher.root.text.includes('尚未分享')); assert.ok(teacher.root.text.includes('建立本班分享連結')); assert.equal(teacher.root.text.includes('確認登入中'), false);
+        const guest = open({ remembered: false });
+        assert.ok(guest.root.text.includes('登入後可用')); assert.equal(guest.root.text.includes('確認登入中'), false);
+    });
     await test('隨專案提供的 QR 函式庫可將分享連結編成矩陣', async () => {
         const ctx = {}; vm.createContext(ctx);
         vm.runInContext(fs.readFileSync('js/vendor/qrcode-generator.js', 'utf8'), ctx);

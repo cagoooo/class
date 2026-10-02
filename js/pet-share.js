@@ -94,6 +94,23 @@
         const bytes = crypto.getRandomValues(new Uint8Array(18));
         return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_');
     }
+    // Firebase 在頁面載入約半秒後才初始化、再還原上次的 Google 登入。在它回報結果之前
+    // 不能當成「未登入」，否則已登入的老師停在寵物頁重新整理時，會被要求再登入一次。
+    let authKnown = false, authWaitTimer = null, authWaitExpired = false;
+    const rememberedGoogle = () => readJson('firebaseUserProfile', null)?.isAnonymous === false;
+    const restoringLogin = () => !isTeacher() && !authKnown && !authWaitExpired && rememberedGoogle();
+    function watchAuth(attempt = 0) {
+        const config = window.FirebaseConfig;
+        if (!config?.onAuthStateChanged) return;
+        // Firebase 尚未初始化時 FirebaseConfig.onAuthStateChanged 掛不上監聽，所以等它就緒再掛。
+        if (!config.getDb?.()) { if (attempt < 150) setTimeout(() => watchAuth(attempt + 1), 400); return; }
+        config.onAuthStateChanged(() => {
+            authKnown = true; clearTimeout(authWaitTimer);
+            if (!panel) return;
+            paint();
+            if (isTeacher() && loadedFor !== uid()) refresh();
+        });
+    }
     function say(message) { notice = message || ''; paint(); }
     function describe(error) {
         if (error?.code === 'permission-denied') return '雲端拒絕這次操作：這個連結可能屬於另一個帳號，或雲端規則尚未更新。請重新產生連結，或稍後再試。';
@@ -337,11 +354,13 @@
         if (!panel?.isConnected) return;
         const share = current(), others = Object.entries(shares()).filter(([classId]) => classId !== cid());
         const summary = el('summary');
-        summary.append(el('strong', '🔗 分享給學生：回家也能看寵物'), el('span', !isTeacher() ? '登入後可用' : share ? '分享中' : '尚未分享', 'pet-share-state' + (share ? ' is-on' : '')));
+        summary.append(el('strong', '🔗 分享給學生：回家也能看寵物'), el('span', restoringLogin() ? '確認登入中' : !isTeacher() ? '登入後可用' : share ? '分享中' : '尚未分享', 'pet-share-state' + (share ? ' is-on' : '')));
         const body = el('div', undefined, 'pet-share-body');
         body.append(el('p', '建立本班專屬連結，學生在家免登入就能看到全班的寵物、和寵物互動，並看見自己離下一次進化還差多少。'));
-        if (!isTeacher()) {
-            body.append(el('p', '分享連結需要老師的 Google 帳號，才能確保只有您能更新或停止本班的分享。', 'pet-share-note'));
+        if (restoringLogin()) {
+            body.append(el('p', '正在確認您的 Google 登入狀態，稍候就會顯示分享設定…', 'pet-share-note'));
+        } else if (!isTeacher()) {
+            body.append(el('p', authWaitExpired && rememberedGoogle() ? '目前無法確認您的 Google 登入狀態（可能離線）。恢復連線後這裡會自動更新，或重新登入一次。' : '分享連結需要老師的 Google 帳號，才能確保只有您能更新或停止本班的分享。', 'pet-share-note'));
             if (window.GoogleAuthUI?.login) body.append(button('用 Google 帳號登入', async () => { await window.GoogleAuthUI.login(); window.ClassPets?.render?.(); }, 'pet-primary'));
         } else if (index.uid !== uid() && loadState !== 'error') {
             body.append(el('p', '正在讀取分享狀態…', 'pet-share-note'));
@@ -389,8 +408,11 @@
         panel = el('details', undefined, 'pet-share'); panel.dataset.petKey = 'share';
         root.append(panel); paint();
         if (isTeacher() && loadedFor !== uid()) refresh();
+        // 登入狀態遲遲沒有回報（例如離線且 Firebase 載入失敗）時，不讓面板一直停在「確認中」。
+        if (restoringLogin() && !authWaitTimer) authWaitTimer = setTimeout(() => { authWaitExpired = true; paint(); }, 10000);
     }
 
+    watchAuth();
     window.addEventListener?.('online', changed);
     window.PetShare = { renderPanel, changed, refresh, publish, create, buildPayload, maskName, shares, NAME_MODES };
 })();
