@@ -178,11 +178,10 @@ const ErrorHandler = (function () {
         return mentionsServiceWorker && isFetchFailure;
     }
 
-    // Firebase 9 compat 的 Firestore 離線快取在多分頁、舊版資料庫版本
-    // 或瀏覽器剛切換分頁時，偶爾會拋出內部狀態錯誤。這不是班級資料寫入
-    // 失敗；Firestore 會退回記憶體快取，雲端讀寫仍可用。
+    // 僅在錯誤堆疊或上下文能確認來自 Firestore SDK 時，才把其內部快取
+    // 斷言排除於一般應用程式錯誤通知之外。這不代表任何特定資料操作成功。
     function isFirestoreCacheAssertion(error, context = '') {
-        const text = `${error?.name || ''} ${error?.message || ''} ${context}`;
+        const text = `${error?.name || ''} ${error?.message || ''} ${context} ${error?.stack || ''}`;
         const internalAssertion = /FIRESTORE\s*\(\d+\.\d+\.\d+\)\s*INTERNAL ASSERTION FAILED:\s*Unexpected state/i.test(text)
             && /firestore(?:-compat)?\.js/i.test(text);
         const incompatiblePersistence = /A newer version of the Firestore SDK was previously used/i.test(text)
@@ -193,7 +192,9 @@ const ErrorHandler = (function () {
 
     function promiseRejectionContext(error) {
         const stack = formatStack(error);
-        const frame = stack.split('\n').slice(1).find(line => /^\s*at\s/.test(line));
+        const frame = stack.split('\n').slice(1).find(line =>
+            /^\s*at\s/.test(line) || /^\s*[^@\n]*@(?:https?:\/\/|file:|blob:)/i.test(line)
+        );
         return frame
             ? `Unhandled Promise Rejection @ ${frame.trim()}`
             : 'Unhandled Promise Rejection';
