@@ -64,6 +64,7 @@ function summarizeEvents(events) {
   const errors = [];
   const featureTotals = {};
   const syncConflictEvents = new Map();
+  const upgradedClasses = new Set(), upgradedTeachers = new Set();
   const pet = {
     rewards: 0,
     rewardOccurrences: 0,
@@ -105,6 +106,11 @@ function summarizeEvents(events) {
     else if (d.type === 'session_start') guestEvents++;
 
     if (isExpectedSyncWait(d)) return;
+    if (d.type === 'sync_upgrade') {
+      upgradedClasses.add(`${d.uid || ''}:${d.classId || ''}`);
+      if (d.uid) upgradedTeachers.add(d.uid);
+      return;
+    }
     if (isSyncConflictEvent(d)) {
       addSyncConflict(d);
       return;
@@ -186,6 +192,7 @@ function summarizeEvents(events) {
     dataActions,
     errors,
     syncConflicts,
+    syncUpgrades: { classes: upgradedClasses.size, teachers: upgradedTeachers.size },
     pet,
     hotFeatures,
   };
@@ -295,8 +302,10 @@ function buildDigestPayload(day, dateLabel, sum, backup) {
   const conflictLine = conflict.total
     ? `⚠️ 今日同步檢查（事件數）：${conflictDetails.join('；')}。請查看班級目前同步狀態，確認是否仍需處理。`
     : '⚠️ 今日雲端同步差異 0 件';
+  const upgrades = sum.syncUpgrades || { classes: 0, teachers: 0 };
   const healthLines = [
     conflictLine,
+    upgrades.classes && `🔄 舊版雲端資料自動升級 ${upgrades.classes} 個班級（${upgrades.teachers} 位老師），已保留雲端舊資料備份`,
     sum.errors.length
       ? `🐞 錯誤 ${sum.errors.length} 則：` + sum.errors.slice(0, 3).map((error) => clip(error.message, 60)).join('；')
       : '🐞 錯誤 0 則，一切正常 ✅',
@@ -316,6 +325,8 @@ function buildDigestPayload(day, dateLabel, sum, backup) {
   if (conflict.total) {
     text += `\n⚠️ 同步檢查事件 ${conflict.total} 件（版本差異 ${conflict.cloudDivergence}／舊版資料首次比對 ${conflict.legacyBaselineDifference}／來源未明 ${conflict.sourceUnverified}）`;
   }
+  if (upgrades.classes) text += `
+🔄 舊版雲端資料自動升級 ${upgrades.classes} 個班級`;
   if (petLines.length) text += `\n🐾 ${petLines.slice(0, 4).join(' · ')}`;
   text += `\n🐞 錯誤 ${sum.errors.length} 則`;
 

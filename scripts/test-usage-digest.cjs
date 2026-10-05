@@ -102,4 +102,19 @@ test('明確離線只限寵物同步 unavailable，不吞掉其他錯誤', () =>
  }
 });
 
+test('舊版雲端資料自動升級只進戰報：以老師與班級去重，並顯示在系統健康', () => {
+  const summary = summarizeEvents([
+    { type: 'sync_upgrade', uid: 'teacher-a', classId: '601', className: '601' },
+    { type: 'sync_upgrade', uid: 'teacher-a', classId: '601', className: '601' },
+    { type: 'sync_upgrade', uid: 'teacher-a', classId: '602' },
+    { type: 'sync_upgrade', uid: 'teacher-b', classId: '601' },
+  ]);
+  assert.deepEqual(summary.syncUpgrades, { classes: 3, teachers: 2 });
+  assert.equal(summary.syncConflicts.total, 0);
+  const payload = buildDigestPayload('2026-10-05', '10/05（週一）', summary, null);
+  assert.match(JSON.stringify(payload.cardsV2), /自動升級 3 個班級（2 位老師）/);
+  assert.match(payload.text, /自動升級 3 個班級/);
+  assert.doesNotMatch(buildDigestPayload('2026-10-05', '10/05', summarizeEvents([]), null).text, /自動升級/);
+});
+
 console.log(`✅ 每日戰報彙整測試通過：${passed} 項`);

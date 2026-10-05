@@ -52,6 +52,7 @@ const EVENT_META = {
   data_action:     { emoji: '⚙️', title: '重大資料操作' },
   error:           { emoji: '🐞', title: '系統發生錯誤' },
   sync_conflict:  { emoji: '⚠️', title: '雲端同步衝突提醒' },
+  sync_upgrade:   { emoji: '🔄', title: '舊版雲端資料已自動升級' },   // 只進每日戰報，不即時推播
   ...PET_EVENT_META,
 };
 
@@ -476,6 +477,11 @@ async function logUsageEvent(eventType, data, who, uid) {
       doc.action = clip(data.action, 80);
       doc.details = clip(data.details, 300);
     }
+    if (eventType === 'sync_upgrade') {
+      doc.classId = clip(data.classId, 80);
+      doc.className = clip(data.className, 80);
+      doc.students = Number.isSafeInteger(Number(data.students)) ? Number(data.students) : 0;
+    }
     if (eventType === 'sync_conflict') {
       doc.message = clip(data.message, 300);
       doc.context = clip(data.context, 160);
@@ -513,6 +519,13 @@ async function logUsageEvent(eventType, data, who, uid) {
       const device = doc.deviceId || 'unknown';
       const id = `feat_${day}_${uid || 'anon'}_${device}`;
       await db.collection(EVENT_LOG_COLLECTION).doc(id).set(doc, { merge: true });
+      return 'ok';
+    }
+
+    if (eventType === 'sync_upgrade') {
+      // 同一帳號同一班級只會升級一次；固定文件鍵讓重送不重複計數。
+      const safe = (value, fallback) => String(value || fallback).replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 80);
+      await db.collection(EVENT_LOG_COLLECTION).doc(`upg_${safe(uid, 'anon')}_${safe(data.classId, 'default')}`).set(doc, { merge: true });
       return 'ok';
     }
 

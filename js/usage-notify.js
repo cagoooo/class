@@ -429,6 +429,19 @@
         // 同步提醒，不是寵物程式故障；同一班每天只建立一筆事件，避免
         // 自動同步反覆觸發時洗版。只有 CloudSafety 確認不是同源分頁競速
         // 的衝突才會要求後端即時通知。
+        // 舊版雲端資料自動升級成功：只進每日戰報，不即時推播（後端不在即時清單內）。
+        // 同一班只會升級一次，用班級當天去重避免重送。
+        syncUpgrade: function (details) {
+            details = details || {};
+            var classId = String(details.classId || 'default').slice(0, 80);
+            if (!dayOnce('sync_upgrade_' + hash(classId))) return;
+            enqueue('sync_upgrade', {
+                classId: classId,
+                className: String(details.className || '').slice(0, 80),
+                students: Number(details.students) || 0
+            });
+        },
+
         syncConflict: function (message, details) {
             details = details || {};
             var classId = String(details.classId || 'default').slice(0, 80);

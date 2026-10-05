@@ -183,6 +183,7 @@
                 && matchesRemote;
             // 一鍵同步是在老師已確認覆蓋後執行；仍在同一個分頁鎖內
             // 重新讀取雲端，避免另一個同源分頁的舊讀取造成假衝突。
+            let upgradedLegacy = false;
             let expected = options.allowRemoteOverwrite
                 ? (remote.empty ? undefined : remote.token)
                 : (Object.hasOwn(options, 'expectedToken') ? options.expectedToken : (known?.token || (canAdoptLegacy ? remote.token : undefined)));
@@ -202,6 +203,7 @@
                 // 雲端只有舊版程式留下的資料（沒有同步版本），而且每一筆在本機都找得到：本機是較新的版本。
                 // 雲端舊資料已另存一份，原集合也不會被改動，所以直接升級成第一份快照，不必請老師手動比較。
                 expected = remote.token;
+                upgradedLegacy = true;
             }
             if (!remote.empty && expected !== remote.token) {
                 // 沒有本機同步基準時，無法證明是另一台裝置改了雲端：
@@ -260,6 +262,10 @@
             clearLocalChange(c, before);
             localStorage.setItem('lastSyncTime', new Date().toISOString());
             delete conflicts[recoveryKey(c)];
+            if (upgradedLegacy) {
+                try { window.UsageNotify?.syncUpgrade?.({ classId: c.id, className: classNameFor(c.id), students: dataFor(values).students.length }); }
+                catch (e) { /* 戰報統計失敗不影響同步 */ }
+            }
             // Changes made during upload retain a different fingerprint and remain pending.
             window.SyncStatusIndicator?.updateStateBasedOnSync();
             return true;
