@@ -183,7 +183,7 @@
                 && matchesRemote;
             // 一鍵同步是在老師已確認覆蓋後執行；仍在同一個分頁鎖內
             // 重新讀取雲端，避免另一個同源分頁的舊讀取造成假衝突。
-            const expected = options.allowRemoteOverwrite
+            let expected = options.allowRemoteOverwrite
                 ? (remote.empty ? undefined : remote.token)
                 : (Object.hasOwn(options, 'expectedToken') ? options.expectedToken : (known?.token || (canAdoptLegacy ? remote.token : undefined)));
             // revision token 可能因另一個分頁重送相同快照而改變；若完整內容
@@ -195,6 +195,13 @@
                 localStorage.setItem('lastSyncTime', new Date().toISOString());
                 window.SyncStatusIndicator?.updateStateBasedOnSync();
                 return true;
+            }
+            if (!remote.empty && expected !== remote.token && !options.allowRemoteOverwrite && !Object.hasOwn(options, 'expectedToken')
+                && String(remote.token || '').startsWith('legacy:') && supersedesLegacy(values, remote.values)
+                && await keepLegacyCopy(c, remote)) {
+                // 雲端只有舊版程式留下的資料（沒有同步版本），而且每一筆在本機都找得到：本機是較新的版本。
+                // 雲端舊資料已另存一份，原集合也不會被改動，所以直接升級成第一份快照，不必請老師手動比較。
+                expected = remote.token;
             }
             if (!remote.empty && expected !== remote.token) {
                 // 沒有本機同步基準時，無法證明是另一台裝置改了雲端：
@@ -257,6 +264,27 @@
             window.SyncStatusIndicator?.updateStateBasedOnSync();
             return true;
         });
+    }
+    /**
+     * 雲端舊版資料的每一筆（以編號判斷）本機都有，才算本機取代得了它。內容不比對：本機本來就會比雲端多出後續的加分與修改。
+     * 雲端有本機沒有的資料時，代表另一處改過它，維持原本的比較流程。
+     */
+    function supersedesLegacy(local, remote) {
+        try {
+            for (const k of ['students', 'pointsHistory', 'notebookEntries', 'homeworkList', 'lotteryHistory']) {
+                if (remote[k] == null) continue;
+                const mine = new Set(JSON.parse(local[k] || '[]').map(item => String(item?.id)));
+                if (JSON.parse(remote[k]).some(item => !mine.has(String(item?.id)))) return false;
+            }
+            return true;
+        } catch { return false; }
+    }
+    /** 自動升級前把雲端舊資料存進本機還原區；存不進去就回傳 false，改走手動比較。 */
+    async function keepLegacyCopy(c, remote) {
+        try {
+            await window.LocalRecovery.put(`legacy-cloud:${c.uid}:${c.id}`, { savedAt: new Date().toISOString(), classId: c.id, values: remote.values });
+            return true;
+        } catch { return false; }
     }
     async function checkpoint(id = current()) {
         const uid = window.FirebaseConfig?.getCurrentUserId() || 'local';
