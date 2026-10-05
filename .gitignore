@@ -19,3 +19,4 @@ art/pets/*.err
 art/pets/render-one.py
 art/pets/fox-preview.png
 art/pets/source/*.blend1
+!critical-update.json

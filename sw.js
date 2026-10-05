@@ -1,12 +1,12 @@
 /**
  * 班級小管家 Service Worker
- * @version 3.45.4
+ * @version 3.46.0
  * @description PWA 離線支援與快取策略優化
  */
 
-const CACHE_NAME = 'class-manager-v3.45.4';
-const STATIC_CACHE = 'class-manager-static-v3.45.4';
-const DYNAMIC_CACHE = 'class-manager-dynamic-v3.45.4';
+const CACHE_NAME = 'class-manager-v3.46.0';
+const STATIC_CACHE = 'class-manager-static-v3.46.0';
+const DYNAMIC_CACHE = 'class-manager-dynamic-v3.46.0';
 
 
 // 靜態資源列表（安裝時預快取）
@@ -64,6 +64,7 @@ const STATIC_ASSETS = [
     // v3.1.0 新增模組
     './js/sync-status-indicator.js',
     './js/leave-sync-guard.js',
+    './js/critical-update.js',
     './js/cloud-fast-forward.js',
     './js/class-quick-switcher.js',
     // v3.2.0 新增模組
@@ -166,6 +167,9 @@ self.addEventListener('message', (event) => {
 self.addEventListener('fetch', (event) => {
     const { request } = event;
     const url = new URL(request.url);
+
+    // 重要更新標記必須永遠即時，不能被快取住（否則舊版永遠看不到新的 minVersion）
+    if (new URL(event.request.url).pathname.endsWith('/critical-update.json')) return;
 
     // 只處理 http/https 請求
     if (!request.url.startsWith('http')) return;
