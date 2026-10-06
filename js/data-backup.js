@@ -112,10 +112,10 @@ class DataBackup {
         // 工作表 4：聯絡簿
         const nb = data.notebookEntries || [];
         if (nb.length) {
-            const s4 = [['日期', '類型', '內容', '建立時間']];
-            nb.forEach(e => s4.push([e.date || '', ({ homework: '作業', exam: '考試', activity: '活動', notice: '通知', other: '其他' }[e.type] || e.type || ''), e.content || '', e.timestamp || '']));
+            const s4 = [['日期', '類型', '重要', '內容', '建立時間']];
+            nb.forEach(e => s4.push([e.date || '', ({ homework: '作業', exam: '考試', activity: '活動', notice: '通知', other: '其他' }[e.type] || e.type || ''), e.priority === 'high' ? '⭐ 重要' : '', e.content || '', e.timestamp || '']));
             const ws4 = XLSX.utils.aoa_to_sheet(s4);
-            ws4['!cols'] = [{ wch: 14 }, { wch: 10 }, { wch: 44 }, { wch: 20 }];
+            ws4['!cols'] = [{ wch: 14 }, { wch: 10 }, { wch: 8 }, { wch: 44 }, { wch: 20 }];
             XLSX.utils.book_append_sheet(wb, ws4, '聯絡簿');
         }
 

@@ -33,12 +33,12 @@
     </script>
 
     <!-- 🔒 多班級資料隔離：必須在所有模組之前載入，攔截 localStorage 自動依班級路由 -->
-    <script src="js/class-aware-storage.js?v=3.51.1"></script>
-    <script src="js/backup-integrity.js?v=3.51.1"></script>
-    <script src="js/data-backup.js?v=3.51.1"></script>
-    <link rel="stylesheet" href="css/data-safety.css?v=3.51.1">
+    <script src="js/class-aware-storage.js?v=3.52.0"></script>
+    <script src="js/backup-integrity.js?v=3.52.0"></script>
+    <script src="js/data-backup.js?v=3.52.0"></script>
+    <link rel="stylesheet" href="css/data-safety.css?v=3.52.0">
     <!-- 🌱 通用空狀態元件：各區塊沒資料時顯示友善引導 -->
-    <script src="js/empty-state.js?v=3.51.1"></script>
+    <script src="js/empty-state.js?v=3.52.0"></script>
 
     <!-- 🔧 開發環境：localhost 自動清除 Service Worker 快取，避免 404 攔截問題 -->
     <script>
@@ -72,7 +72,7 @@
     <link rel="icon" href="favicon.ico" sizes="any">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="shortcut icon" href="favicon.ico">
-    <title>班級小管家 v3.51.1</title>
+    <title>班級小管家 v3.52.0</title>
     <meta name="description" content="教師班級管理的貼心小幫手 — 學生管理、作業檢查、計時器、抽籤、考試監考，一站搞定。">
 
     <!-- Open Graph / Facebook / LINE -->
@@ -95,14 +95,14 @@
     <meta name="twitter:description" content="教師班級管理的貼心小幫手 — 學生管理、作業檢查、計時器、抽籤、考試監考，一站搞定。">
     <meta name="twitter:image" content="https://cagoooo.github.io/class/og-preview.png?v=3.12.17">
     <!-- 📦 版本號（由 scripts/update-sw-version.js 自動同步） -->
-    <script>window.APP_VERSION = '3.51.1';</script>
+    <script>window.APP_VERSION = '3.52.0';</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 深色模式統一由 .dark class 驅動（與 theme-toggle.js 一致），不再跟隨作業系統的 prefers-color-scheme，
          否則 OS 深色但 App 淺色（或反之）時，dark: 工具類與自訂 .dark CSS 不同步 → 深底配深字、按鈕文字看不到 -->
     <script>tailwind.config = { darkMode: 'class' };</script>
-    <link rel="stylesheet" href="css/rwd-breakpoints.css?v=3.51.1">
-    <link rel="stylesheet" href="css/pwa-install.css?v=3.51.1">
-    <link rel="stylesheet" href="css/skeleton.css?v=3.51.1">
+    <link rel="stylesheet" href="css/rwd-breakpoints.css?v=3.52.0">
+    <link rel="stylesheet" href="css/pwa-install.css?v=3.52.0">
+    <link rel="stylesheet" href="css/skeleton.css?v=3.52.0">
     <!-- 新增 Excel 讀取套件 -->
 
     <script crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -744,7 +744,7 @@
                                 title="目前版本（點擊查看更新資訊）"
                                 class="text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-800/60 transition-colors"
                                 onclick="window.open('https://github.com/cagoooo/class/blob/main/CHANGELOG.md', '_blank')">
-                                v3.51.1
+                                v3.52.0
                             </span>
                         </div>
                         <div class="hidden sm:block text-xs sm:text-sm text-gray-600">讓課堂管理變得簡單有趣</div>
@@ -1304,68 +1304,70 @@
 
 
         <!-- 聯絡簿 -->
-        <div id="notebook-section" class="section bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6 hidden">
+        <div id="notebook-section" class="section nb-scope bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6 hidden">
             <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-6 flex items-center">
                 <span class="text-2xl sm:text-3xl mr-2 sm:mr-3">📝</span>聯絡簿
             </h2>
-            <div class="space-y-6 lg:grid lg:grid-cols-2 lg:gap-6 lg:space-y-0">
-                <div>
-                    <h3 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">新增聯絡事項</h3>
-                    <div class="space-y-3 sm:space-y-4">
-                        <input type="date" id="notebookDate"
-                            class="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 text-sm sm:text-base">
-                        <select id="notebookType"
-                            class="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 text-sm sm:text-base">
-                            <option value="homework">作業</option>
-                            <option value="exam">考試</option>
-                            <option value="activity">活動</option>
-                            <option value="notice">通知</option>
-                            <option value="other">其他</option>
-                        </select>
-                        <textarea id="notebookContent" placeholder="聯絡事項內容..." rows="4"
-                            class="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 resize-none text-sm sm:text-base"></textarea>
-                        <button onclick="addNotebook()" data-primary-action="true"
-                            class="w-full bg-yellow-500 text-white py-2 rounded-lg hover:bg-yellow-600 transition-colors text-sm sm:text-base active:scale-95">新增聯絡事項</button>
-                    </div>
+            <!-- 互動由 js/notebook-enhancement.js 負責；保留原本的 id 供既有程式使用 -->
+            <div class="nb-daybar">
+                <div class="nb-daynav">
+                    <button type="button" id="nbPrev" class="nb-arrow" aria-label="前一天">◀</button>
+                    <div class="nb-daytitle" aria-live="polite"><b id="nbDayLabel">今天</b><span id="nbDayTag" class="nb-tag"></span></div>
+                    <button type="button" id="nbNext" class="nb-arrow" aria-label="後一天">▶</button>
+                    <input type="date" id="notebookDate" aria-label="選擇日期">
+                    <button type="button" class="nb-chip" data-nb-jump="0">今天</button>
+                    <button type="button" class="nb-chip" data-nb-jump="1">明天</button>
                 </div>
-                <div>
-                    <h3 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">快速範本</h3>
-                    <div class="space-y-2">
-                        <button onclick="useTemplate('明天數學小考，範圍：第三章')"
-                            class="w-full text-left bg-gray-100 p-2 sm:p-3 rounded-lg hover:bg-gray-200 transition-colors text-xs sm:text-sm active:scale-95">📊
-                            明天數學小考，範圍：第三章</button>
-                        <button onclick="useTemplate('請準備明天的美勞用品：彩色筆、圖畫紙')"
-                            class="w-full text-left bg-gray-100 p-2 sm:p-3 rounded-lg hover:bg-gray-200 transition-colors text-xs sm:text-sm active:scale-95">🎨
-                            請準備明天的美勞用品</button>
-                        <button onclick="useTemplate('下週一校外教學，請穿著運動服')"
-                            class="w-full text-left bg-gray-100 p-2 sm:p-3 rounded-lg hover:bg-gray-200 transition-colors text-xs sm:text-sm active:scale-95">🚌
-                            下週一校外教學通知</button>
-                        <button onclick="useTemplate('家長會訂於本週五晚上7點舉行')"
-                            class="w-full text-left bg-gray-100 p-2 sm:p-3 rounded-lg hover:bg-gray-200 transition-colors text-xs sm:text-sm active:scale-95">👨‍👩‍👧‍👦
-                            家長會通知</button>
-                    </div>
+                <div class="nb-dayactions">
+                    <button type="button" id="nbCopyDay" class="nb-action">📋 複製這天（貼 LINE）</button>
+                    <button type="button" class="nb-action nb-proj-btn" onclick="openNotebookPresentation()">📺 投影這天</button>
                 </div>
             </div>
-            <div class="mt-6">
-                <div class="flex justify-between items-center mb-2">
-                    <h3 class="text-base sm:text-lg font-semibold">聯絡簿記錄</h3>
-                    <div id="priority-filter" class="flex gap-1 items-center">
-                        <button onclick="filterNotebookByPriority('all')"
-                            class="px-2 py-1 text-xs bg-gray-200 rounded hover:bg-gray-300">全部</button>
-                        <button onclick="filterNotebookByPriority('high')"
-                            class="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200">🔴</button>
-                        <button onclick="filterNotebookByPriority('normal')"
-                            class="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200">🟡</button>
-                        <button onclick="filterNotebookByPriority('low')"
-                            class="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200">🟢</button>
-                        <button onclick="openNotebookPresentation()"
-                            class="ml-2 px-3 py-1 text-xs bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-all flex items-center gap-1 shadow-sm">
-                            📺 展示模式
-                        </button>
+            <div class="nb-layout">
+                <section class="nb-card nb-add" aria-labelledby="nbAddTitle">
+                    <div class="nb-head"><h3 id="nbAddTitle">新增到 <span id="nbAddTarget"></span></h3></div>
+                    <div id="nbTypes" class="nb-types" role="radiogroup" aria-label="類型"></div>
+                    <select id="notebookType" hidden aria-hidden="true">
+                        <option value="homework">作業</option>
+                        <option value="exam">考試</option>
+                        <option value="activity">活動</option>
+                        <option value="notice">通知</option>
+                        <option value="other">其他</option>
+                    </select>
+                    <select id="notebookPriority" hidden aria-hidden="true">
+                        <option value="high">重要</option>
+                        <option value="normal" selected>一般</option>
+                        <option value="low">低</option>
+                    </select>
+                    <label class="nb-star"><input type="checkbox" id="nbImportant" autocomplete="off"> ⭐ 標為重要</label>
+                    <div class="nb-sub"><span>常用語（點一下加一行）</span><button type="button" id="nbPhraseEdit" class="nb-link">✏️ 編輯</button></div>
+                    <div id="nbPhrases" class="nb-phrases"></div>
+                    <div id="nbPhraseEditor" hidden></div>
+                    <textarea id="notebookContent" rows="5" aria-label="聯絡事項，一行一項"
+                        placeholder="一行一項，例如：&#10;國語習作 p.20&#10;明天考數學第三單元&#10;請帶彩色筆"></textarea>
+                    <div class="nb-addopts">
+                        <label><input type="checkbox" id="nbWhole" autocomplete="off"> 整段當成一則</label>
+                        <select id="nbLongTpl" aria-label="長篇範本"><option value="">📄 長篇範本…</option></select>
+                        <button type="button" id="nbReuse" class="nb-small">↻ 沿用上一次</button>
+                    </div>
+                    <button id="nbAddBtn" onclick="addNotebook()" data-primary-action="true" class="nb-add-btn">新增事項</button>
+                    <p class="nb-hint">一行會變成一則（行首的 1. ① • 會自動去掉）；Ctrl＋Enter 也能新增。</p>
+                </section>
+                <section class="nb-card nb-day" aria-labelledby="nbListTitle">
+                    <div class="nb-head"><h3 id="nbListTitle">這天的聯絡簿</h3><span id="nbDayCount" class="nb-hint"></span></div>
+                    <div id="notebookList" class="nb-list"></div>
+                </section>
+            </div>
+            <section class="nb-card nb-history mt-6" aria-labelledby="nbHistoryTitle">
+                <div class="nb-head">
+                    <h3 id="nbHistoryTitle">其他日期</h3>
+                    <div class="nb-history-tools">
+                        <input type="search" id="nbSearch" placeholder="🔍 搜尋聯絡簿" aria-label="搜尋聯絡簿">
+                        <label><input type="checkbox" id="nbOnlyImportant" autocomplete="off"> 只看 ⭐ 重要</label>
                     </div>
                 </div>
-                <div id="notebookList" class="space-y-2 sm:space-y-3 max-h-48 sm:max-h-60 overflow-y-auto"></div>
-            </div>
+                <div id="nbHistory"></div>
+            </section>
         </div>
 
         <!-- 作業檢查 -->
@@ -4615,44 +4617,44 @@
         // --- 結束全螢幕時鐘功能 ---
     </script>
     <!-- 增強模組 -->
-    <script src="js/skeleton.js?v=3.51.1"></script>
-    <script src="js/event-bus.js?v=3.51.1"></script>
-    <script src="js/error-handler.js?v=3.51.1"></script>
+    <script src="js/skeleton.js?v=3.52.0"></script>
+    <script src="js/event-bus.js?v=3.52.0"></script>
+    <script src="js/error-handler.js?v=3.52.0"></script>
 
-    <script src="js/class-db.js?v=3.51.1"></script>
-    <script src="js/firebase-config.js?v=3.51.1"></script>
-    <script src="js/usage-notify.js?v=3.51.1"></script>
-    <script src="js/cloud-safety.js?v=3.51.1"></script>
-    <script src="js/firebase-sync.js?v=3.51.1"></script>
-    <script src="js/firebase-ui.js?v=3.51.1"></script>
-    <script src="js/storage-manager.js?v=3.51.1"></script>
-    <script src="js/app-state.js?v=3.51.1"></script>
-    <script src="js/homework-enhancement.js?v=3.51.1"></script>
-    <script src="js/notebook-enhancement.js?v=3.51.1"></script>
-    <script src="js/leaderboard-enhancement.js?v=3.51.1"></script>
-    <script src="js/timer-enhancement.js?v=3.51.1"></script>
-    <script src="js/timer-alarm.js?v=3.51.1"></script>
-    <script src="js/theme-toggle.js?v=3.51.1"></script>
-    <script src="js/today-attendance.js?v=3.51.1"></script>
-    <script src="js/lottery-enhancement.js?v=3.51.1"></script>
-    <script src="js/grouping-enhancement.js?v=3.51.1"></script>
-    <script src="js/points-enhancement.js?v=3.51.1"></script>
-    <script src="js/student-enhancement.js?v=3.51.1"></script>
-    <script src="js/pomodoro.js?v=3.51.1"></script>
-    <script src="js/keyboard-shortcuts.js?v=3.51.1"></script>
-    <script src="js/ui-enhancement.js?v=3.51.1"></script>
-    <script src="js/navigation-enhancement.js?v=3.51.1"></script>
-    <script src="js/data-reports.js?v=3.51.1"></script>
-    <script src="js/exam-proctor.js?v=3.51.1"></script>
-    <script src="js/exam-sounds.js?v=3.51.1"></script>
-    <script src="js/announcement.js?v=3.51.1"></script>
+    <script src="js/class-db.js?v=3.52.0"></script>
+    <script src="js/firebase-config.js?v=3.52.0"></script>
+    <script src="js/usage-notify.js?v=3.52.0"></script>
+    <script src="js/cloud-safety.js?v=3.52.0"></script>
+    <script src="js/firebase-sync.js?v=3.52.0"></script>
+    <script src="js/firebase-ui.js?v=3.52.0"></script>
+    <script src="js/storage-manager.js?v=3.52.0"></script>
+    <script src="js/app-state.js?v=3.52.0"></script>
+    <script src="js/homework-enhancement.js?v=3.52.0"></script>
+    <script src="js/notebook-enhancement.js?v=3.52.0"></script>
+    <script src="js/leaderboard-enhancement.js?v=3.52.0"></script>
+    <script src="js/timer-enhancement.js?v=3.52.0"></script>
+    <script src="js/timer-alarm.js?v=3.52.0"></script>
+    <script src="js/theme-toggle.js?v=3.52.0"></script>
+    <script src="js/today-attendance.js?v=3.52.0"></script>
+    <script src="js/lottery-enhancement.js?v=3.52.0"></script>
+    <script src="js/grouping-enhancement.js?v=3.52.0"></script>
+    <script src="js/points-enhancement.js?v=3.52.0"></script>
+    <script src="js/student-enhancement.js?v=3.52.0"></script>
+    <script src="js/pomodoro.js?v=3.52.0"></script>
+    <script src="js/keyboard-shortcuts.js?v=3.52.0"></script>
+    <script src="js/ui-enhancement.js?v=3.52.0"></script>
+    <script src="js/navigation-enhancement.js?v=3.52.0"></script>
+    <script src="js/data-reports.js?v=3.52.0"></script>
+    <script src="js/exam-proctor.js?v=3.52.0"></script>
+    <script src="js/exam-sounds.js?v=3.52.0"></script>
+    <script src="js/announcement.js?v=3.52.0"></script>
 
     <!-- PWA 支援 -->
-    <script src="js/pwa-install.js?v=3.51.1"></script>
+    <script src="js/pwa-install.js?v=3.52.0"></script>
     <!-- v3.46.0：重要更新（critical-update.json）在不打斷老師的時機自動套用 -->
-    <script src="js/critical-update.js?v=3.51.1"></script>
-    <script src="js/clock-settings-toggle.js?v=3.51.1"></script>
-    <script src="js/admin-console.js?v=3.51.1"></script>
+    <script src="js/critical-update.js?v=3.52.0"></script>
+    <script src="js/clock-settings-toggle.js?v=3.52.0"></script>
+    <script src="js/admin-console.js?v=3.52.0"></script>
 
     <!-- ===== 一鍵更新浮動按鈕 ===== -->
     <style>
@@ -4720,60 +4722,60 @@
     </button>
 
     <!-- 離線狀態偵測（P12：斷網時頂部 Banner 提示） -->
-    <script src="./js/offline-detector.js?v=3.51.1"></script>
+    <script src="./js/offline-detector.js?v=3.52.0"></script>
     <!-- 自動定時同步（P11：每 10 分鐘自動上傳至 Firebase） -->
-    <script src="./js/auto-sync.js?v=3.51.1"></script>
+    <script src="./js/auto-sync.js?v=3.52.0"></script>
 
     <!-- 手勢操作支援（觸控滑動切換功能區 | 長按快捷選單） -->
-    <script src="./js/gesture-handler.js?v=3.51.1"></script>
+    <script src="./js/gesture-handler.js?v=3.52.0"></script>
 
     <!-- 🧧 十二生肖・開運拉霸機 + 開運籤（開學破冰遊戲） -->
-    <script src="./js/zodiac-slot.js?v=3.51.1"></script>
+    <script src="./js/zodiac-slot.js?v=3.52.0"></script>
 
     <!-- 🛟 資料保險把關（清除前強制備份 + 儲存空間預警） -->
-    <script src="./js/data-safety-guard.js?v=3.51.1"></script>
+    <script src="./js/data-safety-guard.js?v=3.52.0"></script>
 
     <!-- 🎨 班級經營白板（公告白板 + 班級秩序 + 號碼抽籤） -->
-    <script src="./js/class-board.js?v=3.51.1"></script>
+    <script src="./js/class-board.js?v=3.52.0"></script>
 
     <!-- 🦷 潔牙勾選表 -->
-    <script src="./js/brush-check.js?v=3.51.1"></script>
+    <script src="./js/brush-check.js?v=3.52.0"></script>
 
     <!-- ✍️ 成績單評語生成器 -->
-    <script src="./js/comment-gen.js?v=3.51.1"></script>
+    <script src="./js/comment-gen.js?v=3.52.0"></script>
 
     <!-- 💬 生動對話小學堂（國語寫作互動教學） -->
-    <script src="./js/dialogue-school.js?v=3.51.1"></script>
+    <script src="./js/dialogue-school.js?v=3.52.0"></script>
 
     <!-- 學期封存模組（Q01：一鍵封存學期資料至 Firebase archives/） -->
-    <script src="./js/semester-archive.js?v=3.51.1"></script>
+    <script src="./js/semester-archive.js?v=3.52.0"></script>
 
     <!-- 多班級管理模組（在 google-auth-ui.js 之前載入，確保 nav slot 就緒） -->
-    <script src="./js/class-profiles.js?v=3.51.1"></script>
+    <script src="./js/class-profiles.js?v=3.52.0"></script>
     <!-- v3.1.0：Ctrl+K 班級快速切換器 -->
-    <script src="./js/class-quick-switcher.js?v=3.51.1"></script>
+    <script src="./js/class-quick-switcher.js?v=3.52.0"></script>
 
 
     <!-- Google 帳號登入 UI 模組（必須在所有 Firebase 模組之後載入） -->
-    <script src="./js/google-auth-ui.js?v=3.51.1"></script>
+    <script src="./js/google-auth-ui.js?v=3.52.0"></script>
 
     <!-- v3.1.0：同步狀態常駐指示器（位於一鍵更新按鈕左側） -->
-    <script src="./js/sync-status-indicator.js?v=3.51.1"></script>
+    <script src="./js/sync-status-indicator.js?v=3.52.0"></script>
 
     <!-- 離開前同步提醒：有未上傳成果時攔截瀏覽器關閉並提供立即同步入口 -->
-    <script src="./js/leave-sync-guard.js?v=3.51.1"></script>
+    <script src="./js/leave-sync-guard.js?v=3.52.0"></script>
 
     <!-- v3.44.0：自動快轉——沒有未同步變更的裝置自動跟上雲端新版，換裝置不再撞同步衝突 -->
-    <script src="./js/cloud-fast-forward.js?v=3.51.1"></script>
+    <script src="./js/cloud-fast-forward.js?v=3.52.0"></script>
 
     <!-- v3.12.1：版本與健康狀態面板（點版本徽章開啟，R-C1/R-C2） -->
-    <script src="./js/health-panel.js?v=3.51.1"></script>
+    <script src="./js/health-panel.js?v=3.52.0"></script>
 
-    <script src="./js/classroom-ux.js?v=3.51.1"></script>
-    <link rel="stylesheet" href="css/class-pets.css?v=3.51.1">
+    <script src="./js/classroom-ux.js?v=3.52.0"></script>
+    <link rel="stylesheet" href="css/class-pets.css?v=3.52.0">
     <!-- v3.43.0：寵物分享（須在 class-pets.js 之前載入，首次繪製就能帶出分享面板） -->
-    <script src="js/pet-share.js?v=3.51.1"></script>
-    <script src="js/class-pets.js?v=3.51.1"></script>
+    <script src="js/pet-share.js?v=3.52.0"></script>
+    <script src="js/class-pets.js?v=3.52.0"></script>
 </body>
 
 </html>

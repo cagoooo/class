@@ -71,7 +71,7 @@
 
     var FEATURE_LABELS = {
         students: '學生管理', points: '加扣分', grouping: '隨機分組', lottery: '號碼抽籤',
-        timer: '計時器', notebook: '隨堂筆記', homework: '作業檢查', exam: '考試監考',
+        timer: '計時器', notebook: '聯絡簿', homework: '作業檢查', exam: '考試監考',
         zodiac: '開運拉霸', board: '班級經營工具板', brush: '潔牙勾選',
         comment: '評語生成器', dialogue: '對話小學堂', backup: '資料備份', announcement: '班級公告', pets: '班級寵物'
     };
