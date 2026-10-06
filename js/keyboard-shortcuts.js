@@ -10,14 +10,14 @@
 
     // ==================== 快捷鍵配置 ====================
     const SHORTCUTS = {
-        // 功能切換
-        '1': { action: 'showSection', args: ['student-section'], desc: '學生管理', icon: '📋' },
-        '2': { action: 'showSection', args: ['points-section'], desc: '加扣分', icon: '⭐' },
-        '3': { action: 'showSection', args: ['timer-section'], desc: '計時器', icon: '⏰' },
-        '4': { action: 'showSection', args: ['lottery-section'], desc: '抽籤', icon: '🎲' },
-        '5': { action: 'showSection', args: ['group-section'], desc: '分組', icon: '🧩' },
-        '6': { action: 'showSection', args: ['homework-section'], desc: '作業檢查', icon: '✅' },
-        '7': { action: 'showSection', args: ['notebook-section'], desc: '聯絡簿', icon: '📝' },
+        // 功能切換（args 填區塊名稱，不含 -section；showSection 會自己補上）
+        '1': { action: 'showSection', args: ['students'], desc: '學生管理', icon: '📋' },
+        '2': { action: 'showSection', args: ['points'], desc: '加扣分', icon: '⭐' },
+        '3': { action: 'showSection', args: ['timer'], desc: '計時器', icon: '⏰' },
+        '4': { action: 'showSection', args: ['lottery'], desc: '抽籤', icon: '🎲' },
+        '5': { action: 'showSection', args: ['grouping'], desc: '分組', icon: '🧩' },
+        '6': { action: 'showSection', args: ['homework'], desc: '作業檢查', icon: '✅' },
+        '7': { action: 'showSection', args: ['notebook'], desc: '聯絡簿', icon: '📝' },
 
         // 計時器控制
         'Space': { action: 'toggleTimer', desc: '開始/暫停計時', icon: '▶️' },
@@ -251,7 +251,7 @@
 
             case 'startLottery':
                 if (typeof window.startLottery === 'function') {
-                    window.showSection?.('lottery-section');
+                    window.showSection?.('lottery');
                     setTimeout(() => window.startLottery(), 300);
                 }
                 break;
