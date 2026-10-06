@@ -17,7 +17,8 @@
         if (!uid || !db || !window.FirebaseConfig.isConnected()) throw Object.assign(Error('請先登入 Google 帳號'), { code: 'sync-auth-required' });
         return { uid, db, id: id || current() };
     };
-    const sameAccount = c => { if (window.FirebaseConfig.getCurrentUserId() !== c.uid) throw Error('登入帳號已改變，已停止同步'); };
+    // 中途登出或換帳號是「等老師重新登入」，不是寵物或同步故障（code 讓 report() 走等待分支）
+    const sameAccount = c => { if (window.FirebaseConfig.getCurrentUserId() !== c.uid) throw Object.assign(Error('登入帳號已改變，已停止同步'), { code: 'sync-auth-required' }); };
     const root = c => c.id === 'default' ? c.db.collection('users').doc(c.uid) : c.db.collection('users').doc(c.uid).collection('classes').doc(c.id);
     const doc = (c, path) => { const [collection, id] = path.split('/'); return root(c).collection(collection).doc(id); };
     const baseKey = c => `cloudSafetyBase:${c.uid}:${c.id}`;
@@ -144,7 +145,9 @@
         return { values, token: `legacy:${fingerprint(values)}`, empty: !hasData };
     }
     async function read(id = current()) {
-        if (navigator.onLine === false) throw Error('目前離線，請恢復連線後再讀取雲端');
+        // 一定要帶 code：publish() 檢查完網路後要等同步鎖（非同步）才走到這裡，這段空檔斷線
+        // 若沒有 code，report() 會把它當成寵物同步失敗推播給開發者（2026-10-06 實際發生）
+        if (navigator.onLine === false) throw Object.assign(Error('目前離線，請恢復連線後再讀取雲端'), { code: 'sync-offline' });
         const c = context(id), ref = doc(c, 'appSettings/syncRevision');
         const snap = await ref.get({ source: 'server' });
         if (!snap.exists) {
@@ -168,6 +171,8 @@
         if (navigator.onLine === false) throw Object.assign(Error('已存本機，恢復連線後再同步'), { code: 'sync-offline' });
         const c = context(id);
         return withSyncLock(c, async () => {
+            // 等鎖的期間可能斷線：在讀雲端前再確認一次，維持「已存本機」的說法
+            if (navigator.onLine === false) throw Object.assign(Error('已存本機，恢復連線後再同步'), { code: 'sync-offline' });
             const values = capture(id); ensure(values);
             const remote = options.allowRemoteOverwrite
                 ? await read(id)
@@ -422,9 +427,22 @@
             return profile?.name || '';
         } catch { return ''; }
     }
+    // Firestore 自己判定離線時的錯誤（code 'unavailable'），措辭與 SDK 9.22.0 原文一致
+    const FIRESTORE_OFFLINE = [
+        /^Failed to get document because the client is offline\.?$/i,
+        /^Failed to get documents? from server\.\s*\(However, (this document does|these documents may) exist in the local cache\./i
+    ];
+    function isOfflineWait(error) {
+        if (error?.code === 'sync-offline') return true;
+        if (error?.code !== 'unavailable') return false;
+        return navigator.onLine === false || FIRESTORE_OFFLINE.some(re => re.test(String(error?.message || '')));
+    }
     function report(error, id, silent) {
         // 同源分頁已在同步時，這次只是被鎖略過，不是需要老師處理的錯誤。
         if (error?.code === 'sync-busy') return;
+        if (isOfflineWait(error) && error?.code !== 'sync-offline') {
+            error = Object.assign(Error('目前離線，恢復連線後會再同步'), { code: 'sync-offline' });
+        }
         // 可恢復的前置條件不代表寵物操作失敗；保留所有待同步資料。
         if (error?.code === 'sync-auth-required' || error?.code === 'sync-offline') {
             window.SyncStatusIndicator?.setState(error.code === 'sync-offline' ? 'disconnected' : 'offline');
@@ -454,7 +472,11 @@
             } catch (e) { /* 通知不能阻擋衝突保護 */ }
             conflicts[recoveryKey(context(id))] = true;
             window.SyncStatusIndicator?.setState('conflict');
-            if (!silent) return showConflict(id);
+            // 比較視窗要重新讀雲端；此時若斷線，只提示等待，不要變成未處理的錯誤
+            if (!silent) return showConflict(id).catch(e => {
+                if (isOfflineWait(e)) { window.SyncStatusIndicator?.setState('disconnected'); window.NotificationSystem?.warning?.('目前離線，恢復連線後再比較雲端與本機資料'); }
+                else window.NotificationSystem?.error?.(e?.message || '無法開啟比較視窗');
+            });
             return;
         }
 
@@ -482,7 +504,7 @@
             download(copy, '班級成果_還原前副本.json');
         } catch (e) { window.NotificationSystem?.error(e.message); }
     }
-    window.CloudSafety = { downloadRecovery, capture, dataFor, fingerprint, read, publish, restore, fastForward, checkpoint, status, showConflict, report, current, download, hasBaseline, hasLocalChangeMarker, markLocalChange };
+    window.CloudSafety = { isOfflineWait, downloadRecovery, capture, dataFor, fingerprint, read, publish, restore, fastForward, checkpoint, status, showConflict, report, current, download, hasBaseline, hasLocalChangeMarker, markLocalChange };
     // A separate IndexedDB keeps the rollback copy out of localStorage's small quota.
     window.LocalRecovery = {
         async access(mode, key, value) {

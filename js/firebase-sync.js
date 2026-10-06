@@ -279,7 +279,8 @@ async function syncFromCloud() {
         const d = CloudSafety.dataFor(snapshot.values);
         return { ...d, announcements: d.classAnnouncements || [], homeworkChecks: d.homeworkChecks || {}, __snapshot: snapshot };
     } catch (error) {
-        NotificationSystem.error('讀取雲端失敗：' + error.message);
+        if (CloudSafety.isOfflineWait?.(error) || (typeof navigator !== 'undefined' && navigator.onLine === false)) NotificationSystem.warning('📶 目前離線，恢復連線後再讀取雲端');
+        else NotificationSystem.error('讀取雲端失敗：' + error.message);
         return null;
     }
 }

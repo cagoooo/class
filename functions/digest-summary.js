@@ -28,7 +28,14 @@ function canonicalizeFeatureStats(raw) {
 
 function isExpectedSyncWait(event) {
   if (event?.type !== 'error' || event.feature !== 'pet' || event.operation !== 'cloud_sync') return false;
-  return ['請先登入 Google 帳號', '已存本機，恢復連線後再同步'].includes(String(event.message || '').trim());
+  // 完整字串比對：登入／離線等待，以及同步途中斷線、中途換帳號（舊版頁面送出時沒有 code）
+  return [
+    '請先登入 Google 帳號',
+    '已存本機，恢復連線後再同步',
+    '目前離線，請恢復連線後再讀取雲端',
+    '目前離線，恢復連線後會再同步',
+    '登入帳號已改變，已停止同步',
+  ].includes(String(event.message || '').trim());
 }
 
 // Firestore 明確表示用戶端離線時，保留事件供診斷，但不當作程式故障。
@@ -38,7 +45,9 @@ function isRecoverableOfflineSync(event) {
   if (String(event.failureStage || '') !== 'unavailable') return false;
   const message = String(event.message || '').trim();
   return /^Failed to get document because the client is offline\.?$/i.test(message)
-    || /^Failed to get documents? from server\.\s*\(However, these documents may exist in the local cache\.\s*Run again without setting source to ["']server["'] to retrieve the cached documents\.\)$/i.test(message);
+    || /^Failed to get documents? from server\.\s*\(However, these documents may exist in the local cache\.\s*Run again without setting source to ["']server["'] to retrieve the cached documents\.\)$/i.test(message)
+    // 單筆文件、本機快取有資料的版本（Firestore SDK 9.22.0 原文）
+    || /^Failed to get document from server\.\s*\(However, this document does exist in the local cache\.\s*Run again without setting source to ["']server["'] to retrieve the cached document\.\)$/i.test(message);
 }
 
 function isSyncConflictEvent(event) {

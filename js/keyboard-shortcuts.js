@@ -361,19 +361,25 @@
             window.closeTimerFullscreen();
         }
 
-        // 關閉時鐘
+        // 關閉時鐘（它是頁面原本就有的視窗，只能隱藏，不能刪掉，否則之後打不開）
         const clockModal = document.getElementById('clock-modal');
-        if (clockModal && clockModal.style.display !== 'none') {
+        if (clockModal && !clockModal.classList.contains('hidden')) {
             if (typeof window.closeBigClock === 'function') {
                 window.closeBigClock();
             }
         }
 
-        // 關閉其他可能的 Modal
+        // 排行榜同樣是重複使用的視窗，用它自己的關閉函式
+        const leaderboard = document.getElementById('leaderboardModal');
+        if (leaderboard && !leaderboard.classList.contains('hidden') && typeof window.hideLeaderboard === 'function') {
+            window.hideLeaderboard();
+        }
+
+        // 關閉其他臨時產生、目前看得到的 Modal；重複使用或已隱藏的不動
+        const keep = new Set(['shortcuts-modal', 'clock-modal', 'leaderboardModal']);
         document.querySelectorAll('.fixed.inset-0').forEach(el => {
-            if (el.id !== 'shortcuts-modal') {
-                el.remove();
-            }
+            if (keep.has(el.id) || el.classList.contains('hidden')) return;
+            el.remove();
         });
     }
 

@@ -245,6 +245,16 @@
             transform: scale(0.95);
         }
 
+        /* 全螢幕自己的淺色版（只影響全螢幕，不改整個 App 的深淺色） */
+        .timer-fullscreen-modal.fs-light { background: linear-gradient(135deg, #f8fafc 0%, #e0e7ff 55%, #ede9fe 100%); }
+        .fs-light .timer-fullscreen-display { color: #1e293b; text-shadow: none; }
+        .fs-light .timer-fullscreen-title { color: #334155; }
+        .fs-light .timer-fullscreen-status { color: #475569; }
+        .fs-light .timer-fullscreen-close, .fs-light .timer-fullscreen-theme { background: rgba(15, 23, 42, 0.08); color: #1e293b; }
+        .fs-light .timer-fullscreen-btn-secondary { background: rgba(15, 23, 42, 0.05); color: #1e293b; border-color: rgba(15, 23, 42, 0.2); }
+        .fs-light .timer-fullscreen-progress { background: rgba(15, 23, 42, 0.1); }
+        .timer-fullscreen-btn:focus-visible, .timer-fullscreen-close:focus-visible, .timer-fullscreen-theme:focus-visible { outline: 3px solid #fde68a; outline-offset: 3px; }
+
         /* RWD 調整 */
         @media (max-width: 640px) {
             .timer-fullscreen-close {
@@ -364,13 +374,19 @@
         syncTimerState();
 
         // 同步主題按鈕圖示
-        updateThemeButtonIcon();
+        applyFullscreenTheme();
 
+        fullscreenOpener = document.activeElement;
         modal.classList.add('active');
         document.body.style.overflow = 'hidden';
 
         // 開始同步更新
         startFullscreenSync();
+
+        // 焦點移到開始／暫停：按空白鍵或 Enter 就是控制計時
+        // （全螢幕是淡入的，剛打開那一刻還是 visibility:hidden，無法取得焦點，稍等一下再移）
+        const startBtn = document.getElementById('timerFullscreenStartBtn');
+        if (startBtn) setTimeout(() => { if (modal.classList.contains('active')) startBtn.focus({ preventScroll: true }); }, 80);
     };
 
     // 關閉全螢幕計時器
@@ -378,15 +394,30 @@
         const modal = document.getElementById('timerFullscreenModal');
         if (!modal) return;
 
+        if (!modal.classList.contains('active')) return;
         modal.classList.remove('active');
         document.body.style.overflow = '';
 
         // 停止同步
         stopFullscreenSync();
+
+        if (fullscreenOpener && fullscreenOpener.isConnected && typeof fullscreenOpener.focus === 'function') {
+            fullscreenOpener.focus({ preventScroll: true });
+        }
+        fullscreenOpener = null;
     };
 
     // 同步計時器狀態
     let syncInterval = null;
+    let fullscreenOpener = null;
+
+    // classnew.html 的 timerRunning、timerMode 是 let，不在 window 上；改用它提供的 getTimerState()
+    function timerState() {
+        try {
+            if (typeof window.getTimerState === 'function') return window.getTimerState();
+        } catch (e) { /* 讀不到就用預設 */ }
+        return { running: false, mode: 'countdown' };
+    }
 
     function syncTimerState() {
         // 讀取主計時器狀態
@@ -407,7 +438,10 @@
             if (fsDisplay) fsDisplay.classList.remove('warning', 'danger');
             if (fsProgressBar) fsProgressBar.classList.remove('warning', 'danger');
 
-            if (totalSecs <= 10 && totalSecs > 0) {
+            const countdown = timerState().mode === 'countdown';
+            if (!countdown || !(totalSecs > 0)) {
+                // 正數計時、或還沒開始／已歸零：不要顯示「快到了」的閃爍
+            } else if (totalSecs <= 10) {
                 if (fsDisplay) fsDisplay.classList.add('danger');
                 if (fsProgressBar) fsProgressBar.classList.add('danger');
             } else if (totalSecs <= 30) {
@@ -436,7 +470,7 @@
         if (!startBtn) return;
 
         // 檢查計時器是否在運行
-        const isRunning = typeof window.timerRunning !== 'undefined' ? window.timerRunning : false;
+        const isRunning = !!timerState().running;
 
         if (isRunning) {
             startBtn.innerHTML = '⏸️ 暫停';
@@ -475,23 +509,26 @@
     };
 
     // 全螢幕計時器主題切換
+    // 只切換全螢幕計時器自己的淺色／深色（記在這台電腦），不影響整個 App 的主題
     window.toggleTimerFullscreenTheme = function () {
-        // 使用全域的主題切換功能
-        if (typeof window.toggleTheme === 'function') {
-            window.toggleTheme();
-        }
-        // 更新按鈕圖示
-        updateThemeButtonIcon();
+        let light = false;
+        try { light = localStorage.getItem('timerFullscreenLight') === '1'; } catch (e) { /* 預設深色 */ }
+        try { localStorage.setItem('timerFullscreenLight', light ? '0' : '1'); } catch (e) { /* 存不了就只換這次 */ }
+        applyFullscreenTheme(!light);
     };
 
-    // 更新主題按鈕圖示
-    function updateThemeButtonIcon() {
+    function applyFullscreenTheme(force) {
+        let light = force;
+        if (typeof light !== 'boolean') {
+            try { light = localStorage.getItem('timerFullscreenLight') === '1'; } catch (e) { light = false; }
+        }
+        const modal = document.getElementById('timerFullscreenModal');
+        if (modal) modal.classList.toggle('fs-light', light);
         const btn = document.getElementById('timerFullscreenThemeBtn');
         if (!btn) return;
-
-        const isDark = document.documentElement.classList.contains('dark');
-        btn.innerHTML = isDark ? '☀️' : '🌙';
-        btn.title = isDark ? '切換淺色模式' : '切換深色模式';
+        btn.innerHTML = light ? '🌙' : '☀️';
+        btn.title = light ? '全螢幕改成深色背景' : '全螢幕改成淺色背景';
+        btn.setAttribute('aria-label', btn.title);
     }
 
     // 初始化

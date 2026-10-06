@@ -77,7 +77,7 @@ test('同步戰報使用當日事件語氣，不把發生數寫成仍待處理�
 
 test('登入與離線等待不誤報，但真正錯誤保留', () => {
  const base={type:'error',feature:'pet',operation:'cloud_sync'};
- for(const message of ['請先登入 Google 帳號','已存本機，恢復連線後再同步']) {
+ for(const message of ['請先登入 Google 帳號','已存本機，恢復連線後再同步','目前離線，請恢復連線後再讀取雲端','目前離線，恢復連線後會再同步','登入帳號已改變，已停止同步']) {
   assert.equal(isExpectedSyncWait({...base,message}),true);
   assert.equal(summarizeEvents([{...base,message}]).errors.length,0);
  }
@@ -95,6 +95,9 @@ test('明確離線只限寵物同步 unavailable，不吞掉其他錯誤', () =>
  const cachedQueryFailure = {...offline,message:'Failed to get documents from server. (However, these documents may exist in the local cache. Run again without setting source to "server" to retrieve the cached documents.)'};
  assert.equal(isRecoverableOfflineSync(cachedQueryFailure),true);
  assert.equal(summarizeEvents([cachedQueryFailure]).errors.length,0);
+ const cachedDocFailure = {...offline,message:'Failed to get document from server. (However, this document does exist in the local cache. Run again without setting source to "server" to retrieve the cached document.)'};
+ assert.equal(isRecoverableOfflineSync(cachedDocFailure),true);
+ assert.equal(isRecoverableOfflineSync({...cachedDocFailure,failureStage:'sync_failed'}),false);
  for (const change of [{operation:'reward'},{feature:'students'},{failureStage:'permission-denied'},{message:'Firestore service unavailable.'},{message:offline.message+' retry failed'}]) {
   const event = {...offline,...change};
   assert.equal(isRecoverableOfflineSync(event),false);

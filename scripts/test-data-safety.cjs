@@ -219,10 +219,30 @@ let passed=0;async function test(name,fn){await fn();console.log('PASS',name);pa
    if(offline)a.c.navigator.onLine=false;else a.c.FirebaseConfig.getCurrentUserId=()=>null;
    let caught;try{await a.s.publish();}catch(e){caught=e;}
    assert.equal(caught.code,offline?'sync-offline':'sync-auth-required');
-   await a.s.report(caught,true,'A');
+   await a.s.report(caught,'A',true);
    assert.equal(a.petErrors.length,0);assert.equal(JSON.stringify(a.s.capture()),before);
    assert.equal(state,offline?'disconnected':'offline');
   }
+ });
+ await test('同步途中（等同步鎖時）斷線不發寵物錯誤',async()=>{
+  const a=setup(); let state=''; a.c.SyncStatusIndicator={setState:v=>state=v};
+  let release; a.c.navigator.locks={request:(name,opts,cb)=>new Promise((res,rej)=>{release=()=>Promise.resolve().then(()=>cb({name})).then(res,rej);})};
+  const p=a.s.publish(); a.c.navigator.onLine=false; release();
+  let caught; try{await p;}catch(e){caught=e;}
+  assert.equal(caught.code,'sync-offline');
+  await a.s.report(caught,'A',true);
+  assert.equal(a.petErrors.length,0); assert.equal(state,'disconnected');
+ });
+ await test('read() 離線錯誤帶 sync-offline，Firestore 離線與換帳號都不發寵物錯誤',async()=>{
+  const a=setup(); a.c.navigator.onLine=false;
+  await assert.rejects(a.s.read(),e=>e.code==='sync-offline');
+  a.c.navigator.onLine=true;
+  const firestoreOffline=Object.assign(Error('Failed to get document from server. (However, this document does exist in the local cache. Run again without setting source to "server" to retrieve the cached document.)'),{code:'unavailable'});
+  await a.s.report(firestoreOffline,'A',true);
+  await a.s.report(Object.assign(Error('登入帳號已改變，已停止同步'),{code:'sync-auth-required'}),'A',true);
+  assert.equal(a.petErrors.length,0);
+  await a.s.report(Object.assign(Error('Firestore service unavailable.'),{code:'unavailable'}),'A',true);
+  assert.equal(a.petErrors.length,1);
  });
  console.log(passed+' safety checks passed');
 })().catch(e=>{console.error(e);process.exitCode=1;});

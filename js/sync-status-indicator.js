@@ -320,7 +320,18 @@
             }
         }
 
-        if (currentState === 'conflict') { await window.CloudSafety?.showConflict(); updateStateBasedOnSync(); return; }
+        if (currentState === 'conflict') {
+            const offline = !navigator.onLine || (window.OfflineDetector && window.OfflineDetector.isOffline());
+            if (offline) { window.NotificationSystem?.warning?.('📶 目前離線，恢復連線後再比較雲端與本機資料'); return; }
+            try {
+                await window.CloudSafety?.showConflict();
+            } catch (e) {
+                if (window.CloudSafety?.isOfflineWait?.(e)) window.NotificationSystem?.warning?.('📶 目前離線，恢復連線後再比較雲端與本機資料');
+                else window.NotificationSystem?.error?.(e?.message || '無法開啟比較視窗');
+            }
+            updateStateBasedOnSync();
+            return;
+        }
         if (currentState === 'syncing') return;
         // 其他狀態（synced/pending/error/disconnected(在線)）都可觸發手動同步
         if (window.FirebaseSync?.syncToCloud) {
