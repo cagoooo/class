@@ -695,15 +695,58 @@
     // ────────────────────────────────────────────────────────
     // 首次登入流程
     // ────────────────────────────────────────────────────────
+    // 首次登入讀不到雲端（離線、網路不穩）時：只提示等待，恢復連線後自動再試一次
+    let firstLoginRetryArmed = false;
+    function waitAndRetryFirstLogin(message) {
+        NotificationSystem && NotificationSystem.warning(message || '📶 目前連不上雲端，恢復連線後會自動再試');
+        if (firstLoginRetryArmed) return;
+        firstLoginRetryArmed = true;
+        window.addEventListener('online', () => {
+            firstLoginRetryArmed = false;
+            // 已經在別處完成同步就不用再跑
+            if (localStorage.getItem('lastSyncTime') || !window.FirebaseConfig?.getCurrentUserId?.()) return;
+            setTimeout(() => handleFirstTimeLogin(), 1500);
+        }, { once: true });
+    }
+
+    // 多班級還原的結果要照實說：全部成功才說成功、才重新整理
+    function reportAllClassRestore(results) {
+        if (!results) {
+            NotificationSystem && NotificationSystem.warning('雲端同步正在進行中，這次沒有還原，稍後請再試一次');
+            return false;
+        }
+        const ok = results.filter(r => r.status === 'ok');
+        const fail = results.filter(r => r.status !== 'ok');
+        if (!fail.length) {
+            NotificationSystem && NotificationSystem.success(`已從雲端還原所有班級（共 ${ok.length} 個）📥`);
+            setTimeout(() => location.reload(), 900);
+            return true;
+        }
+        if (!ok.length) {
+            if (navigator.onLine === false) waitAndRetryFirstLogin('📶 目前離線，班級資料還沒從雲端載入；恢復連線後會自動再試');
+            else NotificationSystem && NotificationSystem.error('雲端班級沒有還原成功：' + (fail[0].error || '請稍後再試'));
+            return false;
+        }
+        // 部分成功：說清楚哪些班沒成功，再重新整理顯示已還原的班級
+        NotificationSystem && NotificationSystem.warning(`已還原 ${ok.length} 個班級；${fail.map(r => r.name).join('、')} 沒有成功，可稍後在「資料備份」重新下載`);
+        setTimeout(() => location.reload(), 2500);
+        return true;
+    }
+
     async function handleFirstTimeLogin() {
-        // 檢查雲端是否有資料
+        if (navigator.onLine === false) {
+            waitAndRetryFirstLogin('📶 目前離線，恢復連線後會自動從雲端載入你的班級資料');
+            return;
+        }
+        // 檢查雲端是否有資料（讀不到 ≠ 雲端是空的，不能據此判斷）
         let cloudHasData = false;
+        let cloudUnknown = false;
         try {
             const db = window.FirebaseConfig.getDb();
             const uid = window.FirebaseConfig.getCurrentUserId();
             const snap = await db.collection('users').doc(uid).collection('students').limit(1).get();
             cloudHasData = !snap.empty;
-        } catch (e) { /* 無法取得則視為空 */ }
+        } catch (e) { cloudUnknown = true; }
 
         // 檢查雲端是否有「預設班以外」的班級（科任老師常見：資料全在 601~606，預設班反而是空的）
         // 若只看預設班會誤判成「雲端沒資料」→ 整批班級不會還原，新裝置只看得到預設班
@@ -711,8 +754,14 @@
         try {
             const cloudProfiles = await window.FirebaseSync.fetchCloudClassProfiles?.() || [];
             cloudExtraClasses = cloudProfiles.filter(p => String(p.id) !== 'default');
-        } catch (e) { /* 略過 */ }
+        } catch (e) { cloudUnknown = true; }
         const cloudHasAny = cloudHasData || cloudExtraClasses.length > 0;
+
+        // 雲端讀不到又沒讀到任何資料：先不要說「帳號已就緒」或要求上傳，等連線恢復再判斷
+        if (cloudUnknown && !cloudHasAny) {
+            waitAndRetryFirstLogin('📶 暫時讀不到雲端資料，恢復連線後會自動再試');
+            return;
+        }
 
         const localHasData = hasLocalData();
 
@@ -746,16 +795,16 @@
             setSyncing(true);
             if (cloudExtraClasses.length > 0) {
                 // 多班級帳號：一次還原所有班級（含 601~606），而非只還原預設班
-                await window.FirebaseSync.syncAllClassesFromCloud();
+                const results = await window.FirebaseSync.syncAllClassesFromCloud();
                 setSyncing(false);
-                NotificationSystem && NotificationSystem.success(`已從雲端還原所有班級（共 ${cloudExtraClasses.length + 1} 個）📥`);
-                setTimeout(() => location.reload(), 900);
+                reportAllClassRestore(results);
                 return;
             }
-            await window.FirebaseSync.loadFromCloud();
+            // loadFromCloud 成功時自己會顯示「已完整還原」，失敗時也會自己說明原因；這裡不再多報一次成功
+            const loaded = await window.FirebaseSync.loadFromCloud();
             setSyncing(false);
             refreshSyncTime();
-            NotificationSystem && NotificationSystem.success('已從雲端載入你的資料 📥');
+            if (!loaded && navigator.onLine === false) waitAndRetryFirstLogin('📶 目前離線，資料還沒從雲端載入；恢復連線後會自動再試');
             return;
         }
 
@@ -772,11 +821,10 @@
         setSyncing(true);
         if (choice === 'cloud') {
             if (cloudExtraClasses.length > 0) {
-                // 多班級：還原全部班級後重新載入
-                await window.FirebaseSync.syncAllClassesFromCloud();
+                // 多班級：還原全部班級，全部成功才重新載入
+                const results = await window.FirebaseSync.syncAllClassesFromCloud();
                 setSyncing(false);
-                NotificationSystem && NotificationSystem.success(`已從雲端還原所有班級（共 ${cloudExtraClasses.length + 1} 個）📥`);
-                setTimeout(() => location.reload(), 900);
+                reportAllClassRestore(results);
                 return;
             }
             await window.FirebaseSync.loadFromCloud();
