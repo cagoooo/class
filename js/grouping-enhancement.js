@@ -317,9 +317,11 @@
         } catch (e) { /* 只是偏好設定，存不了不影響分組 */ }
     }
 
-    // ---------- 今天誰參加（請假名單只記當天、各班分開） ----------
-    const absentKey = () => 'groupingAbsent-' + classId();
+    // ---------- 今天誰參加（與抽籤共用 js/today-attendance.js：只記當天、各班分開） ----------
+    const absentKey = () => 'todayAbsent-' + classId();
+    let savingAbsent = false;
     function loadAbsent() {
+        if (window.TodayAttendance) return TodayAttendance.load();
         try {
             const raw = JSON.parse(localStorage.getItem(absentKey()) || 'null');
             if (raw && raw.date === todayStamp() && Array.isArray(raw.ids)) return new Set(raw.ids.map(String));
@@ -327,6 +329,11 @@
         return new Set();
     }
     function saveAbsent() {
+        if (window.TodayAttendance) {
+            savingAbsent = true;   // 自己存的不用再重畫名單（避免點名字時清單跳動）
+            try { TodayAttendance.save(absent); } finally { savingAbsent = false; }
+            return;
+        }
         try {
             if (absent.size) localStorage.setItem(absentKey(), JSON.stringify({ date: todayStamp(), ids: [...absent] }));
             else localStorage.removeItem(absentKey());
@@ -498,6 +505,7 @@
         updatePreview();
     }
     function refreshSettings() {
+        absent = loadAbsent();   // 抽籤那邊可能改過今天的請假名單
         pruneAbsent();
         syncMethodUI();
         updateRosterInfo();
@@ -1313,6 +1321,11 @@
                 export: exportGroups
             };
             actions[b.dataset.gp]?.();
+        });
+
+        // 抽籤那邊改了今天的請假名單：分組頁正開著就立刻更新
+        window.addEventListener('todayattendancechange', () => {
+            if (!savingAbsent && !section.classList.contains('hidden') && !state.busy) { refreshSettings(); }
         });
 
         // 每次打開「隨機分組」都重新整理名單（學生可能剛新增或刪除）

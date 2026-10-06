@@ -33,12 +33,12 @@
     </script>
 
     <!-- 🔒 多班級資料隔離：必須在所有模組之前載入，攔截 localStorage 自動依班級路由 -->
-    <script src="js/class-aware-storage.js?v=3.48.1"></script>
-    <script src="js/backup-integrity.js?v=3.48.1"></script>
-    <script src="js/data-backup.js?v=3.48.1"></script>
-    <link rel="stylesheet" href="css/data-safety.css?v=3.48.1">
+    <script src="js/class-aware-storage.js?v=3.49.0"></script>
+    <script src="js/backup-integrity.js?v=3.49.0"></script>
+    <script src="js/data-backup.js?v=3.49.0"></script>
+    <link rel="stylesheet" href="css/data-safety.css?v=3.49.0">
     <!-- 🌱 通用空狀態元件：各區塊沒資料時顯示友善引導 -->
-    <script src="js/empty-state.js?v=3.48.1"></script>
+    <script src="js/empty-state.js?v=3.49.0"></script>
 
     <!-- 🔧 開發環境：localhost 自動清除 Service Worker 快取，避免 404 攔截問題 -->
     <script>
@@ -72,7 +72,7 @@
     <link rel="icon" href="favicon.ico" sizes="any">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="shortcut icon" href="favicon.ico">
-    <title>班級小管家 v3.48.1</title>
+    <title>班級小管家 v3.49.0</title>
     <meta name="description" content="教師班級管理的貼心小幫手 — 學生管理、作業檢查、計時器、抽籤、考試監考，一站搞定。">
 
     <!-- Open Graph / Facebook / LINE -->
@@ -95,14 +95,14 @@
     <meta name="twitter:description" content="教師班級管理的貼心小幫手 — 學生管理、作業檢查、計時器、抽籤、考試監考，一站搞定。">
     <meta name="twitter:image" content="https://cagoooo.github.io/class/og-preview.png?v=3.12.17">
     <!-- 📦 版本號（由 scripts/update-sw-version.js 自動同步） -->
-    <script>window.APP_VERSION = '3.48.1';</script>
+    <script>window.APP_VERSION = '3.49.0';</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 深色模式統一由 .dark class 驅動（與 theme-toggle.js 一致），不再跟隨作業系統的 prefers-color-scheme，
          否則 OS 深色但 App 淺色（或反之）時，dark: 工具類與自訂 .dark CSS 不同步 → 深底配深字、按鈕文字看不到 -->
     <script>tailwind.config = { darkMode: 'class' };</script>
-    <link rel="stylesheet" href="css/rwd-breakpoints.css?v=3.48.1">
-    <link rel="stylesheet" href="css/pwa-install.css?v=3.48.1">
-    <link rel="stylesheet" href="css/skeleton.css?v=3.48.1">
+    <link rel="stylesheet" href="css/rwd-breakpoints.css?v=3.49.0">
+    <link rel="stylesheet" href="css/pwa-install.css?v=3.49.0">
+    <link rel="stylesheet" href="css/skeleton.css?v=3.49.0">
     <!-- 新增 Excel 讀取套件 -->
 
     <script crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -744,7 +744,7 @@
                                 title="目前版本（點擊查看更新資訊）"
                                 class="text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-800/60 transition-colors"
                                 onclick="window.open('https://github.com/cagoooo/class/blob/main/CHANGELOG.md', '_blank')">
-                                v3.48.1
+                                v3.49.0
                             </span>
                         </div>
                         <div class="hidden sm:block text-xs sm:text-sm text-gray-600">讓課堂管理變得簡單有趣</div>
@@ -1171,56 +1171,63 @@
         </div>
 
         <!-- 抽籤系統 -->
-        <div id="lottery-section" class="section bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6 hidden">
+        <div id="lottery-section" class="section lt-scope bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6 hidden">
             <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-6 flex items-center">
                 <span class="text-2xl sm:text-3xl mr-2 sm:mr-3">🎲</span>抽籤系統
             </h2>
-            <div class="space-y-6 lg:grid lg:grid-cols-2 lg:gap-6 lg:space-y-0">
-                <div>
+            <div class="space-y-6 lg:grid lg:grid-cols-5 lg:gap-6 lg:space-y-0">
+                <div class="lg:col-span-2">
                     <h3 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">抽籤設定</h3>
-                    <div class="space-y-3 sm:space-y-4">
+                    <div class="space-y-4 bg-gray-50 p-4 rounded-lg">
+                        <div id="lotteryPoolInfo" class="lt-poolinfo" aria-live="polite"></div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">抽籤類型</label>
-                            <!-- 改為分段按鈕（觸控更好按）；隱藏 input 保留 id 供既有程式讀 .value -->
+                            <span id="lotteryTypeLabel" class="block text-sm font-medium text-gray-700 mb-2">抽籤類型</span>
+                            <!-- 分段按鈕（觸控更好按）；隱藏 input 保留 id 供既有程式讀 .value -->
                             <input type="hidden" id="lotteryType" value="single">
                             <!-- 分組抽籤已移除：分組相關統一在「隨機分組」功能使用，避免重疊與依賴錯誤 -->
-                            <div class="grid grid-cols-2 gap-2" role="group" aria-label="抽籤類型">
-                                <button type="button" data-ltype="single" data-on="1" onclick="setLotteryType('single')"
-                                    class="lottery-type-btn flex items-center justify-center gap-1 py-3 rounded-xl border-2 font-bold text-sm sm:text-base transition-all active:scale-95 data-[on=1]:bg-purple-500 data-[on=1]:border-purple-600 data-[on=1]:text-white data-[on=1]:shadow-md data-[on=1]:scale-105 data-[on=0]:bg-white data-[on=0]:border-gray-200 data-[on=0]:text-gray-600 data-[on=0]:hover:border-purple-300 data-[on=0]:hover:bg-purple-50">👤 單人</button>
-                                <button type="button" data-ltype="multiple" data-on="0" onclick="setLotteryType('multiple')"
-                                    class="lottery-type-btn flex items-center justify-center gap-1 py-3 rounded-xl border-2 font-bold text-sm sm:text-base transition-all active:scale-95 data-[on=1]:bg-purple-500 data-[on=1]:border-purple-600 data-[on=1]:text-white data-[on=1]:shadow-md data-[on=1]:scale-105 data-[on=0]:bg-white data-[on=0]:border-gray-200 data-[on=0]:text-gray-600 data-[on=0]:hover:border-purple-300 data-[on=0]:hover:bg-purple-50">👥 多人</button>
+                            <div class="grid grid-cols-2 gap-2" role="group" aria-labelledby="lotteryTypeLabel">
+                                <button type="button" data-ltype="single" data-on="1" aria-pressed="true" onclick="setLotteryType('single')"
+                                    class="lottery-type-btn flex items-center justify-center gap-1 py-3 rounded-xl border-2 font-bold text-sm sm:text-base transition-all active:scale-95 data-[on=1]:bg-purple-500 data-[on=1]:border-purple-600 data-[on=1]:text-white data-[on=1]:shadow-md data-[on=0]:bg-white data-[on=0]:border-gray-200 data-[on=0]:text-gray-600 data-[on=0]:hover:border-purple-300 data-[on=0]:hover:bg-purple-50">👤 抽 1 人</button>
+                                <button type="button" data-ltype="multiple" data-on="0" aria-pressed="false" onclick="setLotteryType('multiple')"
+                                    class="lottery-type-btn flex items-center justify-center gap-1 py-3 rounded-xl border-2 font-bold text-sm sm:text-base transition-all active:scale-95 data-[on=1]:bg-purple-500 data-[on=1]:border-purple-600 data-[on=1]:text-white data-[on=1]:shadow-md data-[on=0]:bg-white data-[on=0]:border-gray-200 data-[on=0]:text-gray-600 data-[on=0]:hover:border-purple-300 data-[on=0]:hover:bg-purple-50">👥 一次抽多人</button>
                             </div>
                         </div>
                         <div id="multipleCount" class="hidden">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">抽取人數</label>
-                            <input type="number" id="lotteryCount" value="2" min="1"
-                                class="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm sm:text-base">
-                        </div>
-                        <div class="bg-purple-50 p-3 rounded-lg">
-                            <div class="flex items-center justify-between mb-2">
-                                <label class="flex items-center cursor-pointer">
-                                    <input type="checkbox" id="noRepeatToggle" checked onchange="toggleNoRepeat()"
-                                        class="w-4 h-4 text-purple-600 rounded focus:ring-purple-500">
-                                    <span class="ml-2 text-sm font-medium text-gray-700">不重複抽取</span>
-                                </label>
-                                <button onclick="resetDrawnStudents()"
-                                    class="text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded-lg transition-colors">
-                                    🔄 重置
-                                </button>
+                            <label for="lotteryCount" class="block text-sm font-medium text-gray-700 mb-2">一次抽幾人？</label>
+                            <div class="lt-stepper">
+                                <button type="button" id="lotteryMinus" aria-label="少抽 1 人">−</button>
+                                <input type="number" id="lotteryCount" value="2" min="1" inputmode="numeric">
+                                <button type="button" id="lotteryPlus" aria-label="多抽 1 人">＋</button>
                             </div>
-                            <div id="lotteryStats" class="text-xs text-gray-600">
-                                <span>剩餘：<span id="remainingCount" class="font-semibold text-purple-600 dark:text-purple-300">0</span>
-                                    人</span>
-                                <span class="mx-2">|</span>
-                                <span>已抽：<span id="drawnCount" class="font-semibold text-gray-500">0</span> 人</span>
-                            </div>
+                            <div id="lotteryQuick" class="lt-quick" role="group" aria-label="快速選擇人數"></div>
                         </div>
+                        <div class="lt-norepeat">
+                            <label class="lt-toggle">
+                                <input type="checkbox" id="noRepeatToggle" checked onchange="toggleNoRepeat()">
+                                <span><b>不重複抽取</b><small>抽過的人先不再抽，全部抽完一輪會自動放回</small></span>
+                            </label>
+                            <div id="lotteryRound" class="lt-round"></div>
+                        </div>
+                        <details id="lotteryPool" class="lt-pool">
+                            <summary>
+                                <span>🫙 籤筒名單</span>
+                                <span id="lotteryPoolBadge" class="lt-badge"></span>
+                            </summary>
+                            <div class="lt-pool-body">
+                                <p class="lt-pool-help">點名字可以切換：<span class="lt-stu lt-demo">可抽</span> → <span class="lt-stu lt-demo" data-state="absent">請假</span>（分組也會跳過）；<span class="lt-stu lt-demo" data-state="drawn">已抽過</span> 點一下放回籤筒。</p>
+                                <div id="lotteryPoolList" class="lt-pool-list"></div>
+                            </div>
+                        </details>
+                        <label class="lt-toggle lt-toggle-plain">
+                            <input type="checkbox" id="lotteryAnimToggle" checked>
+                            <span>抽籤動畫與音效</span>
+                        </label>
                         <button id="startLotteryBtn" onclick="startLottery()" data-primary-action="true"
-                            class="w-full bg-purple-500 text-white py-3 rounded-lg hover:bg-purple-600 transition-colors text-base sm:text-lg font-semibold active:scale-95">🎲
-                            開始抽籤</button>
+                            class="w-full bg-purple-500 text-white py-3 rounded-lg hover:bg-purple-600 transition-colors text-base sm:text-lg font-semibold active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed">🎲 開始抽籤</button>
+                        <button type="button" id="lotteryProjectBtn" class="lt-proj-open-btn">🖥️ 投影抽籤（全螢幕大字）</button>
                     </div>
                 </div>
-                <div>
+                <div class="lg:col-span-3">
                     <h3 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">抽籤結果</h3>
                     <div id="lotteryResult"
                         class="bg-gradient-to-r from-purple-100 to-pink-100 p-4 sm:p-6 rounded-lg text-center min-h-24 sm:min-h-32 flex items-center justify-center overflow-hidden">
@@ -1229,8 +1236,8 @@
                 </div>
             </div>
             <div class="mt-6">
-                <h3 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">抽籤歷史</h3>
-                <div id="lotteryHistory" class="bg-gray-50 p-3 sm:p-4 rounded-lg max-h-32 sm:max-h-40 overflow-y-auto">
+                <h3 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4 flex items-baseline gap-2">抽籤紀錄 <span id="lotteryHistoryCount" class="text-sm font-normal text-gray-500"></span></h3>
+                <div id="lotteryHistory" class="bg-gray-50 p-3 sm:p-4 rounded-lg max-h-72 overflow-y-auto">
                 </div>
             </div>
         </div>
@@ -2304,15 +2311,7 @@
             document.getElementById('notebookDate').value = DataBackup.getDateString();
             document.getElementById('homeworkDue').value = DataBackup.getDateString();
 
-            document.getElementById('lotteryType').addEventListener('change', function () {
-                const multipleCount = document.getElementById('multipleCount');
-                if (!multipleCount) return;
-                if (this.value === 'multiple') {
-                    multipleCount.classList.remove('hidden');
-                } else {
-                    multipleCount.classList.add('hidden');
-                }
-            });
+            // 抽籤類型、人數、籤筒與記憶設定改由 js/lottery-enhancement.js 負責
 
             // 分組方式切換、預覽與記憶設定改由 js/grouping-enhancement.js 負責
 
@@ -4624,42 +4623,43 @@
         // --- 結束全螢幕時鐘功能 ---
     </script>
     <!-- 增強模組 -->
-    <script src="js/skeleton.js?v=3.48.1"></script>
-    <script src="js/event-bus.js?v=3.48.1"></script>
-    <script src="js/error-handler.js?v=3.48.1"></script>
+    <script src="js/skeleton.js?v=3.49.0"></script>
+    <script src="js/event-bus.js?v=3.49.0"></script>
+    <script src="js/error-handler.js?v=3.49.0"></script>
 
-    <script src="js/class-db.js?v=3.48.1"></script>
-    <script src="js/firebase-config.js?v=3.48.1"></script>
-    <script src="js/usage-notify.js?v=3.48.1"></script>
-    <script src="js/cloud-safety.js?v=3.48.1"></script>
-    <script src="js/firebase-sync.js?v=3.48.1"></script>
-    <script src="js/firebase-ui.js?v=3.48.1"></script>
-    <script src="js/storage-manager.js?v=3.48.1"></script>
-    <script src="js/app-state.js?v=3.48.1"></script>
-    <script src="js/homework-enhancement.js?v=3.48.1"></script>
-    <script src="js/notebook-enhancement.js?v=3.48.1"></script>
-    <script src="js/leaderboard-enhancement.js?v=3.48.1"></script>
-    <script src="js/timer-enhancement.js?v=3.48.1"></script>
-    <script src="js/timer-alarm.js?v=3.48.1"></script>
-    <script src="js/theme-toggle.js?v=3.48.1"></script>
-    <script src="js/lottery-enhancement.js?v=3.48.1"></script>
-    <script src="js/grouping-enhancement.js?v=3.48.1"></script>
-    <script src="js/student-enhancement.js?v=3.48.1"></script>
-    <script src="js/pomodoro.js?v=3.48.1"></script>
-    <script src="js/keyboard-shortcuts.js?v=3.48.1"></script>
-    <script src="js/ui-enhancement.js?v=3.48.1"></script>
-    <script src="js/navigation-enhancement.js?v=3.48.1"></script>
-    <script src="js/data-reports.js?v=3.48.1"></script>
-    <script src="js/exam-proctor.js?v=3.48.1"></script>
-    <script src="js/exam-sounds.js?v=3.48.1"></script>
-    <script src="js/announcement.js?v=3.48.1"></script>
+    <script src="js/class-db.js?v=3.49.0"></script>
+    <script src="js/firebase-config.js?v=3.49.0"></script>
+    <script src="js/usage-notify.js?v=3.49.0"></script>
+    <script src="js/cloud-safety.js?v=3.49.0"></script>
+    <script src="js/firebase-sync.js?v=3.49.0"></script>
+    <script src="js/firebase-ui.js?v=3.49.0"></script>
+    <script src="js/storage-manager.js?v=3.49.0"></script>
+    <script src="js/app-state.js?v=3.49.0"></script>
+    <script src="js/homework-enhancement.js?v=3.49.0"></script>
+    <script src="js/notebook-enhancement.js?v=3.49.0"></script>
+    <script src="js/leaderboard-enhancement.js?v=3.49.0"></script>
+    <script src="js/timer-enhancement.js?v=3.49.0"></script>
+    <script src="js/timer-alarm.js?v=3.49.0"></script>
+    <script src="js/theme-toggle.js?v=3.49.0"></script>
+    <script src="js/today-attendance.js?v=3.49.0"></script>
+    <script src="js/lottery-enhancement.js?v=3.49.0"></script>
+    <script src="js/grouping-enhancement.js?v=3.49.0"></script>
+    <script src="js/student-enhancement.js?v=3.49.0"></script>
+    <script src="js/pomodoro.js?v=3.49.0"></script>
+    <script src="js/keyboard-shortcuts.js?v=3.49.0"></script>
+    <script src="js/ui-enhancement.js?v=3.49.0"></script>
+    <script src="js/navigation-enhancement.js?v=3.49.0"></script>
+    <script src="js/data-reports.js?v=3.49.0"></script>
+    <script src="js/exam-proctor.js?v=3.49.0"></script>
+    <script src="js/exam-sounds.js?v=3.49.0"></script>
+    <script src="js/announcement.js?v=3.49.0"></script>
 
     <!-- PWA 支援 -->
-    <script src="js/pwa-install.js?v=3.48.1"></script>
+    <script src="js/pwa-install.js?v=3.49.0"></script>
     <!-- v3.46.0：重要更新（critical-update.json）在不打斷老師的時機自動套用 -->
-    <script src="js/critical-update.js?v=3.48.1"></script>
-    <script src="js/clock-settings-toggle.js?v=3.48.1"></script>
-    <script src="js/admin-console.js?v=3.48.1"></script>
+    <script src="js/critical-update.js?v=3.49.0"></script>
+    <script src="js/clock-settings-toggle.js?v=3.49.0"></script>
+    <script src="js/admin-console.js?v=3.49.0"></script>
 
     <!-- ===== 一鍵更新浮動按鈕 ===== -->
     <style>
@@ -4727,60 +4727,60 @@
     </button>
 
     <!-- 離線狀態偵測（P12：斷網時頂部 Banner 提示） -->
-    <script src="./js/offline-detector.js?v=3.48.1"></script>
+    <script src="./js/offline-detector.js?v=3.49.0"></script>
     <!-- 自動定時同步（P11：每 10 分鐘自動上傳至 Firebase） -->
-    <script src="./js/auto-sync.js?v=3.48.1"></script>
+    <script src="./js/auto-sync.js?v=3.49.0"></script>
 
     <!-- 手勢操作支援（觸控滑動切換功能區 | 長按快捷選單） -->
-    <script src="./js/gesture-handler.js?v=3.48.1"></script>
+    <script src="./js/gesture-handler.js?v=3.49.0"></script>
 
     <!-- 🧧 十二生肖・開運拉霸機 + 開運籤（開學破冰遊戲） -->
-    <script src="./js/zodiac-slot.js?v=3.48.1"></script>
+    <script src="./js/zodiac-slot.js?v=3.49.0"></script>
 
     <!-- 🛟 資料保險把關（清除前強制備份 + 儲存空間預警） -->
-    <script src="./js/data-safety-guard.js?v=3.48.1"></script>
+    <script src="./js/data-safety-guard.js?v=3.49.0"></script>
 
     <!-- 🎨 班級經營白板（公告白板 + 班級秩序 + 號碼抽籤） -->
-    <script src="./js/class-board.js?v=3.48.1"></script>
+    <script src="./js/class-board.js?v=3.49.0"></script>
 
     <!-- 🦷 潔牙勾選表 -->
-    <script src="./js/brush-check.js?v=3.48.1"></script>
+    <script src="./js/brush-check.js?v=3.49.0"></script>
 
     <!-- ✍️ 成績單評語生成器 -->
-    <script src="./js/comment-gen.js?v=3.48.1"></script>
+    <script src="./js/comment-gen.js?v=3.49.0"></script>
 
     <!-- 💬 生動對話小學堂（國語寫作互動教學） -->
-    <script src="./js/dialogue-school.js?v=3.48.1"></script>
+    <script src="./js/dialogue-school.js?v=3.49.0"></script>
 
     <!-- 學期封存模組（Q01：一鍵封存學期資料至 Firebase archives/） -->
-    <script src="./js/semester-archive.js?v=3.48.1"></script>
+    <script src="./js/semester-archive.js?v=3.49.0"></script>
 
     <!-- 多班級管理模組（在 google-auth-ui.js 之前載入，確保 nav slot 就緒） -->
-    <script src="./js/class-profiles.js?v=3.48.1"></script>
+    <script src="./js/class-profiles.js?v=3.49.0"></script>
     <!-- v3.1.0：Ctrl+K 班級快速切換器 -->
-    <script src="./js/class-quick-switcher.js?v=3.48.1"></script>
+    <script src="./js/class-quick-switcher.js?v=3.49.0"></script>
 
 
     <!-- Google 帳號登入 UI 模組（必須在所有 Firebase 模組之後載入） -->
-    <script src="./js/google-auth-ui.js?v=3.48.1"></script>
+    <script src="./js/google-auth-ui.js?v=3.49.0"></script>
 
     <!-- v3.1.0：同步狀態常駐指示器（位於一鍵更新按鈕左側） -->
-    <script src="./js/sync-status-indicator.js?v=3.48.1"></script>
+    <script src="./js/sync-status-indicator.js?v=3.49.0"></script>
 
     <!-- 離開前同步提醒：有未上傳成果時攔截瀏覽器關閉並提供立即同步入口 -->
-    <script src="./js/leave-sync-guard.js?v=3.48.1"></script>
+    <script src="./js/leave-sync-guard.js?v=3.49.0"></script>
 
     <!-- v3.44.0：自動快轉——沒有未同步變更的裝置自動跟上雲端新版，換裝置不再撞同步衝突 -->
-    <script src="./js/cloud-fast-forward.js?v=3.48.1"></script>
+    <script src="./js/cloud-fast-forward.js?v=3.49.0"></script>
 
     <!-- v3.12.1：版本與健康狀態面板（點版本徽章開啟，R-C1/R-C2） -->
-    <script src="./js/health-panel.js?v=3.48.1"></script>
+    <script src="./js/health-panel.js?v=3.49.0"></script>
 
-    <script src="./js/classroom-ux.js?v=3.48.1"></script>
-    <link rel="stylesheet" href="css/class-pets.css?v=3.48.1">
+    <script src="./js/classroom-ux.js?v=3.49.0"></script>
+    <link rel="stylesheet" href="css/class-pets.css?v=3.49.0">
     <!-- v3.43.0：寵物分享（須在 class-pets.js 之前載入，首次繪製就能帶出分享面板） -->
-    <script src="js/pet-share.js?v=3.48.1"></script>
-    <script src="js/class-pets.js?v=3.48.1"></script>
+    <script src="js/pet-share.js?v=3.49.0"></script>
+    <script src="js/class-pets.js?v=3.49.0"></script>
 </body>
 
 </html>
