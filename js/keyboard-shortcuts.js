@@ -404,7 +404,8 @@
      */
     function handleKeyDown(e) {
         // 忽略在輸入框內的按鍵
-        if (e.target.matches('input, textarea, select, [contenteditable]')) {
+        const target = e.target && typeof e.target.matches === 'function' ? e.target : null;
+        if (target && target.matches('input, textarea, select, [contenteditable]')) {
             // 只處理 Escape
             if (e.key === 'Escape') {
                 closeAllModals();
@@ -420,6 +421,11 @@
         // 取得按鍵
         let key = e.key;
         if (key === ' ') key = 'Space';
+
+        // 焦點在按鈕／連結上時，空白鍵是「按下這個按鈕」，不要同時開始計時器
+        if (key === 'Space' && target && target.closest('button, a[href], summary, [role="button"], [role="radio"]')) {
+            return;
+        }
 
         // 檢查是否有對應的快捷鍵
         const shortcut = SHORTCUTS[key];
