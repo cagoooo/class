@@ -1,3 +1,8 @@
+## 2026-10-06 作業檢查誤判「沒有學生」修正 v3.46.3
+
+- 作業總覽儀表板與全螢幕檢查，原本用 `AppState.students`（舊的空陣列）判斷有沒有學生，班級明明有名單仍跳出「請先在學生管理中新增學生資料」。
+- 新增 `getRoster()`：優先讀真實名單 `window.students`，再依序退回全域變數、`AppState`、localStorage；全模組（網格、統計、儀表板、表格）統一使用。
+
 ## 2026-10-05 Safari Firestore 錯誤來源辨識 v3.46.2
 
 - Safari 的 Promise 堆疊使用 `函式@網址` 格式；舊版只解析 Chrome 的 `at …`，導致 Firestore 內部狀態訊息沒有被認出來源，仍送出一般系統錯誤 Webhook。

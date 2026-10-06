@@ -15,6 +15,25 @@
         late: { color: 'bg-yellow-100 border-yellow-500', text: 'text-yellow-700', label: '遲交', icon: '⚠️' }
     };
 
+
+    // 取得目前班級的學生名單：真實名單在 window.students（切換班級／雲端還原時會被換掉），
+    // AppState.students 是舊的空陣列，不能拿來判斷
+    function getRoster() {
+        const candidates = [
+            window.students,
+            (typeof students !== 'undefined') ? students : null,
+            (typeof AppState !== 'undefined') ? AppState.students : null
+        ];
+        for (const c of candidates) {
+            if (Array.isArray(c) && c.length > 0) return c;
+        }
+        try {
+            const raw = JSON.parse(localStorage.getItem('students') || '[]');
+            if (Array.isArray(raw)) return raw;
+        } catch (e) { /* ignore */ }
+        return [];
+    }
+
     let currentFilter = 'all';
     let isFromDashboard = false;
     let dashboardView = localStorage.getItem('homeworkDashboardView') || 'cards'; // 'cards' or 'table'
@@ -963,7 +982,7 @@
         }
 
         // 檢查是否有學生資料
-        const studentList = (typeof AppState !== 'undefined' && AppState.students) ? AppState.students : (typeof students !== 'undefined' ? students : []);
+        const studentList = getRoster();
         if (!Array.isArray(studentList) || studentList.length === 0) {
             const msg = '請先在學生管理中新增學生資料，才能使用全螢幕檢查功能';
             if (typeof NotificationSystem !== 'undefined') {
@@ -998,7 +1017,7 @@
 
         // === 骨架屏：先在學生網格插入骨架屏，再渲染真實資料 ===
         if (typeof SkeletonManager !== 'undefined') {
-            const studentList = (typeof AppState !== 'undefined' && AppState.students) ? AppState.students : (typeof students !== 'undefined' ? students : []);
+            const studentList = getRoster();
             const count = Math.min(Math.max(studentList.length, 4), 12);
             SkeletonManager.show('homeworkStudentGrid', 'student', count);
         }
@@ -1076,7 +1095,7 @@
         if (!container) return;
 
         // 檢查資料
-        if (typeof students === 'undefined' || !Array.isArray(students) || students.length === 0) {
+        if (getRoster().length === 0) {
             container.innerHTML = `<div class="col-span-full text-center text-gray-500 py-12">
                 <div class="text-4xl mb-4">👥</div>
                 <div>目前尚無學生資料</div>
@@ -1090,7 +1109,7 @@
             ? homeworkChecks[homeworkId] : {};
 
         // 排序學生
-        const sortedStudents = [...students].sort((a, b) => (a.number || 999) - (b.number || 999));
+        const sortedStudents = [...getRoster()].sort((a, b) => (a.number || 999) - (b.number || 999));
 
         // 篩選學生
         const filteredStudents = sortedStudents.filter(student => {
@@ -1149,12 +1168,12 @@
     // === 全部設定狀態 ===
     window.setAllHomeworkStatus = function (status) {
         const homeworkId = document.getElementById('checkHomework').value;
-        if (!homeworkId || typeof students === 'undefined' || typeof homeworkChecks === 'undefined') return;
+        if (!homeworkId || typeof homeworkChecks === 'undefined') return;
 
         if (!homeworkChecks[homeworkId]) homeworkChecks[homeworkId] = {};
 
         const prevChecks = Object.assign({}, homeworkChecks[homeworkId]);
-        students.forEach(student => {
+        getRoster().forEach(student => {
             if (status === 'unchecked') {
                 delete homeworkChecks[homeworkId][student.id];
             } else {
@@ -1179,14 +1198,14 @@
     // === 更新統計 ===
     function updateFullscreenStats() {
         const container = document.getElementById('homeworkFullscreenStats');
-        if (!container || typeof students === 'undefined') return;
+        if (!container) return;
 
         const homeworkId = document.getElementById('checkHomework').value;
         const checks = (typeof homeworkChecks !== 'undefined' && homeworkChecks[homeworkId])
             ? homeworkChecks[homeworkId] : {};
 
         const stats = {
-            total: students.length,
+            total: getRoster().length,
             completed: 0,
             incomplete: 0,
             needs_correction: 0,
@@ -1194,7 +1213,7 @@
             unchecked: 0
         };
 
-        students.forEach(student => {
+        getRoster().forEach(student => {
             const status = checks[student.id] || 'unchecked';
             stats[status]++;
         });
@@ -1301,7 +1320,7 @@
     // === 開啟儀表板 ===
     window.openHomeworkDashboard = function () {
         // 檢查是否有學生資料，若無則提示
-        const studentList = (typeof AppState !== 'undefined' && AppState.students) ? AppState.students : (typeof students !== 'undefined' ? students : []);
+        const studentList = getRoster();
         if (!Array.isArray(studentList) || studentList.length === 0) {
             const msg = '請先在學生管理中新增學生資料，才能使用儀表板功能';
             if (typeof NotificationSystem !== 'undefined') {
@@ -1369,7 +1388,7 @@
         if (!container) return;
 
         const homeworks = (typeof homeworkList !== 'undefined') ? homeworkList : [];
-        const studentList = (typeof students !== 'undefined') ? [...students].sort((a, b) => (a.number || 999) - (b.number || 999)) : [];
+        const studentList = [...getRoster()].sort((a, b) => (a.number || 999) - (b.number || 999));
         const checks = (typeof homeworkChecks !== 'undefined') ? homeworkChecks : {};
 
         if (homeworks.length === 0) {
@@ -1498,7 +1517,7 @@
             return;
         }
 
-        const studentList = (typeof students !== 'undefined') ? students : [];
+        const studentList = getRoster();
         const checks = (typeof homeworkChecks !== 'undefined') ? homeworkChecks : {};
 
         let csvContent = '\uFEFF'; // BOM for UTF-8
@@ -1551,7 +1570,7 @@
         if (!container) return;
 
         const homeworks = (typeof homeworkList !== 'undefined') ? homeworkList : [];
-        const studentList = (typeof students !== 'undefined' && Array.isArray(students)) ? students : [];
+        const studentList = getRoster();
         const checks = (typeof homeworkChecks !== 'undefined') ? homeworkChecks : {};
 
         // 更新數量顯示
@@ -1611,7 +1630,7 @@
         if (!container) return;
 
         const homeworks = (typeof homeworkList !== 'undefined') ? homeworkList : [];
-        const studentList = (typeof students !== 'undefined') ? students : [];
+        const studentList = getRoster();
         const checks = (typeof homeworkChecks !== 'undefined') ? homeworkChecks : {};
 
         if (homeworks.length === 0) {
