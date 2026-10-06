@@ -35,6 +35,7 @@ const {
   isSyncConflictEvent,
   summarizeEvents,
 } = require('./digest-summary');
+const { dumpTree, buildDump, verifyDump } = require('./purge-backup');
 
 admin.initializeApp();
 
@@ -1060,9 +1061,11 @@ exports.getAdminStats = onCall(
 
 // 一個班級底下會有的資料子集合。明細統計與清理備份都走這份清單，
 // 兩邊共用才不會出現「明細說有 3 筆、備份卻少一種」的落差。
+// 名稱要和前端實際寫入的一致（js/firebase-sync.js 的 COLLECTIONS）：聯絡簿是 notebooks、公告是 classAnnouncements。
+// 清理前的備份不再用這份名單，而是 purge-backup.js 依實際存在的子集合整棵讀下來。
 const RECORD_COLLECTIONS = [
-  'students', 'pointsHistory', 'groups', 'notebookEntries', 'homeworks',
-  'homeworkChecks', 'lotteryHistory', 'announcements', 'examData',
+  'students', 'pointsHistory', 'groups', 'notebooks', 'homeworks',
+  'homeworkChecks', 'lotteryHistory', 'classAnnouncements', 'examData',
   'appSettings', 'archives',
 ];
 
@@ -1645,31 +1648,38 @@ exports.purgeDeletedClassLeftovers = onCall(
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
 
     const results = [];
+    // 函式最長 300 秒：留 60 秒給最後一個班的刪除與回應。時間不夠就不開始下一個班，
+    // 回報 deferred 讓管理員再按一次，不要在備份或刪除做到一半時被系統中止。
+    const startedAt = Date.now();
+    const BUDGET_MS = 240000;
     for (const classId of targets) {
+      if (Date.now() - startedAt > BUDGET_MS) { results.push({ classId, status: 'deferred', error: '這次時間不夠，未處理' }); continue; }
       const classRef = userRef.collection('classes').doc(classId);
 
       // Snapshot parts are nested. Never recursively purge with the legacy flat backup.
       const snapshots = await classRef.collection('syncSnapshots').listDocuments();
       if (snapshots.length) { results.push({ classId, status: 'fail', error: '此班含完整版本備份，已保護並停止舊版清理流程' }); continue; }
 
-      // ── 安全機制 3：先備份 ──
-      const dump = { uid: targetUid, classId, purgedAt: new Date().toISOString(), purgedBy: adminEmail, data: {} };
+      // ── 安全機制 3：先備份（整棵子集合樹，任意深度），讀回核對無誤才刪 ──
+      // recursiveDelete 會刪掉所有層；備份也必須涵蓋所有層，否則沒備到的永遠救不回來。
       let docCount = 0;
+      let backupPath = '';
       try {
         const marker = await classRef.get();
-        dump.marker = marker.exists ? marker.data() : null;
-        for (const name of RECORD_COLLECTIONS) {
-          const snap = await classRef.collection(name).get();
-          if (snap.empty) continue;
-          dump.data[name] = snap.docs.map((d) => ({ id: d.id, data: d.data() }));
-          docCount += snap.size;
-        }
-        const path = `deleted_leftovers/${targetUid}/${classId}-${stamp}.json`;
-        await bucket.file(path).save(JSON.stringify(dump, null, 2), {
-          contentType: 'application/json; charset=utf-8',
+        const docs = await dumpTree(classRef);
+        docCount = docs.length;
+        const dump = buildDump({
+          uid: targetUid, classId, classPath: classRef.path,
+          marker: marker.exists ? marker.data() : null,
+          docs, purgedBy: adminEmail, at: new Date().toISOString(),
         });
-        dump.backupPath = `gs://${bucketName}/${path}`;
-        logger.info(`[Purge] 已備份 ${classId}（${docCount} 筆）→ ${dump.backupPath}`);
+        const path = `deleted_leftovers/${targetUid}/${classId}-${stamp}.json`;
+        const file = bucket.file(path);
+        await file.save(JSON.stringify(dump), { contentType: 'application/json; charset=utf-8' });
+        const [saved] = await file.download();
+        verifyDump(saved.toString('utf8'), docs);
+        backupPath = `gs://${bucketName}/${path}`;
+        logger.info(`[Purge] 已備份並核對 ${classId}（${docCount} 筆，含所有子集合）→ ${backupPath}`, { counts: dump.counts });
       } catch (err) {
         // 備份失敗就不刪。寧可留著殘留，也不要刪了救不回來。
         logger.error(`[Purge] 備份 ${classId} 失敗，跳過刪除`, err);
@@ -1681,7 +1691,7 @@ exports.purgeDeletedClassLeftovers = onCall(
       try {
         await db.recursiveDelete(classRef);
         logger.info(`[Purge] ${adminEmail} 已清理 ${targetUid}/${classId}（${docCount} 筆文件）`);
-        results.push({ classId, status: 'purged', docCount, backupPath: dump.backupPath });
+        results.push({ classId, status: 'purged', docCount, backupPath });
       } catch (err) {
         logger.error(`[Purge] 刪除 ${classId} 失敗`, err);
         results.push({ classId, status: 'delete-failed', error: String(err && err.message || err) });

@@ -1102,21 +1102,28 @@
         const btn = modal.querySelector('#purge-confirm-btn');
         if (btn) { btn.disabled = true; btn.textContent = '清理中…'; }
         try {
-            const fn = firebase.app().functions('asia-east1').httpsCallable('purgeDeletedClassLeftovers');
+            // 伺服器最長跑 300 秒（整棵備份＋讀回核對＋刪除）；前端預設 70 秒就放棄，會誤報失敗
+            const fn = firebase.app().functions('asia-east1').httpsCallable('purgeDeletedClassLeftovers', { timeout: 300000 });
             const resp = await fn({ uid: uid, classIds: classIds });
             const r = (resp && resp.data) || {};
             if (!r.ok) throw new Error(r.reason || '回傳異常');
 
+            // 每個班的結果都要讓管理員看到：被保護、備份失敗、刪除失敗、留到下一次都不是「已清理」
+            const STATUS = { fail: '已保護未刪', 'backup-failed': '備份失敗未刪', 'delete-failed': '刪除失敗', deferred: '時間不夠，請再按一次' };
+            const problems = (r.results || []).filter(function (x) { return x.status !== 'purged'; });
+            const parts = [];
+            if (r.purged > 0) parts.push('已清理「' + teacherName + '」的 ' + r.purged + ' 個殘留班級（共 ' + r.docCount + ' 筆文件），刪除前已完整備份並核對。');
+            if ((r.rejected || []).length) parts.push('有 ' + r.rejected.length + ' 筆因不符合殘留條件被擋下。');
+            problems.forEach(function (x) { parts.push(x.classId + '：' + (STATUS[x.status] || x.status) + (x.error ? '（' + x.error + '）' : '')); });
             if (typeof NotificationSystem !== 'undefined') {
-                let msg = '已清理「' + teacherName + '」的 ' + r.purged + ' 個殘留班級（共 '
-                    + r.docCount + ' 筆文件），刪除前已備份。';
-                if ((r.rejected || []).length) {
-                    msg += ' 有 ' + r.rejected.length + ' 筆因不符合殘留條件被擋下。';
-                }
-                NotificationSystem.success(msg);
+                const msg = parts.join(' ') || '沒有清理任何班級。';
+                if (!problems.length && r.purged > 0) NotificationSystem.success(msg);
+                else if (r.purged > 0) NotificationSystem.warning(msg);
+                else NotificationSystem.error(msg);
             }
-            modal.classList.remove('open');
             loadStats();
+            if (r.purged > 0 && !problems.length) modal.classList.remove('open');
+            else if (btn) { btn.disabled = false; btn.textContent = '永久刪除勾選的殘留'; }
         } catch (e) {
             console.error('[AdminConsole] 清理失敗:', e);
             if (typeof NotificationSystem !== 'undefined') {
