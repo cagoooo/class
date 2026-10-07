@@ -217,6 +217,21 @@ function backupLine(backup) {
   return `🗄️ 備份失敗 ⚠️ ${clip(backup.error, 60)}`;
 }
 
+/** 舊快照清理一行；排程在 dailyUsageDigest 之前（05:30），所以當晚一定有今天的紀錄。 */
+function pruneLine(prune) {
+  if (!prune || !prune.day) return '🧹 舊快照清理：今日尚無紀錄 ⚠️';
+  if (prune.status === 'skipped') return '🧹 舊快照清理：今日備份未成功，已暫停清理（資料未動）⚠️';
+  if (prune.status === 'failed') return `🧹 舊快照清理失敗 ⚠️ ${clip(prune.error, 60)}`;
+  const skippedClasses = Object.values(prune.skipped || {}).reduce((n, c) => n + safeInteger(c), 0);
+  const notes = [
+    prune.deferredSnapshots && `另有 ${prune.deferredSnapshots} 份明天繼續`,
+    skippedClasses && `${skippedClasses} 班版本資訊不完整，未動`,
+    prune.failedParts && `${prune.failedParts} 個分段刪除失敗`,
+  ].filter(Boolean);
+  const mark = prune.status === 'ok' && !skippedClasses ? '✅' : '⚠️';
+  return `🧹 清理一週前舊快照 ${safeInteger(prune.removedSnapshots)} 份${notes.length ? `（${notes.join('；')}）` : ''} ${mark}`;
+}
+
 function signed(value) {
   const number = safeInteger(value);
   return number > 0 ? `+${number}` : String(number);
@@ -230,7 +245,7 @@ function settingsSummary(settingsByAction) {
     .join('、');
 }
 
-function buildDigestPayload(day, dateLabel, sum, backup) {
+function buildDigestPayload(day, dateLabel, sum, backup, prune) {
   const conflict = sum.syncConflicts || { total: 0, cloudDivergence: 0, legacyBaselineDifference: 0, sourceUnverified: 0 };
   const overviewLines = [`👥 當日有事件帳號 ${sum.activeTeachers} 個`];
   if (sum.newTeachers.length) {
@@ -320,6 +335,8 @@ function buildDigestPayload(day, dateLabel, sum, backup) {
       : '🐞 錯誤 0 則，一切正常 ✅',
     backupLine(backup),
   ];
+  // 沒傳 prune（舊呼叫端）就不顯示；排程傳 null 代表今天沒紀錄，要顯示警告
+  if (prune !== undefined) healthLines.push(pruneLine(prune));
   sections.push({
     header: '🐞 系統健康',
     widgets: [{ decoratedText: { topLabel: '今日狀態', text: healthLines.join('\n'), wrapText: true } }],
@@ -354,6 +371,7 @@ function buildDigestPayload(day, dateLabel, sum, backup) {
 module.exports = {
   backupLine,
   buildDigestPayload,
+  pruneLine,
   canonicalFeatureLabel,
   canonicalizeFeatureStats,
   isRecoverableOfflineSync,

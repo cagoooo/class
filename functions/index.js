@@ -36,6 +36,7 @@ const {
   summarizeEvents,
 } = require('./digest-summary');
 const { dumpTree, buildDump, verifyDump } = require('./purge-backup');
+const { KEEP_DAYS, groupSnapshotParts, planClassPrune } = require('./snapshot-prune');
 
 admin.initializeApp();
 
@@ -738,13 +739,24 @@ exports.dailyUsageDigest = onSchedule(
       logger.warn('[Digest] 讀取備份狀態失敗', e);
     }
 
+    // 舊快照清理狀態：同樣只認今天的紀錄
+    let prune = null;
+    try {
+      const ps = await admin.firestore()
+        .collection(SNAPSHOT_PRUNE_STATUS_PATH.col).doc(SNAPSHOT_PRUNE_STATUS_PATH.doc).get();
+      const pd = ps.exists ? ps.data() : null;
+      if (pd && pd.day === day) prune = pd;
+    } catch (e) {
+      logger.warn('[Digest] 讀取舊快照清理狀態失敗', e);
+    }
+
     const events = snap.docs.map((doc) => ({ ...(doc.data() || {}), _documentId: doc.id }));
     const sum = summarizeEvents(events);
     const dateLabel = new Date().toLocaleDateString('zh-TW', {
       timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit', weekday: 'short',
     });
 
-    const ok = await postToChat(webhook, buildDigestPayload(day, dateLabel, sum, backup));
+    const ok = await postToChat(webhook, buildDigestPayload(day, dateLabel, sum, backup, prune));
     logger.info(`[Digest] ${day} 戰報${ok ? '已送出' : '送出失敗'}`, {
       events: snap.size, activeTeachers: sum.activeTeachers, errors: sum.errors.length,
     });
@@ -900,6 +912,122 @@ exports.scheduledFirestoreExport = onSchedule(
     }
   }
 );
+
+// 舊快照清理狀態：每日清理寫入、每日戰報讀出。
+const SNAPSHOT_PRUNE_STATUS_PATH = { col: '_systemStatus', doc: 'lastSnapshotPrune' };
+// 單次刪除上限（分段數）：久未執行累積太多時分幾天消化，不在一次排程裡跑到逾時。
+const MAX_PRUNE_PARTS_PER_RUN = 5000;
+
+/**
+ * 🧹 同步快照定期清理 (pruneSyncSnapshots)：每天 05:30（台北）刪掉「被新版取代超過一週」的舊快照。
+ *
+ * 每次上傳都會多一份完整快照、舊的從不刪，資料庫與每日備份因此天天長大
+ * （2026-09-22 備份 9.5 MB → 10-07 155 MB）。保留規則見 snapshot-prune.js：
+ * 目前版本與上一版本永遠保留，版本資訊不完整的班級整班跳過。
+ *
+ * ⚠️ 安全閘：當天 04:00 的備份必須成功才清，否則整天不動。排在備份之後，
+ *    所以今天刪掉的快照，今天清晨的備份裡一定有（備份桶保留 30 天）。
+ */
+exports.pruneSyncSnapshots = onSchedule(
+  {
+    schedule: 'every day 05:30',
+    timeZone: 'Asia/Taipei',
+    region: REGION,
+    secrets: [GOOGLE_CHAT_WEBHOOK],
+    timeoutSeconds: 540,
+    memory: '512MiB',
+  },
+  async () => {
+    const db = admin.firestore();
+    const day = taipeiDay();
+    const startedAt = new Date().toISOString();
+    const statusRef = db.collection(SNAPSHOT_PRUNE_STATUS_PATH.col).doc(SNAPSHOT_PRUNE_STATUS_PATH.doc);
+    const webhook = (GOOGLE_CHAT_WEBHOOK.value() || '').trim();
+
+    try {
+      const bs = await db.collection(BACKUP_STATUS_PATH.col).doc(BACKUP_STATUS_PATH.doc).get();
+      const backup = bs.exists ? bs.data() : null;
+      if (!backup || backup.day !== day || backup.status !== 'ok') {
+        logger.warn(`[Prune] ${day} 今日備份未成功，略過清理`, { backupDay: backup && backup.day, backupStatus: backup && backup.status });
+        await statusRef.set({
+          day, startedAt, finishedAt: new Date().toISOString(), status: 'skipped',
+          reason: 'backup-not-ok', expireAt: expiryTimestamp(),
+        });
+        return;
+      }
+
+      // 只取 index 欄位：要的是路徑與建立時間，不必把每份約 60KB 的內容讀回來。
+      // 學期封存的 archives/{key}/parts 也會被查到，groupSnapshotParts 會把它們排除。
+      const partsSnap = await db.collectionGroup('parts').select('index').get();
+      const roots = groupSnapshotParts(partsSnap.docs.map((d) => ({ path: d.ref.path, createMs: d.createTime.toMillis() })));
+
+      const nowMs = Date.now();
+      const plans = [];
+      const rootList = [...roots.keys()];
+      for (let i = 0; i < rootList.length; i += 20) {
+        await Promise.all(rootList.slice(i, i + 20).map(async (root) => {
+          const head = await db.doc(`${root}/appSettings/syncRevision`).get();
+          const snapshots = [...roots.get(root).values()];
+          plans.push({ snapshots, plan: planClassPrune({ snapshots, head: head.exists ? head.data() : null, nowMs }) });
+        }));
+      }
+
+      // 一份快照的分段要嘛全部排入、要嘛整份留到明天，不會只刪一半
+      const skipped = {};
+      const removePaths = [];
+      let removedSnapshots = 0, keptSnapshots = 0, deferredSnapshots = 0;
+      for (const { snapshots, plan } of plans) {
+        if (plan.action === 'skip') {
+          skipped[plan.reason] = (skipped[plan.reason] || 0) + 1;
+          keptSnapshots += snapshots.length;
+          continue;
+        }
+        keptSnapshots += plan.keep.length;
+        const byToken = new Map(snapshots.map((s) => [s.token, s]));
+        for (const token of plan.remove) {
+          const { paths } = byToken.get(token);
+          if (removePaths.length + paths.length > MAX_PRUNE_PARTS_PER_RUN) { deferredSnapshots++; continue; }
+          removePaths.push(...paths);
+          removedSnapshots++;
+        }
+      }
+
+      let failedParts = 0;
+      const writer = db.bulkWriter();
+      const deletes = removePaths.map((path) => writer.delete(db.doc(path)).catch((e) => {
+        failedParts++;
+        logger.warn('[Prune] 分段刪除失敗', { path, error: String((e && e.message) || e) });
+      }));
+      await writer.close();
+      await Promise.all(deletes);
+
+      const result = {
+        day, startedAt, finishedAt: new Date().toISOString(),
+        status: failedParts ? 'partial' : 'ok',
+        keepDays: KEEP_DAYS, classes: roots.size,
+        removedSnapshots, removedParts: removePaths.length - failedParts,
+        keptSnapshots, deferredSnapshots, failedParts, skipped,
+        expireAt: expiryTimestamp(),
+      };
+      await statusRef.set(result);
+      logger.info(`[Prune] ${day} 清理 ${removedSnapshots} 份舊快照（${result.removedParts} 個分段），保留 ${keptSnapshots} 份`, { deferredSnapshots, failedParts, skipped });
+    } catch (error) {
+      const msg = String((error && error.message) || error);
+      logger.error('[Prune] 舊快照清理失敗', error);
+      await statusRef.set({
+        day, startedAt, finishedAt: new Date().toISOString(), status: 'failed',
+        error: msg.slice(0, 300), expireAt: expiryTimestamp(),
+      }).catch(() => {});
+      await pushSystemAlert(webhook, '舊快照清理失敗', [
+        `日期：${day}`,
+        `錯誤：${msg.slice(0, 200)}`,
+        '各班目前版本不在清理範圍內；請檢查 Cloud Functions log。',
+      ]);
+      // 同每日備份：不 throw，避免排程重試連發警報。
+    }
+  }
+);
+
 /**
  * 維運小後台 API (R-D1)：列出所有教師的統計數據（班級數、最後同步時間、孤兒資料）。
  *
