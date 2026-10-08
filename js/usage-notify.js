@@ -209,8 +209,12 @@
         try { localStorage.setItem(QKEY, JSON.stringify(q.slice(-MAX_QUEUE))); } catch (e) { /* ignore */ }
     }
 
+    // 來源系統標記：剛好學與本站同網域、共用同一個佇列鍵與同一支 notifyUsage，
+    // 排隊時就寫進事件本身，不論最後由哪一站送出，後端都能標對來源。
+    var APP = 'class';
+
     function enqueue(type, data) {
-        var ev = Object.assign({ type: type, ts: new Date().toISOString() }, data || {});
+        var ev = Object.assign({ type: type, ts: new Date().toISOString(), app: APP }, data || {});
         ev._id = Date.now() + '-' + Math.random().toString(36).slice(2, 8);
         var q = loadQ();
         q.push(ev);
@@ -222,7 +226,7 @@
     // 用於「當日累計值」這種後蓋前的事件（功能統計），避免離線時佇列
     // 塞滿同一天的十幾份中途快照。
     function enqueueReplace(type, data, dedupeKey) {
-        var ev = Object.assign({ type: type, ts: new Date().toISOString() }, data || {});
+        var ev = Object.assign({ type: type, ts: new Date().toISOString(), app: APP }, data || {});
         ev._id = Date.now() + '-' + Math.random().toString(36).slice(2, 8);
         ev._dedupe = dedupeKey;
         var q = loadQ().filter(function (x) { return x._dedupe !== dedupeKey; });

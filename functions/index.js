@@ -28,12 +28,15 @@ const {
   petEventSummary,
 } = require('./pet-notification');
 const {
+  appLabel,
   buildDigestPayload,
   canonicalizeFeatureStats,
   isExpectedSyncWait,
   isRecoverableOfflineSync,
   isSyncConflictEvent,
+  resolveSourceApp,
   summarizeEvents,
+  withSourceApp,
 } = require('./digest-summary');
 const { dumpTree, buildDump, verifyDump } = require('./purge-backup');
 const { KEEP_DAYS, groupSnapshotParts, planClassPrune } = require('./snapshot-prune');
@@ -460,6 +463,8 @@ async function logUsageEvent(eventType, data, who, uid) {
 
     const doc = {
       type: eventType,
+      // 來源系統（班級小管家／剛好學）：戰報分開計、後台錯誤清單可辨識
+      app: resolveSourceApp({ ...data, type: eventType }),
       day,
       uid: uid || '',
       email: who.email || '',
@@ -657,7 +662,9 @@ exports.notifyUsage = onCall(
       return { ok: true, logged: quota.log, pushed: false, reason: 'no-webhook' };
     }
 
-    const pushed = await postToChat(webhook, buildCard(eventType, data, who));
+    // 標上來源系統：剛好學也共用這支函式，不標的話一律看起來像班級小管家
+    const app = resolveSourceApp({ ...data, type: eventType });
+    const pushed = await postToChat(webhook, withSourceApp(buildCard(eventType, data, who), app));
     return { ok: true, logged: quota.log, pushed };
   }
 );
@@ -1634,10 +1641,11 @@ exports.getUsageAnalytics = onCall(
         if (d.type === 'error' && !isSyncConflictEvent(d) && !isExpectedSyncWait(d) && !isRecoverableOfflineSync(d)) {
           const msg = clip(d.message, 200) || '(無訊息)';
           if (!errorMap[msg]) {
-            errorMap[msg] = { message: msg, count: 0, uids: {}, contexts: {}, devices: {}, urls: {}, lastTs: '', firstDay: day };
+            errorMap[msg] = { message: msg, count: 0, uids: {}, contexts: {}, devices: {}, urls: {}, apps: {}, lastTs: '', firstDay: day };
           }
           const g = errorMap[msg];
           g.count++;
+          g.apps[appLabel(resolveSourceApp(d))] = true;
           if (d.uid) g.uids[d.uid] = d.name || d.email || d.uid;
           if (d.context) g.contexts[clip(d.context, 80)] = true;
           if (d.ua) g.devices[deviceLabel(d.ua)] = true;
@@ -1658,6 +1666,7 @@ exports.getUsageAnalytics = onCall(
           contexts: Object.keys(g.contexts).slice(0, 3),
           devices: Object.keys(g.devices).slice(0, 3),
           urls: Object.keys(g.urls).slice(0, 2),
+          apps: Object.keys(g.apps),
           lastTs: g.lastTs,
           firstDay: g.firstDay,
         };

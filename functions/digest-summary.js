@@ -8,6 +8,50 @@ function clip(value, length) {
   return String(value == null ? '' : value).slice(0, length);
 }
 
+// ─────────────────────────────────────────────────────────────
+// 🏷️ 事件來源系統
+//
+// notifyUsage 不只班級小管家在用：同一個 Firebase 專案也是「剛好學」(cagoooo/Akailao)
+// 的後端，它的錯誤、登入也走這支函式，過去全部被標成「班級小管家」，害人以為是
+// 班級小管家壞了（2026-10-08）。兩站都在 cagoooo.github.io 底下、共用同一個
+// localStorage 佇列鍵，A 站排隊的事件可能由 B 站送出，所以來源只能看事件本身，
+// 不能看是哪個頁面送的。
+// ─────────────────────────────────────────────────────────────
+const APP_LABELS = { class: '班級小管家', akailao: '剛好學' };
+// 只有剛好學會送的事件型別
+const AKAILAO_ONLY_TYPES = new Set(['create', 'feature', 'ai_api', 'class_end']);
+
+/**
+ * 判斷事件來自哪個系統。新版前端會帶 app；舊版（快取中的頁面）沒帶時看欄位特徵：
+ * 剛好學的事件帶 role／classroom，錯誤不附網址；班級小管家的錯誤一定附 url。
+ */
+function resolveSourceApp(event) {
+  if (!event || typeof event !== 'object') return 'class';
+  const app = String(event.app || '').trim().toLowerCase();
+  if (Object.hasOwn(APP_LABELS, app)) return app;
+  if (Object.hasOwn(event, 'role') || Object.hasOwn(event, 'classroom')) return 'akailao';
+  if (AKAILAO_ONLY_TYPES.has(event.type)) return 'akailao';
+  // 剛好學的錯誤只有 message／context；班級小管家的錯誤附網址，寵物、同步錯誤還帶班級與操作欄位
+  if (event.type === 'error' && !event.url && !event.feature && !event.operation
+    && !event.failureStage && !event.classId) return 'akailao';
+  return 'class';
+}
+
+function appLabel(app) {
+  return APP_LABELS[app] || APP_LABELS.class;
+}
+
+/** 在即時通知（純文字摘要＋卡片副標題）標上來源系統，手機預覽一眼就看得出是哪一站。 */
+function withSourceApp(payload, app, kind = '使用情形') {
+  const label = appLabel(app);
+  const out = { ...payload, text: `【${label}】${payload.text || ''}` };
+  out.cardsV2 = (payload.cardsV2 || []).map((entry) => ({
+    ...entry,
+    card: { ...entry.card, header: { ...(entry.card && entry.card.header), subtitle: `${label} · ${kind}` } },
+  }));
+  return out;
+}
+
 function canonicalFeatureLabel(value) {
   const label = clip(value, 40).trim();
   return /^pets$/i.test(label) ? '班級寵物' : label;
@@ -90,6 +134,8 @@ function summarizeEvents(events) {
     errors: 0,
   };
   let guestEvents = 0;
+  // 其他系統（剛好學）另外計，不混進班級小管家的帳號數、訪客數與錯誤數
+  const otherApps = {};
 
   function addSyncConflict(event) {
     const classId = String(event.classId || '');
@@ -111,6 +157,11 @@ function summarizeEvents(events) {
 
   (Array.isArray(events) ? events : []).forEach((d) => {
     if (!d || typeof d !== 'object') return;
+    const app = resolveSourceApp(d);
+    if (app !== 'class') {
+      (otherApps[app] = otherApps[app] || []).push(d);
+      return;
+    }
     if (d.uid) activeUids.add(d.uid);
     else if (d.type === 'session_start') guestEvents++;
 
@@ -204,7 +255,23 @@ function summarizeEvents(events) {
     syncUpgrades: { classes: upgradedClasses.size, teachers: upgradedTeachers.size },
     pet,
     hotFeatures,
+    apps: Object.fromEntries(Object.entries(otherApps).map(([app, list]) => [app, summarizeOtherApp(list)])),
   };
+}
+
+/** 其他系統只需要「有沒有人在用、有沒有出錯」：帳號數與錯誤清單。 */
+function summarizeOtherApp(events) {
+  const googleUids = new Set(), anonymousUids = new Set();
+  const errors = [];
+  let guestEvents = 0;
+  events.forEach((d) => {
+    if (d.uid) (d.anonymous ? anonymousUids : googleUids).add(d.uid);
+    else if (d.type === 'session_start') guestEvents++;
+    if (d.type === 'error' && !isExpectedSyncWait(d) && !isRecoverableOfflineSync(d)) {
+      errors.push({ message: d.message || '', context: d.context || '', who: d.name || d.email || '' });
+    }
+  });
+  return { events: events.length, accounts: googleUids.size, anonymous: anonymousUids.size, guestEvents, errors };
 }
 
 function backupLine(backup) {
@@ -318,6 +385,30 @@ function buildDigestPayload(day, dateLabel, sum, backup, prune) {
     });
   }
 
+  const akailao = sum.apps && sum.apps.akailao;
+  if (akailao && akailao.events) {
+    const people = [
+      `Google 帳號 ${akailao.accounts} 個`,
+      akailao.anonymous && `匿名 ${akailao.anonymous} 個`,
+      akailao.guestEvents && `未登入造訪 ${akailao.guestEvents} 次`,
+    ].filter(Boolean).join('、');
+    sections.push({
+      header: `🎓 ${APP_LABELS.akailao}（共用同一支通知，另外計算）`,
+      widgets: [{
+        decoratedText: {
+          topLabel: '今日狀態',
+          text: [
+            `👥 有事件帳號：${people}`,
+            akailao.errors.length
+              ? `🐞 錯誤 ${akailao.errors.length} 則：` + akailao.errors.slice(0, 3).map((error) => clip(error.message, 60)).join('；')
+              : '🐞 錯誤 0 則 ✅',
+          ].join('\n'),
+          wrapText: true,
+        },
+      }],
+    });
+  }
+
   const conflictDetails = [
     `已確認雲端版本差異 ${conflict.cloudDivergence} 件`,
     conflict.legacyBaselineDifference && `舊版雲端資料首次比對差異 ${conflict.legacyBaselineDifference} 件（當時已暫停上傳以保護資料）`,
@@ -355,6 +446,9 @@ function buildDigestPayload(day, dateLabel, sum, backup, prune) {
 🔄 舊版雲端資料自動升級 ${upgrades.classes} 個班級`;
   if (petLines.length) text += `\n🐾 ${petLines.slice(0, 4).join(' · ')}`;
   text += `\n🐞 錯誤 ${sum.errors.length} 則`;
+  if (akailao && akailao.events) {
+    text += `\n🎓 ${APP_LABELS.akailao}：帳號 ${akailao.accounts} 個 · 錯誤 ${akailao.errors.length} 則`;
+  }
 
   return {
     text,
@@ -369,6 +463,10 @@ function buildDigestPayload(day, dateLabel, sum, backup, prune) {
 }
 
 module.exports = {
+  APP_LABELS,
+  appLabel,
+  resolveSourceApp,
+  withSourceApp,
   backupLine,
   buildDigestPayload,
   pruneLine,

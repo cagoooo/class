@@ -1309,6 +1309,8 @@
         const rows = errors.slice(0, 20).map(function (e) {
             const when = e.lastTs ? relativeDays(e.lastTs) : '';
             const bits = [];
+            // 來源系統：剛好學也共用同一支通知函式，錯誤要標明是哪一站
+            if ((e.apps || []).length) bits.push('<span>🏷️ ' + esc(e.apps.join('、')) + '</span>');
             if (e.teacherCount) {
                 bits.push('<span>👤 ' + e.teacherCount + ' 位老師：' +
                     esc((e.teachers || []).join('、')) +
