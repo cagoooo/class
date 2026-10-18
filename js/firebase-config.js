@@ -67,44 +67,74 @@ async function initializeFirebase() {
     }
 }
 
+// 手機上 Google 登入彈窗可能先被判定「已關閉」，帳號選擇結果才慢一步回來，
+// SDK 仍會完成登入。等候期間若出現新的 Google 使用者，就補走登入後續流程
+// （記住帳號、登入通知、首次同步引導），否則老師會只看到右上角變成已登入。
+const LATE_SIGN_IN_WAIT_MS = 60000;
+let stopLateSignInWatch = null;
+
+function watchLateGoogleSignIn(previousUid) {
+    if (stopLateSignInWatch) stopLateSignInWatch();
+    let unsubscribe = null;
+    const timer = setTimeout(() => stopLateSignInWatch && stopLateSignInWatch(), LATE_SIGN_IN_WAIT_MS);
+    const stop = () => {
+        clearTimeout(timer);
+        if (unsubscribe) unsubscribe();
+        if (stopLateSignInWatch === stop) stopLateSignInWatch = null;
+    };
+    stopLateSignInWatch = stop;
+    unsubscribe = firebaseAuth.onAuthStateChanged((user) => {
+        if (!user || user.isAnonymous || user.uid === previousUid) return;
+        stop();
+        const profile = completeGoogleSignIn(user, false);
+        console.log('✅ Google 登入在彈窗關閉後才完成，已補接登入流程');
+        window.dispatchEvent(new CustomEvent('gauth:late-signin', { detail: profile }));
+    });
+}
+
+function completeGoogleSignIn(user, isNewUser) {
+    currentUserId = user.uid;
+    currentUserProfile = {
+        uid: user.uid,
+        displayName: user.displayName || '老師',
+        email: user.email || '',
+        photoURL: user.photoURL || '',
+        isAnonymous: false,
+    };
+
+    localStorage.setItem('firebaseUserId', currentUserId);
+    localStorage.setItem('firebaseUserProfile', JSON.stringify(currentUserProfile));
+
+    console.log('✅ Google 登入成功:', currentUserProfile.email);
+    // 使用情形通知：老師登入（失敗不影響登入流程）
+    try { if (window.UsageNotify) UsageNotify.login(currentUserProfile, isNewUser); } catch (e) { /* ignore */ }
+    return currentUserProfile;
+}
+
 /**
  * Google 帳號登入（Popup 方式）
  */
 async function signInWithGoogle() {
+    if (!firebaseAuth) {
+        console.error('Firebase Auth 尚未初始化');
+        return null;
+    }
+    if (stopLateSignInWatch) stopLateSignInWatch();
+    const previousUser = firebaseAuth.currentUser;
+    const previousUid = previousUser && !previousUser.isAnonymous ? previousUser.uid : null;
     try {
-        if (!firebaseAuth) {
-            console.error('Firebase Auth 尚未初始化');
-            return null;
-        }
-
         const provider = new firebase.auth.GoogleAuthProvider();
         provider.setCustomParameters({ prompt: 'select_account' });
 
         const userCredential = await firebaseAuth.signInWithPopup(provider);
-        const user = userCredential.user;
-
-        currentUserId = user.uid;
-        currentUserProfile = {
-            uid: user.uid,
-            displayName: user.displayName || '老師',
-            email: user.email || '',
-            photoURL: user.photoURL || '',
-            isAnonymous: false,
-        };
-
         const isNewUser = !!(userCredential.additionalUserInfo && userCredential.additionalUserInfo.isNewUser);
-
-        localStorage.setItem('firebaseUserId', currentUserId);
-        localStorage.setItem('firebaseUserProfile', JSON.stringify(currentUserProfile));
-
-        console.log('✅ Google 登入成功:', currentUserProfile.email);
-        // 使用情形通知：老師登入（失敗不影響登入流程）
-        try { if (window.UsageNotify) UsageNotify.login(currentUserProfile, isNewUser); } catch (e) { /* ignore */ }
-        return currentUserProfile;
+        return completeGoogleSignIn(userCredential.user, isNewUser);
     } catch (error) {
-        // 使用者關閉 Popup = 正常取消，不顯示錯誤
-        if (error.code !== 'auth/popup-closed-by-user' &&
-            error.code !== 'auth/cancelled-popup-request') {
+        // 使用者關閉 Popup = 正常取消，不顯示錯誤；但手機上可能只是結果慢一步
+        if (error.code === 'auth/popup-closed-by-user' ||
+            error.code === 'auth/cancelled-popup-request') {
+            watchLateGoogleSignIn(previousUid);
+        } else {
             console.error('Google 登入失敗:', error);
         }
         return null;

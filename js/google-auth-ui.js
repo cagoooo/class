@@ -1056,6 +1056,25 @@
     // ────────────────────────────────────────────────────────
     // 公開 API
     // ────────────────────────────────────────────────────────
+    async function afterGoogleLogin(profile) {
+        // 登入成功 → 永久關閉登入提醒 Banner
+        dismissLoginReminder(true);
+        showLoggedIn(profile);
+
+        // 首次登入：確認是否曾同步
+        const everSynced = localStorage.getItem('lastSyncTime');
+        if (!everSynced) {
+            await handleFirstTimeLogin();
+        } else {
+            NotificationSystem && NotificationSystem.success(`歡迎回來，${profile.displayName} ✨`);
+        }
+    }
+
+    // 手機上彈窗先被判定關閉、登入結果才慢一步回來時，仍要走完登入後續流程
+    window.addEventListener('gauth:late-signin', (event) => {
+        if (event.detail) afterGoogleLogin(event.detail);
+    });
+
     window.GoogleAuthUI = {
 
         async login() {
@@ -1083,19 +1102,8 @@
                 loginBtnM.disabled = false;
             }
 
-            if (!profile) return; // 使用者取消
-
-            // 登入成功 → 永久關閉登入提醒 Banner
-            dismissLoginReminder(true);
-            showLoggedIn(profile);
-
-            // 首次登入：確認是否曾同步
-            const everSynced = localStorage.getItem('lastSyncTime');
-            if (!everSynced) {
-                await handleFirstTimeLogin();
-            } else {
-                NotificationSystem && NotificationSystem.success(`歡迎回來，${profile.displayName} ✨`);
-            }
+            if (!profile) return; // 使用者取消（手機慢一步完成的登入由 gauth:late-signin 補接）
+            await afterGoogleLogin(profile);
         },
 
         async logout() {

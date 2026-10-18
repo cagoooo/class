@@ -79,8 +79,23 @@ context.ErrorHandler.handle(compatibilityError, 'UNKNOWN', 'Unhandled Promise Re
 assert.equal(context.ErrorHandler.getHistory().length, 0, 'Firestore 版本不相容訊息不得寫入錯誤紀錄');
 console.log('PASS Firestore 快取版本不相容不產生 webhook 錯誤');
 
+const authStale = vm.runInContext("new Error('INTERNAL ASSERTION FAILED: Pending promise was never set')", context);
+authStale.stack = 'Error: INTERNAL ASSERTION FAILED: Pending promise was never set\n    at G (https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js:1:22836)';
+let authStalePrevented = false;
+listeners.get('unhandledrejection')({ reason: authStale, preventDefault() { authStalePrevented = true; } });
+assert.equal(authStalePrevented, true, 'Auth 登入彈窗慢一步的斷言應被辨識');
+assert.equal(context.ErrorHandler.getHistory().length, 0, 'Auth 登入彈窗慢一步的斷言不得送出錯誤 webhook');
+console.log('PASS Google 登入彈窗慢一步回傳的 Auth 斷言不產生 webhook 錯誤');
+
+const appPending = vm.runInContext("new Error('INTERNAL ASSERTION FAILED: Pending promise was never set')", context);
+appPending.stack = 'Error: INTERNAL ASSERTION FAILED: Pending promise was never set\n    at save (https://cagoooo.github.io/class/js/points.js:10:2)';
+context.ErrorHandler.handle(appPending, 'UNKNOWN', 'points/save');
+assert.equal(context.ErrorHandler.getHistory().length, 1, '沒有 Auth SDK 來源的同名斷言仍應保留');
+context.ErrorHandler.clearHistory();
+console.log('PASS 缺少 Auth SDK 來源時仍保留錯誤');
+
 context.ErrorHandler.handle(new Error('真正的資料寫入失敗'), 'STORAGE', 'students/save');
 assert.equal(context.ErrorHandler.getHistory().length, 1, '真正錯誤仍應保留紀錄');
 console.log('PASS 真正資料錯誤仍保留紀錄');
 
-console.log('6 error-handler checks passed');
+console.log('8 error-handler checks passed');

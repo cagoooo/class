@@ -190,6 +190,16 @@ const ErrorHandler = (function () {
         return internalAssertion || incompatiblePersistence;
     }
 
+    // Firebase Auth 9 compat 在手機（尤其 Android Chrome）上，登入彈窗被判定
+    // 「已關閉」後，Google 帳號選擇結果才慢一步回來；SDK 仍會完成登入，但內部
+    // 找不到等待中的 Promise 而丟出此斷言。只在堆疊確認來自 Auth SDK 時排除，
+    // 登入後續流程由 firebase-config.js 的「慢一步登入」補接處理。
+    function isAuthPopupStaleAssertion(error, context = '') {
+        const text = `${error?.message || ''} ${context} ${error?.stack || ''}`;
+        return /INTERNAL ASSERTION FAILED:\s*Pending promise was never set/i.test(text)
+            && /firebase-auth(?:-compat)?\.js/i.test(text);
+    }
+
     function promiseRejectionContext(error) {
         const stack = formatStack(error);
         const frame = stack.split('\n').slice(1).find(line =>
@@ -255,6 +265,13 @@ const ErrorHandler = (function () {
                 event.preventDefault();
                 if (config.logToConsole) {
                     console.warn('[ErrorHandler] Firestore 離線快取版本不相容，已改用記憶體快取');
+                }
+                return;
+            }
+            if (isAuthPopupStaleAssertion(reason, context)) {
+                event.preventDefault();
+                if (config.logToConsole) {
+                    console.warn('[ErrorHandler] 忽略 Google 登入彈窗慢一步回傳的 SDK 內部斷言');
                 }
                 return;
             }
@@ -367,6 +384,13 @@ const ErrorHandler = (function () {
             if (isFirestoreCacheAssertion(errorObj, context)) {
                 if (config.logToConsole) {
                     console.warn(`[ErrorHandler] 忽略 Firestore 離線快取相容性訊息: ${errorObj.message}`);
+                }
+                return;
+            }
+
+            if (isAuthPopupStaleAssertion(errorObj, context)) {
+                if (config.logToConsole) {
+                    console.warn(`[ErrorHandler] 忽略 Google 登入彈窗慢一步回傳的 SDK 內部斷言: ${errorObj.message}`);
                 }
                 return;
             }
