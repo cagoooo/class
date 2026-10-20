@@ -129,7 +129,7 @@
                 console.log('[ClassProfiles] 切班前沒有待同步異動，略過同步');
                 return;
             }
-            if (window.FirebaseConfig?.isConnected?.() && window.FirebaseSync?.syncToCloud) {
+            if (window.FirebaseConfig?.canWriteCloud?.() && window.FirebaseSync?.syncToCloud) {
                 const { syncToCloud } = window.FirebaseSync;
                 await syncToCloud();
                 console.log('[ClassProfiles] 切換前同步完成');
@@ -712,7 +712,7 @@
 
             // R-A2：同步從雲端移除名冊項 + marker，否則「只增不減」的合併上傳會把它加回來（殭屍班）
             try {
-                if (window.FirebaseConfig?.isConnected?.() && window.FirebaseSync?.deleteClassFromCloud) {
+                if (window.FirebaseConfig?.canWriteCloud?.() && window.FirebaseSync?.deleteClassFromCloud) {
                     await window.FirebaseSync.deleteClassFromCloud(id);
                 }
             } catch (e) { console.warn('[ClassProfiles] 雲端移除班級失敗（本地已刪）:', e); }

@@ -25,7 +25,7 @@
         pending: { color: '#f59e0b', icon: '🔄', label: '有未同步變更', title: '有新變動尚未同步到雲端' },
         syncing: { color: '#3b82f6', icon: '☁️', label: '同步中', title: '正在上傳到雲端...' },
         error: { color: '#ef4444', icon: '⚠️', label: '同步失敗', title: '最近一次同步失敗，點擊重試' },
-        offline: { color: '#9ca3af', icon: '☁️', label: '未登入', title: '登入 Google 帳號即可自動同步' },
+        offline: { color: '#9ca3af', icon: '☁️', label: '未登入', title: '資料只存在這台裝置；登入 Google 才會雲端備份與跨裝置同步' },
         disconnected: { color: '#f59e0b', icon: '📵', label: '離線模式', title: '目前無網路連線，資料將在恢復後自動同步' },
     };
 
@@ -301,7 +301,7 @@
         if (currentState === 'offline') {
             // 未登入 → 提示登入
             if (typeof NotificationSystem !== 'undefined') {
-                NotificationSystem.info('請點擊右上角的「Google 登入」按鈕啟用雲端同步');
+                NotificationSystem.info('資料目前只存在這台裝置。請點右上角「Google 登入」，才會雲端備份與跨裝置同步。');
             } else {
                 alert('請先登入 Google 帳號以啟用雲端同步');
             }

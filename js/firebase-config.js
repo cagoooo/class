@@ -229,6 +229,19 @@ function getCurrentUserProfile() { return currentUserProfile; }
 function getFirestoreDb() { return firebaseDb; }
 function isFirebaseConnected() { return currentUserId !== null && firebaseDb !== null; }
 function isGoogleUser() { return currentUserProfile && !currentUserProfile.isAnonymous; }
+/**
+ * 班級／學生資料能不能寫上雲端：只有 Google 帳號（非匿名）才可以。
+ * 開頁自動建立的匿名身分只綁在這個瀏覽器，換裝置或清除瀏覽器資料就再也找不回，
+ * 寫上雲端只會留下沒人認領的學生資料，所以匿名狀態的資料一律只留在這台裝置。
+ * isConnected() 對匿名也是 true，任何「寫入」雲端的地方都要改用這個判斷。
+ */
+function canWriteCloud() {
+    if (!isFirebaseConnected() || !isGoogleUser()) return false;
+    try {
+        const user = firebaseAuth && firebaseAuth.currentUser;
+        return !!(user && !user.isAnonymous && user.uid === currentUserId);
+    } catch (e) { return false; }
+}
 
 // 導出
 window.FirebaseConfig = {
@@ -242,5 +255,6 @@ window.FirebaseConfig = {
     getDb: getFirestoreDb,
     isConnected: isFirebaseConnected,
     isGoogleUser: isGoogleUser,
+    canWriteCloud: canWriteCloud,
 };
 

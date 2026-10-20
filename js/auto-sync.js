@@ -99,6 +99,18 @@
     }
 
     /**
+     * 匿名（未以 Google 登入）時有待同步的資料：每個分頁提醒一次，資料只在這台裝置。
+     */
+    let localOnlyReminded = false;
+    function remindLocalOnly() {
+        if (localOnlyReminded || !hasPendingLocalChanges()) return;
+        localOnlyReminded = true;
+        try {
+            window.NotificationSystem?.info?.('💾 資料目前只存在這台裝置。登入 Google 才會雲端備份與跨裝置同步。');
+        } catch (e) { /* 提醒失敗不影響使用 */ }
+    }
+
+    /**
      * 嘗試執行同步（內部安全版）
      * - 未登入、離線、已在同步中 → 靜默跳過
      */
@@ -108,9 +120,10 @@
             console.log('[AutoSync] 同步中，跳過本次觸發');
             return false;
         }
-        // 未連線 → 跳過
-        if (!window.FirebaseConfig?.isConnected?.()) {
-            console.log('[AutoSync] 未登入或離線，跳過本次觸發');
+        // 未以 Google 登入 → 跳過（開頁自動建立的匿名身分不寫雲端，資料只留在這台裝置）
+        if (!window.FirebaseConfig?.canWriteCloud?.()) {
+            console.log('[AutoSync] 未以 Google 登入，資料只留在這台裝置');
+            remindLocalOnly();
             return false;
         }
         // 離線 → 跳過
@@ -330,7 +343,7 @@
      *  (2) 頁面載入時發現 isConnected() 為 true （已登入狀態）
      */
     function tryAutoStart() {
-        if (window.FirebaseConfig?.isConnected?.()) {
+        if (window.FirebaseConfig?.canWriteCloud?.()) {
             AutoSync.start();
         }
     }

@@ -17,6 +17,13 @@
         if (!uid || !db || !window.FirebaseConfig.isConnected()) throw Object.assign(Error('請先登入 Google 帳號'), { code: 'sync-auth-required' });
         return { uid, db, id: id || current() };
     };
+    // 寫入雲端只限 Google 帳號：開頁自動建立的匿名身分只綁在這個瀏覽器，
+    // 寫上去只會留下沒人認領的學生資料，所以匿名時資料只留在本機。
+    const writeContext = id => {
+        if (!window.FirebaseConfig?.canWriteCloud?.()) throw Object.assign(Error('登入 Google 才會雲端備份與跨裝置同步；目前資料只存在這台裝置'), { code: 'sync-auth-required' });
+        const c = context(id);
+        return c;
+    };
     // 中途登出或換帳號是「等老師重新登入」，不是寵物或同步故障（code 讓 report() 走等待分支）
     const sameAccount = c => { if (window.FirebaseConfig.getCurrentUserId() !== c.uid) throw Object.assign(Error('登入帳號已改變，已停止同步'), { code: 'sync-auth-required' }); };
     const root = c => c.id === 'default' ? c.db.collection('users').doc(c.uid) : c.db.collection('users').doc(c.uid).collection('classes').doc(c.id);
@@ -169,7 +176,7 @@
     }
     async function publish(id = current(), options = {}) {
         if (navigator.onLine === false) throw Object.assign(Error('已存本機，恢復連線後再同步'), { code: 'sync-offline' });
-        const c = context(id);
+        const c = writeContext(id);
         return withSyncLock(c, async () => {
             // 等鎖的期間可能斷線：在讀雲端前再確認一次，維持「已存本機」的說法
             if (navigator.onLine === false) throw Object.assign(Error('已存本機，恢復連線後再同步'), { code: 'sync-offline' });

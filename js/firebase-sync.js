@@ -49,6 +49,15 @@ function setSyncProgress(percent, phase, detail, classId) {
 }
 
 /**
+ * 只有 Google 帳號（非匿名）才能把班級資料寫上雲端；開頁自動建立的匿名身分
+ * 只綁在這個瀏覽器，寫上去只會留下沒人認領的學生資料，所以匿名時一律只留本機。
+ * isConnected() 對匿名也是 true，所有「寫入」雲端的函式都要先過這一關。
+ */
+function canWriteCloud() {
+    return !!window.FirebaseConfig?.canWriteCloud?.();
+}
+
+/**
  * 取得用戶的資料集合參考
  * 多班級支援：預設班級使用原有路徑，其他班級使用 classes/{classId}/ 子路徑
  */
@@ -76,6 +85,7 @@ function getUserCollection(collectionName) {
  * 確保雲端與本地完全一致，不殘留舊班資料
  */
 async function uploadCollection(collectionName, dataArray) {
+    if (!canWriteCloud()) return false;
     try {
         const collection = getUserCollection(collectionName);
         if (!collection) return false;
@@ -123,6 +133,7 @@ async function uploadCollection(collectionName, dataArray) {
  * 上傳單一 Object 形式的設定文件
  */
 async function uploadSingleDoc(collectionName, docId, data) {
+    if (!canWriteCloud()) return false;
     try {
         const collection = getUserCollection(collectionName);
         if (!collection) return false;
@@ -172,6 +183,7 @@ async function downloadSingleDoc(collectionName, docId) {
  * 上傳單一資料項目
  */
 async function uploadItem(collectionName, itemId, data) {
+    if (!canWriteCloud()) return false;
     try {
         const collection = getUserCollection(collectionName);
         if (!collection) return false;
@@ -190,6 +202,7 @@ async function uploadItem(collectionName, itemId, data) {
  * 刪除資料項目
  */
 async function deleteItem(collectionName, itemId) {
+    if (!canWriteCloud()) return false;
     try {
         const collection = getUserCollection(collectionName);
         if (!collection) return false;
@@ -251,6 +264,10 @@ function getLocalStats() {
 // ─────────────────────────────────────────────────────
 async function syncToCloud(silent = false) {
     if (syncStatus.isSyncing) return false;
+    if (!canWriteCloud()) {
+        if (!silent) NotificationSystem.warning('登入 Google 才會雲端備份與跨裝置同步；目前資料只存在這台裝置');
+        return false;
+    }
     const id = CloudSafety.current();
     syncStatus.isSyncing = true;
     syncStatus.progress = null;
@@ -459,8 +476,8 @@ function getCloudStats(cloudData) {
  * 顯示同步確認 Modal（上傳 or 下載）
  */
 async function showSyncConfirmModal(direction) {
-    if (!window.FirebaseConfig.isConnected()) {
-        NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號');
+    if (!canWriteCloud()) {
+        NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號，才能雲端備份與跨裝置同步');
         return;
     }
 
@@ -624,6 +641,7 @@ function getUserCollectionForClass(collectionName, classId) {
  * 針對指定班級上傳 collection（先刪多餘再寫入）
  */
 async function uploadCollectionForClass(collectionName, dataArray, classId) {
+    if (!canWriteCloud()) return false;
     try {
         const collection = getUserCollectionForClass(collectionName, classId);
         if (!collection) return false;
@@ -674,6 +692,7 @@ async function waitUntilIdle(limitMs = 15000) {
 }
 
 async function syncAllClassesToCloud(onProgress) {
+    if (!canWriteCloud()) return null;
     if (!await waitUntilIdle()) return null;
     syncStatus.isSyncing = true;
     const results = [];
@@ -704,7 +723,7 @@ async function syncAllClassesToCloud(onProgress) {
 }
 
 async function syncPendingClasses() {
-    if (syncStatus.isSyncing || navigator.onLine === false || !window.FirebaseConfig.isConnected()) return false;
+    if (syncStatus.isSyncing || navigator.onLine === false || !canWriteCloud()) return false;
     syncStatus.isSyncing = true;
     let ok = true, uploaded = false;
     try {
@@ -723,6 +742,10 @@ async function syncPendingClasses() {
 }
 
 async function showAllClassSyncModal() {
+    if (!canWriteCloud()) {
+        NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號，才能雲端備份與跨裝置同步');
+        return;
+    }
     // 移除既有 Modal
     const existId = 'all-class-sync-modal';
     document.getElementById(existId)?.remove();
@@ -882,6 +905,7 @@ async function fetchCloudClassProfiles() {
  * 寫了 marker 後，前端可直接列舉 classes/ 發現所有班級，達成「名冊自我修復」。
  */
 async function writeClassMarker(classId, profile) {
+    if (!canWriteCloud()) return;
     try {
         if (!classId || String(classId) === 'default') return; // default 不走 classes/ 子路徑
         const db = window.FirebaseConfig.getDb();
@@ -1091,7 +1115,8 @@ function mergeClassRegistry({ cloudProfiles = [], cloudDeleted = {}, localProfil
  * @returns {Promise<null|{profiles: Array, uploaded: Array, cloudCount: number, added: string[], removed: string[], changed: boolean}>}
  */
 async function reconcileClassRegistry({ prefer = 'cloud' } = {}) {
-    if (!window.FirebaseConfig?.isConnected?.()) return null;
+    // 名冊對齊會寫回雲端，匿名身分不參與
+    if (!canWriteCloud()) return null;
     const db = window.FirebaseConfig.getDb(), userId = window.FirebaseConfig.getCurrentUserId();
     if (!db || !userId) return null;
     const readLocal = () => { try { const v = JSON.parse(localStorage.getItem('classProfiles') || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
@@ -1158,7 +1183,7 @@ async function reconcileClassRegistry({ prefer = 'cloud' } = {}) {
  * @returns {Promise<{beforeCount:number, afterCount:number, recovered:number, names:string[]}|null>}
  */
 async function repairClassRegistry() {
-    if (!window.FirebaseConfig.isConnected()) {
+    if (!canWriteCloud()) {
         NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號');
         return null;
     }
@@ -1197,6 +1222,7 @@ async function repairClassRegistry() {
  * R-A5：把「本次上傳時間」寫到雲端 _meta/syncInfo，供其他裝置判斷雲端是否較新。
  */
 async function writeCloudSyncInfo() {
+    if (!canWriteCloud()) return;
     try {
         const db = window.FirebaseConfig.getDb();
         const userId = window.FirebaseConfig.getCurrentUserId();
@@ -1232,7 +1258,7 @@ async function fetchCloudLastUploadMs() {
 async function deleteClassFromCloud(classId) {
     try {
         if (!classId || String(classId) === 'default') return false;
-        if (!window.FirebaseConfig.isConnected()) return false;
+        if (!canWriteCloud()) return false;
         const db = window.FirebaseConfig.getDb();
         const userId = window.FirebaseConfig.getCurrentUserId();
 

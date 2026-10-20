@@ -1169,8 +1169,8 @@
             const ddM = document.getElementById('gauth-dropdown-mobile');
             if (ddM) ddM.style.display = 'none';
 
-            if (!window.FirebaseConfig.isConnected()) {
-                NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號');
+            if (!window.FirebaseConfig.canWriteCloud()) {
+                NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號，才能雲端備份與跨裝置同步');
                 return;
             }
             // 呼叫新的詳細差異預覽 Modal
@@ -1188,8 +1188,8 @@
             const ddM = document.getElementById('gauth-dropdown-mobile');
             if (ddM) ddM.style.display = 'none';
 
-            if (!window.FirebaseConfig.isConnected()) {
-                NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號');
+            if (!window.FirebaseConfig.canWriteCloud()) {
+                NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號，才能雲端備份與跨裝置同步');
                 return;
             }
             // 呼叫新的詳細差異預覽 Modal（還原方向）
@@ -1207,8 +1207,8 @@
             const ddM = document.getElementById('gauth-dropdown-mobile');
             if (ddM) ddM.style.display = 'none';
 
-            if (!window.FirebaseConfig.isConnected()) {
-                NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號');
+            if (!window.FirebaseConfig.canWriteCloud()) {
+                NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號，才能雲端備份與跨裝置同步');
                 return;
             }
             if (!window.FirebaseSync || typeof window.FirebaseSync.showAllClassSyncModal !== 'function') {
@@ -1255,8 +1255,8 @@
             const ddM = document.getElementById('gauth-dropdown-mobile');
             if (ddM) ddM.style.display = 'none';
 
-            if (!window.FirebaseConfig.isConnected()) {
-                NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號');
+            if (!window.FirebaseConfig.canWriteCloud()) {
+                NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號，才能雲端備份與跨裝置同步');
                 return;
             }
             if (!window.FirebaseSync || typeof window.FirebaseSync.showAllClassDownloadModal !== 'function') {
@@ -1301,8 +1301,8 @@
             const ddM = document.getElementById('gauth-dropdown-mobile');
             if (ddM) ddM.style.display = 'none';
 
-            if (!window.FirebaseConfig.isConnected()) {
-                NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號');
+            if (!window.FirebaseConfig.canWriteCloud()) {
+                NotificationSystem && NotificationSystem.warning('請先登入 Google 帳號，才能雲端備份與跨裝置同步');
                 return;
             }
             // 🔐 僅限管理員：即使有人手動呼叫此函式也擋下
