@@ -26,6 +26,7 @@
  *      下次載入再補送，確保不漏。Function 尚未部署時也只是留在佇列等之後補送。
  *   4. 功能統計是「當日累計值」而非增量，重複回報會被伺服端覆寫而不是累加，
  *      所以多送幾次不會把數字灌大；佇列裡也只保留同一天的最後一份。
+ *   5. 學生姓名不出裝置：通報只帶座號，排隊與送出前再把班級名單上的姓名換成座號。
  *
  * 對外：window.UsageNotify.{ init, login, classCreate, feature, error, pet, petError, syncConflict }
  */
@@ -213,8 +214,53 @@
     // 排隊時就寫進事件本身，不論最後由哪一站送出，後端都能標對來源。
     var APP = 'class';
 
+    // ───────── 學生姓名不出裝置 ─────────
+    // 事件會推到 Google Chat，並在雲端 `_usageEvents` 留底約 180 天，所以任何
+    // 事件都不能帶學生姓名，只能帶座號。呼叫端已改用座號；這裡是最後一道防線：
+    // 排隊與送出前，把目前班級名單上的姓名一律換成座號，擋住瀏覽器錯誤訊息夾帶
+    // 的資料片段（例如 JSON 解析錯誤會附上原文），或日後新程式不小心放進去的姓名。
+    var REDACT_KEYS = ['message', 'context', 'details', 'reason', 'action', 'productName', 'kinds'];
+
+    function studentLabel(student) {
+        var n = student && student.number;
+        return (n === 0 || n) ? '座號 ' + n : '座號未設定';
+    }
+
+    function rosterEntries() {
+        var list = null;
+        try { if (Array.isArray(window.students)) list = window.students; } catch (e) { /* ignore */ }
+        if (!list) {
+            try { list = JSON.parse(localStorage.getItem(window.STUDENTS_KEY || 'students') || '[]'); }
+            catch (e) { list = []; }
+        }
+        var out = [];
+        (Array.isArray(list) ? list : []).forEach(function (s) {
+            var name = s && typeof s.name === 'string' ? s.name.trim() : '';
+            // 單一字太容易誤傷一般文字；學生姓名至少兩個字
+            if (name.length >= 2) out.push({ name: name, label: studentLabel(s) });
+        });
+        // 長的先換，避免「王小明」只被「小明」換掉一半
+        out.sort(function (a, b) { return b.name.length - a.name.length; });
+        return out;
+    }
+
+    function redactStudentNames(ev) {
+        var roster;
+        try { roster = rosterEntries(); } catch (e) { roster = []; }
+        if (!roster.length) return ev;
+        REDACT_KEYS.forEach(function (key) {
+            if (typeof ev[key] !== 'string' || !ev[key]) return;
+            var text = ev[key];
+            roster.forEach(function (r) {
+                if (text.indexOf(r.name) !== -1) text = text.split(r.name).join(r.label);
+            });
+            ev[key] = text;
+        });
+        return ev;
+    }
+
     function enqueue(type, data) {
-        var ev = Object.assign({ type: type, ts: new Date().toISOString(), app: APP }, data || {});
+        var ev = redactStudentNames(Object.assign({ type: type, ts: new Date().toISOString(), app: APP }, data || {}));
         ev._id = Date.now() + '-' + Math.random().toString(36).slice(2, 8);
         var q = loadQ();
         q.push(ev);
@@ -226,7 +272,7 @@
     // 用於「當日累計值」這種後蓋前的事件（功能統計），避免離線時佇列
     // 塞滿同一天的十幾份中途快照。
     function enqueueReplace(type, data, dedupeKey) {
-        var ev = Object.assign({ type: type, ts: new Date().toISOString(), app: APP }, data || {});
+        var ev = redactStudentNames(Object.assign({ type: type, ts: new Date().toISOString(), app: APP }, data || {}));
         ev._id = Date.now() + '-' + Math.random().toString(36).slice(2, 8);
         ev._dedupe = dedupeKey;
         var q = loadQ().filter(function (x) { return x._dedupe !== dedupeKey; });
@@ -252,6 +298,8 @@
             var ev = currentQ[0];
             var payload = {};
             for (var k in ev) { if (k !== '_id' && k !== '_dedupe') payload[k] = ev[k]; }
+            // 舊版排進佇列、還沒送出的事件可能帶著姓名，送出前再過濾一次
+            redactStudentNames(payload);
             // 帶上事件唯一 ID 讓伺服端做冪等。
             // ⚠️ 這條佇列是「送出成功才移除」，但建立班級後會 location.reload()——
             //    若在回應回來前就重載，移除那步不會執行，事件仍留在佇列，

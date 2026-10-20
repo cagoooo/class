@@ -79,6 +79,7 @@ function selectAvatar(avatar, studentId) {
             student.avatar = avatar;
             if (!window.SafeStorage.set(window.STUDENTS_KEY || 'students', JSON.stringify(students), {
                 context: '更換「' + student.name + '」的頭像',
+                reportContext: '更換學生頭像（座號 ' + student.number + '）',
                 rollback: () => { student.avatar = prevAvatar; }
             })) { renderStudentsEnhanced(); return; }
             renderStudentsEnhanced();
@@ -162,6 +163,7 @@ function toggleStudentTag(studentId, tagKey) {
 
     if (!window.SafeStorage.set(window.STUDENTS_KEY || 'students', JSON.stringify(students), {
         context: '修改「' + student.name + '」的標籤',
+        reportContext: '修改學生標籤（座號 ' + student.number + '）',
         rollback: () => { student.tags = prevTags; }
     })) return;
 
@@ -356,6 +358,7 @@ function enhanceAddStudentForm() {
                 // 失敗就讓兩者回到未設定狀態，學生本身保留。
                 window.SafeStorage.set(window.STUDENTS_KEY || 'students', JSON.stringify(students), {
                     context: '設定新學生「' + (newStudent.name || '') + '」的頭像',
+                    reportContext: '設定新學生頭像（座號 ' + newStudent.number + '）',
                     rollback: () => { delete newStudent.avatar; delete newStudent.tags; }
                 });
                 renderStudentsEnhanced();

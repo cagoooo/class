@@ -286,8 +286,10 @@
      *
      * @param {Array<[string,?string]>} pairs 要寫入的 [key, value] 陣列（value 必須已是字串；
      *        value 給 null 代表「刪除這個 key」，讓匯入／還原可以把刪除也納入同一次原子操作）
-     * @param {{context?:string, rollback?:Function, message?:string, feature?:string, petAction?:string, classId?:string, className?:string}} [opts]
-     *        context  — 出事時要顯示／通報的情境，例如「新增學生（王小明）」
+     * @param {{context?:string, reportContext?:string, rollback?:Function, message?:string, feature?:string, petAction?:string, classId?:string, className?:string}} [opts]
+     *        context  — 出事時要顯示給老師看的情境，例如「新增學生（王小明）」
+     *        reportContext — 通報開發者用的情境；context 含學生姓名時必填，只能帶座號，
+     *                   例如「新增學生（座號 7）」。通報會推到 Google Chat 並在雲端留底。
      *        rollback — 還原記憶體狀態的函式（例如把剛 push 的項目 pop 回來）
      *        message  — 自訂給老師看的訊息；預設會用 context 組一句
      * @returns {boolean} true=已存檔；false=沒存檔（呼叫端應該 return，不要繼續往下走）
@@ -326,7 +328,7 @@
                         .forEach(key => { if (opts[key] != null) errorOptions[key] = opts[key]; });
                     window.ErrorHandler.handle(
                         new Error('資料寫入失敗：' + ((err && err.message) || err)),
-                        'STORAGE', context, errorOptions
+                        'STORAGE', opts.reportContext || context, errorOptions
                     );
                 }
             } catch (e) { /* 通報失敗不能再擋住主流程 */ }

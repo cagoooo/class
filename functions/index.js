@@ -38,6 +38,7 @@ const {
   summarizeEvents,
   withSourceApp,
 } = require('./digest-summary');
+const { redactEventData, redactLegacyStudentNames } = require('./privacy-redact');
 const { dumpTree, buildDump, verifyDump } = require('./purge-backup');
 const { KEEP_DAYS, groupSnapshotParts, planClassPrune } = require('./snapshot-prune');
 
@@ -265,6 +266,16 @@ function buildCard(type, data, who) {
           text: clip(data.context, 160),
           wrapText: true
         }
+      });
+    }
+    // 通報不帶學生姓名，改用「班級＋座號」定位問題。
+    if (data.className || data.classId) {
+      contentWidgets.push({
+        decoratedText: {
+          topLabel: '班級',
+          text: [clip(data.className, 80), data.classId && `（${clip(data.classId, 80)}）`].filter(Boolean).join(' '),
+          wrapText: true,
+        },
       });
     }
     if (data.feature === 'pet' || data.petAction) {
@@ -595,7 +606,8 @@ async function postToChat(webhook, payload) {
 exports.notifyUsage = onCall(
   { region: REGION, secrets: [GOOGLE_CHAT_WEBHOOK], cors: true, maxInstances: 5 },
   async (request) => {
-    const data = request.data || {};
+    // 尚未更新的舊版頁面會把學生姓名寫進錯誤情境；留底與推播前先遮蔽。
+    const data = redactEventData(request.data);
     const type = String(data.type || '').trim();
 
     // 舊頁面暫存的登入／離線提示不消耗錯誤配額，也不推播。
@@ -1639,7 +1651,7 @@ exports.getUsageAnalytics = onCall(
           });
         }
         if (d.type === 'error' && !isSyncConflictEvent(d) && !isExpectedSyncWait(d) && !isRecoverableOfflineSync(d)) {
-          const msg = clip(d.message, 200) || '(無訊息)';
+          const msg = clip(redactLegacyStudentNames(d.message), 200) || '(無訊息)';
           if (!errorMap[msg]) {
             errorMap[msg] = { message: msg, count: 0, uids: {}, contexts: {}, devices: {}, urls: {}, apps: {}, lastTs: '', firstDay: day };
           }
@@ -1647,7 +1659,8 @@ exports.getUsageAnalytics = onCall(
           g.count++;
           g.apps[appLabel(resolveSourceApp(d))] = true;
           if (d.uid) g.uids[d.uid] = d.name || d.email || d.uid;
-          if (d.context) g.contexts[clip(d.context, 80)] = true;
+          // 舊紀錄可能還留著舊版寫入的學生姓名：只遮蔽顯示，不改、不刪原紀錄。
+          if (d.context) g.contexts[clip(redactLegacyStudentNames(d.context), 80)] = true;
           if (d.ua) g.devices[deviceLabel(d.ua)] = true;
           if (d.url) g.urls[clip(d.url, 120)] = true;
           const ts = d.ts || '';
