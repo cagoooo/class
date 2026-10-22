@@ -85,7 +85,11 @@ function isExpectedSyncWait(event) {
 // Firestore 明確表示用戶端離線時，保留事件供診斷，但不當作程式故障。
 // 限定完整訊息與 unavailable 階段，避免隱藏其他暫時性伺服器錯誤。
 function isRecoverableOfflineSync(event) {
-  if (event?.type !== 'error' || event.feature !== 'pet' || event.operation !== 'cloud_sync') return false;
+  if (event?.type !== 'error' || event.feature !== 'pet') return false;
+  // 頁面從瀏覽器暫存恢復後 Firestore 已在 pagehide 自行關閉（SDK 原文），重新整理即恢復。
+  // 舊版頁面任何寵物操作都可能撞到，所以不限 cloud_sync。
+  if (/^The client has already been terminated\.?$/i.test(String(event.message || '').trim())) return true;
+  if (event.operation !== 'cloud_sync') return false;
   if (String(event.failureStage || '') !== 'unavailable') return false;
   const message = String(event.message || '').trim();
   return /^Failed to get document because the client is offline\.?$/i.test(message)

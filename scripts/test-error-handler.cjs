@@ -99,3 +99,13 @@ assert.equal(context.ErrorHandler.getHistory().length, 1, '真正錯誤仍應保
 console.log('PASS 真正資料錯誤仍保留紀錄');
 
 console.log('8 error-handler checks passed');
+
+{
+    const { context: ctx } = setup();
+    let notified = 0;
+    ctx.UsageNotify = { error() { notified++; } };
+    ctx.ErrorHandler.handle(vm.runInContext("new Error('The client has already been terminated.')", ctx), 'STORAGE', '寵物系統/reward', { severity: 'critical', silent: true, feature: 'pet' });
+    assert.equal(notified, 0, '頁面暫存恢復後的 Firestore 已關閉不得送出 webhook');
+    assert.equal(ctx.ErrorHandler.getHistory().length, 0);
+    console.log('PASS 頁面暫存恢復後 Firestore 已關閉不推播');
+}

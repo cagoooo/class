@@ -105,6 +105,15 @@ test('明確離線只限寵物同步 unavailable，不吞掉其他錯誤', () =>
  }
 });
 
+test('頁面暫存恢復後 Firestore 已關閉：寵物任何操作都不推播，其他功能與變體照常', () => {
+ const terminated = {type:'error',feature:'pet',operation:'cloud_sync',failureStage:'failed-precondition',message:'The client has already been terminated.'};
+ assert.equal(isRecoverableOfflineSync(terminated),true);
+ assert.equal(isRecoverableOfflineSync({...terminated,operation:'reward',failureStage:'exception'}),true);
+ assert.equal(summarizeEvents([terminated]).errors.length,0);
+ assert.equal(isRecoverableOfflineSync({...terminated,feature:'students'}),false);
+ assert.equal(isRecoverableOfflineSync({...terminated,message:'The client has already been terminated. extra'}),false);
+});
+
 test('舊版雲端資料自動升級只進戰報：以老師與班級去重，並顯示在系統健康', () => {
   const summary = summarizeEvents([
     { type: 'sync_upgrade', uid: 'teacher-a', classId: '601', className: '601' },

@@ -450,6 +450,13 @@
         if (isOfflineWait(error) && error?.code !== 'sync-offline') {
             error = Object.assign(Error('目前離線，恢復連線後會再同步'), { code: 'sync-offline' });
         }
+        // 頁面從瀏覽器暫存恢復後 Firestore 已自行關閉：資料都還在本機，
+        // 重新整理頁面就能恢復同步，不是寵物程式故障，不推播。
+        if (window.FirebaseConfig?.isClientTerminated?.(error)) {
+            window.SyncStatusIndicator?.setState('disconnected');
+            if (!silent) window.NotificationSystem?.warning?.('雲端連線已暫停，資料已存在這台裝置；重新整理頁面後會繼續同步');
+            return;
+        }
         // 可恢復的前置條件不代表寵物操作失敗；保留所有待同步資料。
         if (error?.code === 'sync-auth-required' || error?.code === 'sync-offline') {
             window.SyncStatusIndicator?.setState(error.code === 'sync-offline' ? 'disconnected' : 'offline');

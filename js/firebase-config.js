@@ -224,6 +224,28 @@ function onAuthStateChanged(callback) {
     }
 }
 
+// 瀏覽器把頁面「暫存」(bfcache) 時，Firestore 9.22.0 的離線持久化會在 pagehide
+// 自行關閉；老師切回來時畫面還在，資料庫連線卻已停用，之後每次同步都會拋出
+// "The client has already been terminated."。恢復時若沒在上課操作就直接重新載入，
+// 有計時器、全螢幕或對話框時先不打斷，同步改顯示「請重新整理」提示。
+function isClientTerminated(error) {
+    return /The client has already been terminated/i.test(String(error?.message || ''));
+}
+
+function isPageBusy() {
+    try {
+        if (typeof window.getTimerState === 'function' && window.getTimerState()?.running) return true;
+        if (document.fullscreenElement || document.webkitFullscreenElement) return true;
+        if (document.querySelector('dialog[open]')) return true;
+    } catch (e) { /* 判斷失敗就當作忙碌，寧可不重整 */ return true; }
+    return false;
+}
+
+window.addEventListener('pageshow', (event) => {
+    if (!event.persisted || !firebaseDb) return;
+    if (!isPageBusy()) window.location.reload();
+});
+
 function getCurrentUserId() { return currentUserId; }
 function getCurrentUserProfile() { return currentUserProfile; }
 function getFirestoreDb() { return firebaseDb; }
@@ -256,5 +278,6 @@ window.FirebaseConfig = {
     isConnected: isFirebaseConnected,
     isGoogleUser: isGoogleUser,
     canWriteCloud: canWriteCloud,
+    isClientTerminated: isClientTerminated,
 };
 

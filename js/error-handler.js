@@ -388,6 +388,15 @@ const ErrorHandler = (function () {
                 return;
             }
 
+            // 頁面從瀏覽器暫存恢復後 Firestore 已自行關閉；資料仍在本機，
+            // 重新整理即恢復，不是程式故障（firebase-config.js 會在恢復時自動重整）。
+            if (/^The client has already been terminated\.?$/i.test(String(errorObj?.message || '').trim())) {
+                if (config.logToConsole) {
+                    console.warn(`[ErrorHandler] 忽略頁面暫存恢復後的 Firestore 已關閉訊息: ${errorObj.message}`);
+                }
+                return;
+            }
+
             if (isAuthPopupStaleAssertion(errorObj, context)) {
                 if (config.logToConsole) {
                     console.warn(`[ErrorHandler] 忽略 Google 登入彈窗慢一步回傳的 SDK 內部斷言: ${errorObj.message}`);
