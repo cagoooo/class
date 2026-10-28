@@ -376,6 +376,8 @@
         if (!force) {
             const snooze = parseInt(rawGet(LS_SNOOZE) || '0', 10);
             if (Date.now() < snooze) return;
+            // 安靜挑戰常投影在大螢幕上，麥克風開著時先不跳提醒；每 10 分鐘會再檢查一次
+            if (window.QuietChallenge?.isActive?.()) return;
         }
         estimateUsage().then(est => {
             const ratio = est.quota ? est.usage / est.quota : 0;
