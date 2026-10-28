@@ -32,14 +32,19 @@
                 const action = button.getAttribute('onclick');
                 const label = /^removeStudent\(/.test(action) ? '刪除學生'
                     : /^removeNotebook\(/.test(action) ? '刪除此事項'
+                    : /^renameHomework\(/.test(action) ? '✏️ 修改名稱'
                     : /^removeHomework\(/.test(action) ? '刪除此作業' : '';
                 if (!label) return;
-                const menu = document.createElement('details');
-                menu.className = 'class-management-action';
-                const summary = document.createElement('summary');
-                summary.textContent = '管理';
-                menu.append(summary);
-                button.before(menu);
+                // 同一列的多個操作收進同一個「管理」選單
+                let menu = button.parentElement && button.parentElement.querySelector(':scope > details.class-management-action');
+                if (!menu) {
+                    menu = document.createElement('details');
+                    menu.className = 'class-management-action';
+                    const summary = document.createElement('summary');
+                    summary.textContent = '管理';
+                    menu.append(summary);
+                    button.before(menu);
+                }
                 button.textContent = label;
                 button.setAttribute('aria-label', label);
                 menu.append(button);
