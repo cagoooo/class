@@ -236,6 +236,7 @@ function isPageBusy() {
     try {
         if (typeof window.getTimerState === 'function' && window.getTimerState()?.running) return true;
         if (document.fullscreenElement || document.webkitFullscreenElement) return true;
+        if (window.QuietChallenge?.isActive?.()) return true;
         if (document.querySelector('dialog[open]')) return true;
     } catch (e) { /* 判斷失敗就當作忙碌，寧可不重整 */ return true; }
     return false;

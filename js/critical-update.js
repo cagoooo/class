@@ -24,6 +24,7 @@
     function busy() {
         try {
             if (document.fullscreenElement) return true;
+            if (window.QuietChallenge?.isActive?.()) return true;   // 安靜挑戰進行中，老師不會碰鍵盤滑鼠
             const exam = document.getElementById('examFullscreenModal');
             if (exam && getComputedStyle(exam).display !== 'none' && getComputedStyle(exam).visibility !== 'hidden') return true;
             return !!window.syncStatus?.isSyncing;

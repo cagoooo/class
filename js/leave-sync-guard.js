@@ -341,7 +341,9 @@
             visible: bannerVisible(), userSyncing: state.userSyncing, snoozeUntil: state.snoozeUntil,
             exitIntentAt: state.exitIntentAt, lastInputAt: state.lastInputAt, pendingSince: state.pendingSince,
         };
-        if (shouldShow(info, view, now)) updateBanner(info);
+        // 安靜挑戰進行中（常投影在大螢幕上）不跳同步提醒；老師自己按同步仍照常顯示進度
+        const quietBusy = !state.userSyncing && !!window.QuietChallenge?.isActive?.();
+        if (!quietBusy && shouldShow(info, view, now)) updateBanner(info);
         else hideBanner();
         return info;
     }

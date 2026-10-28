@@ -897,6 +897,8 @@
     window.selectQuickPointsValue = v => onItem(quickItem(Number(v)), 'panel');
     window.selectQuickAction = a => a && onItem({ points: Number(a.points), reason: String(a.reason || '') }, 'panel');
     window.finishBatchPoints = () => { disarm(); clearSelection(); };
+    // 安靜挑戰成功時，老師按「全班加分」才呼叫；走同一套給分（可撤銷、寵物同步）
+    window.awardPointsToAll = (points, reason) => apply(getStudents().map(s => String(s.id)), { points, reason });
     window.applyPointsToStudentFromList = id => onStudent(String(id));
     window.addCustomPoints = () => $('ptCustomBox')?.querySelector('input')?.focus();
     window.PointsUI = { apply: (ids, points, reason) => apply(ids.map(String), { points, reason }), undo: undoRecords, refresh: () => { renderGrid(); renderHistory(); } };
