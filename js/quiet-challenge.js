@@ -112,7 +112,7 @@
     const K_CFG = 'quietChallengeCfg';   // 每台裝置自己的設定（每間教室、每支麥克風都不同）
     const K_LOG = 'quietChallengeLog';   // 挑戰紀錄，依班級隔離
     const MINUTES = [1, 2, 3, 5, 10];
-    const DEFAULT_CFG = { threshold: DEFAULT_TH, minutes: 3, mode: 'pause', sound: true, reward: 1, animal: 'owl', floorDb: null, calibAt: 0 };
+    const DEFAULT_CFG = { threshold: DEFAULT_TH, minutes: 3, mode: 'pause', sound: true, reward: 1, animal: 'random', animalPicked: false, floorDb: null, calibAt: 0 };
     const TICK_MS = 50;
     const CALIB_MS = 3000;
     const CALIB_WAIT_MS = 8000;          // 校正最多等幾秒收到聲音
@@ -172,7 +172,8 @@
         c.threshold = Math.max(10, Math.min(99, Number(c.threshold) || DEFAULT_CFG.threshold));
         if (!MINUTES.includes(Number(c.minutes))) c.minutes = DEFAULT_CFG.minutes;
         c.reward = Math.max(1, Math.min(5, parseInt(c.reward, 10) || 1));
-        if (c.animal !== 'random' && !ANIMALS[c.animal]) c.animal = 'owl';
+        // 預設每次隨機換小幫手；老師自己選過才固定（舊版會把預設的貓頭鷹存起來，也一律改回隨機）
+        if (!c.animalPicked || (c.animal !== 'random' && !ANIMALS[c.animal])) c.animal = 'random';
         c.floorDb = Number.isFinite(c.floorDb) ? c.floorDb : null;
         return c;
     }
@@ -187,7 +188,7 @@
     let calib = null;          // 校正中：{ left, dbs, auto }
     let awarded = false;
     let fsOn = false;
-    let curAnimal = cfg.animal === 'random' ? ANIMAL_KEYS[0] : cfg.animal;
+    let curAnimal = cfg.animal === 'random' ? ANIMAL_KEYS[Math.floor(Math.random() * ANIMAL_KEYS.length)] : cfg.animal;
     let mood = '', pendingMood = '', pendingAt = 0, lastLine = '';
 
     const $ = id => document.getElementById(id);
@@ -533,6 +534,7 @@
             const b = e.target.closest('[data-animal]');
             if (!b) return;
             cfg.animal = b.dataset.animal;
+            cfg.animalPicked = true;
             lsSet(K_CFG, cfg);
             curAnimal = cfg.animal === 'random' ? randomAnimal() : cfg.animal;
             syncSeg();
@@ -951,7 +953,11 @@
         init() {
             injectCSS();
             cfg = loadCfg();
+            // 每次進入本頁換一隻小幫手（麥克風開著時不換，避免偵測中突然變角色）
+            if (!audio.stream) curAnimal = cfg.animal === 'random' ? randomAnimal() : cfg.animal;
+            const fresh = !($('qc-root') && $('qc-root').dataset.ready);
             render();
+            if (!fresh) { syncSeg(); setMood(mood || 'off', true); }
             renderLog();
             renderActions();
             renderCalibInfo();
