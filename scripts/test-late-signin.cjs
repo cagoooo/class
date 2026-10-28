@@ -24,6 +24,7 @@ function setup({ popupError, currentUser = null }) {
         localStorage: { setItem: (k, v) => store.set(k, v), getItem: k => store.get(k) ?? null, removeItem: k => store.delete(k) },
         CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init?.detail; } },
         dispatchEvent: e => events.push(e),
+        addEventListener() {},   // firebase-config.js 會掛 pageshow 監聽（v3.56.1）
         UsageNotify: { login: (profile, isNew) => usage.push({ profile, isNew }) },
         firebase: {
             apps: [{}],

@@ -52,6 +52,12 @@ jobs:
           node scripts/test-error-report-privacy.cjs
           node scripts/test-google-only-sync.cjs
           node scripts/test-quiet-challenge.cjs
+          node scripts/test-late-signin.cjs
+          node scripts/test-sync-status.cjs
+          node scripts/test-semester-archive.cjs
+          node scripts/test-purge-backup.cjs
+          node scripts/test-snapshot-prune.cjs
+          node scripts/test-source-app.cjs
 
       - name: Inject Secrets 💉
         run: python .github/inject.py
