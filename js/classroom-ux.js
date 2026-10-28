@@ -32,8 +32,7 @@
                 const action = button.getAttribute('onclick');
                 const label = /^removeStudent\(/.test(action) ? '刪除學生'
                     : /^removeNotebook\(/.test(action) ? '刪除此事項'
-                    : /^renameHomework\(/.test(action) ? '✏️ 修改名稱'
-                    : /^removeHomework\(/.test(action) ? '刪除此作業' : '';
+                    : '';
                 if (!label) return;
                 // 同一列的多個操作收進同一個「管理」選單
                 let menu = button.parentElement && button.parentElement.querySelector(':scope > details.class-management-action');
@@ -50,7 +49,8 @@
                 menu.append(button);
             });
         }
-        ['studentsList', 'notebookList', 'homeworkList'].forEach(id => {
+        // 作業列表用列內的「改名／刪除」小按鈕（刪除前會再確認），不收進會撐高整列的管理選單
+        ['studentsList', 'notebookList'].forEach(id => {
             const root = document.getElementById(id);
             if (!root) return;
             tidyActions(root);
