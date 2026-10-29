@@ -113,13 +113,17 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
         assert.equal(await pet.setCoinsEnabled(true),true); assert.equal(pet.coinsFor(1),0);
         await pet.award([1],3,'新獎勵'); assert.equal(pet.coinsFor(1),3); assert.equal(pet.xpFor(1),13); assert.equal(ctx.students[0].points,18);
     });
-    await test('規則可分別設定三種數值，修改不重算舊紀錄',async()=>{
+    await test('規則只設分數，成長值與金幣同步，修改不重算舊紀錄',async()=>{
         const {pet,ctx}=setup();await pet.setCoinsEnabled(true);
-        assert.equal(await pet.saveRule({name:'合作',points:2,xp:5,coins:7}),true); const rule=pet.settings().rules[0];
-        await pet.award([1],rule.points,rule.name,rule.xp,'rule-batch',rule.coins); const original=JSON.stringify(ctx.pointsHistory);
-        assert.equal(await pet.saveRule({name:'合作新版',points:3,xp:0,coins:1},rule.id),true);
-        assert.equal(pet.settings().rules.length,1);assert.equal(JSON.stringify(ctx.pointsHistory),original);assert.equal(pet.coinsFor(1),7);assert.equal(pet.xpFor(1),5);
+        assert.equal(await pet.saveRule({name:'合作',points:4,xp:9,coins:9}),true); const rule=pet.settings().rules[0];
+        assert.deepEqual([rule.points,rule.xp,rule.coins],[4,4,4]);
+        await pet.award([1],rule.points,rule.name,undefined,'rule-batch'); const original=JSON.stringify(ctx.pointsHistory);
+        assert.equal(pet.coinsFor(1),4);assert.equal(pet.xpFor(1),4);assert.equal(ctx.students[0].points,9);
+        assert.equal(await pet.saveRule({name:'合作新版',points:3},rule.id),true);
+        assert.equal(pet.settings().rules.length,1);assert.equal(JSON.stringify(ctx.pointsHistory),original);assert.equal(pet.coinsFor(1),4);
         await pet.undo([ctx.pointsHistory[0].id]);assert.equal(pet.coinsFor(1),0);assert.equal(pet.xpFor(1),0);assert.equal(ctx.students[0].points,5);
+        assert.equal(await pet.saveRule({name:'扣分',points:-2}),true);const minus=pet.settings().rules[1];assert.deepEqual([minus.xp,minus.coins],[0,0]);
+        await pet.award([1],minus.points,minus.name);assert.equal(pet.coinsFor(1),0);assert.equal(pet.xpFor(1),0);assert.equal(ctx.students[0].points,3);
     });
     await test('金幣與成長可分別暫停，重新啟用不補發',async()=>{
         const {pet,storage}=setup();await pet.setCoinsEnabled(true);await pet.award([1],2,'努力');await pet.setCoinsEnabled(false);await pet.award([1],4,'努力');assert.equal(pet.coinsFor(1),2);assert.equal(pet.xpFor(1),6);
@@ -137,8 +141,8 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
     });
     await test('金幣設定存檔失敗與非法規則不覆蓋原設定',async()=>{
         const {pet,storage}=setup();const before=storage.getItem('petSettings');storage.failKey='petSettings';assert.equal(await pet.setCoinsEnabled(true),false);assert.equal(storage.getItem('petSettings'),before);
-        for(const coins of [-1,1.5,1001,NaN])assert.equal(await pet.saveRule({name:'測試',points:2,xp:2,coins}),false);
-        assert.equal(await pet.saveRule({name:'扣分',points:-1,xp:0,coins:1}),false);assert.equal(storage.getItem('petSettings'),before);
+        for(const points of [0,1.5,1001,-1001,NaN])assert.equal(await pet.saveRule({name:'測試',points}),false);
+        assert.equal(await pet.saveRule({name:'',points:2}),false);assert.equal(storage.getItem('petSettings'),before);
     });
     await test('金幣備份重建去重、班級隔離與期初餘額',async()=>{
         const {pet,ctx,persist,storage}=setup('B');ctx.students[0].petCarryCoins=12;persist();pet.prepare();await pet.setCoinsEnabled(true);await pet.award([1],2,'努力',3,'carry',5);

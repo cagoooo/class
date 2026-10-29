@@ -193,7 +193,7 @@
         { id: 'art', name: '作品展示一週', cost: 30, icon: '🎨', category: '分享舞台' },
         { id: 'sharing', name: '課堂才藝分享五分鐘', cost: 40, icon: '🌟', category: '分享舞台' }
     ];
-    const blankRule = () => ({ name: '', points: '2', xp: '2', coins: '2' });
+    const blankRule = () => ({ name: '', points: '2' });
     let ruleDraft = blankRule();
     let onlySelected = false;
     let viewMode = ['compact', 'cards'].includes(localStorage.getItem('petViewMode')) ? localStorage.getItem('petViewMode') : (window.matchMedia?.('(max-width: 600px)').matches ? 'compact' : 'cards');
@@ -827,17 +827,24 @@
             rules: config.rules.map(r => ({ ...r, coins: r.coins ?? Math.max(0, r.points) })) },
             { action: enabled ? '啟用金幣' : '暫停金幣累積' });
     }
+    // 獎勵規則只設一個分數：加分時成長值、金幣同步增加同樣數量；扣分只扣分數，不影響寵物與金幣。
     function saveRule(values, id = null) {
         const name = String(values.name || '').trim();
-        const points = Number(values.points), xp = Number(values.xp), coins = Number(values.coins);
-        if (!name || name.length > 40 || !Number.isInteger(points) || !points || Math.abs(points) > 1000 ||
-            !Number.isInteger(xp) || xp < 0 || xp > 1000 || !Number.isInteger(coins) || coins < 0 || coins > 1000 ||
-            (points < 0 && (xp !== 0 || coins !== 0))) return Promise.resolve(fail('請填寫名稱與非零整數分數；成長值、金幣需為 0～1000 的整數，扣分規則請設為 0。'));
+        const points = Number(values.points);
+        if (!name || name.length > 40 || !Number.isInteger(points) || !points || Math.abs(points) > 1000)
+            return Promise.resolve(fail('請填寫規則名稱，分數請填 -1000 到 1000 的非零整數。'));
         const config = settings();
         if (id && !config.rules.some(r => r.id === id)) return Promise.resolve(fail('這項規則已不存在，請重新選取。'));
-        const rule = { id: id || uid(), name, points, xp, coins };
+        const synced = Math.max(0, points);   // 還沒更新的舊版裝置會讀 xp、coins，一併寫成同步值
+        const rule = { id: id || uid(), name, points, xp: synced, coins: synced };
         return saveSettings({ ...config, rules: id ? config.rules.map(r => r.id === id ? rule : r) : [...config.rules, rule] },
             { action: id ? '更新獎勵規則' : '新增獎勵規則', reason: name });
+    }
+    // 發放前與規則編輯時的同步說明：加分帶動成長值與金幣，扣分只扣分數
+    function syncText(points, config) {
+        if (points < 0) return `每人扣 ${-points} 分；寵物成長與金幣不受影響。`;
+        const extra = [config.enabled ? `寵物成長 +${points}` : '', config.coinsEnabled ? `金幣 +${points}` : ''].filter(Boolean);
+        return `每人 +${points} 分` + (extra.length ? `，同步${extra.join('、')}。` : '。（寵物成長、金幣尚未啟用）');
     }
     function saveProduct(values, id = null) {
         const name = String(values.name || '').trim(), cost = Number(values.cost);
@@ -1036,7 +1043,7 @@
         coinText.append(el('strong', config.coinsEnabled ? '🪙 金幣累積中' : '🪙 金幣尚未啟用'), el('span', config.coinsEnabled ? '正向加分會同時發放金幣，學生可以用來兌換下面的獎勵。' : '啟用後，正向加分會同時發放等量金幣；之前的分數不會換算。'));
         coin.append(coinText, button(config.coinsEnabled ? '暫停累積' : '啟用本班金幣', requestCoinsToggle, config.coinsEnabled ? '' : 'pet-primary'));
         const coinGuide = el('details', undefined, 'pet-shop-guide'); coinGuide.dataset.petKey = 'coins-guide';
-        coinGuide.append(el('summary', '金幣怎麼運作？'), el('p', '金幣與成長值分開記錄。啟用後，原本正向加分會獲得等量金幣；自訂規則可調整金額。舊分數不換算，一般扣分與分數歸零不扣金幣，撤銷獎勵會扣回該筆金幣。暫停累積後仍可使用餘額兌換。'));
+        coinGuide.append(el('summary', '金幣怎麼運作？'), el('p', '金幣與成長值分開記錄。啟用後，原本正向加分會獲得等量金幣；自訂獎勵規則也一樣，加幾分就得幾枚金幣。舊分數不換算，一般扣分與分數歸零不扣金幣，撤銷獎勵會扣回該筆金幣。暫停累積後仍可使用餘額兌換。'));
         panel.append(coin, coinGuide);
 
         // 2. 本班獎勵：直接在清單上改，不必先按「編輯」再到別處填表單
@@ -1214,7 +1221,7 @@
         const guide = el('details', undefined, 'pet-guide'); guide.dataset.petKey = 'guide';
         const guideSummary=el('summary');guideSummary.append(el('strong','成長指南與同步說明'),el('span','孵化門檻・解鎖規則・換裝置三步驟','pet-guide-subtitle'));guide.append(guideSummary);
         const guideBody=el('div',undefined,'pet-guide-body');
-        const growthGuide=el('section',undefined,'pet-guide-panel');growthGuide.append(el('h3','01　每一份努力，都讓牠長大'),el('p','啟用寵物成長後，正向加分會帶動成長；自訂獎勵依老師設定發放。'));
+        const growthGuide=el('section',undefined,'pet-guide-panel');growthGuide.append(el('h3','01　每一份努力，都讓牠長大'),el('p','啟用寵物成長後，正向加分會帶動成長，加幾分就長幾點成長值；自訂獎勵規則也一樣。'));
         const path=el('ol',undefined,'pet-guide-path');
         for(const [amount,title,description] of [['10','Lv.1 · 孵化','隨機揭曉你的成長夥伴'],['50','Lv.3 · 成長','解鎖新造型與新姿態'],['90','Lv.5 · 成熟','解鎖進階姿態與對話']]) {const step=el('li');step.append(el('strong',amount+' 成長值'),el('span',title),el('small',description));path.append(step);}
         growthGuide.append(path,el('p','以上為累積成長值；孵化後每增加 20 成長值升一級。','pet-guide-note'));
@@ -1291,45 +1298,48 @@
         const bar = el('div', undefined, 'pet-award-bar'); const count = el('span'); count.setAttribute('role', 'status');
         const ruleSelect = el('select'); ruleSelect.setAttribute('aria-label', '獎勵規則');
         ruleSelect.dataset.petFocus = 'rule';
-        config.rules.forEach(r => ruleSelect.add(new Option(`${r.name} · ${r.points > 0 ? '+' : ''}${r.points} 分 / 成長 +${config.enabled ? r.xp : 0} / 金幣 +${config.coinsEnabled ? (r.coins || 0) : 0}`, r.id)));
+        config.rules.forEach(r => ruleSelect.add(new Option(`${r.name} · ${r.points > 0 ? '+' : ''}${r.points} 分`, r.id)));
         if (config.rules.some(r => r.id === selectedRule)) ruleSelect.value = selectedRule;
         ruleSelect.addEventListener('change', () => { selectedRule = ruleSelect.value; });
         const give = button('確認發放', async () => {
             const r = config.rules.find(r => r.id === ruleSelect.value); if (!r) return;
             const ids = [...selected].filter(id => window.students.some(s => String(s.id) === id));
             if (!ids.length) return fail('請先選取學生。');
-            if (!await confirmAction(`發放「${r.name}」給 ${ids.length} 位學生？\n每人 ${r.points} 分、成長 +${config.enabled ? r.xp : 0}、金幣 +${config.coinsEnabled ? (r.coins || 0) : 0}。`)) return;
+            if (!await confirmAction(`發放「${r.name}」給 ${ids.length} 位學生？\n${syncText(r.points, config)}`)) return;
             give.disabled = true;
-            await award(ids, r.points, r.name, r.xp, undefined, r.coins || 0);
+            await award(ids, r.points, r.name);   // 不帶覆寫值：成長值、金幣跟著分數同步
             give.disabled = false;
         }, 'pet-primary');
         give.dataset.petFocus = 'award';
         function updateCount() { bar.classList.toggle('pet-award-active', selected.size > 0); const shown = visibleStudents().filter(s => selected.has(String(s.id))).length; count.textContent = `已選 ${selected.size} 人${selected.size > shown ? `（篩選外 ${selected.size - shown} 人）` : ''}`; give.disabled = !selected.size || busy; }
         bar.append(count, ruleSelect, give); root.append(bar); renderCards(); updateCount();
         const rules = el('details'); rules.dataset.petKey = 'rules'; rules.append(el('summary', '⚙️ 自訂獎勵規則與設定'));
-        rules.append(el('p', '規則修改只影響之後的發放；已發放的分數、成長值與金幣不會改動。'));
+        rules.append(el('p', '每條規則只要設定分數：加分時，寵物成長值與金幣會自動增加同樣的數量；扣分只扣分數，不影響寵物與金幣。規則修改只影響之後的發放。', 'pet-rule-intro'));
         const form = el('form', undefined, 'pet-rule-editor');
         form.append(el('strong', editingRuleId ? '編輯獎勵規則' : '新增獎勵規則'));
         const name = el('input'); name.required = true; name.maxLength = 40; name.placeholder = '規則名稱'; name.setAttribute('aria-label', '規則名稱');
         name.value = ruleDraft.name; name.dataset.petFocus = 'rule-name'; name.addEventListener('input', () => { ruleDraft.name = name.value; });
         function number(label, value, min) { const wrapper = el('label', label); const input = el('input'); input.type = 'number'; input.value = value; input.required = true; input.min = min; input.max = 1000; input.step = 1; wrapper.append(input); return [wrapper, input]; }
-        const [pl, point] = number('分數', ruleDraft.points, -1000), [xl, xp] = number('成長值', ruleDraft.xp, 0), [cl, coins] = number('金幣', ruleDraft.coins, 0);
-        [[point, 'points'], [xp, 'xp'], [coins, 'coins']].forEach(([input, key]) => { input.dataset.petFocus = 'rule-' + key; input.addEventListener('input', () => { ruleDraft[key] = input.value; }); });
+        const [pl, point] = number('分數（扣分填負數）', ruleDraft.points, -1000);
+        point.dataset.petFocus = 'rule-points';
+        const preview = el('p', '', 'pet-rule-preview'); preview.setAttribute('aria-live', 'polite');
+        const updatePreview = () => { const n = Number(point.value); preview.textContent = Number.isInteger(n) && n && Math.abs(n) <= 1000 ? syncText(n, config) : '請填寫 -1000 到 1000 的非零整數'; };
+        point.addEventListener('input', () => { ruleDraft.points = point.value; updatePreview(); }); updatePreview();
         const submit = el('button', editingRuleId ? '儲存規則' : '新增規則', 'pet-primary'); submit.type = 'submit';
         const actions = el('div', undefined, 'pet-tools'); actions.append(submit);
         if (editingRuleId) actions.append(button('取消編輯', () => { editingRuleId = null; ruleDraft = blankRule(); render(); }));
-        form.append(name, pl, xl, cl, actions);
+        form.append(name, pl, preview, actions);
         form.addEventListener('submit', async e => {
             e.preventDefault();
-            const ok = await saveRule({ name: name.value, points: point.value, xp: xp.value, coins: coins.value }, editingRuleId);
+            const ok = await saveRule({ name: name.value, points: point.value }, editingRuleId);
             if (ok) { editingRuleId = null; ruleDraft = blankRule(); render(); if (typeof NotificationSystem !== 'undefined') NotificationSystem.success('規則已存本機'); }
         });
         rules.append(form);
         config.rules.forEach(r => {
             const row = el('div', undefined, 'pet-rule');
-            const edit = button('編輯', () => { editingRuleId = r.id; ruleDraft = { name: r.name, points: String(r.points), xp: String(r.xp), coins: String(r.coins || 0) }; render(); document.querySelector('[data-pet-focus="rule-name"]')?.focus(); });
+            const edit = button('編輯', () => { editingRuleId = r.id; ruleDraft = { name: r.name, points: String(r.points) }; render(); document.querySelector('[data-pet-focus="rule-name"]')?.focus(); });
             edit.setAttribute('aria-label', `編輯「${r.name}」規則`);
-            row.append(el('span', `${r.name} · ${r.points} 分 / 成長 ${r.xp} / 金幣 ${r.coins || 0}`), edit, button('移除規則', async () => {
+            row.append(el('span', `${r.name} · ${r.points > 0 ? '+' : ''}${r.points} 分`), edit, button('移除規則', async () => {
                 const ok = await saveSettings({ ...config, rules: config.rules.filter(x => x.id !== r.id) });
                 if (ok && editingRuleId === r.id) { editingRuleId = null; ruleDraft = blankRule(); render(); }
             })); rules.append(row);
