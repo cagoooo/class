@@ -16,9 +16,9 @@ function setup({ dry = 'newer', applied = 'updated', google = true, syncing = fa
         location: { reload() { calls.push('reload'); } },
         NotificationSystem: { success: message => notices.push(message) },
         syncStatus: { isSyncing: syncing },
-        FirebaseConfig: { isGoogleUser: () => google, getDb: () => ({}), onAuthStateChanged: fn => authCallbacks.push(fn) },
+        FirebaseConfig: { isGoogleUser: () => ctx.google, getCurrentUserId: () => ctx.uid, isPageBusy: () => ctx.busy, getDb: () => ({}), onAuthStateChanged: fn => authCallbacks.push(fn) },
         CloudSafety: { async fastForward(id, options) { calls.push(options?.dryRun ? 'dry' : 'apply'); return options?.dryRun ? ctx.dry : ctx.applied; } } };
-    ctx.dry = dry; ctx.applied = applied; ctx.window = ctx; vm.createContext(ctx);
+    ctx.dry = dry; ctx.applied = applied; ctx.google = google; ctx.uid = 'teacher'; ctx.busy = false; ctx.window = ctx; vm.createContext(ctx);
     vm.runInContext(fs.readFileSync('js/cloud-fast-forward.js', 'utf8'), ctx);
     const fire = type => (listeners[type] || []).forEach(fn => fn({}));
     const settle = () => new Promise(resolve => setImmediate(resolve));
@@ -78,6 +78,37 @@ async function test(name, fn) { await fn(); passed++; console.log('PASS', name);
     await test('短時間內不重複重新載入', async () => {
         const env = setup(); env.session.set('cloudFastForwardReloadAt', String(Date.now())); await env.auth();
         assert.deepEqual(env.calls, ['dry', 'apply']); assert.equal(env.notices.length, 1);
+    });
+    await test('開頁後才按 Google 登入：按登入鈕不算開始上課，登入後仍自動更新', async () => {
+        const env = setup({ google: false }); await env.auth();   // 開頁時未登入（匿名）
+        assert.deepEqual(env.calls, []);
+        env.fire('pointerdown');                                  // 按下「Google 登入」
+        env.ctx.google = true; await env.auth();
+        assert.deepEqual(env.calls, ['dry', 'apply', 'reload']);
+    });
+    await test('登入後若有計時器、全螢幕或對話框，只提示不重新載入', async () => {
+        const env = setup({ google: false }); await env.auth(); env.fire('pointerdown');
+        env.ctx.busy = true; env.ctx.google = true; await env.auth();
+        assert.deepEqual(env.calls, ['dry']); assert.ok(banner(env));
+    });
+    await test('開頁時已登入、老師先操作：仍只提示（原行為不變）', async () => {
+        const env = setup(); env.fire('pointerdown'); await env.auth(); await env.auth();
+        assert.deepEqual(env.calls, ['dry']);
+    });
+    await test('登入時正在同步：等同步結束再檢查，最多重試有限次', async () => {
+        const env = setup({ google: false }); await env.auth(); env.fire('pointerdown');
+        env.ctx.syncStatus.isSyncing = true; env.ctx.google = true; await env.auth();
+        assert.deepEqual(env.calls, []);                          // 同步中不檢查，也不會無限重試
+        const later = setup({ google: false }); await later.auth(); later.fire('pointerdown');
+        let first = true; later.ctx.syncStatus = { get isSyncing() { if (first) { first = false; return true; } return false; } };
+        later.ctx.google = true; await later.auth(); await later.settle(); await later.settle();
+        assert.deepEqual(later.calls, ['dry', 'apply', 'reload']);
+    });
+    await test('同一帳號重複收到登入狀態不重複檢查；換帳號重新檢查', async () => {
+        const env = setup({ dry: 'current' }); await env.auth(); await env.auth();
+        assert.deepEqual(env.calls, ['dry']);
+        env.ctx.uid = 'other'; await env.auth();
+        assert.deepEqual(env.calls, ['dry', 'dry']);
     });
     console.log(`${passed} fast-forward checks passed`);
 })().catch(e => { console.error(e); process.exitCode = 1; });

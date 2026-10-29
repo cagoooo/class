@@ -280,5 +280,6 @@ window.FirebaseConfig = {
     isGoogleUser: isGoogleUser,
     canWriteCloud: canWriteCloud,
     isClientTerminated: isClientTerminated,
+    isPageBusy: isPageBusy,
 };
 

@@ -8,12 +8,17 @@
  * - 使用途中切回分頁或恢復連線：只提示「雲端有新資料」，由老師按下才更新，
  *   避免打斷計時、考試，或洗掉輸入到一半的文字。
  * - 本機有任何未同步的變更時完全不介入，維持原本的比較流程。
+ * - 開頁後才按「Google 登入」：按登入鈕本身就算「已操作」，以前因此只顯示提示、老師沒看到就在舊資料上加分。
+ *   登入後短時間內（且沒有計時器、全螢幕、對話框）仍視同剛開啟，可自動更新。
  */
 (function () {
     'use strict';
     const NOTICE_KEY = 'cloudFastForwardNotice', RELOAD_KEY = 'cloudFastForwardReloadAt';
-    const RECHECK_MS = 60000, RELOAD_GUARD_MS = 20000;
+    const RECHECK_MS = 60000, RELOAD_GUARD_MS = 20000, SIGN_IN_GRACE_MS = 30000, SYNC_RETRY_MS = 3000, SYNC_RETRIES = 10;
     let interacted = false, checking = false, lastCheck = 0, startupDone = false, banner = null;
+    let signedInAt = 0, lastUser;   // lastUser：undefined＝還沒收到登入狀態，null＝目前沒有以 Google 登入
+    const justSignedIn = () => Date.now() - signedInAt < SIGN_IN_GRACE_MS;
+    const pageBusy = () => { try { return !!window.FirebaseConfig?.isPageBusy?.(); } catch { return true; } };
 
     const ready = () => !!(window.CloudSafety?.fastForward && window.FirebaseConfig?.isGoogleUser?.() && window.FirebaseConfig?.getDb?.());
     const say = message => { try { window.NotificationSystem?.success?.(message); } catch { /* 提示失敗不影響更新 */ } };
@@ -72,13 +77,18 @@
      * @param {{auto?: boolean}} [options] auto：允許在老師尚未操作時直接更新；否則一律只提示
      */
     async function check(options = {}) {
+        if (window.syncStatus?.isSyncing && options.auto && justSignedIn() && (options.retries || 0) < SYNC_RETRIES) {
+            // 剛登入時常會同時開始一次同步，等它結束再檢查，不要就此錯過自動更新的時機
+            setTimeout(() => check({ ...options, retries: (options.retries || 0) + 1 }), SYNC_RETRY_MS);
+            return 'skipped';
+        }
         if (checking || !ready() || window.syncStatus?.isSyncing) return 'skipped';
         checking = true; lastCheck = Date.now();
         try {
             await syncRegistry();
             const state = await window.CloudSafety.fastForward(undefined, { dryRun: true });
             if (state !== 'newer') { hideBanner(); return state; }
-            if (options.auto && !interacted) return await apply();
+            if (options.auto && (!interacted || (justSignedIn() && !pageBusy()))) return await apply();
             showBanner();
             return state;
         } catch (error) {
@@ -95,7 +105,13 @@
         // Firebase 尚未初始化時掛不上監聽，等它就緒再掛（與分享面板相同的時序問題）。
         if (!config.getDb?.()) { if (attempt < 150) setTimeout(() => watchAuth(attempt + 1), 400); return; }
         config.onAuthStateChanged(() => {
-            if (startupDone || !ready()) return;
+            if (!ready()) { lastUser = null; return; }
+            const user = config.getCurrentUserId?.() || 'google';
+            if (user === lastUser) return;
+            const freshSignIn = lastUser !== undefined;   // 開頁時沒登入，之後才登入或換帳號
+            lastUser = user;
+            if (freshSignIn) signedInAt = Date.now();
+            else if (startupDone) return;
             startupDone = true;
             check({ auto: true });
         });
