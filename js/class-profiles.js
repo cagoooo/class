@@ -139,6 +139,26 @@
         }
     }
 
+    /**
+     * 切過去之前，先讓目標班級跟上雲端最新版本。
+     * 科任老師在多台電腦間輪流使用，這台的目標班級資料可能停在幾天前；開啟頁面時的自動更新只檢查當時的班級，
+     * 若切班後直接在舊資料上加分，就會撞上同步衝突。換不換、能不能換全由 CloudSafety.fastForward 判斷
+     * （這台有任何未同步變更就不動），網路太慢時最多等 6 秒，之後照常切換，開啟後仍有原本的檢查。
+     */
+    async function catchUpBeforeSwitch(id) {
+        const safety = window.CloudSafety;
+        if (!safety?.fastForward || !window.FirebaseConfig?.isGoogleUser?.()) return;
+        try {
+            const result = await Promise.race([
+                safety.fastForward(id),
+                new Promise(resolve => setTimeout(() => resolve('timeout'), 6000)),
+            ]);
+            console.log('[ClassProfiles] 切班前確認雲端版本：', result);
+        } catch (e) {
+            console.warn('[ClassProfiles] 切班前確認雲端版本未完成（繼續切換）:', e?.message || e);
+        }
+    }
+
     /** 刪除指定 IDB */
     function deleteIdb(id) {
         return new Promise((resolve) => {
@@ -640,6 +660,9 @@
 
             // 先同步目前班級資料
             await syncBeforeSwitch();
+            // 目標班級若在其他電腦有更新，先換成雲端最新版本
+            if (msg) msg.textContent = `正在確認「${targetName}」的雲端最新資料...`;
+            await catchUpBeforeSwitch(id);
 
             // 切換
             setCurrentId(id);
