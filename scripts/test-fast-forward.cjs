@@ -36,6 +36,19 @@ async function test(name, fn) { await fn(); passed++; console.log('PASS', name);
         vm.runInContext(fs.readFileSync('js/cloud-fast-forward.js', 'utf8'), env.ctx); await env.settle();
         assert.equal(env.notices.length, 1); assert.match(env.notices[0], /已自動更新/); assert.equal(env.session.has('cloudFastForwardNotice'), false);
     });
+    await test('本機有未同步變更：剛開啟就走一次同步，尚未操作時可當場合併', async () => {
+        const env = setup({ dry: 'local-changes' }); const calls = [];
+        env.ctx.FirebaseSync = { syncPendingClasses: options => calls.push(options.mergeCurrent) };
+        await env.auth();
+        assert.deepEqual(calls, [true]); assert.deepEqual(env.calls, ['dry']);
+    });
+    await test('自動合併後重新載入，並告訴老師', async () => {
+        const env = setup({ dry: 'current' }); await env.auth();
+        env.fire('window:cloud-auto-merged');
+        assert.equal(env.calls.at(-1), 'reload'); assert.equal(env.session.get('cloudFastForwardNotice'), 'merged');
+        vm.runInContext(fs.readFileSync('js/cloud-fast-forward.js', 'utf8'), env.ctx); await env.settle();
+        assert.match(env.notices.at(-1), /自動合併/);
+    });
     await test('老師已開始操作：只提示，按下才更新', async () => {
         const env = setup(); env.fire('pointerdown'); await env.auth();
         assert.deepEqual(env.calls, ['dry']); const shown = banner(env); assert.ok(shown);

@@ -10,6 +10,8 @@
  * - 本機有任何未同步的變更時完全不介入，維持原本的比較流程。
  * - 開頁後才按「Google 登入」：按登入鈕本身就算「已操作」，以前因此只顯示提示、老師沒看到就在舊資料上加分。
  *   登入後短時間內（且沒有計時器、全螢幕、對話框）仍視同剛開啟，可自動更新。
+ * - 本機有未同步的變更：剛開啟時立刻走一次同步，雲端也較新就自動合併，不等老師在舊資料上繼續操作。
+ * - 目前班級自動合併後一律重新載入，理由同上。
  */
 (function () {
     'use strict';
@@ -87,6 +89,7 @@
         try {
             await syncRegistry();
             const state = await window.CloudSafety.fastForward(undefined, { dryRun: true });
+            if (state === 'local-changes' && options.auto) window.FirebaseSync?.syncPendingClasses?.({ mergeCurrent: !interacted });
             if (state !== 'newer') { hideBanner(); return state; }
             if (options.auto && (!interacted || (justSignedIn() && !pageBusy()))) return await apply();
             showBanner();
@@ -116,14 +119,21 @@
             check({ auto: true });
         });
     }
+    function onMerged() {
+        session.set(NOTICE_KEY, 'merged'); session.set(RELOAD_KEY, String(Date.now()));
+        window.LeaveSyncGuard?.allowInternalNavigation?.();
+        location.reload();
+    }
     function init() {
+        window.addEventListener('cloud-auto-merged', onMerged);
         for (const type of ['pointerdown', 'keydown']) document.addEventListener(type, () => { interacted = true; }, { capture: true, once: true });
         document.addEventListener('visibilitychange', () => { if (!document.hidden) recheck(); });
         window.addEventListener('focus', recheck);
         window.addEventListener('online', recheck);
-        if (session.get(NOTICE_KEY)) {
+        const notice = session.get(NOTICE_KEY);
+        if (notice) {
             session.remove(NOTICE_KEY);
-            setTimeout(() => say('☁️ 已自動更新為雲端最新版本（其他裝置的變更已帶入）'), 1200);
+            setTimeout(() => say(notice === 'merged' ? '☁️ 已自動合併其他裝置的更新，兩邊的紀錄都保留了' : '☁️ 已自動更新為雲端最新版本（其他裝置的變更已帶入）'), 1200);
         }
         watchAuth();
     }

@@ -13,6 +13,9 @@
  * - 按「稍後提醒」就安靜 15 分鐘，期間再怎麼加分都不會跳出來。
  * - 背景自動同步不會把卡片叫出來；只有老師自己按「立即同步」才顯示進度。
  * 關閉分頁時的原生確認視窗不受以上規則影響，仍是最後一道保險。
+ *
+ * 同步衝突：其他班背景同步停下來時也要讓老師看得到（卡片直接開該班的比較視窗）。
+ * 目前班級等待自動合併時，等老師停下來、沒有計時或輸入才進行，因為合併後要重新載入。
  */
 (function () {
     'use strict';
@@ -22,6 +25,7 @@
     const SNOOZE_MS = 15 * 60 * 1000;       // 按「稍後提醒」後安靜多久
     const SOFT_SNOOZE_MS = 5 * 60 * 1000;   // 沒按按鈕、直接繼續操作後安靜多久
     const EXIT_INTENT_MS = 8 * 1000;        // 滑鼠移出視窗上緣（準備關閉分頁）後的顯示時間
+    const MERGE_RETRY_MS = 60 * 1000;       // 等待自動合併時，兩次嘗試的最短間隔
     const SNOOZE_KEY = 'leaveSyncSnoozeUntil';
 
     const state = {
@@ -35,6 +39,7 @@
         snoozeUntil: 0,
         exitIntentAt: 0,
         userSyncing: false,
+        mergeRetryAt: 0,
     };
 
     /**
@@ -64,6 +69,22 @@
             const profile = window.ClassProfiles?.currentProfile?.();
             return profile?.name || currentClassId();
         } catch (e) { return currentClassId(); }
+    }
+
+    function classNameFor(id) {
+        if (id === currentClassId()) return currentClassName();
+        if (id === 'default') return '預設班級';
+        try {
+            const profiles = JSON.parse(localStorage.getItem('classProfiles') || '[]');
+            return profiles.find(profile => String(profile.id) === id)?.name || id;
+        } catch (e) { return id; }
+    }
+
+    /** 背景同步停在別班時，目前班級的狀態看不出來，要另外問。 */
+    function otherConflictId() {
+        try {
+            return (window.CloudSafety?.conflictIds?.() || []).find(id => id !== currentClassId()) || '';
+        } catch (e) { return ''; }
     }
 
     function isGoogleUser() {
@@ -124,12 +145,14 @@
     }
 
     function signal() {
-        const status = cloudStatus();
+        const other = cloudStatus() === 'conflict' ? '' : otherConflictId();
+        const status = other ? 'conflict' : cloudStatus();
         const syncing = !!window.syncStatus?.isSyncing;
-        const active = isGoogleUser() && hasPendingEvidence(currentClassId(), status, syncing);
+        const id = other || currentClassId();
+        const active = isGoogleUser() && hasPendingEvidence(id, status, syncing);
         return {
-            id: currentClassId(),
-            name: currentClassName(),
+            id,
+            name: classNameFor(id),
             status,
             syncing,
             progress: syncing ? syncProgress() : null,
@@ -270,6 +293,7 @@
         const banner = createBanner();
         if (!banner) return;
         const message = banner.querySelector('.leave-sync-message');
+        banner.querySelector('.leave-sync-title').textContent = info.status === 'conflict' && !info.syncing ? '有一個班需要你確認' : '離開前記得同步班級';
         const action = banner.querySelector('[data-action="sync"]');
         const progressBox = banner.querySelector('.leave-sync-progress');
         const progressFill = banner.querySelector('.leave-sync-progress-fill');
@@ -293,8 +317,8 @@
             progressPercent.textContent = progress ? `${Math.round(percent)}%` : '處理中';
             progressNote.textContent = `${phaseText(progress)} · ${elapsedText(progress?.startedAt)}` + (percent >= 90 ? ' · 即將完成' : ' · 通常還需要幾秒');
         } else if (info.status === 'conflict') {
-            message.textContent = `「${info.name}」班的雲端版本與本機資料不同，請先比較資料，避免覆蓋成果。`;
-            action.textContent = '比較同步差異';
+            message.textContent = `「${info.name}」班有其他裝置的更新，和這台的內容改到同一個地方，系統無法自動合併。資料都還在，請選擇要保留哪一份。`;
+            action.textContent = '查看並選擇';
             action.disabled = false;
         } else {
             message.textContent = `「${info.name}」班還有變更尚未上傳。先同步到 Google 雲端，回家或換電腦就能繼續整理。`;
@@ -329,8 +353,22 @@
         }
     }
 
+    /** 老師停下來時補做自動合併；上課中、計時中、輸入到一半都不動。 */
+    function retryDeferredMerge(now) {
+        try {
+            if (!window.CloudSafety?.isMergeWaiting?.() || window.syncStatus?.isSyncing || !isOnline()) return;
+            if (now - state.lastInputAt < QUIET_MS || now - state.mergeRetryAt < MERGE_RETRY_MS) return;
+            if (window.FirebaseConfig?.isPageBusy?.() !== false) return;
+            const focused = document.activeElement;
+            if (focused?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(focused?.tagName)) return;
+            state.mergeRetryAt = now;
+            window.FirebaseSync?.syncPendingClasses?.({ mergeCurrent: true });
+        } catch (e) { /* 下次再試 */ }
+    }
+
     function refresh() {
         const info = signal(), now = Date.now();
+        retryDeferredMerge(now);
         if (!info.active) {
             state.pendingSince = 0;
             hideBanner();

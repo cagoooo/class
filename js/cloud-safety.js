@@ -177,15 +177,16 @@
     async function publish(id = current(), options = {}) {
         if (navigator.onLine === false) throw Object.assign(Error('已存本機，恢復連線後再同步'), { code: 'sync-offline' });
         const c = writeContext(id);
+        let autoMerged = null;
         return withSyncLock(c, async () => {
             // 等鎖的期間可能斷線：在讀雲端前再確認一次，維持「已存本機」的說法
             if (navigator.onLine === false) throw Object.assign(Error('已存本機，恢復連線後再同步'), { code: 'sync-offline' });
-            const values = capture(id); ensure(values);
+            let values = capture(id); ensure(values);
             const remote = options.allowRemoteOverwrite
                 ? await read(id)
                 : (options.remote || await read(id));
             const known = base(c);
-            const before = fingerprint(values);
+            let before = fingerprint(values);
             const matchesRemote = !remote.empty && before === fingerprint(remote.values);
             // 舊版客戶端把資料直接寫在 students/pointsHistory 等集合，尚未有
             // syncRevision。只要本機內容與這份舊雲端快照完全相同，就能把它
@@ -205,6 +206,7 @@
             if (matchesRemote && !canAdoptLegacy) {
                 remember(c, remote.token, values);
                 clearLocalChange(c, before);
+                delete conflicts[recoveryKey(c)];
                 localStorage.setItem('lastSyncTime', new Date().toISOString());
                 window.SyncStatusIndicator?.updateStateBasedOnSync();
                 return true;
@@ -224,7 +226,35 @@
                 // webhook，避免把正常的首次資料分歧當成系統錯誤。
                 const hasKnownBaseline = !!known?.token;
                 const explicitlyConfirmed = Object.hasOwn(options, 'expectedToken') || options.allowRemoteOverwrite === true;
-                throw conflict(undefined, {
+                let mergeBlock = '';
+                // 只有同步流程會要求合併（autoMerge）：學期封存等其他呼叫者遇到差異仍要停下來
+                if (options.autoMerge && hasKnownBaseline && !explicitlyConfirmed) {
+                    // 目前開著的班要等安靜的時機：合併後必須重新載入，才不會被模組手上的舊資料寫回去
+                    if (id === current() && options.autoMerge !== 'now') { mergeWaiting.add(recoveryKey(c)); throw Object.assign(Error('等老師告一段落再合併'), { code: 'sync-merge-deferred' }); }
+                    const result = await threeWay(c, known, values, remote);
+                    mergeBlock = result.block || '';
+                    if (result.values) {
+                        if (fingerprint(capture(id)) !== before) throw syncBusy();   // 比對期間老師又有新操作，下次重新比對
+                        autoMerged = { added: result.added, newCloud: result.newCloud };
+                        const ops = keys().map(k => [keyFor(k, c.id), result.values[k] ?? null]);
+                        ops.push([baseKey(c), baseline(remote.token, remote.values)]);
+                        const openClass = current(), openDirty = raw(dirtyKey(c.uid, openClass));
+                        if (!window.SafeStorage.writeRaw(ops, { context: '自動合併雲端版本' })) throw conflict(undefined, { notify: true, source: 'cloud-divergence', mergeBlock: 'local-write' });
+                        // 寫入偵測只認得目前開著的班：背景合併別班時不能把它誤標成有變更
+                        if (openClass !== c.id && !openDirty) rawRemove(dirtyKey(c.uid, openClass));
+                        delete conflicts[recoveryKey(c)];
+                        // 本機沒有比雲端多的內容：等於已經跟上雲端，不用再上傳一份
+                        if (!result.added) {
+                            clearLocalChange(c, fingerprint(result.values));
+                            localStorage.setItem('lastSyncTime', new Date().toISOString());
+                            announceMerge(c, autoMerged);
+                            return true;
+                        }
+                        values = result.values; before = fingerprint(values); expected = remote.token;
+                    }
+                }
+                if (expected !== remote.token) throw conflict(undefined, {
+                    mergeBlock,
                     notify: hasKnownBaseline || explicitlyConfirmed,
                     source: hasKnownBaseline || explicitlyConfirmed
                         ? 'cloud-divergence'
@@ -274,6 +304,8 @@
             clearLocalChange(c, before);
             localStorage.setItem('lastSyncTime', new Date().toISOString());
             delete conflicts[recoveryKey(c)];
+            mergeWaiting.delete(recoveryKey(c));
+            if (autoMerged) announceMerge(c, autoMerged);
             if (upgradedLegacy) {
                 try { window.UsageNotify?.syncUpgrade?.({ classId: c.id, className: classNameFor(c.id), students: dataFor(values).students.length }); }
                 catch (e) { /* 戰報統計失敗不影響同步 */ }
@@ -303,6 +335,61 @@
             await window.LocalRecovery.put(`legacy-cloud:${c.uid}:${c.id}`, { savedAt: new Date().toISOString(), classId: c.id, values: remote.values });
             return true;
         } catch { return false; }
+    }
+    /** 讀出老師上次同步時的共同版本。快照被清理（超過 7 天）或內容對不上時回傳 null。 */
+    async function snapshotValues(c, known) {
+        const snap = await root(c).collection('syncSnapshots').doc(known.token).collection('parts').get({ source: 'server' });
+        if (snap.empty) return null;
+        const parts = snap.docs.map(d => d.data()).sort((a, b) => a.index - b.index);
+        if (parts.some((p, i) => p.index !== i || typeof p.text !== 'string')) return null;
+        const payload = JSON.parse(parts.map(p => p.text).join(''));
+        return payload.classId === c.id && fingerprint(payload.values) === known.fingerprint ? payload.values : null;
+    }
+    /** 兩邊都兌換過時，個別看都夠扣，合起來可能超支：這要老師決定，不能自動變成負數。 */
+    function overdrawn(merged, local, remote) {
+        const data = dataFor(merged), a = dataFor(local), b = dataFor(remote);
+        const coins = (source, student) => window.ClassPets.coinsFor(student.id, source.pointsHistory, Number(student.petCarryCoins) || 0);
+        return data.students.some(s => coins(data, s) < 0 && coins(a, s) >= 0 && coins(b, s) >= 0);
+    }
+    /** @returns {Promise<{values?:Object, added?:boolean, newCloud?:boolean, block?:string}>} */
+    async function threeWay(c, known, values, remote) {
+        if (String(remote.token || '').startsWith('legacy:')) return { block: 'legacy' };
+        let base = null;
+        try { base = await snapshotValues(c, known); }
+        catch (e) { if (isOfflineWait(e)) throw e; }
+        if (!base) return { block: 'no-base' };
+        const result = window.CloudMerge.mergeValues(base, values, remote.values, keys(), globalKeys);
+        if (!result.ok) return { block: result.path };
+        if (typeof window.ClassPets?.coinsFor !== 'function' || overdrawn(result.values, values, remote.values)) return { block: 'coins' };
+        ensure(result.values);
+        try { await window.LocalRecovery.put(`auto-merge:${c.uid}:${c.id}`, { version: '1.2', classId: c.id, exportDate: new Date().toISOString(), ...dataFor(values) }); }
+        catch { return { block: 'no-recovery' }; }
+        const shared = keys().filter(k => !globalKeys.includes(k));
+        return {
+            values: result.values,
+            added: shared.some(k => (result.values[k] ?? null) !== (remote.values[k] ?? null)),
+            newCloud: shared.some(k => (result.values[k] ?? null) !== (values[k] ?? null))
+        };
+    }
+    /** 老師不用處理，但要讓老師知道發生過：留底進每日戰報；目前開著的班交給 CloudFastForward 重新載入。 */
+    function announceMerge(c, merged) {
+        mergeWaiting.delete(recoveryKey(c));
+        window.SyncStatusIndicator?.updateStateBasedOnSync();
+        const name = classNameFor(c.id) || (c.id === 'default' ? '預設班級' : c.id);
+        try { window.UsageNotify?.dataAction?.('sync_auto_merge', `${name}｜${merged.added ? '兩邊都有更新' : '本機已跟上雲端'}`); }
+        catch (e) { /* 戰報統計失敗不影響同步 */ }
+        if (c.id !== current()) {
+            if (merged.added) window.NotificationSystem?.success?.(`☁️ 「${name}」班已自動合併其他裝置的更新`);
+            return;
+        }
+        if (merged.newCloud) window.dispatchEvent(new CustomEvent('cloud-auto-merged', { detail: { classId: c.id } }));
+    }
+    /** 背景同步要不要處理這班：沒有異動標記、班級資料也和上次同步相同，代表這台沒有東西要上傳。 */
+    function needsUpload(id = current()) {
+        if (status(id) !== 'pending') return false;
+        const c = context(id), known = base(c);
+        if (raw(dirtyKey(c.uid, c.id))) return true;
+        return !(known?.tracked && known.tracked === trackedFingerprint(capture(id)));
     }
     async function checkpoint(id = current()) {
         const uid = window.FirebaseConfig?.getCurrentUserId() || 'local';
@@ -380,7 +467,16 @@
             return changed ? 'updated' : 'current';
         });
     }
-    const conflicts = {};
+    const conflicts = {}, mergeBlocks = {}, mergeWaiting = new Set();
+    function conflictIds() {
+        try {
+            const prefix = `${window.FirebaseConfig.getCurrentUserId()}:`;
+            return Object.keys(conflicts).filter(k => k.startsWith(prefix)).map(k => k.slice(prefix.length));
+        } catch { return []; }
+    }
+    function isMergeWaiting(id = current()) {
+        try { return mergeWaiting.has(recoveryKey(context(id))); } catch { return false; }
+    }
     function status(id = current()) {
         try {
             const c = context(id);
@@ -392,17 +488,23 @@
         const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
         const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
-    async function showConflict(id = current()) {
+    const BLOCK_LABELS = {
+        coins: '兩邊都有兌換，合併後金幣會變成負數。', 'no-base': '這台太久沒有同步，已找不到兩邊共同的舊版本。', legacy: '雲端是舊版程式留下的資料。',
+        students: '同一位學生的資料兩邊改得不一樣。', pointsHistory: '同一筆紀錄兩邊改得不一樣。', groups: '小組資料兩邊改得不一樣。', petSettings: '寵物或商店設定兩邊改得不一樣。',
+        seatingConfig: '座位表兩邊改得不一樣。', homeworkList: '作業資料兩邊改得不一樣。', homeworkChecks: '作業繳交狀態兩邊改得不一樣。'
+    };
+    const conflictTarget = () => { const ids = conflictIds(); return ids.includes(current()) || !ids.length ? current() : ids[0]; };
+    async function showConflict(id = conflictTarget()) {
         const c = context(id), remote = await read(id), localValues = capture(id), local = dataFor(localValues);
         const previewFingerprint = fingerprint(localValues);
-        const checkPreview = () => { sameAccount(c); if (current() !== id || fingerprint(capture(id)) !== previewFingerprint) throw Error('班級或本機資料已改變，請關閉後重新比較'); };
+        const checkPreview = () => { sameAccount(c); if (fingerprint(capture(id)) !== previewFingerprint) throw Error('本機資料已改變，請關閉後重新比較'); };
         const dialog = document.createElement('dialog'); dialog.className = 'cloud-conflict';
         const header = document.createElement('div'); header.className = 'cloud-conflict-header';
-        const title = document.createElement('h2'); title.textContent = '先保留成果，再處理同步差異';
+        const title = document.createElement('h2'); title.textContent = `「${classNameFor(id) || (id === 'default' ? '預設班級' : id)}」班需要你選擇要保留的版本`;
         const dismiss = () => { dialog.close(); dialog.remove(); };
         const closeButton = document.createElement('button'); closeButton.type = 'button'; closeButton.className = 'cloud-conflict-close'; closeButton.textContent = '關閉'; closeButton.setAttribute('aria-label', '關閉同步衝突視窗'); closeButton.title = '關閉視窗，稍後再處理'; closeButton.onclick = dismiss;
         header.append(title, closeButton);
-        const text = document.createElement('p'); text.textContent = `本機：${local.students.length} 位學生、${local.pointsHistory.length} 筆紀錄；雲端：${dataFor(remote.values).students.length} 位學生、${dataFor(remote.values).pointsHistory.length} 筆紀錄。兩邊可能有不同的獎勵或兌換，系統不會自動合併金幣。請依照下方 3 個步驟處理。`;
+        const text = document.createElement('p'); text.textContent = `本機：${local.students.length} 位學生、${local.pointsHistory.length} 筆紀錄；雲端：${dataFor(remote.values).students.length} 位學生、${dataFor(remote.values).pointsHistory.length} 筆紀錄。系統已先試過自動合併，這次無法判斷：${BLOCK_LABELS[String(mergeBlocks[recoveryKey(c)] || '').split('.')[0]] || '兩邊有改到相同的內容。'}請依照下方 3 個步驟處理。`;
         const note = document.createElement('p'); note.className = 'cloud-conflict-note'; note.setAttribute('role', 'status');
         const steps = document.createElement('ol'); steps.className = 'cloud-conflict-steps';
         const step1 = document.createElement('li'); step1.textContent = '下載兩份備份，先把成果留在電腦裡。';
@@ -446,7 +548,7 @@
     }
     function report(error, id, silent) {
         // 同源分頁已在同步時，這次只是被鎖略過，不是需要老師處理的錯誤。
-        if (error?.code === 'sync-busy') return;
+        if (error?.code === 'sync-busy' || error?.code === 'sync-merge-deferred') return;
         if (isOfflineWait(error) && error?.code !== 'sync-offline') {
             error = Object.assign(Error('目前離線，恢復連線後會再同步'), { code: 'sync-offline' });
         }
@@ -474,7 +576,7 @@
                         classId: id || current(),
                         // 通知卡片只看得到班級代碼時很難判斷是哪一班，補上名冊裡的名稱。
                         className: classNameFor(id || current()),
-                        context: '班級資料/雲端同步',
+                        context: `班級資料/雲端同步${error?.mergeBlock ? `｜無法自動合併：${error.mergeBlock}` : ''}`,
                         feature: 'pet',
                         operation: 'cloud_sync',
                         // 目前只能確認雲端與本機快照不同，不能從瀏覽器端
@@ -485,6 +587,8 @@
                 );
             } catch (e) { /* 通知不能阻擋衝突保護 */ }
             conflicts[recoveryKey(context(id))] = true;
+            mergeWaiting.delete(recoveryKey(context(id)));
+            mergeBlocks[recoveryKey(context(id))] = error?.mergeBlock || '';
             window.SyncStatusIndicator?.setState('conflict');
             // 比較視窗要重新讀雲端；此時若斷線，只提示等待，不要變成未處理的錯誤
             if (!silent) return showConflict(id).catch(e => {
@@ -513,12 +617,13 @@
     async function downloadRecovery() {
         try {
             const uid = window.FirebaseConfig?.getCurrentUserId() || 'local';
-            const copy = await LocalRecovery.get(`${uid}:${current()}`);
+            const copies = await Promise.all([`${uid}:${current()}`, `auto-merge:${uid}:${current()}`].map(k => LocalRecovery.get(k)));
+            const copy = copies.filter(Boolean).sort((a, b) => String(b.exportDate).localeCompare(String(a.exportDate)))[0];
             if (!copy) throw Error('此班目前沒有還原前副本');
             download(copy, '班級成果_還原前副本.json');
         } catch (e) { window.NotificationSystem?.error(e.message); }
     }
-    window.CloudSafety = { isOfflineWait, downloadRecovery, capture, dataFor, fingerprint, read, publish, restore, fastForward, checkpoint, status, showConflict, report, current, download, hasBaseline, hasLocalChangeMarker, markLocalChange };
+    window.CloudSafety = { isOfflineWait, downloadRecovery, capture, dataFor, fingerprint, read, publish, restore, fastForward, checkpoint, status, showConflict, report, current, download, hasBaseline, hasLocalChangeMarker, markLocalChange, needsUpload, conflictIds, isMergeWaiting };
     // A separate IndexedDB keeps the rollback copy out of localStorage's small quota.
     window.LocalRecovery = {
         async access(mode, key, value) {

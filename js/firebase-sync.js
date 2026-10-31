@@ -275,7 +275,7 @@ async function syncToCloud(silent = false) {
     window.SyncStatusIndicator?.updateStateBasedOnSync();
     try {
         setSyncProgress(18, 'snapshot', '上傳班級完整快照', id);
-        await CloudSafety.publish(id);
+        await CloudSafety.publish(id, { autoMerge: silent ? 'quiet' : 'now' });   // 老師自己按同步：可以馬上合併並重新載入
         setSyncProgress(76, 'registry', '更新班級清單', id);
         await uploadClassProfilesMerged();
         setSyncProgress(92, 'metadata', '寫入同步時間', id);
@@ -722,7 +722,7 @@ async function syncAllClassesToCloud(onProgress) {
     } finally { syncStatus.isSyncing = false; }
 }
 
-async function syncPendingClasses() {
+async function syncPendingClasses(options = {}) {
     if (syncStatus.isSyncing || navigator.onLine === false || !canWriteCloud()) return false;
     syncStatus.isSyncing = true;
     let ok = true, uploaded = false;
@@ -730,10 +730,12 @@ async function syncPendingClasses() {
         const all = buildAllClassList(JSON.parse(localStorage.getItem('classProfiles') || '[]'));
         for (const cls of all) {
             const id = String(cls.id);
-            if (CloudSafety.status(id) === 'synced' || CloudSafety.status(id) === 'conflict') continue;
+            // 只處理這台真的有變更的班。指紋不同不代表老師動過（主題、時鐘等裝置偏好也算在指紋裡），
+            // 把沒動過的班拿去上傳，只會在雲端較新時撞出假衝突。
+            if (!CloudSafety.needsUpload(id)) continue;
             if (!CloudSafety.dataFor(CloudSafety.capture(id)).students.length && !CloudSafety.dataFor(CloudSafety.capture(id)).pointsHistory.length) continue;
-            try { await CloudSafety.publish(id); uploaded = true; }
-            catch (e) { ok = false; await CloudSafety.report(e, id, true); }
+            try { await CloudSafety.publish(id, { autoMerge: options.mergeCurrent ? 'now' : 'quiet' }); uploaded = true; }
+            catch (e) { if (e?.code === 'sync-merge-deferred') continue; ok = false; await CloudSafety.report(e, id, true); }
         }
         if (ok) await uploadClassProfilesMerged();
         if (uploaded) await writeCloudSyncInfo();

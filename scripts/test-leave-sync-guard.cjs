@@ -128,7 +128,18 @@ try {
     assert.equal(shouldShow(pendingInfo, view({ visible: true, lastInputAt: now }), now), true);
     console.log('PASS 已同步就收起；已顯示的卡片在老師處理前不會自己消失');
 
-    console.log('17 leave-sync-guard checks passed');
+    {
+    // 背景同步停在別班：卡片要指向那一班；目前班級沒事也要看得到
+    const context = setup({ status: 'synced' });
+    context.CloudSafety.conflictIds = () => ['603'];
+    context.localStorage.setItem('classProfiles', JSON.stringify([{ id: '603', name: '六年三班' }]));
+    assert.equal(context.LeaveSyncGuard.refresh().id, '603');
+    assert.equal(context.LeaveSyncGuard.refresh().name, '六年三班');
+    assert.equal(context.LeaveSyncGuard.refresh().status, 'conflict');
+    assert.equal(context.LeaveSyncGuard.refresh().active, true);
+    console.log('PASS 別班同步衝突也會提醒，且指向那一班');
+}
+console.log('17 leave-sync-guard checks passed');
 } catch (error) {
     console.error(error);
     process.exitCode = 1;
