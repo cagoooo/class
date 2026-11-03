@@ -141,6 +141,24 @@
 .gauth-dd-text small { font-size: 0.74rem; color: #6b7280; font-weight: 400; }
 .gauth-dd-rich[data-guide="get-all"] b { color: #6d28d9; }
 .gauth-dd-rich[data-guide="save-all"] b { color: #0369a1; }
+/* 「換電腦怎麼做？」：永遠醒目，每次打開選單亮一下，讓老師知道這裡可以進入導覽 */
+.gauth-dd-rich[data-guide="help"] {
+    position: relative; margin: 6px 8px; width: calc(100% - 16px); border-radius: 12px;
+    background: linear-gradient(90deg, #fff7e6 0%, #fef3c7 100%);
+    box-shadow: inset 0 0 0 1.5px #fbbf24;
+    animation: gauthHelpGlow 1.3s ease-out 0.15s 2;
+}
+.gauth-dd-rich[data-guide="help"]:hover, .gauth-dd-rich[data-guide="help"]:focus-visible {
+    background: linear-gradient(90deg, #fef3c7 0%, #fde68a 100%); outline: none;
+}
+.gauth-dd-rich[data-guide="help"] b { color: #92400e; }
+.gauth-dd-rich[data-guide="help"] small { color: #a16207; }
+@keyframes gauthHelpGlow {
+    0% { box-shadow: inset 0 0 0 1.5px #fbbf24, 0 0 0 0 rgba(245,158,11,.7); }
+    70% { box-shadow: inset 0 0 0 1.5px #fbbf24, 0 0 0 8px rgba(245,158,11,0); }
+    100% { box-shadow: inset 0 0 0 1.5px #fbbf24, 0 0 0 0 rgba(245,158,11,0); }
+}
+@media (prefers-reduced-motion: reduce) { .gauth-dd-rich[data-guide="help"] { animation: none; } }
 .dark #gauth-dropdown, .dark #gauth-dropdown-mobile { background: #1e293b !important; }
 .dark .gauth-dd-item { color: #e2e8f0; }
 .dark .gauth-dd-item:hover { background: #334155; }
@@ -149,6 +167,10 @@
 .dark .gauth-dd-text small { color: #94a3b8; }
 .dark .gauth-dd-rich[data-guide="get-all"] b { color: #c4b5fd; }
 .dark .gauth-dd-rich[data-guide="save-all"] b { color: #7dd3fc; }
+.dark .gauth-dd-rich[data-guide="help"] { background: linear-gradient(90deg, #3b2a0a 0%, #4a3410 100%); }
+.dark .gauth-dd-rich[data-guide="help"]:hover { background: linear-gradient(90deg, #4a3410 0%, #5c4214 100%); }
+.dark .gauth-dd-rich[data-guide="help"] b { color: #fcd34d; }
+.dark .gauth-dd-rich[data-guide="help"] small { color: #fde68a; }
 .dark .gauth-dd-divider { background: #334155; }
 .gauth-dd-item.danger:hover { background: #fef2f2; }
 

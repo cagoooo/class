@@ -88,12 +88,12 @@
     70% { box-shadow:0 0 0 9px rgba(245,158,11,0), 0 0 0 16px rgba(99,102,241,0); }
     100% { box-shadow:0 0 0 0 rgba(245,158,11,0), 0 0 0 0 rgba(99,102,241,0); }
 }
-.cg-hint [data-guide="help"] { background:#fffbeb; }
+.cg-hint [data-guide="help"] { animation:gauthHelpGlow 1.4s ease-out infinite !important; }
 .cg-hint [data-guide="help"] b::after { content:'新'; display:inline-block; margin-left:6px; padding:0 7px; border-radius:999px; background:#f59e0b; color:#fff; font-size:.7rem; line-height:1.5; vertical-align:middle; }
-.dark .cg-hint [data-guide="help"] { background:#422006; }
 @media (prefers-reduced-motion: reduce) {
     .cg-hint #gauth-avatar-initial, .cg-hint #gauth-avatar-img,
     .cg-hint #gauth-avatar-initial-mobile, .cg-hint #gauth-avatar-img-mobile { animation:none; box-shadow:0 0 0 3px #f59e0b; }
+    .cg-hint [data-guide="help"] { animation:none !important; }
 }
 .cg-overlay { position:fixed; inset:0; z-index:2147482000; background:rgba(15,23,42,.62); }
 .cg-spot { position:fixed; z-index:2147482000; border-radius:12px; box-shadow:0 0 0 4px #fbbf24, 0 0 18px 6px rgba(251,191,36,.45); cursor:default; transition:all .25s ease; }
