@@ -96,11 +96,13 @@
     position: absolute;
     top: calc(100% + 10px);
     right: 0;
-    min-width: 230px;
+    width: 290px;
     background: #fff;
     border-radius: 14px;
     box-shadow: 0 8px 32px rgba(0,0,0,.18);
-    overflow: hidden;
+    max-height: calc(100vh - 90px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
     z-index: 9999;
     animation: gauthFadeIn .18s ease;
 }
@@ -128,6 +130,26 @@
 }
 .gauth-dd-item:hover { background: #f5f5ff; }
 .gauth-dd-item.danger { color: #ef4444; }
+.gauth-dd-group {
+    padding: 0.6rem 1rem 0.2rem; font-size: 0.74rem; font-weight: 700;
+    color: #6b7280; background: #fafafa; border-top: 1px solid #f0f0f0;
+}
+.gauth-dd-rich { align-items: flex-start; padding: 0.6rem 1rem; }
+.gauth-dd-ico { flex: 0 0 1.5rem; font-size: 1.15rem; line-height: 1.4; text-align: center; }
+.gauth-dd-text { display: flex; flex-direction: column; gap: 1px; line-height: 1.35; min-width: 0; }
+.gauth-dd-text b { font-size: 0.9rem; font-weight: 700; color: #1f2937; }
+.gauth-dd-text small { font-size: 0.74rem; color: #6b7280; font-weight: 400; }
+.gauth-dd-rich[data-guide="get-all"] b { color: #6d28d9; }
+.gauth-dd-rich[data-guide="save-all"] b { color: #0369a1; }
+.dark #gauth-dropdown, .dark #gauth-dropdown-mobile { background: #1e293b !important; }
+.dark .gauth-dd-item { color: #e2e8f0; }
+.dark .gauth-dd-item:hover { background: #334155; }
+.dark .gauth-dd-group { background: #0f172a; color: #94a3b8; border-top-color: #334155; }
+.dark .gauth-dd-text b { color: #f1f5f9; }
+.dark .gauth-dd-text small { color: #94a3b8; }
+.dark .gauth-dd-rich[data-guide="get-all"] b { color: #c4b5fd; }
+.dark .gauth-dd-rich[data-guide="save-all"] b { color: #7dd3fc; }
+.dark .gauth-dd-divider { background: #334155; }
 .gauth-dd-item.danger:hover { background: #fef2f2; }
 
 /* 同步中圓形動畫 */
@@ -402,6 +424,27 @@
     // ────────────────────────────────────────────────────────
     // HTML 注入（注入到 nav 右側佔位元素，桌面+手機版同步）
     // ────────────────────────────────────────────────────────
+    // 雲端選單的四個功能（桌面、手機共用）。用「存到雲端／取回這台電腦」取代「同步／還原」：
+    // 老師反映「還原」聽起來像電腦重灌還原，回家換電腦時不敢按。data-guide 供教學引導定位。
+    function cloudMenuItemsHTML() {
+        const item = (guide, action, icon, title, desc) => `
+                    <button class="gauth-dd-item gauth-dd-rich" data-guide="${guide}" onclick="${action}">
+                        <span class="gauth-dd-ico" aria-hidden="true">${icon}</span>
+                        <span class="gauth-dd-text"><b>${title}</b><small>${desc}</small></span>
+                    </button>`;
+        return `
+                    <div class="gauth-dd-group">📤 把這台的資料存到雲端</div>`
+            + item('save-one', 'GoogleAuthUI.syncUp()', '☁️', '存目前班級', '剛改完資料，想馬上存起來')
+            + item('save-all', 'GoogleAuthUI.syncAll()', '🌐', '存全部班級', '下班離開學校前按一次最安心')
+            + `
+                    <div class="gauth-dd-group">📥 把雲端的資料取回這台電腦</div>`
+            + item('get-one', 'GoogleAuthUI.syncDown()', '📥', '取回目前班級', '換電腦時，帶回這個班的最新資料')
+            + item('get-all', 'GoogleAuthUI.syncAllDown()', '🏠', '取回全部班級', '回家或新電腦第一次使用，按這個')
+            + `
+                    <div class="gauth-dd-divider"></div>`
+            + item('help', 'GoogleAuthUI.openGuide()', '❓', '換電腦怎麼做？看教學', '一步一步帶你認識這些按鈕');
+    }
+
     // 共用的登入按鈕 HTML（桌面版）
     const DESKTOP_SLOT_HTML = `
             <!-- 未登入 -->
@@ -424,20 +467,9 @@
                     <div class="gauth-dd-header">
                         <div class="gauth-dd-name"  id="gauth-dd-name"></div>
                         <div class="gauth-dd-email" id="gauth-dd-email"></div>
-                        <div class="gauth-dd-sync-time">🕒 上次同步：<span id="gauth-dd-sync"></span></div>
+                        <div class="gauth-dd-sync-time" data-guide="sync-time">🕒 上次存到雲端：<span id="gauth-dd-sync"></span></div>
                     </div>
-                    <button class="gauth-dd-item" onclick="GoogleAuthUI.syncUp()">
-                        ☁️ 立即同步（本地 → 雲端）
-                    </button>
-                    <button class="gauth-dd-item" onclick="GoogleAuthUI.syncDown()">
-                        📥 從雲端還原（雲端 → 本地）
-                    </button>
-                    <button class="gauth-dd-item" onclick="GoogleAuthUI.syncAll()" style="color:#0369a1;font-weight:700;">
-                        🌐 一鍵同步所有班級
-                    </button>
-                    <button class="gauth-dd-item" onclick="GoogleAuthUI.syncAllDown()" style="color:#7c3aed;font-weight:700;">
-                        📥 一鍵還原所有班級
-                    </button>
+${cloudMenuItemsHTML()}
                     <button class="gauth-dd-item" id="gauth-dd-repair" onclick="GoogleAuthUI.repairClasses()" style="display:none;color:#059669;font-weight:700;">
                         🩺 班級健檢與修復
                     </button>
@@ -485,27 +517,17 @@
                 <!-- 手機版下拉選單 -->
                 <div id="gauth-dropdown-mobile" style="
                     display:none; position:absolute; top:calc(100% + 8px); right:0;
-                    min-width:210px; background:#fff; border-radius:14px;
-                    box-shadow:0 8px 32px rgba(0,0,0,.18); overflow:hidden;
+                    width:min(290px, calc(100vw - 16px)); background:#fff; border-radius:14px;
+                    max-height:calc(100vh - 80px); overflow-y:auto; overscroll-behavior:contain;
+                    box-shadow:0 8px 32px rgba(0,0,0,.18);
                     z-index:9999; animation:gauthFadeIn .18s ease;
                 ">
                     <div class="gauth-dd-header" id="gauth-dd-header-mobile">
                         <div class="gauth-dd-name"  id="gauth-dd-name-mobile"></div>
                         <div class="gauth-dd-email" id="gauth-dd-email-mobile"></div>
-                        <div class="gauth-dd-sync-time">🕒 上次同步：<span id="gauth-dd-sync-mobile"></span></div>
+                        <div class="gauth-dd-sync-time" data-guide="sync-time">🕒 上次存到雲端：<span id="gauth-dd-sync-mobile"></span></div>
                     </div>
-                    <button class="gauth-dd-item" onclick="GoogleAuthUI.syncUp()">
-                        ☁️ 立即同步
-                    </button>
-                    <button class="gauth-dd-item" onclick="GoogleAuthUI.syncDown()">
-                        📥 從雲端還原
-                    </button>
-                    <button class="gauth-dd-item" onclick="GoogleAuthUI.syncAll()" style="color:#0369a1;font-weight:700;">
-                        🌐 一鍵同步所有班級
-                    </button>
-                    <button class="gauth-dd-item" onclick="GoogleAuthUI.syncAllDown()" style="color:#7c3aed;font-weight:700;">
-                        📥 一鍵還原所有班級
-                    </button>
+${cloudMenuItemsHTML()}
                     <button class="gauth-dd-item" id="gauth-dd-repair-mobile" onclick="GoogleAuthUI.repairClasses()" style="display:none;color:#059669;font-weight:700;">
                         🩺 班級健檢與修復
                     </button>
@@ -712,23 +734,23 @@
     // 多班級還原的結果要照實說：全部成功才說成功、才重新整理
     function reportAllClassRestore(results) {
         if (!results) {
-            NotificationSystem && NotificationSystem.warning('雲端同步正在進行中，這次沒有還原，稍後請再試一次');
+            NotificationSystem && NotificationSystem.warning('雲端同步正在進行中，這次沒有取回，稍後請再試一次');
             return false;
         }
         const ok = results.filter(r => r.status === 'ok');
         const fail = results.filter(r => r.status !== 'ok');
         if (!fail.length) {
-            NotificationSystem && NotificationSystem.success(`已從雲端還原所有班級（共 ${ok.length} 個）📥`);
+            NotificationSystem && NotificationSystem.success(`已從雲端取回所有班級（共 ${ok.length} 個）📥`);
             setTimeout(() => location.reload(), 900);
             return true;
         }
         if (!ok.length) {
             if (navigator.onLine === false) waitAndRetryFirstLogin('📶 目前離線，班級資料還沒從雲端載入；恢復連線後會自動再試');
-            else NotificationSystem && NotificationSystem.error('雲端班級沒有還原成功：' + (fail[0].error || '請稍後再試'));
+            else NotificationSystem && NotificationSystem.error('雲端班級沒有取回成功：' + (fail[0].error || '請稍後再試'));
             return false;
         }
         // 部分成功：說清楚哪些班沒成功，再重新整理顯示已還原的班級
-        NotificationSystem && NotificationSystem.warning(`已還原 ${ok.length} 個班級；${fail.map(r => r.name).join('、')} 沒有成功，可稍後在「資料備份」重新下載`);
+        NotificationSystem && NotificationSystem.warning(`已取回 ${ok.length} 個班級；${fail.map(r => r.name).join('、')} 沒有成功，可稍後在「資料備份」重新下載`);
         setTimeout(() => location.reload(), 2500);
         return true;
     }
@@ -967,7 +989,7 @@
                 <ul class="gauth-welcome-perks">
                     <li><span class="gauth-perk-ico">☁️</span><span class="gauth-perk-txt"><b>自動雲端備份</b>：換手機、重灌電腦都不怕，資料永遠都在。</span></li>
                     <li><span class="gauth-perk-ico">🔄</span><span class="gauth-perk-txt"><b>多裝置同步</b>：在學校改一改，回到家打開就能接著用。</span></li>
-                    <li><span class="gauth-perk-ico">🗂️</span><span class="gauth-perk-txt"><b>多班級一鍵備份還原</b>：帶好幾個班也不怕弄亂。</span></li>
+                    <li><span class="gauth-perk-ico">🗂️</span><span class="gauth-perk-txt"><b>換電腦一鍵取回</b>：帶好幾個班，回家登入就能接著用。</span></li>
                     <li><span class="gauth-perk-ico">🔒</span><span class="gauth-perk-txt"><b>安全又私密</b>：資料綁你的帳號，只有你自己看得到。</span></li>
                 </ul>
                 <div class="gauth-welcome-actions">
@@ -1032,7 +1054,7 @@
                         <ul class="gauth-reminder-perks">
                             <li>☁️ 自動備份</li>
                             <li>🔄 多裝置同步</li>
-                            <li>🗂️ 多班級還原</li>
+                            <li>🗂️ 換電腦一鍵取回</li>
                             <li>🔒 安全私密</li>
                         </ul>
                     </div>
@@ -1068,6 +1090,8 @@
         } else {
             NotificationSystem && NotificationSystem.success(`歡迎回來，${profile.displayName} ✨`);
         }
+        // 這個帳號在這台裝置第一次登入：帶老師認識右上角雲端選單（看過就不再自動出現）
+        window.CloudGuide?.afterLogin?.();
     }
 
     // 手機上彈窗先被判定關閉、登入結果才慢一步回來時，仍要走完登入後續流程
@@ -1125,6 +1149,15 @@
             await window.FirebaseConfig.signOut();
             showLoggedOut();
             NotificationSystem && NotificationSystem.info('已登出');
+        },
+
+        /** 選單「換電腦怎麼做？」：重看雲端選單教學 */
+        openGuide() {
+            const dd = document.getElementById('gauth-dropdown');
+            if (dd) dd.classList.remove('open');
+            const ddM = document.getElementById('gauth-dropdown-mobile');
+            if (ddM) ddM.style.display = 'none';
+            window.CloudGuide?.start?.();
         },
 
         toggleDropdown() {
@@ -1229,17 +1262,17 @@
             const confirmed = await showAllClassConfirmDialog({
                 direction: 'upload',
                 icon: '🌐',
-                title: '一鍵同步所有班級',
-                subtitle: '本地 → 雲端',
+                title: '存全部班級到雲端',
+                subtitle: '這台電腦 → 雲端',
                 arrowHtml: `
                     <div style="display:flex;align-items:center;gap:12px;justify-content:center;margin:16px 0;">
-                        <div style="background:#dbeafe;border-radius:10px;padding:8px 16px;font-weight:700;color:#1d4ed8;">📱 本地裝置</div>
+                        <div style="background:#dbeafe;border-radius:10px;padding:8px 16px;font-weight:700;color:#1d4ed8;">💻 這台電腦</div>
                         <div style="font-size:1.4rem;color:#2563eb;">→</div>
-                        <div style="background:#d1fae5;border-radius:10px;padding:8px 16px;font-weight:700;color:#065f46;">☁️ Firebase 雲端</div>
+                        <div style="background:#d1fae5;border-radius:10px;padding:8px 16px;font-weight:700;color:#065f46;">☁️ 雲端</div>
                     </div>`,
-                warningText: `本操作將把本裝置上 <strong>${classCount} 個班級</strong> 的資料上傳至雲端，<strong>雲端舊資料將被覆蓋</strong>。`,
+                warningText: `會把這台電腦上 <strong>${classCount} 個班級</strong> 的資料存到雲端，<strong>雲端上較舊的版本會被這次的資料取代</strong>。若其他電腦有較新的變更，系統會先停下來請你比較。`,
                 dataList: ['學生名單與分數', '加扣分記錄', '分組資料', '聯絡簿 / 作業 / 公告', '考試監考設定', '時鐘 / 抽籤設定', '作業繳交狀態'],
-                confirmLabel: '確定同步至雲端',
+                confirmLabel: '確定存到雲端',
                 confirmColor: '#2563eb',
             });
             if (!confirmed) return;
@@ -1275,17 +1308,17 @@
             const confirmed = await showAllClassConfirmDialog({
                 direction: 'download',
                 icon: '📥',
-                title: '一鍵還原所有班級',
-                subtitle: '雲端 → 本地',
+                title: '取回全部班級到這台電腦',
+                subtitle: '雲端 → 這台電腦',
                 arrowHtml: `
                     <div style="display:flex;align-items:center;gap:12px;justify-content:center;margin:16px 0;">
-                        <div style="background:#d1fae5;border-radius:10px;padding:8px 16px;font-weight:700;color:#065f46;">☁️ Firebase 雲端</div>
+                        <div style="background:#d1fae5;border-radius:10px;padding:8px 16px;font-weight:700;color:#065f46;">☁️ 雲端</div>
                         <div style="font-size:1.4rem;color:#7c3aed;">→</div>
-                        <div style="background:#ede9fe;border-radius:10px;padding:8px 16px;font-weight:700;color:#5b21b6;">📱 本地裝置</div>
+                        <div style="background:#ede9fe;border-radius:10px;padding:8px 16px;font-weight:700;color:#5b21b6;">💻 這台電腦</div>
                     </div>`,
-                warningText: `本操作將把雲端上 <strong>${classCount} 個班級</strong> 的資料下載至本裝置，<strong>本地現有資料將被覆蓋</strong>。`,
+                warningText: `會把雲端上 <strong>${classCount} 個班級</strong> 的資料帶到這台電腦，<strong>這台電腦上的這些班級會換成雲端的版本</strong>。換之前會先自動保存一份這台原本的資料；雲端上的資料不會被改動。`,
                 dataList: ['學生名單與分數', '加扣分記錄', '分組資料', '聯絡簿 / 作業 / 公告', '考試監考設定', '時鐘 / 抽籤設定', '作業繳交狀態'],
-                confirmLabel: '確定還原至本地',
+                confirmLabel: '確定取回這台電腦',
                 confirmColor: '#7c3aed',
             });
             if (!confirmed) return;
@@ -1321,7 +1354,7 @@
                 if (!r) return;
                 if (r.recovered > 0) {
                     NotificationSystem && NotificationSystem.success(
-                        `🩺 健檢完成：找回 ${r.recovered} 個班級（目前共 ${r.afterCount} 個）。班級選單已更新，可再「一鍵還原所有班級」把資料拉回本機。`
+                        `🩺 健檢完成：找回 ${r.recovered} 個班級（目前共 ${r.afterCount} 個）。班級選單已更新，可再點頭像按「取回全部班級」把資料帶到這台電腦。`
                     );
                 } else {
                     NotificationSystem && NotificationSystem.success(

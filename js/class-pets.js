@@ -1231,7 +1231,7 @@
         const eggGuide=el('details',undefined,'pet-guide-extra');eggGuide.dataset.petKey='egg-guide';eggGuide.append(el('summary','蛋殼如何隨成長改變？'),el('p','0–2：安靜孵育 → 3–5：出現裂紋 → 6–8：裂縫擴大 → 9：即將破殼 → 10：孵化揭曉。'));growthGuide.append(eggGuide);
         const syncGuide=el('section',undefined,'pet-guide-panel pet-guide-sync');syncGuide.append(el('h3','02　換裝置，記得帶上班級成果'),el('p','資料先儲存在本機，完成雲端同步後，另一台裝置才能取得最新成果。'));
         const syncSteps=el('ol',undefined,'pet-guide-sync-steps');
-        for(const [title,copy] of [['離開前：上傳','登入老師的 Google 帳號，執行班級同步，確認顯示同步完成。'],['換裝置：下載','登入同一帳號，從雲端還原班級資料，確認班級與成果正確。'],['確認後：繼續操作','再進行加分或兌換；同一班請避免兩台裝置同時修改。']]){const item=el('li');item.append(el('strong',title),el('p',copy));syncSteps.append(item);}syncGuide.append(syncSteps);
+        for(const [title,copy] of [['離開前：存到雲端','登入老師的 Google 帳號，點右上角頭像按「存全部班級」，確認顯示完成。'],['換裝置：取回這台電腦','登入同一帳號，點頭像按「取回全部班級」，確認班級與成果正確。'],['確認後：繼續操作','再進行加分或兌換；同一班請避免兩台裝置同時修改。']]){const item=el('li');item.append(el('strong',title),el('p',copy));syncSteps.append(item);}syncGuide.append(syncSteps);
         syncGuide.append(el('p','離線或尚未登入時，請保留目前裝置的資料，恢復連線並登入後再同步。若出現版本差異，先備份與比較，再選擇要保留的版本。','pet-guide-sync-note'));
         const notifications=el('details',undefined,'pet-guide-extra');notifications.dataset.petKey='notification-guide';notifications.append(el('summary','哪些活動會發送通知？'),el('p','孵化、升級、撤銷、兌換、退幣與設定變更彙整至每日戰報。真正的儲存或同步異常才依錯誤分類通知；單純未登入、離線等待不當作寵物故障。'));syncGuide.append(notifications);
         guideBody.append(growthGuide,syncGuide);guide.append(guideBody);

@@ -308,7 +308,7 @@ async function loadFromCloudData(cloudData) {
     try {
         if (cloudData.__snapshot.classId !== CloudSafety.current()) throw Error('預覽後已切換班級，請重新讀取雲端');
         const ok = await CloudSafety.restore(cloudData.__snapshot);
-        if (ok) NotificationSystem.success('已完整還原；還原前本機副本已保留');
+        if (ok) NotificationSystem.success('已從雲端取回；這台原本的資料已另存副本');
         return ok;
     } catch (error) { NotificationSystem.error(error.message); return false; }
     finally { syncStatus.isSyncing = false; }
@@ -343,11 +343,11 @@ function buildSyncPreviewHTML(direction, local, cloud, extraWarnHtml = '') {
             return found ? found.name : currentId;
         } catch { return '目前班級'; }
     })();
-    const title = isUpload ? `立即同步（本地 → 雲端）` : `從雲端還原（雲端 → 本地）`;
+    const title = isUpload ? `存目前班級到雲端（這台電腦 → 雲端）` : `取回目前班級（雲端 → 這台電腦）`;
     const warn = isUpload
         ? `⚠️ <b>只同步「${currentClassName}」班的資料</b>至雲端，將建立完整雲端版本；若其他裝置已更新，會先停止並請你比較資料。`
-        : `⚠️ <b>只還原「${currentClassName}」班的資料</b>至本地，會先保存還原前副本，再取代本機資料。`;
-    const btnText = isUpload ? '✅ 確認上傳' : '✅ 確認還原';
+        : `⚠️ <b>只取回「${currentClassName}」班的資料</b>到這台電腦。會先自動保存一份這台原本的資料，再換成雲端的版本；雲端上的資料不會被改動。`;
+    const btnText = isUpload ? '✅ 確認存到雲端' : '✅ 確認取回';
     const btnClass = isUpload ? 'gauth-btn-primary' : 'gauth-btn-danger';
 
     const ITEMS = [
@@ -420,9 +420,9 @@ function buildSyncPreviewHTML(direction, local, cloud, extraWarnHtml = '') {
             <thead>
               <tr style="border-bottom:2px solid #e5e7eb">
                 <th style="padding:6px 4px;text-align:left;font-size:.8rem;color:#6b7280">資料類別</th>
-                <th style="padding:6px 8px;text-align:right;font-size:.8rem;color:#6b7280">${isUpload ? '本地' : '雲端'}</th>
+                <th style="padding:6px 8px;text-align:right;font-size:.8rem;color:#6b7280">${isUpload ? '這台電腦' : '雲端'}</th>
                 <th style="padding:6px 4px"></th>
-                <th style="padding:6px 8px;text-align:left;font-size:.8rem;color:#6b7280">${isUpload ? '雲端（同步後）' : '本地（還原後）'}</th>
+                <th style="padding:6px 8px;text-align:left;font-size:.8rem;color:#6b7280">${isUpload ? '雲端（存好後）' : '這台電腦（取回後）'}</th>
                 <th style="padding:6px 4px;text-align:right;font-size:.8rem;color:#6b7280">差異</th>
               </tr>
             </thead>
@@ -1364,16 +1364,16 @@ async function showAllClassDownloadModal() {
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;">
             <span style="font-size:1.6rem;">📥</span>
             <div>
-                <div style="font-weight:700;font-size:1.1rem;color:#1e293b;">還原所有班級至本地</div>
-                <div style="color:#64748b;font-size:.88rem;">雲端 → 本地，共 ${total} 個班級</div>
+                <div style="font-weight:700;font-size:1.1rem;color:#1e293b;">取回全部班級到這台電腦</div>
+                <div style="color:#64748b;font-size:.88rem;">雲端 → 這台電腦，共 ${total} 個班級</div>
             </div>
         </div>
         <div style="background:#fef3c7;border-radius:10px;padding:8px 14px;font-size:.82rem;color:#92400e;margin-bottom:14px;">
-            ⚠️ 各班本地資料將被雲端資料覆蓋，操作前請確認雲端有最新備份
+            這台電腦上的各班會換成雲端的版本；換之前會先自動保存一份這台原本的資料
         </div>
         <div style="background:#f0f9ff;border-radius:10px;padding:8px 14px;margin-bottom:16px;">
             <div style="display:flex;justify-content:space-between;font-size:.85rem;color:#0369a1;margin-bottom:6px;">
-                <span id="acdm-label">準備還原...</span>
+                <span id="acdm-label">準備取回...</span>
                 <span id="acdm-counter">0 / ${total}</span>
             </div>
             <div style="background:#bae6fd;border-radius:999px;height:8px;">
@@ -1400,13 +1400,13 @@ async function showAllClassDownloadModal() {
 
         const idx = status === 'syncing' ? done : done - 1;
         if (status === 'syncing') {
-            if (label) label.textContent = `正在還原：${name}...`;
+            if (label) label.textContent = `正在取回：${name}...`;
             const icon = document.getElementById(`acdm-icon-${idx}`);
             const info = document.getElementById(`acdm-info-${idx}`);
             if (icon) icon.textContent = '⏳';
             if (info) info.textContent = '下載中...';
         } else if (status === 'ok') {
-            if (label) label.textContent = `已還原：${name}`;
+            if (label) label.textContent = `已取回：${name}`;
             const icon = document.getElementById(`acdm-icon-${idx}`);
             const info = document.getElementById(`acdm-info-${idx}`);
             if (icon) icon.textContent = '✅';
@@ -1432,7 +1432,7 @@ async function showAllClassDownloadModal() {
         // 另一個同步遲遲沒結束：這次沒有還原任何班級，不能顯示成功。
         if (bar) bar.style.width = '0%';
         if (counter) counter.textContent = `0 / ${total}`;
-        if (label) { label.textContent = '⚠️ 另一個同步還在進行，這次沒有還原。請稍候再按一次。'; label.style.color = '#d97706'; }
+        if (label) { label.textContent = '⚠️ 另一個同步還在進行，這次沒有取回。請稍候再按一次。'; label.style.color = '#d97706'; }
         if (closeBtn) { closeBtn.textContent = '關閉'; closeBtn.style.background = '#d97706'; }
         return;
     }
@@ -1440,7 +1440,7 @@ async function showAllClassDownloadModal() {
     const restored = results.length - failed;
     if (label) {
         label.textContent = failed === 0
-            ? `✅ 所有 ${total} 個班級已還原至本地！`
+            ? `✅ 所有 ${total} 個班級已取回這台電腦！`
             : `⚠️ ${restored} 班成功，${failed} 班失敗`;
         label.style.color = failed === 0 ? '#16a34a' : '#d97706';
     }
@@ -1451,8 +1451,8 @@ async function showAllClassDownloadModal() {
         // 重新載入讓整個畫面都以還原後的資料啟動（與首次登入的還原流程一致）。
         if (restored) closeBtn.onclick = () => { document.getElementById(existId)?.remove(); location.reload(); };
     }
-    if (failed) window.NotificationSystem?.warning(`已還原 ${restored} 班，${failed} 班未完成；原資料已保留`);
-    else if (restored) window.NotificationSystem?.success('所有班級已從雲端還原 📥');
+    if (failed) window.NotificationSystem?.warning(`已取回 ${restored} 班，${failed} 班未完成；原資料已保留`);
+    else if (restored) window.NotificationSystem?.success('所有班級已從雲端取回 📥');
 }
 
 
