@@ -7,6 +7,7 @@
  * - 只在老師親自按登入之後自動出現一次（每個帳號、每台裝置各一次）；之後可從選單「換電腦怎麼做？」重看。
  * - 有對話框、計時器、全螢幕或正在同步時先不出現，等畫面安靜再開始，不打斷上課。
  * - 教學期間點背景不會誤按到選單裡的功能；Esc 或「略過」隨時結束。
+ * - 還沒看過教學時，右上角頭像會有一圈會動的亮光，選單裡的「換電腦怎麼做？」標上「新」，看完或略過就消失。
  *
  * 全域 API：CloudGuide.start()、CloudGuide.afterLogin()
  */
@@ -17,7 +18,7 @@
 
     const STEPS = [
         { target: 'avatar', title: '👋 這是你的雲端帳號', text: '右上角的頭像就是雲端選單的開關，點一下就會打開。接下來帶你看看裡面每個按鈕什麼時候用。' },
-        { target: 'sync-time', title: '☁️ 平常會自動幫你存', text: '登入後，系統每 10 分鐘會自動把資料存到雲端。這裡顯示最後一次存好的時間，時間很近就可以放心。', open: true },
+        { target: 'sync-time', title: '☁️ 平常會自動幫你存', text: '登入後，只要資料有變動，系統每 10 分鐘會自動存到雲端。這裡顯示雲端狀態：看到「✅ 已是最新」，就代表這台的資料都存好了。', open: true },
         { target: 'save-one', title: '存目前班級', text: '剛改完重要的資料（例如加完分、改了名單），想馬上存起來，就按這個。', open: true },
         { target: 'save-all', title: '存全部班級', text: '帶好幾個班的老師，下班離開學校前按一次，所有班級都會存到雲端，最安心。', open: true },
         { target: 'get-one', title: '取回目前班級', text: '換到另一台電腦時，把「這個班」在雲端的最新資料帶到這台電腦。', open: true },
@@ -79,6 +80,21 @@
         const style = document.createElement('style');
         style.id = 'cloud-guide-style';
         style.textContent = `
+/* 還沒看過教學：頭像外圍一圈會動的亮光，提醒這裡有教學 */
+.cg-hint #gauth-avatar-initial, .cg-hint #gauth-avatar-img,
+.cg-hint #gauth-avatar-initial-mobile, .cg-hint #gauth-avatar-img-mobile { animation:cgPulse 1.8s ease-out infinite; border-color:#f59e0b !important; }
+@keyframes cgPulse {
+    0% { box-shadow:0 0 0 0 rgba(245,158,11,.85), 0 0 0 0 rgba(99,102,241,.55); }
+    70% { box-shadow:0 0 0 9px rgba(245,158,11,0), 0 0 0 16px rgba(99,102,241,0); }
+    100% { box-shadow:0 0 0 0 rgba(245,158,11,0), 0 0 0 0 rgba(99,102,241,0); }
+}
+.cg-hint [data-guide="help"] { background:#fffbeb; }
+.cg-hint [data-guide="help"] b::after { content:'新'; display:inline-block; margin-left:6px; padding:0 7px; border-radius:999px; background:#f59e0b; color:#fff; font-size:.7rem; line-height:1.5; vertical-align:middle; }
+.dark .cg-hint [data-guide="help"] { background:#422006; }
+@media (prefers-reduced-motion: reduce) {
+    .cg-hint #gauth-avatar-initial, .cg-hint #gauth-avatar-img,
+    .cg-hint #gauth-avatar-initial-mobile, .cg-hint #gauth-avatar-img-mobile { animation:none; box-shadow:0 0 0 3px #f59e0b; }
+}
 .cg-overlay { position:fixed; inset:0; z-index:2147482000; background:rgba(15,23,42,.62); }
 .cg-spot { position:fixed; z-index:2147482000; border-radius:12px; box-shadow:0 0 0 4px #fbbf24, 0 0 18px 6px rgba(251,191,36,.45); cursor:default; transition:all .25s ease; }
 .cg-spot.cg-none { display:none; }
@@ -222,6 +238,29 @@
         openMenu(false);
         if (uid()) raw.set(seenKey(), '1');
         raw.remove(PENDING_KEY);
+        updateHint();
+    }
+
+    /** 已登入、這個帳號在這台還沒看過教學 → 頭像亮圈＋選單「新」標籤；看過就拿掉 */
+    function updateHint() {
+        const show = signedIn() && !!uid() && !raw.get(seenKey());
+        if (show) injectStyle();
+        for (const id of ['gauth-avatar-wrap', 'gauth-avatar-wrap-mobile']) {
+            const wrap = document.getElementById(id);
+            if (!wrap) continue;
+            wrap.classList.toggle('cg-hint', show);
+            for (const avatar of wrap.querySelectorAll('[id^="gauth-avatar-initial"], [id^="gauth-avatar-img"]')) {
+                if (show) avatar.title = '點我看雲端選單與換電腦教學';
+                else if (avatar.title === '點我看雲端選單與換電腦教學') avatar.removeAttribute('title');
+            }
+        }
+    }
+    function watchAuth(attempt = 0) {
+        const config = window.FirebaseConfig;
+        if (!config?.onAuthStateChanged || !config.getDb?.()) { if (attempt < 150) setTimeout(() => watchAuth(attempt + 1), 400); return; }
+        // 登入狀態與頭像由 google-auth-ui 在同一輪更新，稍等一下再判斷
+        config.onAuthStateChanged(() => setTimeout(updateHint, 300));
+        updateHint();
     }
 
     /** 等畫面安靜（沒有對話框、沒在同步）才開始；登入後取回資料而重新整理時，重整後接著顯示 */
@@ -233,6 +272,7 @@
 
     /** 老師親自按下登入、完成首次登入流程後呼叫 */
     function afterLogin() {
+        updateHint();
         if (!uid() || raw.get(seenKey())) return;
         raw.set(PENDING_KEY, '1');
         setTimeout(() => startWhenQuiet(), WAIT_MS);
@@ -245,7 +285,8 @@
         else raw.remove(PENDING_KEY);   // 已登出就不再等
     }
 
-    window.CloudGuide = { start, afterLogin, finish, steps: STEPS.length };
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => resumePending());
-    else resumePending();
+    window.CloudGuide = { start, afterLogin, finish, updateHint, steps: STEPS.length };
+    const boot = () => { resumePending(); watchAuth(); };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+    else boot();
 })();

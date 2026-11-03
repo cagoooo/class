@@ -117,7 +117,7 @@
 .gauth-dd-header .gauth-dd-name { font-weight: 700; font-size: 0.95rem; }
 .gauth-dd-header .gauth-dd-email { font-size: 0.75rem; opacity: .8; margin-top: 1px; }
 .gauth-dd-header .gauth-dd-sync-time {
-    font-size: 0.72rem; opacity: .65; margin-top: 5px;
+    font-size: 0.74rem; opacity: .92; margin-top: 5px; line-height: 1.45;
 }
 .gauth-dd-divider { height: 1px; background: #f0f0f0; margin: 0; }
 .gauth-dd-item {
@@ -405,13 +405,23 @@
     // ────────────────────────────────────────────────────────
     // 工具函式
     // ────────────────────────────────────────────────────────
-    function lastSyncText() {
-        const t = localStorage.getItem('lastSyncTime');
-        if (!t) return '從未同步';
+    // 「上次存到雲端」只在真的有東西上傳時才更新；資料沒變動就不會上傳，時間停在幾天前，
+    // 老師看了會以為沒存到。所以先講目前這個班的狀態（已是最新／還有變更沒存），時間只當補充。
+    function agoText(t) {
         const diff = Math.round((Date.now() - new Date(t).getTime()) / 60000);
         if (diff < 1) return '剛剛';
         if (diff < 60) return `${diff} 分鐘前`;
-        return `${Math.floor(diff / 60)} 小時前`;
+        if (diff < 48 * 60) return `${Math.floor(diff / 60)} 小時前`;
+        return `${Math.floor(diff / 1440)} 天前`;
+    }
+    function lastSyncText() {
+        const t = localStorage.getItem('lastSyncTime');
+        let state = null;
+        try { state = window.CloudSafety?.status?.(); } catch { state = null; }
+        if (state === 'conflict') return '⚠️ 兩邊資料不同，請比較後再選';
+        if (state === 'synced') return t ? `✅ 已是最新（${agoText(t)}存的）` : '✅ 已是最新';
+        if (state === 'pending') return t ? `⏳ 有變更還沒存，稍後自動存（上次 ${agoText(t)}）` : '⏳ 有變更還沒存，稍後自動存';
+        return t ? `上次存好：${agoText(t)}` : '還沒存過';
     }
 
     function hasLocalData() {
@@ -467,7 +477,7 @@
                     <div class="gauth-dd-header">
                         <div class="gauth-dd-name"  id="gauth-dd-name"></div>
                         <div class="gauth-dd-email" id="gauth-dd-email"></div>
-                        <div class="gauth-dd-sync-time" data-guide="sync-time">🕒 上次存到雲端：<span id="gauth-dd-sync"></span></div>
+                        <div class="gauth-dd-sync-time" data-guide="sync-time">☁️ 雲端狀態：<span id="gauth-dd-sync"></span></div>
                     </div>
 ${cloudMenuItemsHTML()}
                     <button class="gauth-dd-item" id="gauth-dd-repair" onclick="GoogleAuthUI.repairClasses()" style="display:none;color:#059669;font-weight:700;">
@@ -525,7 +535,7 @@ ${cloudMenuItemsHTML()}
                     <div class="gauth-dd-header" id="gauth-dd-header-mobile">
                         <div class="gauth-dd-name"  id="gauth-dd-name-mobile"></div>
                         <div class="gauth-dd-email" id="gauth-dd-email-mobile"></div>
-                        <div class="gauth-dd-sync-time" data-guide="sync-time">🕒 上次存到雲端：<span id="gauth-dd-sync-mobile"></span></div>
+                        <div class="gauth-dd-sync-time" data-guide="sync-time">☁️ 雲端狀態：<span id="gauth-dd-sync-mobile"></span></div>
                     </div>
 ${cloudMenuItemsHTML()}
                     <button class="gauth-dd-item" id="gauth-dd-repair-mobile" onclick="GoogleAuthUI.repairClasses()" style="display:none;color:#059669;font-weight:700;">
