@@ -8,6 +8,7 @@
  * 功能：從 manifest.json 讀取 version，自動更新：
  *   - sw.js 中的 CACHE_NAME、STATIC_CACHE、DYNAMIC_CACHE 與 @version 標籤
  *   - classnew.html 中的 <title>、window.APP_VERSION、版本徽章 v3.x.x
+ *   - README.md 的「目前版本：v3.x.x」
  *   確保每次升版不會漏改。
  */
 
@@ -122,6 +123,18 @@ if (fs.existsSync(SHARE_PATH)) {
     if (updated !== share) {
         fs.writeFileSync(SHARE_PATH, updated, 'utf8');
         console.log(`✅ pets.html 本地 js/css ?v= → ${version}`);
+    }
+}
+
+// ─────────────── 更新 README.md 的「目前版本」───────────────
+// README 是 GitHub 首頁，版本停在舊號會讓人以為專案很久沒更新（v3.24.0 停了一個多月才發現）。
+const README_PATH = path.join(ROOT, 'README.md');
+if (fs.existsSync(README_PATH)) {
+    const readme = fs.readFileSync(README_PATH, 'utf8');
+    const updated = readme.replace(/(目前版本：v)[\d.]+/, `$1${version}`);
+    if (updated !== readme) {
+        fs.writeFileSync(README_PATH, updated, 'utf8');
+        console.log(`✅ README.md 目前版本 → v${version}`);
     }
 }
 
