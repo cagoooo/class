@@ -25,9 +25,17 @@ class DataBackup {
     static export() {
         try {
             const data = this.collectData();
-            // 老師備份後通常要登記成績，優先輸出 Excel；若 XLSX 未載入則退回 JSON
+            // 老師備份後通常要登記成績，優先輸出 Excel；Excel 工具第一次用時才載入，載不到就退回 JSON
             if (typeof XLSX !== 'undefined') {
                 this.exportExcel(data);
+            } else if (typeof window.ensureXLSX === 'function') {
+                if (typeof NotificationSystem !== 'undefined') NotificationSystem.info('正在準備 Excel…');
+                window.ensureXLSX()
+                    .then(() => this.exportExcel(data))
+                    .catch(err => {
+                        console.warn('[DataBackup] Excel 工具載入失敗，改存 JSON:', err);
+                        this.exportJSON(data);
+                    });
             } else {
                 this.exportJSON(data);
             }
@@ -155,6 +163,7 @@ class DataBackup {
 
             let data;
             if (/\.xlsx$/i.test(file.name)) {
+                if (typeof XLSX === 'undefined' && typeof window.ensureXLSX === 'function') await window.ensureXLSX();
                 if (typeof XLSX === 'undefined') throw new Error('無法讀取 Excel（XLSX 套件未載入）');
                 const buf = await file.arrayBuffer();
                 const wb = XLSX.read(buf, { type: 'array' });

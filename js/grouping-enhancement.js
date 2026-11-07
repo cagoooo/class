@@ -939,7 +939,12 @@
         const gs = getGroups();
         if (!gs.length) { toast('還沒有分組可以匯出'); return; }
         if (typeof XLSX === 'undefined') {
-            if (typeof window.exportGroupScores === 'function') window.exportGroupScores();
+            if (typeof window.ensureXLSX === 'function') {
+                // Excel 工具第一次用時才載入；載不到就改匯出 CSV
+                window.ensureXLSX().then(exportGroups).catch(() => {
+                    if (typeof window.exportGroupScores === 'function') window.exportGroupScores();
+                });
+            } else if (typeof window.exportGroupScores === 'function') window.exportGroupScores();
             return;
         }
         try {

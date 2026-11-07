@@ -258,6 +258,10 @@ const SemesterArchive = (() => {
         try {
             const copy = { version: '1.1', exportDate: new Date().toISOString(), appVersion: window.APP_VERSION || '', ...data };
             if (typeof XLSX !== 'undefined') DataBackup.exportExcel(copy);
+            else if (typeof window.ensureXLSX === 'function') {
+                // Excel 工具第一次用時才載入；載不到就改存 JSON
+                window.ensureXLSX().then(() => DataBackup.exportExcel(copy)).catch(() => DataBackup.exportJSON(copy));
+            }
             else DataBackup.exportJSON(copy);
             return true;
         } catch (e) {
