@@ -109,3 +109,34 @@ console.log('8 error-handler checks passed');
     assert.equal(ctx.ErrorHandler.getHistory().length, 0);
     console.log('PASS 頁面暫存恢復後 Firestore 已關閉不推播');
 }
+
+{
+    // 臉書／LINE 內建瀏覽器注入的腳本（iabjs://）出錯，不是班級小管家的錯，不送警報。
+    const { context: ctx, listeners: ls } = setup();
+    const before = ctx.ErrorHandler.getHistory().length;
+    ls.get('error')({
+        message: 'Error invoking postMessage: Java object is gone',
+        filename: 'iabjs://navigation_performance_logger_android',
+        lineno: 1,
+        colno: 11722,
+        error: null,
+    });
+    ls.get('error')({
+        message: 'Uncaught TypeError: x is undefined',
+        filename: 'chrome-extension://abcdef/content.js',
+        lineno: 3,
+        colno: 9,
+        error: null,
+    });
+    assert.equal(ctx.ErrorHandler.getHistory().length, before, '內建瀏覽器或擴充功能注入的錯誤不得寫入錯誤紀錄');
+
+    ls.get('error')({
+        message: 'Uncaught TypeError: boom',
+        filename: 'https://cagoooo.github.io/class/js/points.js',
+        lineno: 10,
+        colno: 2,
+        error: null,
+    });
+    assert.equal(ctx.ErrorHandler.getHistory().length, before + 1, '班級小管家自己的錯誤仍要記錄');
+    console.log('PASS 臉書內建瀏覽器注入腳本的錯誤不推播，自己的錯誤照常記錄');
+}

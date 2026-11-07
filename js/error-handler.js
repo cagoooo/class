@@ -306,6 +306,22 @@ const ErrorHandler = (function () {
                 return;
             }
 
+            // 臉書、LINE 等 App 內建瀏覽器會在網頁裡偷偷注入自己的腳本
+            // （例如 iabjs://navigation_performance_logger_android），
+            // 這些腳本自己出錯（像「Java object is gone」）跟班級小管家無關，
+            // 也修不到，就不送警報；瀏覽器擴充功能的腳本同理。
+            const filename = String(event.filename || '');
+            const isInjectedScriptError =
+                (/^[a-z][a-z0-9+.-]*:\/\//i.test(filename) && !/^https?:\/\//i.test(filename)) ||
+                /Java object is gone/i.test(String(event.message || ''));
+
+            if (isInjectedScriptError) {
+                if (config.logToConsole) {
+                    console.warn('[ErrorHandler] 忽略內建瀏覽器或擴充功能注入腳本的錯誤：' + filename);
+                }
+                return;
+            }
+
             if (isFirestoreCacheAssertion(event.error || new Error(event.message), event.filename)) {
                 event.preventDefault();
                 if (config.logToConsole) {
@@ -364,7 +380,8 @@ const ErrorHandler = (function () {
                 /internal error was encountered in the indexed database/i,
                 /connection to indexed database server lost/i,
                 /without an in-progress transaction/i,
-                /attempt to get records from database/i
+                /attempt to get records from database/i,
+                /Java object is gone/i
             ];
             const shouldIgnore = ignorePatterns.some(pattern => pattern.test(errorObj.message));
             if (shouldIgnore) {
