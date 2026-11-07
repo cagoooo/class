@@ -240,8 +240,9 @@
 @keyframes csFadeIn { from { opacity:0; transform:translateY(-6px);} to { opacity:1; transform:translateY(0);} }
 #class-selector-dropdown.open { display: block; }
 
-/* 選單標題 */
-#class-selector-dropdown .cs-header {
+/* 選單標題（桌面與手機共用；手機原本沒套到，標題列沒有底色） */
+#class-selector-dropdown .cs-header,
+#class-selector-dropdown-mobile .cs-header {
     padding: 0.7rem 1rem 0.5rem;
     background: linear-gradient(135deg, #6366f1 0%, #818cf8 100%);
     color: #fff;
@@ -316,7 +317,13 @@
 .cs-action-btn:hover { background: #f5f5ff; }
 .cs-action-btn.danger { color: #ef4444; }
 .cs-action-btn.danger:hover { background: #fef2f2; }
-
+#class-selector-dropdown-mobile .cs-class-item,
+#class-selector-dropdown-mobile .cs-action-btn { min-height: 46px; }
+#class-selector-dropdown-mobile .cs-class-item > span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 /* 班級輸入 Modal */
 #cs-input-modal {
     display: none;
@@ -481,9 +488,10 @@
                         ${curIcon}
                     </button>
                     <div id="class-selector-dropdown-mobile"
-                        style="display:none;position:absolute;top:calc(100% + 8px);left:0;right:auto;min-width:210px;
+                        style="display:none;position:fixed;top:72px;right:12px;width:min(300px, calc(100vw - 24px));
                                background:#fff;border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.18);
-                               overflow:hidden;z-index:9998;animation:csFadeIn .18s ease;">
+                               overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;
+                               z-index:9998;animation:csFadeIn .18s ease;">
                         ${renderDropdown()}
                     </div>
                 </div>
@@ -538,6 +546,24 @@
                 if (ddm) ddm.style.display = 'none';
             }
         });
+        // 選單固定在畫面上，頁面捲動或轉向後按鈕位置會變，直接收起避免選單和按鈕分開
+        window.addEventListener('scroll', closeMobileDropdown, { passive: true });
+        window.addEventListener('resize', closeMobileDropdown);
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMobileDropdown(); });
+    }
+
+    // 手機版選單：按鈕在頁首中間偏右，從按鈕左緣往右展開會超出螢幕。
+    // 改成固定在畫面右側、按鈕正下方，寬度不超過螢幕，班級多時選單內自己捲動。
+    function placeMobileDropdown(ddm) {
+        const btn = document.getElementById('class-selector-btn-mobile');
+        const top = btn ? Math.round(btn.getBoundingClientRect().bottom + 8) : 72;
+        ddm.style.top = top + 'px';
+        ddm.style.maxHeight = `calc(100dvh - ${top + 16}px)`;
+    }
+
+    function closeMobileDropdown() {
+        const ddm = document.getElementById('class-selector-dropdown-mobile');
+        if (ddm) ddm.style.display = 'none';
     }
 
     function _getCurrentName() {
@@ -631,6 +657,7 @@
                 if (!isOpen) {
                     // 更新選單內容
                     ddm.innerHTML = renderDropdown();
+                    placeMobileDropdown(ddm);
                     ddm.style.display = 'block';
                 } else {
                     ddm.style.display = 'none';
