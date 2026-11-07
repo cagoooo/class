@@ -140,3 +140,20 @@ console.log('8 error-handler checks passed');
     assert.equal(ctx.ErrorHandler.getHistory().length, before + 1, '班級小管家自己的錯誤仍要記錄');
     console.log('PASS 臉書內建瀏覽器注入腳本的錯誤不推播，自己的錯誤照常記錄');
 }
+
+{
+    // iPhone Safari／臉書內建瀏覽器打不開 Firestore 離線快取，SDK 自己改用記憶體快取，不送警報。
+    const { context: ctx, listeners: ls } = setup();
+    let prevented = false;
+    ls.get('unhandledrejection')({
+        reason: vm.runInContext("new Error(\"IndexedDB transaction 'createOrUpgrade' failed: AbortError: The operation was aborted.\")", ctx),
+        preventDefault() { prevented = true; },
+    });
+    assert.equal(prevented, true, 'Firestore 離線快取打不開應被辨識');
+    assert.equal(ctx.ErrorHandler.getHistory().length, 0, 'Firestore 離線快取打不開不得寫入錯誤紀錄');
+
+    // 班級小管家自己接住並回報的同類訊息仍要記錄
+    ctx.ErrorHandler.handle(vm.runInContext("new Error(\"IndexedDB transaction 'createOrUpgrade' failed: AbortError\")", ctx), 'STORAGE', '雲端同步/上傳', { silent: true });
+    assert.equal(ctx.ErrorHandler.getHistory().length, 1, '自己接住的錯誤仍要記錄');
+    console.log('PASS Firestore 離線快取打不開不推播，自己接住的錯誤照常記錄');
+}

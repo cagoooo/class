@@ -190,6 +190,15 @@ const ErrorHandler = (function () {
         return internalAssertion || incompatiblePersistence;
     }
 
+    // Firestore 離線快取是用瀏覽器裡的小資料庫（IndexedDB）存的。iPhone 的
+    // Safari 或臉書／LINE 內建瀏覽器有時打不開它，SDK 會丟出
+    // 「IndexedDB transaction 'createOrUpgrade' failed」這類訊息後改用記憶體快取，
+    // 雲端同步照常可用。這個訊息格式只有 Firestore SDK 會產生，而且只在沒人接住
+    // （unhandledrejection）時才排除；班級小管家自己接住的錯誤仍照常通報。
+    function isFirestoreIndexedDbOpenError(error) {
+        return /^IndexedDB transaction '[^']+' failed:/i.test(String(error?.message || ''));
+    }
+
     // Firebase Auth 9 compat 在手機（尤其 Android Chrome）上，登入彈窗被判定
     // 「已關閉」後，Google 帳號選擇結果才慢一步回來；SDK 仍會完成登入，但內部
     // 找不到等待中的 Promise 而丟出此斷言。只在堆疊確認來自 Auth SDK 時排除，
@@ -265,6 +274,13 @@ const ErrorHandler = (function () {
                 event.preventDefault();
                 if (config.logToConsole) {
                     console.warn('[ErrorHandler] Firestore 離線快取版本不相容，已改用記憶體快取');
+                }
+                return;
+            }
+            if (isFirestoreIndexedDbOpenError(reason)) {
+                event.preventDefault();
+                if (config.logToConsole) {
+                    console.warn('[ErrorHandler] Firestore 離線快取打不開，已改用記憶體快取');
                 }
                 return;
             }

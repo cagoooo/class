@@ -1,3 +1,9 @@
+## 2026-11-08 iPhone 打不開離線快取不再誤報 v3.63.7
+
+- iPhone（Safari 或臉書內建瀏覽器）開班級小管家時，Firestore 的離線快取（瀏覽器裡的 IndexedDB 小資料庫）有時打不開，SDK 丟出「IndexedDB transaction 'createOrUpgrade' failed: AbortError」後自己改用記憶體快取，雲端同步照常可用，卻被當成系統錯誤送到 Google Chat。
+- 這個訊息格式只有 Firestore SDK 會產生；改為沒人接住（Unhandled Promise Rejection）時只在主控台留紀錄、不推播。班級小管家自己接住並回報的錯誤照常通報。
+- 補上測試：SDK 沒接住的這類錯誤不寫入錯誤紀錄，自己接住的仍會記錄。
+
 ## 2026-11-07 臉書內建瀏覽器的錯誤不再誤報 v3.63.6
 
 - 老師從臉書貼文點連結打開班級小管家（Android 臉書 App 內建瀏覽器），臉書會在網頁裡注入自己的效能紀錄腳本（`iabjs://navigation_performance_logger_android`）；離開或切換頁面時這支腳本自己出錯「Error invoking postMessage: Java object is gone」，被當成系統錯誤送到 Google Chat。
