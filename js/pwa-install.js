@@ -217,69 +217,121 @@
                 const s = document.createElement('style');
                 s.id = 'pwa-update-banner-style';
                 s.textContent = `
+                    /* 更新提示卡：上面標題＋一句說明，下面兩顆按鈕並排；手機兩顆等寬、好按 */
                     #pwa-update-banner {
                         position: relative;
                         margin: 12px auto;
-                        width: min(520px, calc(100vw - 24px));
+                        width: min(560px, calc(100vw - 24px));
                         box-sizing: border-box;
                         z-index: 19998;
-                        background: linear-gradient(135deg, #1e3a8a, #3b82f6);
-                        color: #ffffff;
-                        box-shadow: 0 8px 24px rgba(30, 64, 175, 0.32);
-                        padding: 12px 14px;
-                        font-family: 'Noto Sans TC', sans-serif;
-                        font-size: 0.9rem;
-                        font-weight: 500;
-                        display: flex;
-                        align-items: center;
-                        gap: 0.65rem;
-                        flex-wrap: wrap;
-                        transform: none;
-                        transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-                        backdrop-filter: blur(8px);
-                        border: 1px solid rgba(255,255,255,0.24);
+                        display: grid;
+                        grid-template-columns: auto 1fr;
+                        grid-template-areas: "icon text" "icon actions";
+                        column-gap: 14px;
+                        row-gap: 12px;
+                        padding: 16px 18px;
+                        background: #ffffff;
+                        color: #1e293b;
+                        border: 1px solid #c7d2fe;
+                        border-left: 5px solid #4f46e5;
                         border-radius: 16px;
+                        box-shadow: 0 10px 28px rgba(79, 70, 229, 0.16);
+                        font-family: 'Noto Sans TC', sans-serif;
+                        /* 預設就看得到；進場動畫只是加分，分頁在背景時不會卡在透明 */
+                        animation: pwaBannerIn 0.3s ease;
                     }
-                    #pwa-update-banner.show {
-                        transform: none;
+                    @keyframes pwaBannerIn {
+                        from { opacity: 0; transform: translateY(-8px); }
+                        to { opacity: 1; transform: none; }
                     }
-                    .pwa-update-message {
-                        flex: 1 1 220px;
-                        line-height: 1.45;
+                    .pwa-update-icon {
+                        grid-area: icon;
+                        width: 44px;
+                        height: 44px;
+                        border-radius: 12px;
+                        display: grid;
+                        place-items: center;
+                        font-size: 1.35rem;
+                        background: linear-gradient(135deg, #eef2ff, #e0f2fe);
+                    }
+                    .pwa-update-text {
+                        grid-area: text;
+                        min-width: 0;
+                        align-self: center;
+                    }
+                    .pwa-update-title {
+                        margin: 0;
+                        font-size: 1rem;
+                        font-weight: 700;
+                        line-height: 1.4;
+                        color: #312e81;
+                    }
+                    .pwa-update-desc {
+                        margin: 2px 0 0;
+                        font-size: 0.875rem;
+                        line-height: 1.5;
+                        color: #475569;
+                    }
+                    .pwa-update-actions {
+                        grid-area: actions;
+                        display: flex;
+                        justify-content: flex-end;
+                        gap: 10px;
+                    }
+                    .pwa-update-btn,
+                    .pwa-update-close {
+                        min-height: 44px;
+                        padding: 0 20px;
+                        border-radius: 999px;
+                        font-size: 0.9375rem;
+                        font-weight: 700;
+                        font-family: inherit;
+                        cursor: pointer;
+                        white-space: nowrap;
+                        transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
                     }
                     .pwa-update-btn {
-                        background: #ffffff;
-                        color: #1d4ed8;
-                        border: none;
-                        min-height: 44px;
-                        padding: 4px 14px;
-                        border-radius: 999px;
-                        font-weight: 700;
-                        cursor: pointer;
-                        font-size: 0.82rem;
-                        transition: all 0.2s;
-                        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-                    }
-                    .pwa-update-btn:hover {
-                        background: #f3f4f6;
-                        transform: scale(1.05);
-                    }
-                    .pwa-update-btn:active {
-                        transform: scale(0.95);
-                    }
-                    .pwa-update-close {
-                        background: rgba(255,255,255,0.18);
                         border: none;
                         color: #ffffff;
-                        min-height: 44px;
-                        padding: 2px 8px;
-                        border-radius: 4px;
-                        cursor: pointer;
-                        font-size: 0.8rem;
-                        transition: background 0.2s;
+                        background: linear-gradient(135deg, #4f46e5, #3b82f6);
+                        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
                     }
-                    .pwa-update-close:hover {
-                        background: rgba(255,255,255,0.3);
+                    .pwa-update-btn:hover { box-shadow: 0 6px 16px rgba(79, 70, 229, 0.4); }
+                    .pwa-update-btn:active { transform: scale(0.97); }
+                    .pwa-update-btn:disabled { opacity: 0.75; cursor: wait; }
+                    .pwa-update-close {
+                        border: 1px solid #cbd5e1;
+                        color: #475569;
+                        background: #ffffff;
+                    }
+                    .pwa-update-close:hover { background: #f1f5f9; }
+                    .pwa-update-btn:focus-visible,
+                    .pwa-update-close:focus-visible {
+                        outline: 3px solid #a5b4fc;
+                        outline-offset: 2px;
+                    }
+                    @media (max-width: 520px) {
+                        #pwa-update-banner {
+                            grid-template-areas: "icon text" "actions actions";
+                            padding: 14px;
+                        }
+                        .pwa-update-icon { width: 40px; height: 40px; font-size: 1.2rem; }
+                        .pwa-update-actions > button { flex: 1 1 0; padding: 0 12px; }
+                    }
+                    .dark #pwa-update-banner {
+                        background: #1e293b;
+                        color: #e2e8f0;
+                        border-color: #334155;
+                        border-left-color: #818cf8;
+                        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+                    }
+                    .dark .pwa-update-icon { background: #312e81; }
+                    .dark .pwa-update-title { color: #c7d2fe; }
+                    .dark .pwa-update-desc { color: #cbd5e1; }
+                    .dark .pwa-update-close { background: transparent; color: #e2e8f0; border-color: #475569; }
+                    .dark .pwa-update-close:hover { background: #334155; }
+                    @media (prefers-reduced-motion: reduce) {
+                        #pwa-update-banner { animation: none; }
                     }
                 `;
                 document.head.appendChild(s);
@@ -287,11 +339,17 @@
 
             const banner = document.createElement('div');
             banner.id = 'pwa-update-banner';
+            banner.setAttribute('role', 'status');
             banner.innerHTML = `
-                <span style="font-size: 1.1rem;">✨</span>
-                <span class="pwa-update-message">班級小管家有新版本，現在重新載入即可套用。</span>
-                <button class="pwa-update-btn" id="pwa-update-btn-action">立即更新</button>
-                <button class="pwa-update-close" id="pwa-update-btn-close">稍後</button>
+                <span class="pwa-update-icon" aria-hidden="true">✨</span>
+                <div class="pwa-update-text">
+                    <p class="pwa-update-title">班級小管家有新版本</p>
+                    <p class="pwa-update-desc">重新載入就能用，班級資料都會保留</p>
+                </div>
+                <div class="pwa-update-actions">
+                    <button type="button" class="pwa-update-close" id="pwa-update-btn-close">稍後再說</button>
+                    <button type="button" class="pwa-update-btn" id="pwa-update-btn-action">立即更新</button>
+                </div>
             `;
 
             const host = document.getElementById('students-section')?.parentElement || document.body;
