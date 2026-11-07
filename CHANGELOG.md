@@ -1,3 +1,10 @@
+## 2026-11-08 Android 臉書內建瀏覽器自動改用 Chrome 開啟 v3.63.8
+
+- 原本只有 LINE 會自動跳到預設瀏覽器；從臉書、IG、Messenger 等 App 點進來只會蓋上「請改用瀏覽器開啟」提示，要老師自己點「⋯」切換，很多人就直接關掉了。
+- Android 手機改為先顯示提示，0.3 秒後自動用 `intent://` 叫出 Chrome 開啟同一頁（保留原本網址的參數與 #分頁）；提示卡上多一顆綠色「用 Chrome 開啟」按鈕，自動跳轉被 App 擋下時可以手動按。
+- 每個分頁只自動試一次；沒裝 Chrome 時會帶 `iabEscape=1` 回到原本的內建瀏覽器並停止自動跳轉，不會無限跳來跳去。iPhone 沒有可靠的自動跳轉方法，維持原本的提示；LINE 與一般瀏覽器不受影響。
+- 新增 `scripts/test-inapp-escape.cjs`：Android 臉書自動開 Chrome、已試過不再跳、iPhone 只有提示、LINE 照舊、一般 Chrome 不受影響。
+
 ## 2026-11-08 iPhone 打不開離線快取不再誤報 v3.63.7
 
 - iPhone（Safari 或臉書內建瀏覽器）開班級小管家時，Firestore 的離線快取（瀏覽器裡的 IndexedDB 小資料庫）有時打不開，SDK 丟出「IndexedDB transaction 'createOrUpgrade' failed: AbortError」後自己改用記憶體快取，雲端同步照常可用，卻被當成系統錯誤送到 Google Chat。
