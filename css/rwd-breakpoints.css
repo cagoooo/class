@@ -228,15 +228,22 @@
     border-bottom-color: #93c5fd;
 }
 
+/* 手機：右下角有「一鍵更新」與同步狀態兩顆浮動鈕（bottom 約 24～72px、同步鈕左緣在 right:212px），
+   置中時「阿凱老師」連結會被蓋住。改靠左，底部再留出浮動鈕的高度，窄螢幕（320px）也不會重疊。 */
 @media (max-width: 640px) {
+    .site-footer {
+        padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    }
+
     .site-footer__inner {
         flex-direction: column;
+        align-items: flex-start;
         gap: 0.35rem;
-        text-align: center;
+        text-align: left;
     }
 
     .site-footer__credit {
-        text-align: center;
+        text-align: left;
     }
 }
 
