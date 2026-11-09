@@ -31,16 +31,23 @@
     const baseKey = c => `cloudSafetyBase:${c.uid}:${c.id}`;
     const dirtyKey = (uid, id) => `cloudSafetyDirty:${uid}:${id}`;
     const recoveryKey = c => `${c.uid || 'local'}:${c.id}`;
-    const fingerprint = values => BackupIntegrity.checksum(JSON.stringify(Object.keys(values).sort().map(k => [k, values[k]])));
+    // 後來才加入同步的設定：沒設定過（null）時完全不出現在指紋裡，舊的同步基準照樣對得上，
+    // 沒用過這項設定的老師不會因為改版而整批重新上傳；雲端舊版本沒有這一項時也不會清掉這台的設定。
+    const optionalKeys = new Set(['pointsQuickActions']);
+    const fingerprint = values => BackupIntegrity.checksum(JSON.stringify(Object.keys(values)
+        .filter(k => !(optionalKeys.has(k) && values[k] == null)).sort().map(k => [k, values[k]])));
     // 有明確異動追蹤的班級資料（與 sync-status-indicator 的 USER_DATA_KEYS 相同）。白板文字、潔牙勾選、
     // 主題等其餘鍵不會留下異動標記，所以「這台裝置有沒有未同步的變更」要以這組鍵的內容為準。
     const tracked = ['students', 'pointsHistory', 'groups', 'petSettings', 'notebookEntries', 'homeworkList', 'homeworkChecks',
-        'lotteryHistory', 'classAnnouncements', 'examSubjects', 'examReminders', 'examAttendance', 'examAbsenceRecords', 'seatingConfig', 'drawnStudentIds'];
-    const trackedFingerprint = values => fingerprint(Object.fromEntries(tracked.map(k => [k, values[k] ?? null])));
+        'lotteryHistory', 'classAnnouncements', 'examSubjects', 'examReminders', 'examAttendance', 'examAbsenceRecords', 'seatingConfig', 'drawnStudentIds',
+        'pointsQuickActions'];
+    const trackedFingerprint = values => fingerprint(Object.fromEntries(tracked
+        .filter(k => !(optionalKeys.has(k) && values[k] == null)).map(k => [k, values[k] ?? null])));
+    const fromCloud = (k, remoteValues, localValues) => remoteValues[k] ?? (optionalKeys.has(k) ? (localValues?.[k] ?? null) : null);
     const baseline = (token, values) => JSON.stringify({ token, fingerprint: fingerprint(values), tracked: trackedFingerprint(values), at: new Date().toISOString() });
     function capture(id = current()) {
         const values = {};
-        for (const k of keys()) values[k] = raw(keyFor(k, id));
+        for (const k of keys()) { const v = raw(keyFor(k, id)); if (v != null || !optionalKeys.has(k)) values[k] = v; }
         for (const k of core) if (values[k] == null) values[k] = '[]';
         return values;
     }
@@ -410,7 +417,8 @@
         await checkpoint(c.id);
         sameAccount(c);
         if (fingerprint(capture(c.id)) !== before) throw Error('備份期間本機資料已改變，請重新預覽還原');
-        const ops = keys().map(k => [keyFor(k, c.id), remote.values[k] ?? null]);
+        const localNow = capture(c.id);
+        const ops = keys().map(k => [keyFor(k, c.id), fromCloud(k, remote.values, localNow)]);
         ops.push([baseKey(c), baseline(remote.token, remote.values)]);
         if (!window.SafeStorage.writeRaw(ops, { context: '完整還原班級資料' })) return false;
         clearLocalChange(c, fingerprint(remote.values));
@@ -464,8 +472,8 @@
             const state = cleanScope();   // 下載期間老師可能已經開始操作
             if (!state || base(c)?.token !== known?.token) return 'local-changes';
             sameAccount(c);
-            const changed = state.scope.some(k => (remote.values[k] ?? null) !== (state.local[k] ?? null));
-            const ops = state.scope.map(k => [keyFor(k, c.id), remote.values[k] ?? null]);
+            const changed = state.scope.some(k => fromCloud(k, remote.values, state.local) !== (state.local[k] ?? null));
+            const ops = state.scope.map(k => [keyFor(k, c.id), fromCloud(k, remote.values, state.local)]);
             ops.push([baseKey(c), baseline(remote.token, remote.values)]);
             if (!window.SafeStorage.writeRaw(ops, { context: '自動更新為雲端最新版本' })) return 'skipped';
             delete conflicts[recoveryKey(c)];

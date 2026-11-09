@@ -399,7 +399,7 @@
             'notebookEntries', 'homeworkList', 'homeworkChecks',
             'lotteryHistory', 'classAnnouncements',
             'examSubjects', 'examReminders', 'examAttendance', 'examAbsenceRecords',
-            'seatingConfig', 'drawnStudentIds',
+            'seatingConfig', 'drawnStudentIds', 'pointsQuickActions',
         ];
         const isUserKey = (k) => USER_DATA_KEYS.some(uk => k === uk || k.startsWith(uk + '-'));
 

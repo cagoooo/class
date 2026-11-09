@@ -44,6 +44,7 @@
         'boardLotteryCfg',          // 經營白板：號碼抽籤設定
         'brushChecked',             // 潔牙勾選表：今日已潔牙號碼
         'quietChallengeLog',        // 安靜挑戰：挑戰紀錄
+        'pointsQuickActions',       // 加扣分項目（v3.64.2 起依班級存、跟著雲端同步）
     ]);
 
     // 取得原始 Storage 方法（避免被自己攔截）

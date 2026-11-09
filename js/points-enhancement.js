@@ -5,7 +5,7 @@
  *   1. 先點學生（可複選）→ 再按項目：一次給選取的學生，同一批可一起撤銷。
  *   2. 先按項目 →「連續給分」：之後點誰就給誰，按「結束」或 Esc 停止（沿用舊版習慣）。
  * 學生卡片顯示目前分數與「今天」增減；給分後卡片跳出 +1，底部提示可「撤銷」。
- * 加扣分項目可自行編輯（存在這台電腦）；紀錄依日期分段、同一批合併顯示，可逐筆撤銷。
+ * 加扣分項目可自行編輯（依班級存，登入 Google 會跟著雲端同步）；紀錄依日期分段、同一批合併顯示，可逐筆撤銷。
  *
  * 資料一律走既有流程：有班級寵物模組時用 ClassPets.award / ClassPets.undo（與寵物成長、金幣、
  * 小組分數、雲端同步一致）；沒有時退回 addPointsToStudent。本模組不直接改分數資料。
@@ -277,13 +277,16 @@
         document.head.append(style);
     }
 
-    // ---------- 加扣分項目（存在這台電腦） ----------
+    // ---------- 加扣分項目（依班級存、跟著雲端同步；v3.64.2 前只存在這台電腦） ----------
     const validItem = x => x && typeof x.reason === 'string' && x.reason.trim() && Number.isInteger(Number(x.points)) && Number(x.points) !== 0;
     const normItem = x => ({ reason: String(x.reason).trim().slice(0, 20), points: Math.max(-100, Math.min(100, Number(x.points))) });
     function loadItems() {
         if (items) return items;
         try {
-            const raw = JSON.parse(localStorage.getItem(ITEMS_KEY) || 'null');
+            // 這班還沒存過自己的項目：沿用這台電腦原本的清單（v3.64.2 前全部班級共用一份），改過才各班分開
+            const own = localStorage.getItem(ITEMS_KEY);
+            const legacy = own == null && window.ClassAwareStorage?.rawGet ? window.ClassAwareStorage.rawGet(ITEMS_KEY) : null;
+            const raw = JSON.parse(own ?? legacy ?? 'null');
             if (Array.isArray(raw)) items = raw.filter(validItem).map(normItem);
         } catch (e) { items = null; }
         if (!items || !items.length) items = DEFAULT_ITEMS.map(x => ({ ...x }));
@@ -442,7 +445,7 @@
             }),
             btn('pt-done', '完成', () => { state.editing = false; renderPanel(); $('ptEditBtn')?.focus(); })
         );
-        box.append(actions, el('p', 'pt-editor-note', '項目名稱最多 20 字；分數 -100～100（負數是扣分）。常用項目存在這台電腦，換電腦要再設定一次。'));
+        box.append(actions, el('p', 'pt-editor-note', '項目名稱最多 20 字；分數 -100～100（負數是扣分）。項目依班級儲存，登入 Google 後會跟著雲端同步到其他電腦。'));
     }
     function focusLastEditor() {
         const inputs = $('ptEditor')?.querySelectorAll('.pt-editor-row input[type="text"]');

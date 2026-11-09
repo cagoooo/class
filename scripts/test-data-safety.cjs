@@ -289,5 +289,19 @@ let passed=0;async function test(name,fn){await fn();console.log('PASS',name);pa
   assert.deepEqual(Array.from(cloud.pointsHistory.filter(r=>r.id.startsWith('from-')).map(r=>r.id).sort()),['from-a','from-b']);assert.equal(cloud.students[0].points,15);});
  await test('上傳途中被搶先寫入：沒有要求合併的流程（學期封存等）仍停下來回報衝突',async()=>{const{a,b}=await mergePair();addPoints(b,'from-b',3);addPoints(a,'from-a',2);raceOnce(b,a);const before=b.storage.getItem('pointsHistory-A');
   const error=await b.s.publish('A').catch(e=>e);assert.equal(error.code,'sync-conflict');assert.equal(b.storage.getItem('pointsHistory-A'),before);});
+ // 2026-11-09：加扣分項目（pointsQuickActions）依班級跟著雲端同步
+ const ITEMS=JSON.stringify([{reason:'跑步',points:2},{reason:'未靠椅子',points:-1}]);
+ await test('加扣分項目：沒設定過時不進指紋，舊同步基準照樣對得上',async()=>{const a=setup();await a.s.publish();
+  assert.equal(Object.hasOwn(a.s.capture('A'),'pointsQuickActions'),false);assert.equal(a.s.needsUpload('A'),false);});
+ await test('加扣分項目：一台改了會上傳，另一台自動跟上同一份',async()=>{const{a,b}=await mergePair();a.storage.setItem('pointsQuickActions',ITEMS);
+  assert.equal(a.s.needsUpload('A'),true);await a.s.publish();assert.equal(a.s.dataFor((await a.s.read()).values)&&JSON.parse((await a.s.read()).values.pointsQuickActions).length,2);
+  assert.equal(await b.s.fastForward('A'),'updated');assert.equal(b.storage.getItem('pointsQuickActions'),ITEMS);});
+ await test('加扣分項目：改版前就設定過（雲端還沒有）會被當成待上傳，不會被雲端清掉',async()=>{const a=setup();await a.s.publish();
+  a.c.ClassAwareStorage.rawSet('pointsQuickActions-A',ITEMS);assert.equal(a.s.needsUpload('A'),true);
+  assert.equal(await a.s.fastForward('A'),'local-changes');assert.equal(a.storage.getItem('pointsQuickActions'),ITEMS);
+  const old=await a.s.read();assert.equal(old.values.pointsQuickActions??null,null);await a.s.restore(old);assert.equal(a.storage.getItem('pointsQuickActions'),ITEMS);});
+ await test('加扣分項目：兩台各改一項，自動合併兩邊都留下',async()=>{const{a,b}=await mergePair();a.storage.setItem('pointsQuickActions',JSON.stringify([{reason:'跑步',points:2}]));await a.s.publish();
+  b.storage.setItem('pointsQuickActions',JSON.stringify([{reason:'飯菜吃光',points:2}]));assert.equal(await b.s.publish('A',{autoMerge:'now'}),true);
+  const items=JSON.parse((await b.s.read()).values.pointsQuickActions).map(x=>x.reason).sort();assert.deepEqual(Array.from(items),['跑步','飯菜吃光'].sort());});
  console.log(passed+' safety checks passed');
 })().catch(e=>{console.error(e);process.exitCode=1;});
