@@ -44,7 +44,13 @@
     const trackedFingerprint = values => fingerprint(Object.fromEntries(tracked
         .filter(k => !(optionalKeys.has(k) && values[k] == null)).map(k => [k, values[k] ?? null])));
     const fromCloud = (k, remoteValues, localValues) => remoteValues[k] ?? (optionalKeys.has(k) ? (localValues?.[k] ?? null) : null);
-    const baseline = (token, values) => JSON.stringify({ token, fingerprint: fingerprint(values), tracked: trackedFingerprint(values), at: new Date().toISOString() });
+    // 白板、潔牙、安靜挑戰紀錄：v3.64.3 起單獨改它們也會上傳、另一台會跟上。
+    // 考試多日設定（examDayPresets）刻意不放：考試模組載入時會自動寫入預設值，算進來會讓每班開頁就被當成有修改。
+    // 另存一份指紋（tracked2），舊的同步基準沒有這份時不強迫重傳，避免改版後每位老師每班都重跑一次同步。
+    const tracked2 = ['boardNote', 'boardNoteStyle', 'boardActivity', 'boardLotteryCfg', 'brushChecked', 'quietChallengeLog'];
+    const tracked2Fingerprint = values => fingerprint(Object.fromEntries(tracked2.map(k => [k, values[k] ?? null])));
+    // boardValues：這台保留自己的白板等設定（沒換成雲端版本）時，以這台的內容當基準，免得下次把舊白板當成新修改傳上去
+    const baseline = (token, values, boardValues = values) => JSON.stringify({ token, fingerprint: fingerprint(values), tracked: trackedFingerprint(values), tracked2: tracked2Fingerprint(boardValues), at: new Date().toISOString() });
     function capture(id = current()) {
         const values = {};
         for (const k of keys()) { const v = raw(keyFor(k, id)); if (v != null || !optionalKeys.has(k)) values[k] = v; }
@@ -402,7 +408,9 @@
         if (status(id) !== 'pending') return false;
         const c = context(id), known = base(c);
         if (raw(dirtyKey(c.uid, c.id))) return true;
-        return !(known?.tracked && known.tracked === trackedFingerprint(capture(id)));
+        const local = capture(id);
+        if (known?.tracked2 && known.tracked2 !== tracked2Fingerprint(local)) return true;
+        return !(known?.tracked && known.tracked === trackedFingerprint(local));
     }
     async function checkpoint(id = current()) {
         const uid = window.FirebaseConfig?.getCurrentUserId() || 'local';
@@ -458,7 +466,11 @@
             // 主題、時鐘等裝置偏好維持這台的設定。
             if (!known?.token) return blank(local) ? { local, scope: keys().filter(k => !globalKeys.includes(k)) } : null;
             if (fingerprint(local) === known.fingerprint) return { local, scope: keys() };
-            if (known.tracked && trackedFingerprint(local) === known.tracked) return { local, scope: tracked };
+            if (known.tracked && trackedFingerprint(local) === known.tracked) {
+                // 白板等設定這台沒改過（指紋對得上）就一起換成雲端版本；舊基準沒有這份指紋時維持保留這台的內容
+                const boardClean = known.tracked2 && tracked2Fingerprint(local) === known.tracked2;
+                return { local, scope: boardClean ? [...tracked, ...tracked2] : tracked };
+            }
             return null;
         };
         if (!cleanScope()) return known?.token ? 'local-changes' : 'no-baseline';
@@ -474,7 +486,7 @@
             sameAccount(c);
             const changed = state.scope.some(k => fromCloud(k, remote.values, state.local) !== (state.local[k] ?? null));
             const ops = state.scope.map(k => [keyFor(k, c.id), fromCloud(k, remote.values, state.local)]);
-            ops.push([baseKey(c), baseline(remote.token, remote.values)]);
+            ops.push([baseKey(c), baseline(remote.token, remote.values, state.scope.includes(tracked2[0]) ? remote.values : state.local)]);
             if (!window.SafeStorage.writeRaw(ops, { context: '自動更新為雲端最新版本' })) return 'skipped';
             delete conflicts[recoveryKey(c)];
             if (changed && current() === c.id) refreshMemory(capture(c.id));

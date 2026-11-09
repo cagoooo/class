@@ -303,5 +303,16 @@ let passed=0;async function test(name,fn){await fn();console.log('PASS',name);pa
  await test('加扣分項目：兩台各改一項，自動合併兩邊都留下',async()=>{const{a,b}=await mergePair();a.storage.setItem('pointsQuickActions',JSON.stringify([{reason:'跑步',points:2}]));await a.s.publish();
   b.storage.setItem('pointsQuickActions',JSON.stringify([{reason:'飯菜吃光',points:2}]));assert.equal(await b.s.publish('A',{autoMerge:'now'}),true);
   const items=JSON.parse((await b.s.read()).values.pointsQuickActions).map(x=>x.reason).sort();assert.deepEqual(Array.from(items),['跑步','飯菜吃光'].sort());});
+ // 2026-11-09 v3.64.3：白板、潔牙等班級設定單獨修改也會同步
+ const oldBase=env=>{const k='cloudSafetyBase:teacher:A';const b=JSON.parse(env.c.ClassAwareStorage.rawGet(k));delete b.tracked2;env.c.ClassAwareStorage.rawSet(k,JSON.stringify(b));};
+ await test('白板等設定：舊同步基準（沒有白板指紋）什麼都沒改時不會重傳',async()=>{const a=setup();a.storage.setItem('boardNote','明天帶直笛');await a.s.publish();oldBase(a);assert.equal(a.s.needsUpload('A'),false);});
+ await test('白板等設定：只改白板也會上傳，另一台自動跟上',async()=>{const{a,b}=await mergePair();a.storage.setItem('boardNote','明天帶直笛');assert.equal(a.s.needsUpload('A'),true);await a.s.publish();
+  assert.equal(await b.s.fastForward('A'),'updated');assert.equal(b.storage.getItem('boardNote'),'明天帶直笛');});
+ await test('潔牙勾選：只改潔牙也會上傳，另一台自動跟上',async()=>{const{a,b}=await mergePair();a.storage.setItem('brushChecked',JSON.stringify({date:'2026-11-09',nums:[1,3,5]}));assert.equal(a.s.needsUpload('A'),true);await a.s.publish();
+  assert.equal(await b.s.fastForward('A'),'updated');assert.equal(JSON.parse(b.storage.getItem('brushChecked')).nums.length,3);});
+ await test('白板等設定：舊基準的裝置保留自己的白板時，之後不會把舊白板蓋回雲端',async()=>{const{a,b}=await mergePair();oldBase(b);b.c.ClassAwareStorage.rawSet('boardNote-A','B 台的舊公告');
+  a.storage.setItem('boardNote','A 台的新公告');addPoints(a,'from-a',2);await a.s.publish();
+  assert.equal(await b.s.fastForward('A'),'updated');assert.equal(b.storage.getItem('boardNote'),'B 台的舊公告');assert.equal(b.s.needsUpload('A'),false);
+  assert.equal(JSON.parse(b.storage.getItem('pointsHistory-A')).some(r=>r.id==='from-a'),true);});
  console.log(passed+' safety checks passed');
 })().catch(e=>{console.error(e);process.exitCode=1;});

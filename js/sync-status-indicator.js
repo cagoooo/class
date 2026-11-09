@@ -400,6 +400,8 @@
             'lotteryHistory', 'classAnnouncements',
             'examSubjects', 'examReminders', 'examAttendance', 'examAbsenceRecords',
             'seatingConfig', 'drawnStudentIds', 'pointsQuickActions',
+            // v3.64.3：白板、潔牙、安靜挑戰紀錄改了也算待同步（考試多日設定會在載入時自動寫入，不算）
+            'boardNote', 'boardNoteStyle', 'boardActivity', 'boardLotteryCfg', 'brushChecked', 'quietChallengeLog',
         ];
         const isUserKey = (k) => USER_DATA_KEYS.some(uk => k === uk || k.startsWith(uk + '-'));
 
