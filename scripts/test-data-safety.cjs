@@ -278,5 +278,16 @@ let passed=0;async function test(name,fn){await fn();console.log('PASS',name);pa
   assert.equal(b.s.needsUpload('A'),false);});
  await test('比較視窗可以處理不是目前開著的班',async()=>{const{a,b}=await mergePair();a.c.students[0].classPet='cat';a.save();await a.s.publish();b.c.students[0].classPet='fox';b.save();const error=await b.s.publish('A',{autoMerge:'now'}).catch(e=>e);await b.s.report(error,'A',true);away(b);
   assert.deepEqual([...b.s.conflictIds()],['A']);assert.equal(b.s.status('other'),'pending');});
+ // 2026-11-09：上傳途中另一台裝置剛好先寫入（交易時版本頭已變），要走自動合併流程，不可直接推播衝突
+ const raceOnce=(env,other)=>{const orig=env.db.runTransaction.bind(env.db);env.db.runTransaction=async fn=>{env.db.runTransaction=orig;await other.s.publish();return orig(fn);};};
+ await test('上傳途中被搶先寫入：目前開著的班改成等待安靜時合併，不算衝突',async()=>{const{a,b}=await mergePair();addPoints(b,'from-b',3);addPoints(a,'from-a',2);raceOnce(b,a);
+  await assert.rejects(b.s.publish('A',{autoMerge:'quiet'}),e=>e.code==='sync-merge-deferred');assert.equal(b.syncConflicts.length,0);assert.equal(b.s.isMergeWaiting('A'),true);
+  assert.equal(await b.s.publish('A',{autoMerge:'now'}),true);const cloud=b.s.dataFor((await b.s.read()).values);
+  assert.deepEqual(Array.from(cloud.pointsHistory.filter(r=>r.id.startsWith('from-')).map(r=>r.id).sort()),['from-a','from-b']);assert.equal(cloud.students[0].points,15);});
+ await test('上傳途中被搶先寫入：老師按同步時直接合併，兩邊紀錄都在',async()=>{const{a,b}=await mergePair();addPoints(b,'from-b',3);addPoints(a,'from-a',2);raceOnce(b,a);
+  assert.equal(await b.s.publish('A',{autoMerge:'now'}),true);assert.equal(b.syncConflicts.length,0);const cloud=b.s.dataFor((await b.s.read()).values);
+  assert.deepEqual(Array.from(cloud.pointsHistory.filter(r=>r.id.startsWith('from-')).map(r=>r.id).sort()),['from-a','from-b']);assert.equal(cloud.students[0].points,15);});
+ await test('上傳途中被搶先寫入：沒有要求合併的流程（學期封存等）仍停下來回報衝突',async()=>{const{a,b}=await mergePair();addPoints(b,'from-b',3);addPoints(a,'from-a',2);raceOnce(b,a);const before=b.storage.getItem('pointsHistory-A');
+  const error=await b.s.publish('A').catch(e=>e);assert.equal(error.code,'sync-conflict');assert.equal(b.storage.getItem('pointsHistory-A'),before);});
  console.log(passed+' safety checks passed');
 })().catch(e=>{console.error(e);process.exitCode=1;});

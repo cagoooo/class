@@ -178,11 +178,12 @@
         if (navigator.onLine === false) throw Object.assign(Error('已存本機，恢復連線後再同步'), { code: 'sync-offline' });
         const c = writeContext(id);
         let autoMerged = null;
-        return withSyncLock(c, async () => {
+        // retried：上傳途中被別的裝置搶先寫入，重新讀雲端再走一次完整流程（只重試一次）
+        const attempt = async (retried = false) => {
             // 等鎖的期間可能斷線：在讀雲端前再確認一次，維持「已存本機」的說法
             if (navigator.onLine === false) throw Object.assign(Error('已存本機，恢復連線後再同步'), { code: 'sync-offline' });
             let values = capture(id); ensure(values);
-            const remote = options.allowRemoteOverwrite
+            const remote = options.allowRemoteOverwrite || retried
                 ? await read(id)
                 : (options.remote || await read(id));
             const known = base(c);
@@ -297,6 +298,10 @@
                             return true;
                         }
                     } catch { /* 讀取不完整或離線時不可推定資料相同 */ }
+                    // 內容不同：別的裝置剛好在這次上傳途中寫入。要求自動合併的同步重讀雲端再走一次，
+                    // 交給上面的合併／等待安靜時機流程，不要直接當成衝突推播打擾老師（2026-11-09 實際發生）
+                    const explicit = Object.hasOwn(options, 'expectedToken') || options.allowRemoteOverwrite === true;
+                    if (options.autoMerge && !retried && !explicit && known?.token) return attempt(true);
                 }
                 throw error;
             }
@@ -313,7 +318,8 @@
             // Changes made during upload retain a different fingerprint and remain pending.
             window.SyncStatusIndicator?.updateStateBasedOnSync();
             return true;
-        });
+        };
+        return withSyncLock(c, () => attempt());
     }
     /**
      * 雲端舊版資料的每一筆（以編號判斷）本機都有，才算本機取代得了它。內容不比對：本機本來就會比雲端多出後續的加分與修改。
