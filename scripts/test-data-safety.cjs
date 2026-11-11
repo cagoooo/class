@@ -314,5 +314,16 @@ let passed=0;async function test(name,fn){await fn();console.log('PASS',name);pa
   a.storage.setItem('boardNote','A 台的新公告');addPoints(a,'from-a',2);await a.s.publish();
   assert.equal(await b.s.fastForward('A'),'updated');assert.equal(b.storage.getItem('boardNote'),'B 台的舊公告');assert.equal(b.s.needsUpload('A'),false);
   assert.equal(JSON.parse(b.storage.getItem('pointsHistory-A')).some(r=>r.id==='from-a'),true);});
+ // 2026-11-11：改版前的同步紀錄＋本機有加扣分項目＋雲端被另一台更新 → 要自動跟上，不可變成衝突
+ const legacyBase=env=>{const k='cloudSafetyBase:teacher:A';const b=JSON.parse(env.c.ClassAwareStorage.rawGet(k));delete b.tv;delete b.tracked2;env.c.ClassAwareStorage.rawSet(k,JSON.stringify(b));};
+ await test('舊同步紀錄的電腦只多了加扣分項目：不算修改，雲端較新時自動跟上',async()=>{const{a,b}=await mergePair();legacyBase(b);
+  b.c.ClassAwareStorage.rawSet('pointsQuickActions-A',JSON.stringify([{reason:'教室這台的項目',points:1}]));assert.equal(b.s.needsUpload('A'),false);
+  a.storage.setItem('pointsQuickActions',ITEMS);addPoints(a,'from-a',2);await a.s.publish();
+  assert.equal(await b.s.fastForward('A'),'updated');assert.equal(b.syncConflicts.length,0);
+  assert.equal(JSON.parse(b.storage.getItem('pointsHistory-A')).some(r=>r.id==='from-a'),true);assert.equal(b.storage.getItem('pointsQuickActions'),ITEMS);});
+ await test('舊同步紀錄的電腦真的改過分數：照樣算修改，不會被雲端蓋掉',async()=>{const{a,b}=await mergePair();legacyBase(b);addPoints(b,'from-b',3);
+  addPoints(a,'from-a',2);await a.s.publish();assert.equal(b.s.needsUpload('A'),true);assert.equal(await b.s.fastForward('A'),'local-changes');
+  assert.equal(JSON.parse(b.storage.getItem('pointsHistory-A')).some(r=>r.id==='from-b'),true);});
+ await test('新的同步紀錄帶版本標記（tv），之後只用精確比對',async()=>{const a=setup();await a.s.publish();const b=JSON.parse(a.c.ClassAwareStorage.rawGet('cloudSafetyBase:teacher:A'));assert.equal(b.tv,2);});
  console.log(passed+' safety checks passed');
 })().catch(e=>{console.error(e);process.exitCode=1;});
