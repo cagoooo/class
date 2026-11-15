@@ -45,7 +45,23 @@
         return list;
     }
 
+    /**
+     * 同一位學生的蛋在兩台各自孵化（共同版本還沒孵化）：寵物種類是隨機抽的，兩邊不同不代表老師改了什麼。
+     * 採用比較早孵化的那一邊（看不出先後就用雲端），兩邊的孵化欄位對齊後再照常合併，不必整份停下來（2026-11-16 實際發生）。
+     * 共同版本已經孵化過、兩邊又各自改成不同寵物，仍然放棄合併交給老師。
+     */
+    const HATCH = ['classPet', 'classPetRevealed', 'petHatchedAt'];
+    function settleHatch(base, local, remote) {
+        if (!(local.classPetRevealed === true && remote.classPetRevealed === true)) return [local, remote];
+        if (isObject(base) && base.classPetRevealed === true) return [local, remote];
+        const lt = Date.parse(local.petHatchedAt), rt = Date.parse(remote.petHatchedAt);
+        const winner = Number.isFinite(lt) && (!Number.isFinite(rt) || lt < rt) ? local : remote;
+        const pick = o => { const out = { ...o }; for (const k of HATCH) { if (Object.hasOwn(winner, k)) out[k] = winner[k]; else delete out[k]; } return out; };
+        return [pick(local), pick(remote)];
+    }
+
     function merge(path, base, local, remote) {
+        if (path === 'students' && isObject(local) && isObject(remote)) [local, remote] = settleHatch(base, local, remote);
         if (same(local, remote) || same(base, remote)) return local;
         if (same(base, local)) return remote;
         const [top, field, extra] = path.split('.');

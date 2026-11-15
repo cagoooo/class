@@ -69,4 +69,30 @@ test('舊資料同編號重複、沒有編號的紀錄都不會遺失', () => {
 test('無法解析的內容：放棄合併而不是丟錯', () => {
     assert.equal(mergeValues({ boardNote: 'a' }, { boardNote: 'b' }, { boardNote: 'c' }, ['boardNote']).ok, false);
 });
+// 2026-11-16：同一位學生的蛋在兩台各自孵化，抽到不同寵物
+const egg = (extra = {}) => ({ id: 1, points: 8, classPetRevealed: false, ...extra });
+test('兩台各自孵化不同寵物：採用比較早孵化的那隻，其餘照常合併', () => {
+    const base = { students: [egg()], pointsHistory: [record('a', 1)] };
+    const local = { students: [egg({ points: 12, classPet: 'turtle', classPetRevealed: true, petHatchedAt: '2026-11-13T05:24:33Z' })], pointsHistory: [record('c', 3), record('a', 1)] };
+    const remote = { students: [egg({ points: 11, classPet: 'monkey', classPetRevealed: true, petHatchedAt: '2026-11-11T06:20:00Z' })], pointsHistory: [record('b', 2), record('a', 1)] };
+    const out = run(base, local, remote);
+    assert.equal(out.students[0].classPet, 'monkey');
+    assert.equal(out.students[0].petHatchedAt, '2026-11-11T06:20:00Z');
+    assert.equal(out.students[0].points, 15);
+    assert.deepEqual(out.pointsHistory.map(r => r.id), ['c', 'b', 'a']);
+});
+test('兩台孵出同一種寵物、只差孵化時間：也能合併，取比較早的時間', () => {
+    const out = run({ students: [egg()] }, { students: [egg({ classPet: 'cat', classPetRevealed: true, petHatchedAt: '2026-11-13T00:00:00Z' })] },
+        { students: [egg({ classPet: 'cat', classPetRevealed: true, petHatchedAt: '2026-11-12T00:00:00Z' })] });
+    assert.equal(out.students[0].petHatchedAt, '2026-11-12T00:00:00Z');
+});
+test('看不出哪邊先孵化：用雲端那隻', () => {
+    const out = run({ students: [egg()] }, { students: [egg({ classPet: 'dog', classPetRevealed: true })] }, { students: [egg({ classPet: 'fox', classPetRevealed: true })] });
+    assert.equal(out.students[0].classPet, 'fox');
+});
+test('共同版本早就孵化了、兩邊又各自改成不同寵物：仍交給老師', () => {
+    const hatched = { classPet: 'cat', classPetRevealed: true, petHatchedAt: '2026-11-01T00:00:00Z' };
+    assert.deepEqual(run({ students: [egg(hatched)] }, { students: [egg({ ...hatched, classPet: 'dog' })] }, { students: [egg({ ...hatched, classPet: 'fox' })] }),
+        { ok: false, path: 'students.classPet' });
+});
 console.log(`${passed} cloud-merge checks passed`);
