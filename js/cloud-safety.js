@@ -376,13 +376,52 @@
         const coins = (source, student) => window.ClassPets.coinsFor(student.id, source.pointsHistory, Number(student.petCarryCoins) || 0);
         return data.students.some(s => coins(data, s) < 0 && coins(a, s) >= 0 && coins(b, s) >= 0);
     }
+    /**
+     * big 是否完整包含 small 的每一筆紀錄（以編號判斷）。加扣分、抽籤明細寫入後不會再改，所以連內容也要一樣，
+     * 才能確定 small 只是 big 的較舊版本；學生、聯絡簿等本來就會被編輯的資料只看編號。
+     */
+    function containsRecords(big, small) {
+        try {
+            for (const k of ['students', 'pointsHistory', 'notebookEntries', 'homeworkList', 'lotteryHistory']) {
+                const a = JSON.parse(big[k] || '[]'), b = JSON.parse(small[k] || '[]');
+                if (!Array.isArray(a) || !Array.isArray(b)) return false;
+                const mine = new Map(a.map(item => [String(item?.id), item]));
+                for (const item of b) {
+                    if (item?.id == null || !mine.has(String(item.id))) return false;
+                    if ((k === 'pointsHistory' || k === 'lotteryHistory') && JSON.stringify(mine.get(String(item.id))) !== JSON.stringify(item)) return false;
+                }
+            }
+            return true;
+        } catch { return false; }
+    }
+    /**
+     * 共同舊版本已被清理（這台超過 7 天沒同步成功）：沒有基準就不能逐欄合併，但若其中一邊的紀錄完整包含另一邊，
+     * 另一邊只是較舊的版本，採用較完整的一邊即可（2026-11-16 馮老師的教室電腦每次打開都卡在這裡，持續一個多月）。
+     * 兩邊各自有對方沒有的紀錄、或紀錄完全相同只差在內容，仍然看不出誰對，交給老師。被取代的一邊先存進本機還原區。
+     */
+    async function withoutBase(c, values, remote) {
+        const localWins = containsRecords(values, remote.values), remoteWins = containsRecords(remote.values, values);
+        if (localWins === remoteWins) return { block: 'no-base' };
+        const loser = localWins ? remote.values : values;
+        try { await window.LocalRecovery.put(`no-base:${c.uid}:${c.id}`, { version: '1.2', classId: c.id, exportDate: new Date().toISOString(), replaced: localWins ? 'cloud' : 'local', ...dataFor(loser) }); }
+        catch { return { block: 'no-recovery' }; }
+        const merged = {};
+        for (const k of keys()) merged[k] = localWins || globalKeys.includes(k) ? (values[k] ?? null) : fromCloud(k, remote.values, values);
+        ensure(merged);
+        const shared = keys().filter(k => !globalKeys.includes(k));
+        return {
+            values: merged,
+            added: shared.some(k => (merged[k] ?? null) !== (remote.values[k] ?? null)),
+            newCloud: shared.some(k => (merged[k] ?? null) !== (values[k] ?? null))
+        };
+    }
     /** @returns {Promise<{values?:Object, added?:boolean, newCloud?:boolean, block?:string}>} */
     async function threeWay(c, known, values, remote) {
         if (String(remote.token || '').startsWith('legacy:')) return { block: 'legacy' };
         let base = null;
         try { base = await snapshotValues(c, known); }
         catch (e) { if (isOfflineWait(e)) throw e; }
-        if (!base) return { block: 'no-base' };
+        if (!base) return withoutBase(c, values, remote);
         const result = window.CloudMerge.mergeValues(base, values, remote.values, keys(), globalKeys);
         if (!result.ok) return { block: result.path };
         if (typeof window.ClassPets?.coinsFor !== 'function' || overdrawn(result.values, values, remote.values)) return { block: 'coins' };
