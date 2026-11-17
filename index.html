@@ -111,10 +111,37 @@
     </script>
 </head>
 
-<body>
-    <p style="font-family:system-ui,'Microsoft JhengHei',sans-serif;padding:24px;color:#1e3a8a;">
+<body style="margin:0;min-height:100vh;display:flex;flex-direction:column;background:#f8fafc;">
+    <p style="font-family:system-ui,'Microsoft JhengHei',sans-serif;padding:24px;color:#1e3a8a;margin:0;flex:1;">
         正在開啟 <a href="classnew.html">班級小管家</a>…
     </p>
+
+    <!-- 網站頁尾：與 classnew.html 的 .site-footer 同一套樣式 -->
+    <style>
+        .site-footer { padding: 20px 0 calc(20px + env(safe-area-inset-bottom, 0px)); color: #475569; font: 15px/1.6 system-ui, 'Microsoft JhengHei', sans-serif; background: rgba(255, 255, 255, 0.72); border-top: 1px solid rgba(148, 163, 184, 0.35); }
+        .site-footer__inner { width: min(1280px, 94vw); margin: 0 auto; padding-inline: clamp(12px, 3vw, 32px); box-sizing: border-box; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; }
+        .site-footer__product { color: #334155; font-weight: 600; }
+        .site-footer__credit { text-align: right; }
+        .site-footer__heart { display: inline-block; margin: 0 2px; vertical-align: -1px; }
+        .site-footer__author { color: inherit; text-decoration: none; border-bottom: 1px dotted currentColor; padding: 2px 0 1px; }
+        .site-footer__author:hover, .site-footer__author:focus-visible { color: #2563eb; border-bottom-color: #2563eb; }
+        @media (max-width: 640px) {
+            .site-footer__inner { flex-direction: column; text-align: center; }
+            .site-footer__credit { text-align: center; }
+            .site-footer__school { display: block; }
+            .site-footer__dot { display: none; }
+        }
+        @media print { .site-footer { display: none; } }
+    </style>
+    <footer class="site-footer" id="siteFooter" aria-label="網站頁尾">
+        <div class="site-footer__inner">
+            <span class="site-footer__product">班級小管家 · 教師班級管理工具</span>
+            <span class="site-footer__credit">
+                Made with <span class="site-footer__heart" aria-label="愛心">❤️</span> by
+                <a href="https://cagoooo.github.io/Akai/" target="_blank" rel="noopener noreferrer" class="site-footer__author" title="阿凱老師教育科技創新專區">阿凱老師</a><span class="site-footer__school"><span class="site-footer__dot" aria-hidden="true">・</span>桃園市龍潭區石門國民小學</span>
+            </span>
+        </div>
+    </footer>
 </body>
 
 </html>
