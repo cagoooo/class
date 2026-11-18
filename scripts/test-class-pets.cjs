@@ -409,15 +409,29 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
         assert.equal(pet.assetName('cat',89,'curious'),'cat-junior-normal.webp');
         assert.equal(pet.assetName('cat',90,'curious'),'cat-grown-curious.webp');
     });
+    await test('每一級都有獎勵：稱號、配件、星星、光環，Lv.5 以後仍持續',async()=>{
+        const {pet,storage}=setup();const before=[...storage.data];
+        assert.equal(pet.rewardFor(9),null);
+        const titles=new Set();
+        for(let level=1;level<=15;level++){const r=pet.rewardFor(10+(level-1)*20);assert.equal(r.level,level);assert.ok(r.title);titles.add(r.title);assert.ok(pet.levelUnlocks(level).includes('稱號'));}
+        assert.equal(titles.size,15);
+        assert.equal(pet.rewardFor(10).accessory,null);assert.equal(pet.rewardFor(30).accessory,'bow');assert.equal(pet.rewardFor(70).accessory,'medal');assert.equal(pet.rewardFor(110).accessory,'crown');
+        assert.equal(pet.rewardFor(89).stars,0);assert.equal(pet.rewardFor(110).stars,1);assert.equal(pet.rewardFor(290).stars,10);
+        assert.equal(pet.rewardFor(149).aura,null);assert.equal(pet.rewardFor(150).aura,'gold');assert.equal(pet.rewardFor(190).aura,'rainbow');
+        assert.ok(pet.levelUnlocks(8).includes('金色光環'));assert.ok(pet.levelUnlocks(10).includes('彩虹光環'));
+        assert.deepEqual([...storage.data],before);
+    });
     await test('下一姿態提示使用進化門檻且不預告不存在的新階段',async()=>{
         const {pet,storage}=setup();const before=[...storage.data];
-        for(const [xp,remaining,level] of [[10,40,3],[30,20,3],[49,1,3],[50,40,5],[70,20,5],[89,1,5]]) {
+        for(const [xp,remaining,level] of [[10,20,2],[29,1,2],[30,20,3],[49,1,3],[50,20,4],[70,20,5],[89,1,5],[90,20,6],[1000,10,51]]) {
             assert.ok(pet.nextUnlockHint(xp).includes(remaining+' 成長值'));
             assert.ok(pet.nextUnlockHint(xp).includes('Lv.'+level));
         }
         assert.ok(pet.nextUnlockHint(0).includes('10 成長值'));
         assert.ok(pet.nextUnlockHint(9).includes('1 成長值'));
-        for(const xp of [90,110,1000]) assert.ok(pet.nextUnlockHint(xp).includes('皆已解鎖'));
+        // 只有 Lv.3、Lv.5 會換造型，其他等級不預告不存在的新造型
+        for(const xp of [10,50,90,150,1000]) assert.ok(!pet.nextUnlockHint(xp).includes('新造型'));
+        for(const xp of [30,70]) assert.ok(pet.nextUnlockHint(xp).includes('新造型'));
         assert.deepEqual([...storage.data],before);
     });
     await test('交付不扣幣、防重複與退幣後禁止交付',async()=>{

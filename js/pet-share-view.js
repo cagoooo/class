@@ -45,8 +45,8 @@
     const label = s => state.nameMode === 'seat' || !s.name ? (s.seat ? s.seat + ' 號' : `第 ${s.order + 1} 位同學`) : `${s.seat ? s.seat + ' ' : ''}${s.name}`;
     const petName = s => s.nick || (s.kind ? P.pets[s.kind][1] : '神祕寵物蛋');
     // 卡片標題已是寵物名稱；只有取了暱稱時才在這行補上種類，避免同一個名字出現兩次。
-    const stageLine = s => s.kind ? `${s.nick ? P.pets[s.kind][1] + ' · ' : ''}${P.appearance(s.xp).label} · ${P.stage(s.xp).label}` : P.eggStage(s.xp).label;
-    function avatar(s) { const box = el('div', undefined, 'pet-avatar'); box.append(P.interactivePortrait(s.kind || 'cat', s.xp, s.mood)); return box; }
+    const stageLine = s => s.kind ? `${s.nick ? P.pets[s.kind][1] + ' · ' : ''}${P.appearance(s.xp).label} · ${P.stage(s.xp).label}${P.levelTitle ? ' · 🏅 ' + P.levelTitle(P.stage(s.xp).level) : ''}` : P.eggStage(s.xp).label;
+    function avatar(s) { const box = el('div', undefined, 'pet-avatar'); box.append(P.interactivePortrait(s.kind || 'cat', s.xp, s.mood, { reward: true })); return box; }
     function progressBar(s) {
         const growth = P.stage(s.xp), bar = el('progress');
         bar.max = growth.next - growth.start; bar.value = s.xp - growth.start;

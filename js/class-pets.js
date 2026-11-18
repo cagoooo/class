@@ -110,7 +110,7 @@
         target.classList.add('pet-outside'); target.classList.toggle('pet-page-hidden',document.hidden);
         observedPets.add(target); petVisibilityObserver.observe(target);
     }
-    function interactivePortrait(kind, xp, mood = 'normal') {
+    function interactivePortrait(kind, xp, mood = 'normal', options = {}) {
         const egg = xp < 10;
         kind = Object.hasOwn(pets, kind) ? kind : 'cat';
         let previous = {actions:[],texts:[]}, timer, animation, generation = 0;
@@ -143,6 +143,7 @@
         target.title = '點一下，隨機動作與悄悄話；Lv.3 與 Lv.5 解鎖更多互動';
         const bubble = el('span','','pet-touch-reply');bubble.hidden = true;bubble.setAttribute('role','status');bubble.setAttribute('aria-live','polite');bubble.setAttribute('aria-atomic','true');
         target.append(picture,bubble); trackPetVisibility(target);
+        if (options.reward && !egg) decorate(target, xp);
         return target;
     }
     function setPetMood(id, mood) {
@@ -285,10 +286,48 @@
         const level = stage(xp).level;
         return level === 0 ? { id: 'egg', label: eggStage(xp).label } : level < 3 ? { id: 'baby', label: '幼年' } : level < 5 ? { id: 'junior', label: '成長' } : { id: 'grown', label: '成熟' };
     }
+    /**
+     * 每一級都有看得到的獎勵（v3.66.0）：造型只在 Lv.1／3／5 改變，其餘等級補上稱號、配件、星星與光環，
+     * Lv.5 以後也繼續有新東西。只是外觀，不影響成長值、金幣與加分規則；依目前等級顯示，和造型一致。
+     */
+    const LEVEL_TITLES = ['', '新手夥伴', '見習小幫手', '成長小隊員', '班級小隊長', '成熟守護者', '閃耀之星', '勇氣冒險家', '金光守護者', '智慧領航員', '彩虹傳說'];
+    const ACCESSORIES = { bow: ['🎀', '蝴蝶結'], medal: ['🎖️', '勳章'], crown: ['👑', '皇冠'] };
+    const REWARD_MILESTONES = [{ level: 2, icon: '🎀', label: '蝴蝶結' }, { level: 4, icon: '🎖️', label: '勳章' }, { level: 6, icon: '👑', label: '皇冠＋星星' }, { level: 8, icon: '✨', label: '金色光環' }, { level: 10, icon: '🌈', label: '彩虹光環' }];
+    function levelTitle(level) { return level <= 10 ? LEVEL_TITLES[level] || '' : `彩虹傳說 +${level - 10}`; }
+    function rewardFor(xp) {
+        const level = stage(xp).level;
+        if (!level) return null;
+        const accessory = level >= 6 ? 'crown' : level >= 4 ? 'medal' : level >= 2 ? 'bow' : null;
+        return { level, title: levelTitle(level), accessory, stars: Math.max(0, level - 5), aura: level >= 10 ? 'rainbow' : level >= 8 ? 'gold' : null };
+    }
+    /** 升到這一級會拿到什麼（提示與升級慶祝共用）。 */
+    function levelUnlocks(level) {
+        const parts = [];
+        if (level === 3 || level === 5) parts.push('新造型與新姿態');
+        parts.push(`稱號「${levelTitle(level)}」`);
+        const accessory = { 2: 'bow', 4: 'medal', 6: 'crown' }[level];
+        if (accessory) parts.push(ACCESSORIES[accessory].join(' '));
+        if (level >= 6) parts.push(`⭐ 第 ${level - 5} 顆星星`);
+        if (level === 8) parts.push('✨ 金色光環');
+        if (level === 10) parts.push('🌈 彩虹光環');
+        return parts.join('、');
+    }
+    /** 把配件、星星、光環疊在寵物圖上；全部是裝飾（aria-hidden），稱號另以文字呈現。 */
+    function decorate(host, xp) {
+        const reward = rewardFor(xp);
+        host.classList.add('pet-reward-host');
+        host.querySelectorAll(':scope > .pet-reward-aura, :scope > .pet-reward-accessory, :scope > .pet-reward-stars').forEach(node => node.remove());
+        delete host.dataset.aura;
+        if (!reward) return host;
+        if (reward.aura) { host.dataset.aura = reward.aura; const aura = el('span', undefined, 'pet-reward-aura'); aura.setAttribute('aria-hidden', 'true'); host.prepend(aura); }
+        if (reward.accessory) { const badge = el('span', ACCESSORIES[reward.accessory][0], 'pet-reward-accessory'); badge.setAttribute('aria-hidden', 'true'); host.append(badge); }
+        if (reward.stars) { const stars = el('span', reward.stars <= 5 ? '⭐'.repeat(reward.stars) : `⭐×${reward.stars}`, 'pet-reward-stars'); stars.setAttribute('aria-hidden', 'true'); host.append(stars); }
+        return host;
+    }
     function nextUnlockHint(xp) {
-        const next = COLLECTION_VARIANTS.find(item => xp < item.xp);
-        if (!next) return '✓ 目前三階段造型與互動皆已解鎖，成長仍會繼續！';
-        return next.level === 1 ? `？ 再累積 ${next.xp - xp} 成長值，就能孵化並揭曉寵物！` : `？ 再累積 ${next.xp - xp} 成長值，達到 Lv.${next.level} 解鎖新造型與新姿態！`;
+        if (xp < 10) return `？ 再累積 ${10 - xp} 成長值，就能孵化並揭曉寵物！`;
+        const growth = stage(xp), next = growth.level + 1;
+        return `？ 再累積 ${growth.next - xp} 成長值，達到 Lv.${next} 解鎖：${levelUnlocks(next)}！`;
     }
     function milestone(before, after) {
         const from = stage(before).level, to = stage(after).level;
@@ -339,7 +378,7 @@
         const hero = el('section', undefined, 'pet-profile-hero');
         const displayName = profile.nickname || (profile.level ? pets[student.classPet]?.[1] || '我的寵物' : '神祕寵物蛋');
         const showcase = el('div', undefined, 'pet-profile-showcase');
-        showcase.append(el('span', profile.level ? 'Lv.' + profile.level + ' · ' + appearance(profile.xp).label : '等待孵化', 'pet-profile-badge'), interactivePortrait(student.classPet, profile.xp, student.classPetMood), el('p', '輕點一下，和牠打個招呼', 'pet-profile-caption'));
+        showcase.append(el('span', profile.level ? 'Lv.' + profile.level + ' · ' + appearance(profile.xp).label + ' · ' + levelTitle(profile.level) : '等待孵化', 'pet-profile-badge'), interactivePortrait(student.classPet, profile.xp, student.classPetMood, { reward: true }), el('p', '輕點一下，和牠打個招呼', 'pet-profile-caption'));
         const summary = el('div', undefined, 'pet-profile-summary');
         summary.append(el('p', profile.name + '的成長夥伴', 'pet-profile-caption'), el('h3', displayName));
         const stats = el('dl', undefined, 'pet-profile-stats');
@@ -359,7 +398,10 @@
         const milestones=el('section',undefined,'pet-profile-section');milestones.append(el('h3','成長里程碑'),el('p','努力留下的足跡，達成後才揭曉新造型。','pet-profile-caption'));
         const stages=el('div',undefined,'pet-profile-stages');
         for (const entry of COLLECTION_VARIANTS) {const reached=profile.maxLevel>=entry.level;const tile=el('div',undefined,'pet-profile-stage'+(reached?' is-unlocked':''));tile.append(el('span',reached?'✓':'？','pet-profile-stage-icon'),el('strong','Lv.'+entry.level),el('span',reached?appearance(entry.xp).label:'達成後揭曉'));stages.append(tile);}
-        milestones.append(stages);body.append(milestones);
+        milestones.append(stages);
+        const rewards=el('div',undefined,'pet-profile-stages pet-profile-rewards');
+        for (const entry of REWARD_MILESTONES) {const reached=profile.maxLevel>=entry.level;const tile=el('div',undefined,'pet-profile-stage'+(reached?' is-unlocked':''));tile.append(el('span',reached?entry.icon:'？','pet-profile-stage-icon'),el('strong','Lv.'+entry.level),el('span',reached?entry.label:'達成後揭曉'));rewards.append(tile);}
+        milestones.append(el('p','每升一級都有新稱號；以下是看得到的配件與光環。','pet-profile-caption'),rewards);body.append(milestones);
         const history=el('section',undefined,'pet-profile-section');history.append(el('h3','最近成長紀錄'),el('p','最近 10 筆成長變動','pet-profile-caption'));
         if (!profile.recent.length) history.append(el('p','每一次努力，都會成為成長的足跡。尚無本期紀錄；封存前明細請查閱備份。','pet-profile-empty'));
         const list=el('ul',undefined,'pet-profile-history');
@@ -426,9 +468,9 @@
         const hatch = events.filter(e => e.type === 'hatch').length;
         const title = events.length === 1 ? (events[0].blindOpened ? `${events[0].name}開出了${pets[events[0].kind][1]}！` : `${events[0].name}的寵物${hatch ? '孵化了！' : '升級了！'}`) : `${hatch ? `${hatch} 隻孵化` : ''}${hatch && hatch < events.length ? '、' : ''}${events.length > hatch ? `${events.length - hatch} 隻升級` : ''}！`;
         const message = el('div'); message.setAttribute('role', 'status'); message.setAttribute('aria-live', 'polite');
-        const unlockedHint = events.length === 1 && events[0].level === 3 ? '新姿態與成長對話已解鎖，點寵物試試！' : events.length === 1 && events[0].level === 5 ? '進階姿態與成熟對話已解鎖，點寵物試試！' : '一起繼續成長！';
+        const unlockedHint = events.length === 1 && events[0].type === 'level' ? `獲得${levelUnlocks(events[0].level)}！` : '一起繼續成長！';
         message.append(el('strong', title), el('p', events.length === 1 ? `${appearance(events[0].xp).label} · Lv.${events[0].level}，${unlockedHint}` : '這次努力已存本機，到班級寵物查看新造型。'));
-        box.append(events[0].type === 'hatch' ? hatchStage(events[0].kind, events[0].xp) : portrait(events[0].kind, events[0].xp, 'happy'), message, button('關閉', () => { clearTimeout(feedbackTimer); box.remove(); }));
+        box.append(events[0].type === 'hatch' ? hatchStage(events[0].kind, events[0].xp) : decorate(el('span', undefined, 'pet-reward-celebrate'), events[0].xp).appendChild(portrait(events[0].kind, events[0].xp, 'happy')).parentNode, message, button('關閉', () => { clearTimeout(feedbackTimer); box.remove(); }));
         if(projectionMode && events.length>1) {const names=el('p',events.map(e=>e.name).join('、'),'pet-batch-names');box.append(names);box.classList.add('pet-projection-feedback');}
         document.body.append(box); feedbackTimer = setTimeout(() => box.remove(), 8000);
     }
@@ -1301,8 +1343,9 @@
                 check.dataset.petFocus = 'student-' + s.id;
                 check.addEventListener('change', () => { check.checked ? selected.add(String(s.id)) : selected.delete(String(s.id)); if (onlySelected) render(); else updateCount(); });
                 label.append(check, el('span', `${s.number || s.seatNumber || ''} ${s.name}`));
-                const avatar = el('div', undefined, 'pet-avatar'); avatar.append(interactivePortrait(kind, xp, s.classPetMood || 'normal'));
+                const avatar = el('div', undefined, 'pet-avatar'); avatar.append(interactivePortrait(kind, xp, s.classPetMood || 'normal', { reward: true }));
                 card.append(label, avatar, el('strong', `${xp < 10 ? '神祕寵物蛋' : pets[kind][1]} · ${appearance(xp).label}${growth.level ? ' · ' + growth.label : ''}`, 'pet-stage-label'));
+                if (growth.level) card.append(el('p', `🏅 ${levelTitle(growth.level)}`, 'pet-level-title'));
                 const progress = el('progress'); progress.max = growth.next - growth.start; progress.value = xp - growth.start; progress.setAttribute('aria-label', `${s.name}成長進度`);
                 card.append(progress, el('p', `成長值 ${xp} · 距離${growth.level ? '升級' : '孵化'}還有 ${growth.next - xp}`), el('p', nextUnlockHint(xp), 'pet-touch-hint'));
                 const exchange = button(`🪙 金幣 ${coinsFor(s.id)} · 明細／兌換 →`, () => showCoinLedger(s.id), 'pet-coin-balance');
@@ -1424,7 +1467,7 @@
         if (location.hash === '#pets') window.showSection('pets');
     }
     window.ClassPets = { deliver, deliveryStatus, nextUnlockHint, interactionFor, createQuest, contributeQuest, undoQuestContribution, claimQuest, archiveQuest, hatchCollectionEgg, questProgress, profileFor, renamePet, collectionProgress, award, undo, xpFor, coinsFor, setCoinsEnabled, saveRule, saveProduct, addPresetProduct, addPresetProducts, removeProduct, setProductActive, redeem, refund, setPetMood, assetName, stage, appearance, milestone, render, prepare, settings, collectionFor, collectionStagesFor,
-        pets, moods, eggStage, portrait, interactivePortrait, matchesStorage: memoryMatchesStorage };
+        pets, moods, eggStage, portrait, interactivePortrait, rewardFor, levelTitle, levelUnlocks, matchesStorage: memoryMatchesStorage };
     // 學生分享頁（pets.html）只借用寵物圖像與互動，不建立老師端的選單與管理畫面。
     if (document.documentElement?.hasAttribute?.('data-pet-viewer')) return;
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();

@@ -554,3 +554,23 @@
 .dark .pet-shop-warn { background:#451a1a; color:#fecaca; border-color:#7f1d1d; }
 .dark #pets-section button.pet-product-remove { background:#1e293b; border-color:#7a3b35; color:#fda29b; }
 #pets-section .pet-shop-panel > button { align-self:flex-start; }
+
+/* v3.66.0 每級獎勵：配件、星星、光環疊在寵物圖上（裝飾，不影響點擊範圍） */
+.pet-reward-host { position:relative; isolation:isolate; }
+.pet-reward-celebrate { position:relative; isolation:isolate; display:inline-flex; flex:none; }
+.pet-reward-host .pet-portrait { position:relative; }
+.pet-reward-accessory { position:absolute; z-index:1; top:10%; right:14%; display:grid; place-items:center; width:34px; height:34px; border-radius:50%; background:#fffbeb; border:2px solid #fbbf24; font-size:19px; line-height:1; box-shadow:0 2px 5px #0002; pointer-events:none; }
+.dark .pet-reward-accessory { background:#422006; }
+.pet-reward-stars { position:absolute; z-index:1; left:50%; bottom:0; transform:translateX(-50%); padding:2px 8px; border-radius:999px; background:#fffbeb; border:1px solid #fcd34d; font-size:12px; line-height:1.5; white-space:nowrap; letter-spacing:-1px; box-shadow:0 1px 3px #0002; pointer-events:none; }
+.pet-reward-aura { position:absolute; z-index:-1; left:8%; right:8%; top:6%; bottom:4%; border-radius:50%; pointer-events:none; }
+[data-aura=gold] > .pet-reward-aura { background:radial-gradient(circle,#fde68acc 0,#facc1566 45%,#facc1500 70%); }
+[data-aura=rainbow] > .pet-reward-aura { background:conic-gradient(from 0deg,#f472b6,#facc15,#4ade80,#38bdf8,#a78bfa,#f472b6); filter:blur(14px); opacity:.55; animation:pet-aura-spin 9s linear infinite; }
+@keyframes pet-aura-spin { to { transform:rotate(360deg); } }
+.pet-growth-feedback .pet-reward-celebrate .pet-reward-accessory { width:24px; height:24px; font-size:13px; top:0; right:0; }
+.pet-growth-feedback .pet-reward-celebrate .pet-reward-stars { font-size:10px; padding:0 5px; }
+.pet-level-title { margin:2px 0 0; font-size:14px; font-weight:600; color:#a16207; }
+.dark .pet-level-title { color:#fcd34d; }
+.dark .pet-reward-stars { background:#422006; border-color:#a16207; }
+.pet-touch.pet-outside .pet-reward-aura, .pet-touch.pet-page-hidden .pet-reward-aura { animation-play-state:paused; }
+@media(prefers-reduced-motion:reduce) { .pet-reward-aura { animation:none !important; } }
+.pet-touch.pet-motion-reduced .pet-reward-aura { animation:none; }
