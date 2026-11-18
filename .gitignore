@@ -20,3 +20,6 @@ art/pets/render-one.py
 art/pets/fox-preview.png
 art/pets/source/*.blend1
 !critical-update.json
+
+# 清查污染資料前的雲端備份（含學生資料，不入庫）
+cleanup-backups/
