@@ -15,6 +15,8 @@
         const uid = window.FirebaseConfig?.getCurrentUserId();
         const db = window.FirebaseConfig?.getDb();
         if (!uid || !db || !window.FirebaseConfig.isConnected()) throw Object.assign(Error('請先登入 Google 帳號'), { code: 'sync-auth-required' });
+        // 這台的班級資料不屬於目前帳號（同一台電腦換老師、正在切換）：不讀也不寫，等 AccountVault 換好
+        if (window.AccountVault && window.FirebaseConfig.isGoogleUser?.() && !window.AccountVault.owns(uid)) throw Object.assign(Error('這台電腦的班級資料正在切換帳號'), { code: 'sync-auth-required' });
         return { uid, db, id: id || current() };
     };
     // 寫入雲端只限 Google 帳號：開頁自動建立的匿名身分只綁在這個瀏覽器，

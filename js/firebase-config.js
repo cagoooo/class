@@ -38,6 +38,11 @@ async function initializeFirebase() {
 
         firebaseAuth = firebase.auth();
         firebaseDb = firebase.firestore();
+        // v3.67.0 同一台電腦多位老師：Google 帳號一確定（含開頁時記住的登入），先確認這台的班級資料屬於誰，
+        // 不是這位老師的就收好、換成他自己的，切換完成前所有同步都會被 canWriteCloud 擋下
+        firebaseAuth.onAuthStateChanged((user) => {
+            if (user && !user.isAnonymous) window.AccountVault?.claim?.(user.uid);
+        });
 
         // 啟用多分頁離線持久化：同一位老師開啟多個分頁時由 Firestore
         // 協調快取，避免舊版單分頁 persistence 互相搶鎖而拋出內部斷言。
@@ -260,6 +265,8 @@ function isGoogleUser() { return currentUserProfile && !currentUserProfile.isAno
  */
 function canWriteCloud() {
     if (!isFirebaseConnected() || !isGoogleUser()) return false;
+    // 這台電腦目前的班級資料不屬於這個帳號（或正在切換）：上傳會把別的老師的班級帶進這個帳號，下載會蓋掉別人的資料
+    if (window.AccountVault && !window.AccountVault.owns(currentUserId)) return false;
     try {
         const user = firebaseAuth && firebaseAuth.currentUser;
         return !!(user && !user.isAnonymous && user.uid === currentUserId);

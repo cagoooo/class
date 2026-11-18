@@ -205,12 +205,26 @@
         };
     }
 
+    // ───── v3.67.0 同一台電腦多位老師：這頁載入的資料不是目前主人的，就不准再寫回班級資料 ─────
+    // 另一個分頁換了帳號（資料已換成另一位老師的），或正在收納切換時，這頁手上的舊資料寫回去就會混到別人的班級。
+    // 主題、登入狀態等這台電腦的設定不受影響（由 AccountVault.isDeviceKey 判斷）。
+    let pageOwner = _origGet.call(localStorage, 'workspaceOwner');
+    function blockedWrite(key) {
+        const isDevice = window.AccountVault && window.AccountVault.isDeviceKey;
+        if (!isDevice || isDevice(key)) return false;
+        const now = _origGet.call(localStorage, 'workspaceOwner');
+        if (pageOwner !== '__switching__' && (now || null) === (pageOwner || null)) return false;
+        console.warn('[ClassAwareStorage] 這台電腦的班級資料已切換給另一個帳號，這頁的舊資料不再寫入：' + key);
+        return true;
+    }
+
     // ───── 攔截 localStorage 方法（v3.1.4 加入 quota-safe 包裝） ─────
     _proto.getItem = function (key) {
         return _origGet.call(this, classKey(key));
     };
     _proto.setItem = function (key, value) {
         const actualKey = classKey(key);
+        if (this === localStorage && blockedWrite(actualKey)) return;
         try {
             return _origSet.call(this, actualKey, value);
         } catch (err) {
@@ -236,7 +250,9 @@
         }
     };
     _proto.removeItem = function (key) {
-        return _origRemove.call(this, classKey(key));
+        const actualKey = classKey(key);
+        if (this === localStorage && blockedWrite(actualKey)) return;
+        return _origRemove.call(this, actualKey);
     };
 
     // ───── 一次性遷移：保留升級前的現有資料 ─────
@@ -300,6 +316,7 @@
         opts = opts || {};
         const list = (pairs || []).filter(p => Array.isArray(p) && p[0]);
         if (!list.length) return true;
+        if (list.some(p => blockedWrite(opts.raw ? p[0] : classKey(p[0])))) return false;
 
         // 先拍快照（走一般 getItem，與 setItem 同一套班級 key 路由）
         const get = k => opts.raw ? _origGet.call(localStorage, k) : localStorage.getItem(k);
@@ -363,8 +380,12 @@
         },
         // 直接讀取（繞過攔截器，給 sync 模組用）
         rawGet(key) { return _origGet.call(localStorage, key); },
-        rawSet(key, value) { return _origSet.call(localStorage, key, value); },
-        rawRemove(key) { return _origRemove.call(localStorage, key); },
+        rawSet(key, value) { if (blockedWrite(key)) return; return _origSet.call(localStorage, key, value); },
+        rawRemove(key) { if (blockedWrite(key)) return; return _origRemove.call(localStorage, key); },
+        // 只給 AccountVault 收納／切換使用：不經過上面的主人檢查
+        vaultSet(key, value) { return _origSet.call(localStorage, key, value); },
+        vaultRemove(key) { return _origRemove.call(localStorage, key); },
+        setPageOwner(uid) { pageOwner = uid; },
     };
 
     console.log('[ClassAwareStorage] localStorage 攔截器已載入（' + SHARED_KEYS.size + ' 個共用 key 將依班級隔離）');

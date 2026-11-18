@@ -42,7 +42,7 @@ function setup({ popupError, currentUser = null }) {
 (async () => {
     // 彈窗先回報關閉，之後 SDK 才完成登入 → 補接
     const t1 = setup({ popupError: { code: 'auth/popup-closed-by-user' } });
-    await t1.context.FirebaseConfig.initialize();
+    await t1.context.FirebaseConfig.initialize(); t1.authListeners.splice(0);   // 常駐的帳號資料隔離監聽（v3.67.0）不算在等候內
     assert.equal(await t1.context.FirebaseConfig.signInWithGoogle(), null);
     assert.equal(t1.authListeners.length, 1, '取消後應開始等候慢一步的登入');
     t1.authListeners[0](null);
@@ -58,7 +58,7 @@ function setup({ popupError, currentUser = null }) {
 
     // 原本就登入同一帳號 → 不重複觸發
     const t2 = setup({ popupError: { code: 'auth/popup-closed-by-user' }, currentUser: { uid: 'u1', isAnonymous: false } });
-    await t2.context.FirebaseConfig.initialize();
+    await t2.context.FirebaseConfig.initialize(); t2.authListeners.splice(0);   // 常駐的帳號資料隔離監聽（v3.67.0）不算在等候內
     await t2.context.FirebaseConfig.signInWithGoogle();
     t2.authListeners[0]({ uid: 'u1', isAnonymous: false });
     assert.equal(t2.events.length, 0, '同一帳號不應重複補接');
@@ -66,7 +66,7 @@ function setup({ popupError, currentUser = null }) {
 
     // 其他錯誤不等候
     const t3 = setup({ popupError: { code: 'auth/network-request-failed' } });
-    await t3.context.FirebaseConfig.initialize();
+    await t3.context.FirebaseConfig.initialize(); t3.authListeners.splice(0);   // 常駐的帳號資料隔離監聽（v3.67.0）不算在等候內
     await t3.context.FirebaseConfig.signInWithGoogle();
     assert.equal(t3.authListeners.length, 0, '非取消類錯誤不應等候');
     console.log('PASS 非取消類錯誤不啟動補接');

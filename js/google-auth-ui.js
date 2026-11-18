@@ -1114,6 +1114,12 @@ ${cloudMenuItemsHTML()}
         // 登入成功 → 永久關閉登入提醒 Banner
         dismissLoginReminder(true);
         showLoggedIn(profile);
+        // v3.67.0 同一台電腦換老師：先把前一位老師的班級資料收好、換成這位老師的（會重新整理），
+        // 換好之前不要跑首次登入流程，否則會把前一位老師的班級當成「本機資料」問要不要上傳
+        if (window.AccountVault && profile?.uid) {
+            const state = await window.AccountVault.claim(profile.uid);
+            if (state !== 'owned') return;
+        }
 
         // 首次登入：確認是否曾同步
         const everSynced = localStorage.getItem('lastSyncTime');
@@ -1170,7 +1176,7 @@ ${cloudMenuItemsHTML()}
 
             const confirmed = await showModal(
                 '登出確認',
-                '登出後本地資料不受影響，但雲端同步將暫停。確定要登出嗎？',
+                '登出後，你的班級資料會收在這台電腦（不會刪除），畫面會清空，其他老師用這台電腦時看不到；下次用同一個帳號登入就會回來。確定要登出嗎？',
                 [
                     { label: '🚪 確定登出', cls: 'gauth-btn-danger', value: true },
                     { label: '取消', cls: 'gauth-btn-secondary', value: false },
@@ -1178,7 +1184,18 @@ ${cloudMenuItemsHTML()}
             );
             if (!confirmed) return;
 
-            await window.FirebaseConfig.signOut();
+            // v3.67.0 先收好自己的班級資料再登出，下一位用這台電腦的老師才不會看到、也不會同步到他的帳號
+            if (window.AccountVault) {
+                const released = await window.AccountVault.release();
+                if (released === 'failed') {
+                    NotificationSystem && NotificationSystem.error('班級資料沒有收好，這次先不登出，請重新整理後再試');
+                    return;
+                }
+                await window.FirebaseConfig.signOut();
+                if (released === 'released') { NotificationSystem && NotificationSystem.info('已登出，你的班級資料已收好'); setTimeout(() => location.reload(), 600); return; }
+            } else {
+                await window.FirebaseConfig.signOut();
+            }
             showLoggedOut();
             NotificationSystem && NotificationSystem.info('已登出');
         },
@@ -1419,6 +1436,10 @@ ${cloudMenuItemsHTML()}
                     showLoggedIn(profile);
                     dismissLoginReminder(true);
                     closeWelcomeModal();
+                    // v3.67.0 剛把這台電腦換成這位老師的資料並重新整理：接著走登入後流程（空白時從雲端帶回所有班級）
+                    let afterSwitch = null;
+                    try { afterSwitch = sessionStorage.getItem('workspaceAfterSwitch'); sessionStorage.removeItem('workspaceAfterSwitch'); } catch (e) { /* 無痕模式 */ }
+                    if (afterSwitch && afterSwitch === profile.uid) afterGoogleLogin(profile);
                 } else {
                     // 訪客（未登入 / 匿名）→ 兩段式引導：首次置中歡迎彈窗、之後底部 Banner
                     showLoggedOut();
