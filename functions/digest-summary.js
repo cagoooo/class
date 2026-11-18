@@ -455,7 +455,7 @@ function buildDigestPayload(day, dateLabel, sum, backup, prune) {
       ? `🐞 錯誤 ${sum.errors.length} 則：` + sum.errors.slice(0, 3).map((error) => clip(error.message, 60)).join('；')
       : '🐞 錯誤 0 則，一切正常 ✅',
     backupLine(backup),
-  ];
+  ].filter(Boolean); // 今天沒有班級升級時 upgrades.classes 是 0，不過濾會在卡片上印出一行「0」
   // 沒傳 prune（舊呼叫端）就不顯示；排程傳 null 代表今天沒紀錄，要顯示警告
   if (prune !== undefined) healthLines.push(pruneLine(prune));
   sections.push({
