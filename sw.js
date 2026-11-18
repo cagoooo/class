@@ -1,12 +1,12 @@
 /**
  * 班級小管家 Service Worker
- * @version 3.67.0
+ * @version 3.68.0
  * @description PWA 離線支援與快取策略優化
  */
 
-const CACHE_NAME = 'class-manager-v3.67.0';
-const STATIC_CACHE = 'class-manager-static-v3.67.0';
-const DYNAMIC_CACHE = 'class-manager-dynamic-v3.67.0';
+const CACHE_NAME = 'class-manager-v3.68.0';
+const STATIC_CACHE = 'class-manager-static-v3.68.0';
+const DYNAMIC_CACHE = 'class-manager-dynamic-v3.68.0';
 
 
 // 靜態資源列表（安裝時預快取）
@@ -55,6 +55,7 @@ const STATIC_ASSETS = [
     './js/pomodoro.js',
     './js/keyboard-shortcuts.js',
     './js/timer-enhancement.js',
+    './js/timer-bgm.js',
     './js/timer-alarm.js',
     './js/ui-enhancement.js',
     './js/student-enhancement.js',
@@ -184,6 +185,9 @@ self.addEventListener('fetch', (event) => {
 
     // 跳過 Chrome 擴充功能請求
     if (url.protocol === 'chrome-extension:') return;
+
+    // YouTube 播放器（計時背景音樂）交給瀏覽器自己處理：快取住舊的播放器程式會讓影片播不出來
+    if (/(^|\.)(youtube\.com|youtube-nocookie\.com|ytimg\.com|googlevideo\.com)$/.test(url.hostname)) return;
 
     // 只攔截 GET：POST/PUT 等（Cloud Functions callable、Firestore 寫入…）一律放行給瀏覽器。
     // 否則 cacheFirst 內 cache.put(POST) 會丟錯，請求被攔截成 503（會讓 callable 通知失敗）。
