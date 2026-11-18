@@ -162,8 +162,42 @@
         const box = document.getElementById('timerBgmPlayerBox');
         if (!box) return;
         const full = !!document.getElementById('timerFullscreenModal')?.classList.contains('active');
-        box.classList.toggle('timer-bgm-floating', full && !!player);
+        const floating = full && !!player;
+        box.classList.toggle('timer-bgm-floating', floating);
+        if (!floating) { box.style.bottom = ''; lastClearance = 0; return; }
+        // 每 2 秒重新量一次就夠（按鈕很少移動），不必每半秒掃整個角落
+        const now = Date.now();
+        if (now - lastClearance > 2000) { lastClearance = now; box.style.bottom = cornerClearance(box) + 'px'; }
     }
+    let lastClearance = 0;
+    /**
+     * 右下角原本就有「一鍵更新」、雲端同步等浮動按鈕（2026-11-18 老師回報疊在一起）。
+     * 找出這個角落裡其他固定位置的元素，把播放器放到它們上面；之後那裡多了其他按鈕也會自動讓開。
+     */
+    function cornerClearance(box) {
+        const MARGIN = 16, w = window.innerWidth, h = window.innerHeight;
+        if (!document.elementsFromPoint || !w || !h) return MARGIN;
+        let top = h - MARGIN;
+        const width = box.offsetWidth || 240;
+        for (let x = w - 12; x > w - width - MARGIN; x -= 24) {
+            for (let y = h - 12; y > h - 140; y -= 16) {
+                for (const el of document.elementsFromPoint(x, y)) {
+                    if (el === box || box.contains(el) || el === document.body || el === document.documentElement) continue;
+                    if (el.closest('#timerFullscreenModal')) continue;
+                    const fixed = el.closest('*') && [el, ...ancestors(el)].find(a => getComputedStyle(a).position === 'fixed');
+                    if (!fixed || fixed.id === 'timerFullscreenModal') continue;
+                    const r = fixed.getBoundingClientRect();
+                    // 只避開角落的小按鈕；蓋住整個畫面的遮罩（例如登入歡迎視窗的底色）不算
+                    if (r.width > w * 0.5 || r.height > h * 0.5) continue;
+                    if (r.width && r.height && r.top < top) top = r.top;
+                }
+            }
+        }
+        // 播放器至少要完整留在畫面裡
+        const boxHeight = box.offsetHeight || 170;
+        return Math.max(MARGIN, Math.min(Math.round(h - top + 12), h - boxHeight - MARGIN));
+    }
+    function ancestors(el) { const out = []; for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) out.push(p); return out; }
 
     // ── 畫面 ──
     function setStatus(text, error) {
