@@ -82,6 +82,36 @@
   #pets-section .pet-award-bar select { order:3; }
 }
 @media(prefers-reduced-motion:reduce) { .pet-growth-feedback .pet-portrait { animation:none; } }
+/* v3.65.0 孵化短動畫：蛋搖晃 → 沿裂縫分成上下兩半飛開 → 寵物彈出（約 1.7 秒） */
+.pet-hatch-stage { position:relative; flex:none; width:96px; height:108px; }
+.pet-growth-feedback .pet-hatch-stage .pet-portrait { position:absolute; inset:0; width:100%; height:100%; animation:none; }
+.pet-hatch-pet { position:absolute; inset:0; display:grid; place-items:center; transform:scale(0); opacity:0; }
+.pet-hatch-pet .pet-fallback { font-size:52px; }
+.pet-hatch-shell { opacity:0; }
+.pet-hatch-top { clip-path:polygon(0 0,100% 0,100% 47%,88% 41%,76% 51%,64% 42%,52% 52%,40% 43%,28% 51%,16% 42%,0 49%); }
+.pet-hatch-bottom { clip-path:polygon(0 49%,16% 42%,28% 51%,40% 43%,52% 52%,64% 42%,76% 51%,88% 41%,100% 47%,100% 100%,0 100%); }
+.pet-hatch-burst { position:absolute; left:50%; top:52%; width:0; height:0; pointer-events:none; }
+.pet-hatch-burst::before { content:''; position:absolute; left:-36px; top:-36px; width:72px; height:72px; border-radius:50%; background:radial-gradient(circle,#fffbe6 0,#fde68a 45%,#fde68a00 70%); opacity:0; transform:scale(.2); }
+.pet-hatch-burst i { position:absolute; left:-4px; top:-4px; width:8px; height:8px; border-radius:50%; background:#facc15; box-shadow:0 0 6px #fde047; opacity:0; transform:rotate(var(--angle)) translateX(0); }
+.pet-hatch-burst i:nth-child(even) { background:#f472b6; box-shadow:0 0 6px #f9a8d4; width:6px; height:6px; }
+.pet-hatch-stage.is-playing .pet-hatch-egg { animation:pet-hatch-shake .9s ease-in-out forwards; transform-origin:50% 85%; }
+.pet-hatch-stage.is-playing .pet-hatch-top { animation:pet-hatch-top .7s cubic-bezier(.2,.7,.4,1) .9s forwards; }
+.pet-hatch-stage.is-playing .pet-hatch-bottom { animation:pet-hatch-bottom .75s ease-in .9s forwards; }
+.pet-hatch-stage.is-playing .pet-hatch-pet { animation:pet-hatch-pop .6s cubic-bezier(.3,1.6,.5,1) .95s forwards; }
+.pet-hatch-stage.is-playing .pet-hatch-burst::before { animation:pet-hatch-flash .55s ease-out .88s forwards; }
+.pet-hatch-stage.is-playing .pet-hatch-burst i { animation:pet-hatch-spark .7s ease-out .92s forwards; }
+@keyframes pet-hatch-shake { 0% { transform:rotate(0); } 15% { transform:rotate(-7deg); } 30% { transform:rotate(7deg); } 42% { transform:rotate(-9deg) translateY(-2px); } 54% { transform:rotate(9deg); } 66% { transform:rotate(-11deg) translateY(-3px); } 78% { transform:rotate(11deg); } 92% { transform:scale(1.06,.94); opacity:1; } 100% { transform:scale(1.08,.92); opacity:0; } }
+@keyframes pet-hatch-top { 0% { opacity:1; transform:none; } 100% { opacity:0; transform:translate(-14px,-40px) rotate(-38deg); } }
+@keyframes pet-hatch-bottom { 0% { opacity:1; transform:none; } 40% { opacity:1; transform:translateY(3px); } 100% { opacity:0; transform:translateY(16px) scale(.95); } }
+@keyframes pet-hatch-pop { 0% { opacity:0; transform:scale(0) translateY(16px); } 60% { opacity:1; transform:scale(1.12) translateY(-3px); } 100% { opacity:1; transform:scale(1); } }
+@keyframes pet-hatch-flash { 0% { opacity:0; transform:scale(.2); } 35% { opacity:1; } 100% { opacity:0; transform:scale(1.6); } }
+@keyframes pet-hatch-spark { 0% { opacity:1; transform:rotate(var(--angle)) translateX(6px) scale(1); } 100% { opacity:0; transform:rotate(var(--angle)) translateX(52px) scale(.4); } }
+@media(max-width:600px) { .pet-hatch-stage { width:60px; height:68px; } }
+@media(prefers-reduced-motion:reduce) {
+  .pet-hatch-egg, .pet-hatch-shell, .pet-hatch-burst { display:none; }
+  .pet-hatch-pet, .pet-hatch-stage.is-playing .pet-hatch-pet { animation:none; opacity:1; transform:none; }
+}
+
 
 #pets-section .pet-student { min-height:44px; }
 .pet-wallet-status { display:flex; flex-wrap:wrap; align-items:center; gap:8px 16px; padding:12px 16px; margin:12px 0; border:1px solid #dbbe79; border-radius:12px; background:#fffaf0; color:#664913; }

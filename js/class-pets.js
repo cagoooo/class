@@ -396,6 +396,29 @@
         svg.innerHTML = `<ellipse cx="80" cy="149" rx="48" ry="6" fill="#d9e5e4"/>${shape}`;
         return svg;
     }
+    /**
+     * 孵化瞬間的短動畫：沿用 Blender 渲染的蛋與寵物圖，蛋搖晃後沿裂縫分成上下兩半飛開，寵物彈出。
+     * 兩張圖都載好才開始播（最多等 1.5 秒）；減少動態設定時 CSS 直接顯示寵物。
+     */
+    function hatchStage(kind, xp) {
+        const stage = el('div', undefined, 'pet-hatch-stage');
+        const holder = el('div', undefined, 'pet-hatch-pet');
+        const pet = portrait(kind, xp, 'happy'); pet.loading = 'eager'; holder.append(pet);
+        const egg = portrait(kind, 9); egg.loading = 'eager'; egg.classList.remove('pet-egg'); egg.classList.add('pet-hatch-egg');
+        egg.alt = ''; egg.setAttribute('aria-hidden', 'true');
+        const shells = ['top', 'bottom'].map(side => {
+            const shell = el('img', undefined, `pet-portrait pet-rendered pet-hatch-shell pet-hatch-${side}`);
+            shell.src = egg.src; shell.alt = ''; shell.width = 320; shell.height = 360; shell.setAttribute('aria-hidden', 'true');
+            shell.addEventListener('error', () => shell.remove(), { once: true });
+            return shell;
+        });
+        const burst = el('div', undefined, 'pet-hatch-burst'); burst.setAttribute('aria-hidden', 'true');
+        for (let i = 0; i < 8; i++) { const spark = el('i'); spark.style.setProperty('--angle', `${i * 45 + 22}deg`); burst.append(spark); }
+        stage.append(holder, egg, ...shells, burst);
+        const ready = img => img.complete ? Promise.resolve() : new Promise(done => { img.addEventListener('load', done, { once: true }); img.addEventListener('error', done, { once: true }); });
+        Promise.race([Promise.all([ready(egg), ready(pet)]), new Promise(done => setTimeout(done, 1500))]).then(() => stage.classList.add('is-playing'));
+        return stage;
+    }
     function celebrate(events) {
         if (!events.length || !document.body) return;
         document.getElementById('pet-growth-feedback')?.remove(); clearTimeout(feedbackTimer);
@@ -405,7 +428,7 @@
         const message = el('div'); message.setAttribute('role', 'status'); message.setAttribute('aria-live', 'polite');
         const unlockedHint = events.length === 1 && events[0].level === 3 ? '新姿態與成長對話已解鎖，點寵物試試！' : events.length === 1 && events[0].level === 5 ? '進階姿態與成熟對話已解鎖，點寵物試試！' : '一起繼續成長！';
         message.append(el('strong', title), el('p', events.length === 1 ? `${appearance(events[0].xp).label} · Lv.${events[0].level}，${unlockedHint}` : '這次努力已存本機，到班級寵物查看新造型。'));
-        box.append(portrait(events[0].kind, events[0].xp, 'happy'), message, button('關閉', () => { clearTimeout(feedbackTimer); box.remove(); }));
+        box.append(events[0].type === 'hatch' ? hatchStage(events[0].kind, events[0].xp) : portrait(events[0].kind, events[0].xp, 'happy'), message, button('關閉', () => { clearTimeout(feedbackTimer); box.remove(); }));
         if(projectionMode && events.length>1) {const names=el('p',events.map(e=>e.name).join('、'),'pet-batch-names');box.append(names);box.classList.add('pet-projection-feedback');}
         document.body.append(box); feedbackTimer = setTimeout(() => box.remove(), 8000);
     }
