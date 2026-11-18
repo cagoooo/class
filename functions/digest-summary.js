@@ -41,14 +41,40 @@ function appLabel(app) {
   return APP_LABELS[app] || APP_LABELS.class;
 }
 
-/** 在即時通知（純文字摘要＋卡片副標題）標上來源系統，手機預覽一眼就看得出是哪一站。 */
+// 開頭的表情符號（含膚色、變體選擇字元、組合字元），不含一般數字與 #／*
+const LEADING_EMOJI = /^((?:[\p{Extended_Pictographic}\p{Emoji_Modifier}⃣️‍])+)\s*/u;
+
+/**
+ * 摘要文字標上平台：「🐞 【剛好學】系統發生錯誤…」。手機推播只看得到這一行，
+ * 所以平台名放在最前面（表情符號之後）。已經標過的不重複加。
+ */
+function withPlatformText(text, label) {
+  const raw = String(text == null ? '' : text);
+  const tag = `【${label}】`;
+  if (raw.startsWith(tag)) return raw;
+  const match = raw.match(LEADING_EMOJI);
+  if (!match) return tag + raw;
+  const rest = raw.slice(match[0].length);
+  if (rest.startsWith(tag)) return raw;
+  return `${match[1]} ${tag}${rest}`;
+}
+
+/** 卡片標題標上平台：「🐞 系統發生錯誤｜剛好學」。已經標過的不重複加。 */
+function withPlatformTitle(title, label) {
+  const raw = String(title == null ? '' : title);
+  const tag = `｜${label}`;
+  return raw.endsWith(tag) ? raw : raw + tag;
+}
+
+/** 在即時通知（純文字摘要＋卡片標題＋副標題）標上來源系統，手機預覽一眼就看得出是哪一站。 */
 function withSourceApp(payload, app, kind = '使用情形') {
   const label = appLabel(app);
-  const out = { ...payload, text: `【${label}】${payload.text || ''}` };
-  out.cardsV2 = (payload.cardsV2 || []).map((entry) => ({
-    ...entry,
-    card: { ...entry.card, header: { ...(entry.card && entry.card.header), subtitle: `${label} · ${kind}` } },
-  }));
+  const out = { ...payload, text: withPlatformText(payload.text || '', label) };
+  out.cardsV2 = (payload.cardsV2 || []).map((entry) => {
+    const header = { ...(entry.card && entry.card.header), subtitle: `${label} · ${kind}` };
+    if (header.title) header.title = withPlatformTitle(header.title, label);
+    return { ...entry, card: { ...entry.card, header } };
+  });
   return out;
 }
 
@@ -437,7 +463,7 @@ function buildDigestPayload(day, dateLabel, sum, backup, prune) {
     widgets: [{ decoratedText: { topLabel: '今日狀態', text: healthLines.join('\n'), wrapText: true } }],
   });
 
-  let text = `📈 今日戰報 ${dateLabel}\n👥 當日有事件帳號 ${sum.activeTeachers} 個`;
+  let text = `📈 【${APP_LABELS.class}】今日戰報 ${dateLabel}\n👥 當日有事件帳號 ${sum.activeTeachers} 個`;
   if (sum.newTeachers.length) text += ` · 🎉 新加入 ${sum.newTeachers.length} 位`;
   if (sum.classesCreated.length) text += ` · 🏫 新班級 ${sum.classesCreated.length} 個`;
   if (sum.hotFeatures.length) {
@@ -459,7 +485,7 @@ function buildDigestPayload(day, dateLabel, sum, backup, prune) {
     cardsV2: [{
       cardId: 'digest-' + day,
       card: {
-        header: { title: `📈 今日戰報 ${dateLabel}`, subtitle: '班級小管家 · 使用情形彙整' },
+        header: { title: `📈 今日戰報 ${dateLabel}｜${APP_LABELS.class}`, subtitle: '班級小管家 · 使用情形彙整' },
         sections,
       },
     }],
@@ -471,6 +497,8 @@ module.exports = {
   appLabel,
   resolveSourceApp,
   withSourceApp,
+  withPlatformText,
+  withPlatformTitle,
   backupLine,
   buildDigestPayload,
   pruneLine,

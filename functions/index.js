@@ -695,13 +695,14 @@ const BACKUP_STATUS_PATH = { col: '_systemStatus', doc: 'lastBackup' };
  */
 async function pushSystemAlert(webhook, title, lines) {
   if (!webhook) return false;
-  const text = '⚠️ ' + title + '\n' + lines.join('\n');
+  const label = appLabel('class');
+  const text = '⚠️ 【' + label + '】' + title + '\n' + lines.join('\n');
   return postToChat(webhook, {
     text,
     cardsV2: [{
       cardId: 'alert-' + Date.now(),
       card: {
-        header: { title: '⚠️ ' + title, subtitle: '班級小管家 · 系統警報' },
+        header: { title: '⚠️ ' + title + '｜' + label, subtitle: label + ' · 系統警報' },
         sections: [{
           widgets: [{ decoratedText: { topLabel: '詳細', text: lines.join('\n'), wrapText: true } }],
         }],

@@ -7,6 +7,8 @@ const {
   appLabel,
   resolveSourceApp,
   withSourceApp,
+  withPlatformText,
+  withPlatformTitle,
   summarizeEvents,
   buildDigestPayload,
 } = require('../functions/digest-summary');
@@ -49,17 +51,42 @@ test('班級小管家的事件（含舊版）都算班級小管家', () => {
   assert.equal(resolveSourceApp(null), 'class');
 });
 
-test('即時通知：純文字開頭與卡片副標題都標上系統名稱，不改到原物件', () => {
+test('即時通知：純文字摘要、卡片標題與副標題都標上系統名稱，不改到原物件', () => {
   const payload = { text: '🐞 系統發生錯誤 (王老師)', cardsV2: [{ cardId: 'c', card: { header: { title: '🐞 系統發生錯誤', subtitle: '班級小管家 · 使用情形' }, sections: [1] } }] };
   const out = withSourceApp(payload, 'akailao');
-  assert.equal(out.text, '【剛好學】🐞 系統發生錯誤 (王老師)');
+  assert.equal(out.text, '🐞 【剛好學】系統發生錯誤 (王老師)');
   assert.equal(out.cardsV2[0].card.header.subtitle, '剛好學 · 使用情形');
-  assert.equal(out.cardsV2[0].card.header.title, '🐞 系統發生錯誤');
+  assert.equal(out.cardsV2[0].card.header.title, '🐞 系統發生錯誤｜剛好學');
   assert.deepEqual(out.cardsV2[0].card.sections, [1]);
   assert.equal(payload.text, '🐞 系統發生錯誤 (王老師)');
+  assert.equal(payload.cardsV2[0].card.header.title, '🐞 系統發生錯誤');
   assert.equal(payload.cardsV2[0].card.header.subtitle, '班級小管家 · 使用情形');
-  assert.equal(withSourceApp(payload, 'class').text, '【班級小管家】🐞 系統發生錯誤 (王老師)');
+  const classOut = withSourceApp(payload, 'class');
+  assert.equal(classOut.text, '🐞 【班級小管家】系統發生錯誤 (王老師)');
+  assert.equal(classOut.cardsV2[0].card.header.title, '🐞 系統發生錯誤｜班級小管家');
+  // 再包一次不會重複加
+  const twice = withSourceApp(out, 'akailao');
+  assert.equal(twice.text, out.text);
+  assert.equal(twice.cardsV2[0].card.header.title, out.cardsV2[0].card.header.title);
   assert.equal(appLabel('nope'), APP_LABELS.class);
+});
+
+test('平台標記：表情符號之後插入【平台名】，已有的不重複', () => {
+  assert.equal(withPlatformText('⚠️ 每日備份失敗', '班級小管家'), '⚠️ 【班級小管家】每日備份失敗');
+  assert.equal(withPlatformText('👨‍🏫 新老師加入', '剛好學'), '👨‍🏫 【剛好學】新老師加入');
+  assert.equal(withPlatformText('沒有表情符號', '剛好學'), '【剛好學】沒有表情符號');
+  assert.equal(withPlatformText('2 則錯誤', '剛好學'), '【剛好學】2 則錯誤');
+  assert.equal(withPlatformText('🐞 【剛好學】已標過', '剛好學'), '🐞 【剛好學】已標過');
+  assert.equal(withPlatformText('【剛好學】🐞 舊格式', '剛好學'), '【剛好學】🐞 舊格式');
+  assert.equal(withPlatformText('', '剛好學'), '【剛好學】');
+  assert.equal(withPlatformTitle('🐞 系統發生錯誤', '剛好學'), '🐞 系統發生錯誤｜剛好學');
+  assert.equal(withPlatformTitle('🐞 系統發生錯誤｜剛好學', '剛好學'), '🐞 系統發生錯誤｜剛好學');
+});
+
+test('每日戰報：摘要與標題都標上班級小管家', () => {
+  const payload = buildDigestPayload('2026-10-08', '10/08', summarizeEvents([{ type: 'session_start', uid: 'c1' }]), null);
+  assert.match(payload.text, /^📈 【班級小管家】今日戰報 10\/08\n/);
+  assert.equal(payload.cardsV2[0].card.header.title, '📈 今日戰報 10/08｜班級小管家');
 });
 
 test('戰報：剛好學的帳號、訪客、錯誤不混進班級小管家', () => {
