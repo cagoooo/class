@@ -290,18 +290,37 @@ function summarizeEvents(events) {
 }
 
 /** 其他系統只需要「有沒有人在用、有沒有出錯」：帳號數與錯誤清單。 */
+/**
+ * 剛好學：學生輸入的教室代碼找不到開著的教室（多為打錯或老師還沒開課），不是系統故障。
+ * 戰報另外列一行、不算進錯誤數，免得真正的錯誤被擠到前三則以外。
+ */
+function isStudentWrongClassroomCode(d) {
+  return d.context === 'student-join-classroom-not-exists'
+    || /查無開啟中的教室/.test(String(d.message || ''));
+}
+
 function summarizeOtherApp(events) {
   const googleUids = new Set(), anonymousUids = new Set();
   const errors = [];
+  const wrongCodes = [];
   let guestEvents = 0;
   events.forEach((d) => {
     if (d.uid) (d.anonymous ? anonymousUids : googleUids).add(d.uid);
     else if (d.type === 'session_start') guestEvents++;
+    if (d.type === 'error' && isStudentWrongClassroomCode(d)) {
+      const code = /「([^」]{1,40})」/.exec(String(d.message || ''));
+      wrongCodes.push(code ? code[1] : '');
+      return;
+    }
     if (d.type === 'error' && !isExpectedSyncWait(d) && !isRecoverableOfflineSync(d)) {
       errors.push({ message: d.message || '', context: d.context || '', who: d.name || d.email || '' });
     }
   });
-  return { events: events.length, accounts: googleUids.size, anonymous: anonymousUids.size, guestEvents, errors };
+  return {
+    events: events.length, accounts: googleUids.size, anonymous: anonymousUids.size, guestEvents, errors,
+    wrongCodeCount: wrongCodes.length,
+    wrongCodeSamples: [...new Set(wrongCodes.filter(Boolean))].slice(0, 3),
+  };
 }
 
 function backupLine(backup) {
@@ -432,7 +451,10 @@ function buildDigestPayload(day, dateLabel, sum, backup, prune) {
             akailao.errors.length
               ? `🐞 錯誤 ${akailao.errors.length} 則：` + akailao.errors.slice(0, 3).map((error) => clip(error.message, 60)).join('；')
               : '🐞 錯誤 0 則 ✅',
-          ].join('\n'),
+            // 學生打錯代碼不是系統故障，另外列、不算錯誤
+            akailao.wrongCodeCount && `🔤 學生代碼打錯或老師尚未開課 ${akailao.wrongCodeCount} 次`
+              + (akailao.wrongCodeSamples.length ? `（${akailao.wrongCodeSamples.map((c) => clip(c, 20)).join('、')}）` : ''),
+          ].filter(Boolean).join('\n'),
           wrapText: true,
         },
       }],

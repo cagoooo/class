@@ -105,6 +105,7 @@ test('戰報：剛好學的帳號、訪客、錯誤不混進班級小管家', ()
   assert.deepEqual(sum.apps.akailao, {
     events: 5, accounts: 1, anonymous: 1, guestEvents: 1,
     errors: [{ message: '剛好學壞了', context: 'error · @ :1009 · 教師', who: '' }],
+    wrongCodeCount: 0, wrongCodeSamples: [],
   });
 });
 

@@ -129,4 +129,23 @@ test('舊版雲端資料自動升級只進戰報：以老師與班級去重，�
   assert.doesNotMatch(buildDigestPayload('2026-10-05', '10/05', summarizeEvents([]), null).text, /自動升級/);
 });
 
+test('剛好學：學生打錯教室代碼不算錯誤，另外列一行', () => {
+  const summary = summarizeEvents([
+    { type: 'login', app: 'akailao', uid: 'stu-1', anonymous: true },
+    { type: 'error', app: 'akailao', uid: 'stu-1', anonymous: true, context: 'student-join-classroom-not-exists', message: '學生輸入的教室代碼「smart116」查無開啟中的教室（多為代碼打錯或老師尚未開課，非系統故障）' },
+    { type: 'error', app: 'akailao', uid: 'stu-2', anonymous: true, message: '學生輸入的教室代碼「smart116」查無開啟中的教室（多為代碼打錯或老師尚未開課，非系統故障）' },
+    { type: 'error', app: 'akailao', uid: 'stu-3', anonymous: true, context: 'student-join-classroom-not-exists', message: '學生輸入的教室代碼「6O1」查無開啟中的教室（多為代碼打錯或老師尚未開課，非系統故障）' },
+    { type: 'error', app: 'akailao', uid: 'teacher-a', message: 'Firestore 寫入失敗', context: 'set-mode' },
+  ]);
+  const akailao = summary.apps.akailao;
+  assert.equal(akailao.errors.length, 1);
+  assert.equal(akailao.wrongCodeCount, 3);
+  assert.deepEqual(akailao.wrongCodeSamples, ['smart116', '6O1']);
+  const card = JSON.stringify(buildDigestPayload('2026-11-19', '11/19（週三）', summary, null).cardsV2);
+  assert.match(card, /錯誤 1 則：Firestore 寫入失敗/);
+  assert.match(card, /學生代碼打錯或老師尚未開課 3 次（smart116、6O1）/);
+  const clean = summarizeEvents([{ type: 'error', app: 'akailao', uid: 'teacher-a', message: 'x' }]);
+  assert.doesNotMatch(JSON.stringify(buildDigestPayload('2026-11-19', '11/19', clean, null).cardsV2), /學生代碼打錯/);
+});
+
 console.log(`✅ 每日戰報彙整測試通過：${passed} 項`);
