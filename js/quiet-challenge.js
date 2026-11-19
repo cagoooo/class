@@ -180,7 +180,8 @@
     };
     const DARK_MOODS = ['sleep', 'doze', 'storm'];
 
-    // 3D 動作圖：同一隻小幫手 8 條一起預先載入；載入失敗（離線、舊快取）就改畫原本的向量圖
+    // 3D 動作圖：先載入正在用的那一條，好了再載同一隻的其他心情；還沒到之前先顯示原本的向量圖，
+    // 載入失敗（離線、學校網路擋）就一直用向量圖。v3.69.1：圖片改放在不隨版本清掉的快取（見 sw.js ART_CACHE）。
     const SPRITE_REV = '1';
     const SPRITE_BASE = (document.currentScript && document.currentScript.src)
         ? new URL('../assets/quiet-mascot/', document.currentScript.src).href : 'assets/quiet-mascot/';
@@ -188,18 +189,29 @@
     const spriteWait = {};       // 網址 → 載入完成後要做的事
     let spriteTimer = null;
     const spriteUrl = (k, m) => `${SPRITE_BASE}${k}-${m}.webp?v=${SPRITE_REV}`;
-    function loadSprite(u, done) {
+    function loadSprite(u, done, priority) {
         if (done) (spriteWait[u] ||= []).push(done);
         if (spriteState[u]) return;
         spriteState[u] = 'loading';
         const img = new Image();
         img.decoding = 'async';
-        img.onload = () => { spriteState[u] = 'ok'; (spriteWait[u] || []).splice(0).forEach(f => f()); };
+        if (priority) img.fetchPriority = priority;
+        // 動作條至少 2 格寬；離線時 Service Worker 會回一張 100px 的「📷」小圖，不能當成載入成功
+        img.onload = () => { spriteState[u] = img.naturalWidth >= 300 ? 'ok' : 'fail'; (spriteWait[u] || []).splice(0).forEach(f => f()); };
         img.onerror = () => { spriteState[u] = 'fail'; (spriteWait[u] || []).splice(0).forEach(f => f()); };
         img.src = u;
     }
     function preloadAnimal(k) {
-        if (SPRITE_ANIMALS.includes(k)) Object.keys(SPRITE_FRAMES).forEach(m => loadSprite(spriteUrl(k, m)));
+        if (SPRITE_ANIMALS.includes(k)) Object.keys(SPRITE_FRAMES).forEach(m => loadSprite(spriteUrl(k, m), null, 'low'));
+    }
+    /** 電腦空閒時，先下載「下次要出場」那隻小幫手的第一張（約 30KB），進安靜挑戰時就不用等。 */
+    function warmSoon(k) {
+        const c = navigator.connection;
+        if (!SPRITE_ANIMALS.includes(k) || (c && (c.saveData || /2g/.test(c.effectiveType || '')))) return;
+        const go = () => loadSprite(spriteUrl(k, 'off'), null, 'low');
+        const idle = () => ('requestIdleCallback' in window ? window.requestIdleCallback(go, { timeout: 5000 }) : setTimeout(go, 1500));
+        if (document.readyState === 'complete') setTimeout(idle, 1500);
+        else window.addEventListener('load', () => setTimeout(idle, 8000), { once: true });
     }
     function stopSprite() { clearTimeout(spriteTimer); spriteTimer = null; }
     function playSprite(el, m) {
@@ -218,7 +230,7 @@
         };
         spriteTimer = setTimeout(next, plan[0][1]);
     }
-    /** 畫小幫手：3D 動作圖已載入就播放；還在載入先留空位；載入失敗用向量圖。 */
+    /** 畫小幫手：3D 動作圖已載入就播放；還在載入先畫向量圖，載好再淡入換成 3D；載入失敗用向量圖。 */
     function drawMascot() {
         const box = $('qc-svg');
         if (!box) return;
@@ -226,16 +238,16 @@
         const k = curAnimal, m = mood || 'off';
         if (!SPRITE_ANIMALS.includes(k) || !SPRITE_FRAMES[m]) { box.innerHTML = mascotSvg(k, m); return; }
         const u = spriteUrl(k, m);
-        preloadAnimal(k);
         const state = spriteState[u];
         if (state === 'ok') {
+            const wasSvg = !!box.querySelector('svg');
             box.innerHTML = `<div class="qc-fig qc-sprite" role="img" aria-label="${esc(ANIMALS[k].label)}" style="background-image:url('${u}');background-size:${SPRITE_FRAMES[m] * 100}% 100%"></div>`;
+            if (wasSvg) { box.classList.remove('qc-fade'); void box.offsetWidth; box.classList.add('qc-fade'); }
             playSprite(box.firstElementChild, m);
-        } else if (state === 'fail') {
-            box.innerHTML = mascotSvg(k, m);
+            preloadAnimal(k);   // 這一條好了，再慢慢載同一隻的其他心情
         } else {
-            box.innerHTML = '<div class="qc-fig"></div>';
-            loadSprite(u, () => { if (curAnimal === k && (mood || 'off') === m) drawMascot(); });
+            box.innerHTML = mascotSvg(k, m);
+            if (state !== 'fail') loadSprite(u, () => { if (curAnimal === k && (mood || 'off') === m) drawMascot(); }, 'high');
         }
     }
 
@@ -268,6 +280,15 @@
     const $ = id => document.getElementById(id);
     const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+    // 下次進安靜挑戰要出場的小幫手先決定好，空閒時先下載它的第一張
+    let nextAnimal = cfg.animal === 'random' ? pick(ANIMAL_KEYS) : null;
+    warmSoon(nextAnimal || cfg.animal);
+    function takeNextAnimal() {
+        const k = nextAnimal && (nextAnimal !== curAnimal || !mood) ? nextAnimal : randomAnimal();   // 第一次進來直接用先下載好的那隻
+        nextAnimal = pick(ANIMAL_KEYS.filter(a => a !== k));
+        warmSoon(nextAnimal);
+        return k;
+    }
 
     // ───────────── 小幫手 SVG ─────────────
     const OUT = 'stroke="#334155" stroke-width="3" stroke-linejoin="round"';
@@ -421,6 +442,8 @@
         /* 小幫手 */
         .qc-mascot{position:relative;width:clamp(160px,21vw,230px);aspect-ratio:338/406;user-select:none}
         .qc-mascot > #qc-svg{width:100%;height:100%}
+        #qc-svg.qc-fade{animation:qc-fadein .35s ease-out}
+        @keyframes qc-fadein{from{opacity:.25;transform:scale(.96)}to{opacity:1;transform:none}}
         .qc-mascot .qc-fig{width:100%;height:100%;display:block;overflow:visible;filter:drop-shadow(0 10px 14px rgba(0,0,0,.18))}
         .qc-mascot .qc-sprite{background-repeat:no-repeat;background-position:0 0;filter:drop-shadow(0 8px 12px rgba(0,0,0,.14))}
         .m-sleep .qc-mascot .qc-fig,.m-doze .qc-mascot .qc-fig{animation:qc-breathe 3.2s ease-in-out infinite;transform-origin:bottom center}
@@ -1030,7 +1053,7 @@
             injectCSS();
             cfg = loadCfg();
             // 每次進入本頁換一隻小幫手（麥克風開著時不換，避免偵測中突然變角色）
-            if (!audio.stream) curAnimal = cfg.animal === 'random' ? randomAnimal() : cfg.animal;
+            if (!audio.stream) curAnimal = cfg.animal === 'random' ? takeNextAnimal() : cfg.animal;
             const fresh = !($('qc-root') && $('qc-root').dataset.ready);
             render();
             if (!fresh) { syncSeg(); setMood(mood || 'off', true); }

@@ -1,12 +1,17 @@
 /**
  * 班級小管家 Service Worker
- * @version 3.69.0
+ * @version 3.69.1
  * @description PWA 離線支援與快取策略優化
  */
 
-const CACHE_NAME = 'class-manager-v3.69.0';
-const STATIC_CACHE = 'class-manager-static-v3.69.0';
-const DYNAMIC_CACHE = 'class-manager-dynamic-v3.69.0';
+const CACHE_NAME = 'class-manager-v3.69.1';
+const STATIC_CACHE = 'class-manager-static-v3.69.1';
+const DYNAMIC_CACHE = 'class-manager-dynamic-v3.69.1';
+// v3.69.1：寵物、安靜挑戰小幫手等圖片放在不跟著版本清掉的快取。
+// 原本放在 DYNAMIC_CACHE，每次發新版就整個清空，老師幾乎每次更新後都要重新下載一次，小幫手要等很久才出現。
+const ART_CACHE = 'class-manager-art-v1';
+const ART_PATTERN = /\/assets\/.+\.(webp|png|jpe?g|svg)$/i;
+function isArt(url) { return url.origin === self.location.origin && ART_PATTERN.test(url.pathname); }
 
 
 // 靜態資源列表（安裝時預快取）
@@ -150,7 +155,8 @@ self.addEventListener('activate', (event) => {
                             // 刪除舊版本快取
                             return name.startsWith('class-manager-') &&
                                 name !== STATIC_CACHE &&
-                                name !== DYNAMIC_CACHE;
+                                name !== DYNAMIC_CACHE &&
+                                name !== ART_CACHE;
                         })
                         .map((name) => {
                             console.log('[SW] 刪除舊快取:', name);
@@ -221,8 +227,9 @@ async function cacheFirst(request) {
         // 先嘗試快取
         const cachedResponse = await caches.match(request);
         if (cachedResponse) {
-            // 在背景更新快取（Stale While Revalidate）
-            updateCache(request);
+            // 在背景更新快取（Stale While Revalidate）；網址帶版本號（?v=）的圖片內容不會變，不用每次重抓
+            const u = new URL(request.url);
+            if (!(isArt(u) && u.searchParams.has('v'))) updateCache(request);
             return cachedResponse;
         }
 
@@ -231,7 +238,7 @@ async function cacheFirst(request) {
 
         // 快取成功的回應
         if (networkResponse.ok) {
-            const cache = await caches.open(DYNAMIC_CACHE);
+            const cache = await caches.open(isArt(new URL(request.url)) ? ART_CACHE : DYNAMIC_CACHE);
             cache.put(request, networkResponse.clone());
         }
 
@@ -299,7 +306,7 @@ async function updateCache(request) {
     try {
         const networkResponse = await fetch(request);
         if (networkResponse.ok) {
-            const cache = await caches.open(DYNAMIC_CACHE);
+            const cache = await caches.open(isArt(new URL(request.url)) ? ART_CACHE : DYNAMIC_CACHE);
             cache.put(request, networkResponse);
         }
     } catch (error) {
