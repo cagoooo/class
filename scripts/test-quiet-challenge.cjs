@@ -68,4 +68,24 @@ assert.equal(qc.moodOf(97, 90, true), 'loud', '界線很高時超級吵要到 98
 assert.equal(qc.fmtTime(180000), '03:00');
 assert.equal(qc.fmtTime(59001), '01:00', '不足一秒進位顯示');
 
+// v3.69.0 Blender 3D 小幫手：每種心情都有動作時間表、格子編號不超出、動作圖檔案齊全且是 WebP
+const fs = require('node:fs'), path = require('node:path');
+const moods = ['off', 'sleep', 'doze', 'calm', 'warn', 'loud', 'storm', 'party'];
+for (const m of moods) {
+    const plan = qc.SPRITE_PLAN[m], n = qc.SPRITE_FRAMES[m];
+    assert.ok(plan && plan.length && n >= 2, `${m} 要有動作時間表`);
+    for (const [f, ms] of plan) {
+        assert.ok(Number.isInteger(f) && f >= 0 && f < n, `${m} 的格子 ${f} 超出 ${n} 格`);
+        assert.ok(ms >= 100 && ms <= 3000, `${m} 每格停留時間合理`);
+    }
+    assert.equal(new Set(plan.map(p => p[0])).size, n, `${m} 每一格都要用到`);
+    for (const a of qc.SPRITE_ANIMALS) {
+        const file = path.join(__dirname, '..', 'assets', 'quiet-mascot', `${a}-${m}.webp`);
+        const buf = fs.readFileSync(file);
+        assert.equal(buf.toString('ascii', 8, 12), 'WEBP', `${a}-${m} 要是 WebP`);
+        assert.ok(buf.length < 160 * 1024, `${a}-${m} 檔案不要太大（${buf.length}）`);
+    }
+}
+assert.deepEqual(Object.keys(qc.SPRITE_FRAMES).sort(), [...moods].sort(), '動作圖心情與小幫手心情一致');
+
 console.log('✅ 安靜挑戰邏輯測試全部通過');

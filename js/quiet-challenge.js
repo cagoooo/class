@@ -1,7 +1,7 @@
 /**
  * quiet-challenge.js
  * 🤫 安靜挑戰 —— 用麥克風看全班音量，安靜才會計時
- * @version 3.58.0
+ * @version 3.69.0
  *
  * 需求：
  *   - 麥克風即時音量（相對音量 0～100，不是精確分貝），聲音只在這台裝置分析，不錄音、不上傳
@@ -104,7 +104,22 @@
         return 'calm';
     }
 
-    const pure = { dbFromSamples, levelFromDb, floorFromDbs, smooth, loudStep, createChallenge, fmtTime, moodOf, LOUD_HOLD_MS, CALM_HOLD_MS, BASE_LEVEL, DEFAULT_TH, DEFAULT_FLOOR, RANGE_DB };
+    // v3.69.0：Blender 3D 小幫手。每種心情一條動作圖（art/quiet-mascot → assets/quiet-mascot/<動物>-<心情>.webp），
+    // 依下面的時間表輪播格子：[第幾格, 停留毫秒]，做出眨眼、揮手、打呼泡泡、點頭打瞌睡、摀耳朵等動作。
+    const SPRITE_ANIMALS = ['owl', 'cat', 'bear', 'bunny', 'panda'];
+    const SPRITE_FRAMES = { off: 4, calm: 3, sleep: 3, doze: 3, warn: 3, loud: 2, storm: 3, party: 3 };
+    const SPRITE_PLAN = {
+        off: [[0, 260], [1, 260], [0, 260], [1, 260], [2, 1600], [3, 140], [2, 1400]],   // 揮手打招呼、眨眼
+        calm: [[0, 2400], [1, 140], [0, 1800], [2, 1100], [0, 600], [1, 140]],            // 眨眼、瞇眼笑
+        sleep: [[0, 800], [1, 800], [2, 1100], [1, 800]],                                  // 鼻涕泡泡一大一小
+        doze: [[0, 1300], [1, 1000], [2, 350], [0, 900]],                                  // 點頭打瞌睡又驚醒
+        warn: [[0, 520], [1, 520], [2, 700]],                                              // 噓～左看右看
+        loud: [[0, 170], [1, 170]],                                                        // 摀耳朵左右晃
+        storm: [[0, 110], [1, 110], [2, 110]],                                             // 摀耳朵大叫
+        party: [[0, 260], [1, 260], [0, 260], [2, 260]]                                    // 舉手歡呼
+    };
+
+    const pure = { dbFromSamples, levelFromDb, floorFromDbs, smooth, loudStep, createChallenge, fmtTime, moodOf, LOUD_HOLD_MS, CALM_HOLD_MS, BASE_LEVEL, DEFAULT_TH, DEFAULT_FLOOR, RANGE_DB, SPRITE_ANIMALS, SPRITE_FRAMES, SPRITE_PLAN };
     if (typeof module !== 'undefined' && module.exports) module.exports = pure;
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
@@ -164,6 +179,65 @@
         party: [['🎉', 2, 'float'], ['🎊', 2, 'float'], ['🎈', 2, 'float'], ['🌟', 3, 'twinkle']]
     };
     const DARK_MOODS = ['sleep', 'doze', 'storm'];
+
+    // 3D 動作圖：同一隻小幫手 8 條一起預先載入；載入失敗（離線、舊快取）就改畫原本的向量圖
+    const SPRITE_REV = '1';
+    const SPRITE_BASE = (document.currentScript && document.currentScript.src)
+        ? new URL('../assets/quiet-mascot/', document.currentScript.src).href : 'assets/quiet-mascot/';
+    const spriteState = {};      // 網址 → 'loading' | 'ok' | 'fail'
+    const spriteWait = {};       // 網址 → 載入完成後要做的事
+    let spriteTimer = null;
+    const spriteUrl = (k, m) => `${SPRITE_BASE}${k}-${m}.webp?v=${SPRITE_REV}`;
+    function loadSprite(u, done) {
+        if (done) (spriteWait[u] ||= []).push(done);
+        if (spriteState[u]) return;
+        spriteState[u] = 'loading';
+        const img = new Image();
+        img.decoding = 'async';
+        img.onload = () => { spriteState[u] = 'ok'; (spriteWait[u] || []).splice(0).forEach(f => f()); };
+        img.onerror = () => { spriteState[u] = 'fail'; (spriteWait[u] || []).splice(0).forEach(f => f()); };
+        img.src = u;
+    }
+    function preloadAnimal(k) {
+        if (SPRITE_ANIMALS.includes(k)) Object.keys(SPRITE_FRAMES).forEach(m => loadSprite(spriteUrl(k, m)));
+    }
+    function stopSprite() { clearTimeout(spriteTimer); spriteTimer = null; }
+    function playSprite(el, m) {
+        const n = SPRITE_FRAMES[m] || 1, plan = SPRITE_PLAN[m] || [[0, 1000]];
+        const show = f => { el.style.backgroundPosition = n > 1 ? `${(f / (n - 1) * 100).toFixed(3)}% 0` : '0 0'; };
+        show(plan[0][0]);
+        const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (still || plan.length < 2) return;
+        let i = 0;
+        const next = () => {
+            if (!el.isConnected) return;
+            if (document.hidden || !el.offsetParent) { spriteTimer = setTimeout(next, 1000); return; }   // 看不到就不換格
+            i = (i + 1) % plan.length;
+            show(plan[i][0]);
+            spriteTimer = setTimeout(next, plan[i][1]);
+        };
+        spriteTimer = setTimeout(next, plan[0][1]);
+    }
+    /** 畫小幫手：3D 動作圖已載入就播放；還在載入先留空位；載入失敗用向量圖。 */
+    function drawMascot() {
+        const box = $('qc-svg');
+        if (!box) return;
+        stopSprite();
+        const k = curAnimal, m = mood || 'off';
+        if (!SPRITE_ANIMALS.includes(k) || !SPRITE_FRAMES[m]) { box.innerHTML = mascotSvg(k, m); return; }
+        const u = spriteUrl(k, m);
+        preloadAnimal(k);
+        const state = spriteState[u];
+        if (state === 'ok') {
+            box.innerHTML = `<div class="qc-fig qc-sprite" role="img" aria-label="${esc(ANIMALS[k].label)}" style="background-image:url('${u}');background-size:${SPRITE_FRAMES[m] * 100}% 100%"></div>`;
+            playSprite(box.firstElementChild, m);
+        } else if (state === 'fail') {
+            box.innerHTML = mascotSvg(k, m);
+        } else {
+            box.innerHTML = '<div class="qc-fig"></div>';
+            loadSprite(u, () => { if (curAnimal === k && (mood || 'off') === m) drawMascot(); });
+        }
+    }
 
     function lsGet(k, fb) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; } catch (e) { return fb; } }
     function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* 存不了不影響使用 */ } }
@@ -249,7 +323,7 @@
     function mascotSvg(k, exprKey) {
         const a = ANIMALS[k] || ANIMALS.owl, e = EXPR[exprKey] || EXPR.calm;
         const mouthY = k === 'owl' ? 144 : 136;
-        let s = `<svg viewBox="0 -10 200 215" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${esc(a.label)}">`;
+        let s = `<svg class="qc-fig" viewBox="0 -10 200 215" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${esc(a.label)}">`;
         s += earsSvg(k, a);
         s += pair(`<ellipse cx="78" cy="186" rx="17" ry="9" fill="${a.feet}" ${OUT}/>`);
         s += `<ellipse cx="100" cy="122" rx="66" ry="64" fill="${a.body}" ${OUT}/>`;
@@ -345,14 +419,16 @@
         @keyframes qc-flash{0%{opacity:1}100%{opacity:.15}}
         @keyframes qc-float{0%,100%{transform:translateY(0) rotate(-6deg)}50%{transform:translateY(-14px) rotate(6deg)}}
         /* 小幫手 */
-        .qc-mascot{position:relative;width:clamp(170px,22vw,250px);aspect-ratio:200/215;user-select:none}
-        .qc-mascot svg{width:100%;height:100%;display:block;overflow:visible;filter:drop-shadow(0 10px 14px rgba(0,0,0,.18))}
-        .m-sleep .qc-mascot svg,.m-doze .qc-mascot svg{animation:qc-breathe 3.2s ease-in-out infinite;transform-origin:bottom center}
-        .m-calm .qc-mascot svg,.m-off .qc-mascot svg{animation:qc-bob 2.8s ease-in-out infinite}
-        .m-warn .qc-mascot svg{animation:qc-tilt 1.4s ease-in-out infinite;transform-origin:bottom center}
-        .m-loud .qc-mascot svg{animation:qc-shake .35s linear infinite}
-        .m-storm .qc-mascot svg{animation:qc-shake .18s linear infinite}
-        .m-party .qc-mascot svg{animation:qc-jump .7s ease-in-out infinite;transform-origin:bottom center}
+        .qc-mascot{position:relative;width:clamp(160px,21vw,230px);aspect-ratio:338/406;user-select:none}
+        .qc-mascot > #qc-svg{width:100%;height:100%}
+        .qc-mascot .qc-fig{width:100%;height:100%;display:block;overflow:visible;filter:drop-shadow(0 10px 14px rgba(0,0,0,.18))}
+        .qc-mascot .qc-sprite{background-repeat:no-repeat;background-position:0 0;filter:drop-shadow(0 8px 12px rgba(0,0,0,.14))}
+        .m-sleep .qc-mascot .qc-fig,.m-doze .qc-mascot .qc-fig{animation:qc-breathe 3.2s ease-in-out infinite;transform-origin:bottom center}
+        .m-calm .qc-mascot .qc-fig,.m-off .qc-mascot .qc-fig{animation:qc-bob 2.8s ease-in-out infinite}
+        .m-warn .qc-mascot .qc-fig{animation:qc-tilt 1.4s ease-in-out infinite;transform-origin:bottom center}
+        .m-loud .qc-mascot .qc-fig{animation:qc-shake .35s linear infinite}
+        .m-storm .qc-mascot .qc-fig{animation:qc-shake .18s linear infinite}
+        .m-party .qc-mascot .qc-fig{animation:qc-jump .7s ease-in-out infinite;transform-origin:bottom center}
         @keyframes qc-breathe{0%,100%{transform:scale(1,1)}50%{transform:scale(1.04,.97)}}
         @keyframes qc-tilt{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(5deg)}}
         @keyframes qc-shake{0%,100%{transform:translateX(0) rotate(0)}25%{transform:translateX(-7px) rotate(-5deg)}75%{transform:translateX(7px) rotate(5deg)}}
@@ -402,7 +478,7 @@
         .qc-darkbg .qc-fsbtn{background:rgba(255,255,255,.18);color:#f1f5f9}
         /* 全螢幕投影 */
         .qc-stage.qc-fs{position:fixed;inset:0;z-index:2147483000;border-radius:0;min-height:100vh;padding:4vh 4vw}
-        .qc-stage.qc-fs .qc-mascot{width:min(34vh,26vw)}
+        .qc-stage.qc-fs .qc-mascot{width:min(30vh,24vw)}
         .qc-stage.qc-fs .qc-clock{font-size:min(20vh,17vw)}
         .qc-stage.qc-fs .qc-say{font-size:min(5vh,4.4vw)}
         .qc-stage.qc-fs .qc-meter,.qc-stage.qc-fs .qc-prog{width:min(86vw,1400px)}
@@ -659,7 +735,7 @@
         if (!st) return;
         st.className = st.className.replace(/\bm-\w+/g, '').trim() + ' m-' + m;
         st.classList.toggle('qc-darkbg', DARK_MOODS.includes(m));
-        $('qc-svg').innerHTML = mascotSvg(curAnimal, m);
+        drawMascot();
         if (changed || !$('qc-scene').innerHTML) $('qc-scene').innerHTML = sceneHtml(m);
         if (changed || m === 'off') $('qc-say').textContent = line(m);
         else $('qc-say').textContent = lastLine.replace(/噓噓|喵喵|嚕嚕|跳跳|圓圓/, ANIMALS[curAnimal].name);
