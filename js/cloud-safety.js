@@ -403,7 +403,7 @@
      */
     async function withoutBase(c, values, remote) {
         const localWins = containsRecords(values, remote.values), remoteWins = containsRecords(remote.values, values);
-        if (localWins === remoteWins) return { block: 'no-base' };
+        if (localWins === remoteWins) return localWins ? { block: 'no-base' } : unionWithoutBase(c, values, remote);
         const loser = localWins ? remote.values : values;
         try { await window.LocalRecovery.put(`no-base:${c.uid}:${c.id}`, { version: '1.2', classId: c.id, exportDate: new Date().toISOString(), replaced: localWins ? 'cloud' : 'local', ...dataFor(loser) }); }
         catch { return { block: 'no-recovery' }; }
@@ -416,6 +416,22 @@
             added: shared.some(k => (merged[k] ?? null) !== (remote.values[k] ?? null)),
             newCloud: shared.some(k => (merged[k] ?? null) !== (values[k] ?? null))
         };
+    }
+    /**
+     * 兩邊各有對方沒有的紀錄：以雲端為主，補上這台多出來的加扣分與抽籤紀錄（條件見 CloudMerge.unionWithoutBase）。
+     * 這台原本的整份資料先存進本機還原區，存不了就不合併。
+     */
+    async function unionWithoutBase(c, values, remote) {
+        const result = window.CloudMerge?.unionWithoutBase?.(values, remote.values);
+        if (!result?.ok) return { block: 'no-base' };
+        const merged = {};
+        for (const k of keys()) merged[k] = globalKeys.includes(k) ? (values[k] ?? null)
+            : Object.hasOwn(result.changes, k) ? result.changes[k] : fromCloud(k, remote.values, values);
+        if (typeof window.ClassPets?.coinsFor !== 'function' || overdrawn(merged, values, remote.values)) return { block: 'coins' };
+        try { await window.LocalRecovery.put(`no-base:${c.uid}:${c.id}`, { version: '1.2', classId: c.id, exportDate: new Date().toISOString(), replaced: 'local-merged', ...dataFor(values) }); }
+        catch { return { block: 'no-recovery' }; }
+        ensure(merged);
+        return { values: merged, added: true, newCloud: true };
     }
     /** @returns {Promise<{values?:Object, added?:boolean, newCloud?:boolean, block?:string}>} */
     async function threeWay(c, known, values, remote) {

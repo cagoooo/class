@@ -266,8 +266,16 @@ let passed=0;async function test(name,fn){await fn();console.log('PASS',name);pa
   await b.s.report(error,'A',true);assert.equal(b.syncConflicts[0][1].notify,true);assert.match(b.syncConflicts[0][1].context,/students\.classPet/);assert.deepEqual([...b.s.conflictIds()],['A']);});
  await test('兩邊都兌換、合併後金幣變負：不自動合併',async()=>{const{a,b}=await mergePair();addPoints(a,'spend-a',1,-6);await a.s.publish();addPoints(b,'spend-b',1,-6);
   const error=await b.s.publish('A',{autoMerge:'now'}).catch(e=>e);assert.equal(error.code,'sync-conflict');assert.equal(error.mergeBlock,'coins');});
- await test('共同舊版本已被清理：不猜，交給老師',async()=>{const{a,b}=await mergePair();const token=(await b.s.read()).token;addPoints(a,'from-a',2);await a.s.publish();addPoints(b,'from-b',3);a.db.data.delete(`users/teacher/classes/A/syncSnapshots/${token}/parts/0`);
+ await test('共同舊版本已被清理、兩邊各自加分：以雲端為主補上這台的紀錄，分數加總並留下本機副本',async()=>{const{a,b}=await mergePair();const token=(await b.s.read()).token;addPoints(a,'from-a',2);await a.s.publish();addPoints(b,'from-b',3);a.db.data.delete(`users/teacher/classes/A/syncSnapshots/${token}/parts/0`);
+  let saved;const put=b.c.LocalRecovery.put;b.c.LocalRecovery.put=async(key,value)=>{if(key.startsWith('no-base:'))saved=value;return put(key,value);};
+  assert.equal(await b.s.publish('A',{autoMerge:'now'}),true);const cloud=b.s.dataFor((await b.s.read()).values);
+  assert.equal(cloud.pointsHistory.filter(r=>/^from-/.test(r.id)).map(r=>r.id).sort().join(),'from-a,from-b');assert.equal(cloud.students[0].points,15);
+  assert.equal(saved.replaced,'local-merged');assert.equal(saved.pointsHistory.some(r=>r.id==='from-b'),true);assert.equal(b.s.status('A'),'synced');});
+ await test('共同舊版本已被清理、這台多了雲端沒有的學生：不猜，交給老師',async()=>{const{a,b}=await mergePair();const token=(await b.s.read()).token;addPoints(a,'from-a',2);await a.s.publish();addPoints(b,'from-b',3);b.c.students.push({id:2,name:'虛構新生',points:0});b.save();a.db.data.delete(`users/teacher/classes/A/syncSnapshots/${token}/parts/0`);
   const error=await b.s.publish('A',{autoMerge:'now'}).catch(e=>e);assert.equal(error.code,'sync-conflict');assert.equal(error.mergeBlock,'no-base');});
+ await test('共同舊版本已被清理、雲端之後重新計分過：不合併，交給老師',async()=>{const{a,b}=await mergePair();const token=(await b.s.read()).token;addPoints(b,'from-b',3);
+  a.c.pointsHistory.unshift({id:Date.now()+5000,type:'reset',studentId:null,points:0});a.c.students[0].points=0;a.save();await a.s.publish();a.db.data.delete(`users/teacher/classes/A/syncSnapshots/${token}/parts/0`);
+  const error=await b.s.publish('A',{autoMerge:'now'}).catch(e=>e);assert.equal(error.mergeBlock,'no-base');});
  await test('共同舊版本已被清理、本機紀錄完整包含雲端：採用本機並留下雲端副本',async()=>{const{a,b}=await mergePair();const token=(await b.s.read()).token;a.c.students[0].name='雲端改名';a.save();await a.s.publish();addPoints(b,'from-b',3);a.db.data.delete(`users/teacher/classes/A/syncSnapshots/${token}/parts/0`);
   let saved;const put=b.c.LocalRecovery.put;b.c.LocalRecovery.put=async(key,value)=>{if(key.startsWith('no-base:'))saved=value;return put(key,value);};
   assert.equal(await b.s.publish('A',{autoMerge:'now'}),true);const cloud=b.s.dataFor((await b.s.read()).values);assert.equal(cloud.pointsHistory.some(r=>r.id==='from-b'),true);assert.equal(saved.replaced,'cloud');assert.equal(saved.students[0].name,'雲端改名');assert.equal(b.s.status('A'),'synced');});
