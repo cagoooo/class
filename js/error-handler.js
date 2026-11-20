@@ -209,6 +209,16 @@ const ErrorHandler = (function () {
             && /firebase-auth(?:-compat)?\.js/i.test(text);
     }
 
+    // 手機把網頁放到背景、記憶體不夠或要省電時，瀏覽器會把網頁裡的小資料庫（IndexedDB）
+    // 連線關掉。Firebase 登入套件下一次定時去讀登入狀態時就會丟出
+    // 「The database connection is closing」，之後會自己重新連線，登入狀態不受影響。
+    // 只在堆疊確認來自 Firebase 套件時排除；班級小管家自己的資料庫錯誤仍照常通報。
+    function isFirebaseIdbClosing(error, context = '') {
+        const text = `${error?.message || ''} ${context} ${error?.stack || ''}`;
+        return /database connection is closing/i.test(String(error?.message || ''))
+            && /gstatic\.com\/firebasejs\/|firebase-(?:auth|firestore|app)(?:-compat)?\.js/i.test(text);
+    }
+
     function promiseRejectionContext(error) {
         const stack = formatStack(error);
         const frame = stack.split('\n').slice(1).find(line =>
@@ -281,6 +291,13 @@ const ErrorHandler = (function () {
                 event.preventDefault();
                 if (config.logToConsole) {
                     console.warn('[ErrorHandler] Firestore 離線快取打不開，已改用記憶體快取');
+                }
+                return;
+            }
+            if (isFirebaseIdbClosing(reason, context)) {
+                event.preventDefault();
+                if (config.logToConsole) {
+                    console.warn('[ErrorHandler] 瀏覽器關閉了 Firebase 的本機資料庫連線，SDK 會自動重新連線');
                 }
                 return;
             }
@@ -426,6 +443,13 @@ const ErrorHandler = (function () {
             if (/^The client has already been terminated\.?$/i.test(String(errorObj?.message || '').trim())) {
                 if (config.logToConsole) {
                     console.warn(`[ErrorHandler] 忽略頁面暫存恢復後的 Firestore 已關閉訊息: ${errorObj.message}`);
+                }
+                return;
+            }
+
+            if (isFirebaseIdbClosing(errorObj, context)) {
+                if (config.logToConsole) {
+                    console.warn(`[ErrorHandler] 忽略瀏覽器關閉 Firebase 本機資料庫連線: ${errorObj.message}`);
                 }
                 return;
             }

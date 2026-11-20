@@ -94,6 +94,19 @@ assert.equal(context.ErrorHandler.getHistory().length, 1, '沒有 Auth SDK 來�
 context.ErrorHandler.clearHistory();
 console.log('PASS 缺少 Auth SDK 來源時仍保留錯誤');
 
+const idbClosing = vm.runInContext("new Error(\"Failed to execute 'transaction' on 'IDBDatabase': The database connection is closing.\")", context);
+idbClosing.stack = 'yn@https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js:1:81888';
+let idbClosingPrevented = false;
+listeners.get('unhandledrejection')({ reason: idbClosing, preventDefault() { idbClosingPrevented = true; } });
+assert.equal(idbClosingPrevented, true, 'Firebase 套件的本機資料庫連線關閉應被辨識');
+assert.equal(context.ErrorHandler.getHistory().length, 0, 'Firebase 套件的本機資料庫連線關閉不得送出錯誤 webhook');
+const appIdbClosing = vm.runInContext("new Error(\"Failed to execute 'transaction' on 'IDBDatabase': The database connection is closing.\")", context);
+appIdbClosing.stack = 'Error: closing\n    at save (https://cagoooo.github.io/class/js/class-db.js:10:2)';
+context.ErrorHandler.handle(appIdbClosing, 'STORAGE', 'ClassDB/save');
+assert.equal(context.ErrorHandler.getHistory().length, 1, '班級小管家自己的資料庫連線關閉仍應保留');
+context.ErrorHandler.clearHistory();
+console.log('PASS Firebase 套件的本機資料庫連線關閉不產生 webhook 錯誤');
+
 context.ErrorHandler.handle(new Error('真正的資料寫入失敗'), 'STORAGE', 'students/save');
 assert.equal(context.ErrorHandler.getHistory().length, 1, '真正錯誤仍應保留紀錄');
 console.log('PASS 真正資料錯誤仍保留紀錄');
