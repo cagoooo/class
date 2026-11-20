@@ -23,8 +23,8 @@
     <meta property="og:image:height" content="630">
     <meta property="og:locale" content="zh_TW">
 
-    <link rel="stylesheet" href="css/class-pets.css?v=3.69.1">
-    <link rel="stylesheet" href="css/pet-share-view.css?v=3.69.1">
+    <link rel="stylesheet" href="css/class-pets.css?v=3.69.2">
+    <link rel="stylesheet" href="css/pet-share-view.css?v=3.69.2">
 </head>
 
 <body>
@@ -46,9 +46,37 @@
     </footer>
 
     <noscript>這個頁面需要開啟 JavaScript 才能看到寵物。</noscript>
-    <script src="js/firebase-config.js?v=3.69.1"></script>
-    <script src="js/class-pets.js?v=3.69.1"></script>
-    <script src="js/pet-share-view.js?v=3.69.1"></script>
+    <!-- 🧩 舊手機相容：Android 舊版 Chrome（92 以前）缺少的新函式先補上，必須在所有 js/ 之前 -->
+    <!-- COMPAT-POLYFILL:START -->
+    <script>
+        (function () {
+            var define = function (target, name, fn) {
+                if (target && !target[name]) Object.defineProperty(target, name, { value: fn, configurable: true, writable: true });
+            };
+            define(Object, 'hasOwn', function (obj, key) {
+                if (obj == null) throw new TypeError('Cannot convert undefined or null to object');
+                return Object.prototype.hasOwnProperty.call(Object(obj), key);
+            });
+            var c = window.crypto;
+            if (c && c.getRandomValues) define(c, 'randomUUID', function () {
+                var b = c.getRandomValues(new Uint8Array(16)), h = '';
+                b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128;
+                for (var i = 0; i < 16; i++) h += (i === 4 || i === 6 || i === 8 || i === 10 ? '-' : '') + (b[i] + 256).toString(16).slice(1);
+                return h;
+            });
+            [window.Element, window.Document, window.DocumentFragment].forEach(function (C) {
+                if (C) define(C.prototype, 'replaceChildren', function () {
+                    while (this.lastChild) this.removeChild(this.lastChild);
+                    this.append.apply(this, arguments);
+                });
+            });
+        })();
+    </script>
+    <!-- COMPAT-POLYFILL:END -->
+
+    <script src="js/firebase-config.js?v=3.69.2"></script>
+    <script src="js/class-pets.js?v=3.69.2"></script>
+    <script src="js/pet-share-view.js?v=3.69.2"></script>
 </body>
 
 </html>

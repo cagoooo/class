@@ -190,7 +190,7 @@
     let spriteTimer = null;
     const spriteUrl = (k, m) => `${SPRITE_BASE}${k}-${m}.webp?v=${SPRITE_REV}`;
     function loadSprite(u, done, priority) {
-        if (done) (spriteWait[u] ||= []).push(done);
+        if (done) (spriteWait[u] = spriteWait[u] || []).push(done);
         if (spriteState[u]) return;
         spriteState[u] = 'loading';
         const img = new Image();

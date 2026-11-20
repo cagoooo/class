@@ -152,7 +152,7 @@
         let hasData = false;
         await Promise.all(Object.entries(mapping).map(async ([collection, key]) => {
             const snap = await root(c).collection(collection).get({ source: 'server' });
-            hasData ||= !snap.empty;
+            if (!snap.empty) hasData = true;
             values[key] = JSON.stringify(snap.docs.map(d => { const { updatedAt, ...item } = d.data(); return { id: d.id, ...item }; }));
         }));
         const settings = { 'appSettings/pets': 'petSettings', 'appSettings/seating': 'seatingConfig', 'examData/subjects': 'examSubjects', 'examData/reminders': 'examReminders', 'examData/attendance': 'examAttendance', 'examData/absenceRecords': 'examAbsenceRecords', 'examData/dayPresets': 'examDayPresets' };

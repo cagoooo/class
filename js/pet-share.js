@@ -122,7 +122,7 @@
         statusNode.textContent = notice; statusNode.hidden = !notice;
     }
     function flash(control, text) {
-        control.dataset.label ||= control.textContent;
+        if (!control.dataset.label) control.dataset.label = control.textContent;
         control.textContent = text;
         setTimeout(() => { if (control.textContent === text) control.textContent = control.dataset.label; }, 2000);
     }
@@ -274,7 +274,7 @@
     let qrLoading = null;
     function loadQr() {
         if (window.qrcode) return Promise.resolve(window.qrcode);
-        qrLoading ||= new Promise((resolve, reject) => {
+        qrLoading = qrLoading || new Promise((resolve, reject) => {
             const script = el('script'); script.src = QR_SCRIPT;
             script.onload = () => window.qrcode ? resolve(window.qrcode) : reject(new Error('qrcode unavailable'));
             script.onerror = () => { qrLoading = null; script.remove(); reject(new Error('qrcode load failed')); };

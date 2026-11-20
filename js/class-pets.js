@@ -749,7 +749,7 @@
     function saveQuestChange(mutator, action) {
         return change(() => {
             const config = clone(settings()), before = Object.keys(collectionFor()).length;
-            config.quests ||= []; config.collectionEggs ||= [];
+            if (!config.quests) config.quests = []; if (!config.collectionEggs) config.collectionEggs = [];
             if (!mutator(config)) return false;
             if (!SafeStorage.set(KEY, JSON.stringify(config), { context: '班級任務與收藏蛋', feature: 'pet', petAction: 'quest', classId: cid() })) return false;
             const after = Object.keys(collectionFor(window.students, window.pointsHistory, config)).length;
