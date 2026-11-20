@@ -345,7 +345,9 @@ function pruneLine(prune) {
     prune.failedParts && `${prune.failedParts} 個分段刪除失敗`,
   ].filter(Boolean);
   const mark = prune.status === 'ok' && !skippedClasses ? '✅' : '⚠️';
-  return `🧹 清理一週前舊快照 ${safeInteger(prune.removedSnapshots)} 份${notes.length ? `（${notes.join('；')}）` : ''} ${mark}`;
+  const days = safeInteger(prune.keepDays);
+  const span = !days || days === 7 ? '一週前' : days === 14 ? '兩週前' : `${days} 天前`;
+  return `🧹 清理${span}舊快照 ${safeInteger(prune.removedSnapshots)} 份${notes.length ? `（${notes.join('；')}）` : ''} ${mark}`;
 }
 
 function signed(value) {

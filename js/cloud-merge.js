@@ -11,6 +11,8 @@
 (function () {
     'use strict';
     const ADDITIVE = { students: 'points', groups: 'score' };
+    /** 經營白板的公告文字、字體、活動、抽籤設定：兩邊改得不同時保留本機，不擋整份合併。 */
+    const SCREEN_KEYS = ['boardNote', 'boardNoteStyle', 'boardActivity', 'boardLotteryCfg'];
 
     const blocked = path => Object.assign(Error('無法自動合併：' + path), { code: 'merge-blocked', path: path.split('.').slice(0, 2).join('.').slice(0, 60) });
     const same = (a, b) => a === b || JSON.stringify(a) === JSON.stringify(b);
@@ -116,6 +118,17 @@
                 const b = base[key] ?? null, l = local[key] ?? null, r = remote[key] ?? null;
                 if (deviceKeys.includes(key) || l === r || b === r) values[key] = l;
                 else if (b === l) values[key] = r;
+                else if (SCREEN_KEYS.includes(key)) {
+                    // 白板文字等「這台螢幕上顯示的東西」兩邊都改過：能合併就合併，合不了保留這台的，
+                    // 不能因為一段白板文字讓整班的加扣分都傳不上去（柏老師 11/12～11/20 卡了 9 天）。
+                    try {
+                        const merged = merge(key, parse(key, b), parse(key, l), parse(key, r));
+                        values[key] = merged === undefined ? null : JSON.stringify(merged);
+                    } catch (error) {
+                        if (error?.code !== 'merge-blocked') throw error;
+                        values[key] = l;
+                    }
+                }
                 else {
                     const merged = merge(key, parse(key, b), parse(key, l), parse(key, r));
                     values[key] = merged === undefined ? null : JSON.stringify(merged);

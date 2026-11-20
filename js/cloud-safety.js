@@ -363,7 +363,7 @@
             return true;
         } catch { return false; }
     }
-    /** 讀出老師上次同步時的共同版本。快照被清理（超過 7 天）或內容對不上時回傳 null。 */
+    /** 讀出老師上次同步時的共同版本。快照被清理（被取代超過 14 天）或內容對不上時回傳 null。 */
     async function snapshotValues(c, known) {
         const snap = await root(c).collection('syncSnapshots').doc(known.token).collection('parts').get({ source: 'server' });
         if (snap.empty) return null;
@@ -397,7 +397,7 @@
         } catch { return false; }
     }
     /**
-     * 共同舊版本已被清理（這台超過 7 天沒同步成功）：沒有基準就不能逐欄合併，但若其中一邊的紀錄完整包含另一邊，
+     * 共同舊版本已被清理（這台超過 14 天沒同步成功）：沒有基準就不能逐欄合併，但若其中一邊的紀錄完整包含另一邊，
      * 另一邊只是較舊的版本，採用較完整的一邊即可（2026-11-16 馮老師的教室電腦每次打開都卡在這裡，持續一個多月）。
      * 兩邊各自有對方沒有的紀錄、或紀錄完全相同只差在內容，仍然看不出誰對，交給老師。被取代的一邊先存進本機還原區。
      */

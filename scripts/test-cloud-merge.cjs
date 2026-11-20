@@ -67,7 +67,7 @@ test('舊資料同編號重複、沒有編號的紀錄都不會遺失', () => {
     assert.equal(out.pointsHistory.length, 5);
 });
 test('無法解析的內容：放棄合併而不是丟錯', () => {
-    assert.equal(mergeValues({ boardNote: 'a' }, { boardNote: 'b' }, { boardNote: 'c' }, ['boardNote']).ok, false);
+    assert.equal(mergeValues({ classAnnouncements: 'a' }, { classAnnouncements: 'b' }, { classAnnouncements: 'c' }, ['classAnnouncements']).ok, false);
 });
 // 2026-11-16：同一位學生的蛋在兩台各自孵化，抽到不同寵物
 const egg = (extra = {}) => ({ id: 1, points: 8, classPetRevealed: false, ...extra });
@@ -165,5 +165,19 @@ test('這台的加分讓蛋孵化了：沿用這台的寵物；抽籤紀錄也�
 test('這台沒有多出任何紀錄：不合併', () => {
     const base = cls([pr('s', T0, 1, 1)], people(), team());
     assert.equal(unionWithoutBase(base, base).ok, false);
+});
+test('白板文字兩邊都改過：保留這台的白板，加扣分照常合併（柏老師 11/12～11/20 實際情況）', () => {
+    const keys = ['boardNote', 'pointsHistory', 'students'];
+    const base = { boardNote: '舊公告', pointsHistory: '[{"id":"a","createdAtMs":1,"studentId":1,"points":1}]', students: '[{"id":1,"points":1}]' };
+    const local = { boardNote: '這台的公告', pointsHistory: '[{"id":"b","createdAtMs":3,"studentId":1,"points":2},{"id":"a","createdAtMs":1,"studentId":1,"points":1}]', students: '[{"id":1,"points":3}]' };
+    const remote = { boardNote: '秩序不佳', pointsHistory: base.pointsHistory, students: base.students };
+    const result = mergeValues(base, local, remote, keys);
+    assert.equal(result.ok, true);
+    assert.equal(result.values.boardNote, '這台的公告');
+    assert.equal(JSON.parse(result.values.students)[0].points, 3);
+    const style = mergeValues({ boardNoteStyle: '{"size":1,"color":"a"}' }, { boardNoteStyle: '{"size":2,"color":"a"}' }, { boardNoteStyle: '{"size":1,"color":"b"}' }, ['boardNoteStyle']);
+    assert.deepEqual(JSON.parse(style.values.boardNoteStyle), { size: 2, color: 'b' }, '能合併的白板設定照常合併');
+    const clash = mergeValues({ boardNoteStyle: '{"size":1}' }, { boardNoteStyle: '{"size":2}' }, { boardNoteStyle: '{"size":3}' }, ['boardNoteStyle']);
+    assert.equal(clash.values.boardNoteStyle, '{"size":2}', '合不了就保留這台的');
 });
 console.log(`${passed} cloud-merge checks passed`);

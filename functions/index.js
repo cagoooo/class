@@ -939,7 +939,7 @@ const SNAPSHOT_PRUNE_STATUS_PATH = { col: '_systemStatus', doc: 'lastSnapshotPru
 const MAX_PRUNE_PARTS_PER_RUN = 5000;
 
 /**
- * 🧹 同步快照定期清理 (pruneSyncSnapshots)：每天 05:30（台北）刪掉「被新版取代超過一週」的舊快照。
+ * 🧹 同步快照定期清理 (pruneSyncSnapshots)：每天 05:30（台北）刪掉「被新版取代超過兩週」的舊快照。
  *
  * 每次上傳都會多一份完整快照、舊的從不刪，資料庫與每日備份因此天天長大
  * （2026-09-22 備份 9.5 MB → 10-07 155 MB）。保留規則見 snapshot-prune.js：

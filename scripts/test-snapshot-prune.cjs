@@ -1,4 +1,4 @@
-// 同步快照定期清理：最新與上一版本絕不刪、一週內曾是最新的都留、資料不完整整班跳過。
+// 同步快照定期清理：最新與上一版本絕不刪、兩週內曾是最新的都留、資料不完整整班跳過。
 const assert = require('node:assert/strict');
 const { KEEP_DAYS, KEEP_MS, groupSnapshotParts, planClassPrune } = require('../functions/snapshot-prune');
 const { pruneLine, buildDigestPayload, summarizeEvents } = require('../functions/digest-summary');
@@ -12,9 +12,9 @@ const plan = (snapshots, head) => planClassPrune({ snapshots, head, nowMs: NOW }
 let passed = 0;
 function test(name, fn) { fn(); passed++; console.log('PASS', name); }
 
-test('保留天數是一週', () => {
-  assert.equal(KEEP_DAYS, 7);
-  assert.equal(KEEP_MS, 7 * DAY);
+test('保留天數是兩週（久沒開的電腦還能逐筆合併）', () => {
+  assert.equal(KEEP_DAYS, 14);
+  assert.equal(KEEP_MS, 14 * DAY);
 });
 
 test('目前版本再舊也不刪（老師很久沒上傳）', () => {
@@ -35,21 +35,21 @@ test('用「被取代的時間」判斷，不是建立時間', () => {
   assert.deepEqual(r.remove, []);
 });
 
-test('一週前被取代的刪、一週內被取代的留', () => {
-  const r = plan([snap('a', 12), snap('b', 9), snap('c', 6), snap('d', 2), snap('e', 1)], { token: 'e', previous: 'd', count: 1 });
-  // a 被 b（9 天前）取代 → 刪；b 被 c（6 天前）取代 → 留；c 被 d 取代 → 留
+test('兩週前被取代的刪、兩週內被取代的留', () => {
+  const r = plan([snap('a', 25), snap('b', 18), snap('c', 13), snap('d', 2), snap('e', 1)], { token: 'e', previous: 'd', count: 1 });
+  // a 被 b（18 天前）取代 → 刪；b 被 c（13 天前）取代 → 留；c 被 d 取代 → 留
   assert.deepEqual(r.remove, ['a']);
   assert.deepEqual(r.keep, ['b', 'c', 'd', 'e']);
 });
 
-test('比目前版本新、但上傳失敗沒成為最新的：一週後才清', () => {
-  const r = plan([snap('a', 20), snap('old-fail', 10), snap('new-fail', 2)].concat([]), { token: 'a', previous: null, count: 1 });
+test('比目前版本新、但上傳失敗沒成為最新的：兩週後才清', () => {
+  const r = plan([snap('a', 30), snap('old-fail', 20), snap('new-fail', 2)].concat([]), { token: 'a', previous: null, count: 1 });
   assert.deepEqual(r.remove, ['old-fail']);
   assert.deepEqual(r.keep, ['a', 'new-fail']);
 });
 
 test('同一時間建立、排在目前版本之後的也能判斷', () => {
-  const r = plan([snap('z', 10), snap('a', 10)], { token: 'a', previous: null, count: 1 });
+  const r = plan([snap('z', 20), snap('a', 20)], { token: 'a', previous: null, count: 1 });
   assert.deepEqual(r.remove, ['z']);
 });
 
