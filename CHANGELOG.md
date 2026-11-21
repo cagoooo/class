@@ -1,3 +1,10 @@
+## 2026-11-21 沒有網頁音效功能的瀏覽器點一下不再出錯 v3.69.7
+
+- 錯誤通知：iPhone 上「undefined is not a constructor (evaluating 'new (window.AudioContext || window.webkitAudioContext)()')」。有些瀏覽器沒有網頁音效功能（例如部分 App 內建瀏覽器、iPhone 鎖定模式），第一次點畫面準備音效時就出錯。
+- 改成沒有音效功能就靜音跳過，加扣分、抽籤、計時器等照常使用，只是不出聲。
+- 安靜挑戰在開麥克風之前先確認能分析聲音，不行就直接說明原因並建議改用 Safari、Chrome 或 Edge，不會先開麥克風再失敗。
+- 新增測試：沒有音效功能時不得出錯、每個播放音效的函式都先檢查。
+
 ## 2026-11-21 iPhone 的 App 內建瀏覽器注入程式出錯時不再誤報 v3.69.6
 
 - 錯誤通知：iPhone 匿名訪客出現「undefined is not an object (evaluating 'window.webkit.messageHandlers')」，位置是網頁第 1 行。這是 LINE、臉書等 App 內建瀏覽器自己塞進網頁的程式出錯：班級小管家沒有用到 window.webkit.messageHandlers，而每個頁面第 1 行都是 <!DOCTYPE html>，不可能有自己的程式。

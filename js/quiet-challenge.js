@@ -800,9 +800,14 @@
             setMsg('這個瀏覽器不能使用麥克風。請改用 Chrome 或 Edge，並確認網址是 https 開頭。');
             return;
         }
+        // 沒有網頁音效功能（App 內建瀏覽器、iPhone 鎖定模式）就量不到音量：開麥克風前先說清楚，不要開了又失敗
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (typeof Ctx !== 'function') {
+            setMsg('這個瀏覽器無法分析聲音（可能是 App 內建瀏覽器或 iPhone 鎖定模式）。請改用 Safari、Chrome 或 Edge 開啟。');
+            return;
+        }
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
-            const Ctx = window.AudioContext || window.webkitAudioContext;
             const ctx = new Ctx();
             if (ctx.state === 'suspended') { try { await ctx.resume(); } catch (e) { /* 部分瀏覽器要等下次點擊 */ } }
             if (ctx.state === 'suspended') document.addEventListener('pointerdown', () => { try { ctx.resume(); } catch (e) { /* ignore */ } }, { once: true });

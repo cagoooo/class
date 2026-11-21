@@ -67,4 +67,25 @@ assert.equal(modern.FakeObject.hasOwn(), 'native', '瀏覽器已有的函式不�
 assert.equal(modern.window.crypto.randomUUID(), 'native');
 assert.equal(new modern.Element().replaceChildren(), 'native');
 
-console.log('✅ 舊手機相容：沒有 ||= 類語法、補丁位置與功能正確');
+// 5. 沒有網頁音效功能（iPhone App 內建瀏覽器、鎖定模式）：第一次點擊不能出錯，之後的音效靜音（2026-11-21 實際發生）
+{
+    const html = fs.readFileSync('classnew.html', 'utf8');
+    const m = html.match(/function initAudioContext\(\) \{[\s\S]*?\n {8}\}/);
+    assert.ok(m, '找不到 initAudioContext');
+    for (const win of [{}, { AudioContext: undefined, webkitAudioContext: undefined }, { AudioContext: function () { throw new Error('blocked'); } }]) {
+        const ctx = { window: win, audioContext: null };
+        vm.runInNewContext(`let audioContext = null; ${m[0]}; initAudioContext(); this.result = audioContext;`, ctx);
+        assert.equal(ctx.result, null, '沒有音效功能時 initAudioContext 不得丟錯、audioContext 維持 null');
+    }
+    const ok = { window: { AudioContext: function () { this.ok = true; } } };
+    vm.runInNewContext(`let audioContext = null; ${m[0]}; initAudioContext(); this.result = audioContext;`, ok);
+    assert.equal(ok.result.ok, true, '有音效功能時照常建立');
+    for (const fn of ['playTimerEndSound', 'playLotteryTickSound', 'playLotteryWinSound', 'playCheerSound', 'playAddScoreSound', 'playSubtractScoreSound']) {
+        assert.match(html, new RegExp(`function ${fn}\\(\\) \\{\\s*if \\(!audioContext\\) return;`), `${fn} 要先檢查 audioContext`);
+    }
+    const quiet = fs.readFileSync('js/quiet-challenge.js', 'utf8');
+    const check = quiet.indexOf("if (typeof Ctx !== 'function')"), mic = quiet.indexOf('getUserMedia({ audio');
+    assert.ok(check > 0 && check < mic, '安靜挑戰要在開麥克風之前先確認有音效功能');
+}
+
+console.log('✅ 舊手機相容：沒有 ||= 類語法、補丁位置與功能正確、沒有音效功能也不出錯');
