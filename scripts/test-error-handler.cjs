@@ -143,6 +143,34 @@ console.log('8 error-handler checks passed');
     });
     assert.equal(ctx.ErrorHandler.getHistory().length, before, '內建瀏覽器或擴充功能注入的錯誤不得寫入錯誤紀錄');
 
+    // 2026-11-21 iPhone App 內建瀏覽器（WKWebView）注入的腳本：錯誤記在網頁第 1 行
+    ls.get('error')({
+        message: "undefined is not an object (evaluating 'window.webkit.messageHandlers')",
+        filename: 'https://cagoooo.github.io/class/classnew.html#students',
+        lineno: 1,
+        colno: 1142,
+        error: null,
+    });
+    ls.get('error')({
+        message: 'TypeError: something injected',
+        filename: 'https://cagoooo.github.io/class/pets.html?c=abc',
+        lineno: 1,
+        colno: 20,
+        error: null,
+    });
+    assert.equal(ctx.ErrorHandler.getHistory().length, before, 'iPhone 內建瀏覽器注入在網頁第 1 行的錯誤不得寫入錯誤紀錄');
+
+    ls.get('error')({
+        message: 'Uncaught TypeError: inline boom',
+        filename: 'https://cagoooo.github.io/class/classnew.html',
+        lineno: 120,
+        colno: 5,
+        error: null,
+    });
+    assert.equal(ctx.ErrorHandler.getHistory().length, before + 1, '頁面裡自己的內嵌程式出錯仍要記錄');
+    ctx.ErrorHandler.clearHistory();
+    const afterInline = ctx.ErrorHandler.getHistory().length;
+
     ls.get('error')({
         message: 'Uncaught TypeError: boom',
         filename: 'https://cagoooo.github.io/class/js/points.js',
@@ -150,8 +178,8 @@ console.log('8 error-handler checks passed');
         colno: 2,
         error: null,
     });
-    assert.equal(ctx.ErrorHandler.getHistory().length, before + 1, '班級小管家自己的錯誤仍要記錄');
-    console.log('PASS 臉書內建瀏覽器注入腳本的錯誤不推播，自己的錯誤照常記錄');
+    assert.equal(ctx.ErrorHandler.getHistory().length, afterInline + 1, '班級小管家自己的錯誤仍要記錄');
+    console.log('PASS 臉書／iPhone 內建瀏覽器注入腳本的錯誤不推播，自己的錯誤照常記錄');
 }
 
 {

@@ -1,3 +1,8 @@
+## 2026-11-21 iPhone 的 App 內建瀏覽器注入程式出錯時不再誤報 v3.69.6
+
+- 錯誤通知：iPhone 匿名訪客出現「undefined is not an object (evaluating 'window.webkit.messageHandlers')」，位置是網頁第 1 行。這是 LINE、臉書等 App 內建瀏覽器自己塞進網頁的程式出錯：班級小管家沒有用到 window.webkit.messageHandlers，而每個頁面第 1 行都是 <!DOCTYPE html>，不可能有自己的程式。
+- 錯誤通報改為排除「網頁本身第 1 行」與提到 window.webkit.messageHandlers 的錯誤；頁面裡自己的程式出錯仍照常通報，並新增測試。
+
 ## 2026-11-20 白板文字不再卡住整班同步、舊版本保留兩週 v3.69.5
 
 - 查到一台教室電腦從 11/12 起每天早上都撞同步衝突，9 天來的寵物獎勵都傳不上去：原因是白板公告文字兩台都改過，白板是一整段文字沒辦法逐字合併，就把整班的同步都擋下來。

@@ -343,10 +343,16 @@ const ErrorHandler = (function () {
             // （例如 iabjs://navigation_performance_logger_android），
             // 這些腳本自己出錯（像「Java object is gone」）跟班級小管家無關，
             // 也修不到，就不送警報；瀏覽器擴充功能的腳本同理。
+            // iPhone 的 App 內建瀏覽器（LINE、臉書等用的 WKWebView）以 evaluateJavaScript 注入腳本，
+            // 出錯時會記在「網頁本身的第 1 行」；我們每個頁面第 1 行都是 <!DOCTYPE html>，不可能是自己的程式。
+            // 它們常呼叫 window.webkit.messageHandlers（班級小管家從沒用過），在一般 Safari 裡不存在就丟錯。
             const filename = String(event.filename || '');
+            const pagePath = filename.split('#')[0].split('?')[0];
+            const isPageLineOne = Number(event.lineno) === 1 && /^https?:\/\/[^/]+\/.*(\.html?|\/)$/i.test(pagePath);
             const isInjectedScriptError =
                 (/^[a-z][a-z0-9+.-]*:\/\//i.test(filename) && !/^https?:\/\//i.test(filename)) ||
-                /Java object is gone/i.test(String(event.message || ''));
+                /Java object is gone|window\.webkit\.messageHandlers/i.test(String(event.message || '')) ||
+                isPageLineOne;
 
             if (isInjectedScriptError) {
                 if (config.logToConsole) {
