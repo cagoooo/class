@@ -107,6 +107,18 @@ assert.equal(context.ErrorHandler.getHistory().length, 1, '班級小管家自己
 context.ErrorHandler.clearHistory();
 console.log('PASS Firebase 套件的本機資料庫連線關閉不產生 webhook 錯誤');
 
+// 2026-11-21 iPhone App 內建瀏覽器自己加樣式表逾時：沒有任何檔案位置
+let injectedPrevented = false;
+listeners.get('unhandledrejection')({ reason: 'Stylesheet append timeout', preventDefault() { injectedPrevented = true; } });
+assert.equal(injectedPrevented, true, '內建瀏覽器的樣式載入逾時應被辨識');
+assert.equal(context.ErrorHandler.getHistory().length, 0, '內建瀏覽器的樣式載入逾時不得送出錯誤 webhook');
+const ownTimeout = vm.runInContext("new Error('Stylesheet append timeout')", context);
+ownTimeout.stack = 'Error: Stylesheet append timeout\n    at load (https://cagoooo.github.io/class/js/theme.js:3:1)';
+listeners.get('unhandledrejection')({ reason: ownTimeout, preventDefault() {} });
+assert.equal(context.ErrorHandler.getHistory().length, 1, '本站程式自己丟出同樣訊息時仍要通報');
+context.ErrorHandler.clearHistory();
+console.log('PASS App 內建瀏覽器的樣式載入逾時不產生 webhook 錯誤，本站程式的照常通報');
+
 context.ErrorHandler.handle(new Error('真正的資料寫入失敗'), 'STORAGE', 'students/save');
 assert.equal(context.ErrorHandler.getHistory().length, 1, '真正錯誤仍應保留紀錄');
 console.log('PASS 真正資料錯誤仍保留紀錄');

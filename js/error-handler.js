@@ -219,6 +219,16 @@ const ErrorHandler = (function () {
             && /gstatic\.com\/firebasejs\/|firebase-(?:auth|firestore|app)(?:-compat)?\.js/i.test(text);
     }
 
+    // iPhone 的 App 內建瀏覽器（WKWebView）在網頁裡加自己的樣式表，等太久就丟出
+    // 「Stylesheet append timeout」（2026-11-21 匿名訪客，同一台手機早上也有 webkit.messageHandlers 錯誤）。
+    // 班級小管家與 Firebase 都沒有這段文字，錯誤也沒有任何檔案位置；只有在位置不是本站程式時才排除。
+    const INJECTED_REJECTION_MESSAGES = [/^Stylesheet append timeout$/i];
+    function isInjectedRejection(error, context = '') {
+        const message = String(error?.message || '').trim();
+        return INJECTED_REJECTION_MESSAGES.some(pattern => pattern.test(message))
+            && !/cagoooo\.github\.io\/class\//i.test(`${context} ${error?.stack || ''}`);
+    }
+
     function promiseRejectionContext(error) {
         const stack = formatStack(error);
         const frame = stack.split('\n').slice(1).find(line =>
@@ -273,6 +283,13 @@ const ErrorHandler = (function () {
                 ? event.reason
                 : new Error(String(event.reason || '未提供 Promise rejection 原因'));
             const context = promiseRejectionContext(reason);
+            if (isInjectedRejection(reason, context)) {
+                event.preventDefault();
+                if (config.logToConsole) {
+                    console.warn('[ErrorHandler] 忽略 App 內建瀏覽器自己的樣式載入逾時：' + reason.message);
+                }
+                return;
+            }
             if (isServiceWorkerUpdateError(reason, context)) {
                 event.preventDefault();
                 if (config.logToConsole) {

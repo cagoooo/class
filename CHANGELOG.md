@@ -1,3 +1,8 @@
+## 2026-11-21 iPhone App 內建瀏覽器的樣式載入逾時不再誤報 v3.69.8
+
+- 錯誤通知：iPhone 匿名訪客出現「Stylesheet append timeout」（未處理的 Promise 錯誤，沒有任何檔案位置）。班級小管家與 Firebase 都沒有這段文字，是 App 內建瀏覽器在網頁裡加自己的樣式表等太久；同一台手機早上也出現過內建瀏覽器的 window.webkit.messageHandlers 錯誤。
+- 這個訊息在錯誤位置不是本站程式時不再通報；本站程式自己丟出同樣的訊息仍照常通報，並新增測試。
+
 ## 2026-11-21 沒有網頁音效功能的瀏覽器點一下不再出錯 v3.69.7
 
 - 錯誤通知：iPhone 上「undefined is not a constructor (evaluating 'new (window.AudioContext || window.webkitAudioContext)()')」。有些瀏覽器沒有網頁音效功能（例如部分 App 內建瀏覽器、iPhone 鎖定模式），第一次點畫面準備音效時就出錯。
