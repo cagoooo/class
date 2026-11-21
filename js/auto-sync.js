@@ -7,12 +7,12 @@
  * - 從背景切回前台時，若距上次同步超過間隔則立即同步
  * - 同步中顯示導覽列旋轉圖示，完成後顯示成功 Toast（靜默版，不彈大型通知）
  * - 未登入 / 離線 / 已在同步中：自動跳過，不報錯
- * - 可透過設定頁調整間隔（儲存至 ClassDB/localStorage）
+ * - 可透過設定頁調整間隔（儲存至 localStorage）
  *
  * 依賴：
  * - window.FirebaseSync.syncToCloud()   — firebase-sync.js
  * - window.FirebaseConfig.isConnected() — firebase-config.js
- * - ClassDB（可選，v2.9.9 IDB 模組）
+ * （v3.69.9 起已停用 ClassDB，不再依賴）
  *
  * 全域 API：
  *   AutoSync.start()    — 啟動定時器

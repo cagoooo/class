@@ -1,3 +1,9 @@
+## 2026-11-22 停用沒人讀取的舊儲存模組 ClassDB v3.69.9
+
+- 錯誤通知：iPhone 上「Failed to execute 'transaction' on 'IDBDatabase': One of the specified object stores was not found」（class-db.js）。ClassDB 是 v2.9.9 加入、原本要取代 localStorage 的模組，但始終沒有程式讀取它的資料；每台裝置第一次開啟只是把資料再複製一份到瀏覽器資料庫，這次在 iPhone 上找不到資料表又沒有接住錯誤。
+- 新版頁面不再載入它；檔案改成說明用的空殼，還沒更新的舊頁面載入到也不會再開資料庫。班級資料一直存在 localStorage 與雲端，完全不受影響；舊裝置上已複製的資料不主動刪除。
+- 新增測試：頁面不得再載入 class-db.js，空殼不得開資料庫。
+
 ## 2026-11-21 iPhone App 內建瀏覽器的樣式載入逾時不再誤報 v3.69.8
 
 - 錯誤通知：iPhone 匿名訪客出現「Stylesheet append timeout」（未處理的 Promise 錯誤，沒有任何檔案位置）。班級小管家與 Firebase 都沒有這段文字，是 App 內建瀏覽器在網頁裡加自己的樣式表等太久；同一台手機早上也出現過內建瀏覽器的 window.webkit.messageHandlers 錯誤。

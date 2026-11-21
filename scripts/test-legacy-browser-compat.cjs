@@ -88,4 +88,14 @@ assert.equal(new modern.Element().replaceChildren(), 'native');
     assert.ok(check > 0 && check < mic, '安靜挑戰要在開麥克風之前先確認有音效功能');
 }
 
+// 6. 停用的 ClassDB：新版頁面不載入，舊頁面載入到的空殼也不能開資料庫（2026-11-22 iPhone 找不到資料表）
+{
+    for (const f of ['classnew.html', 'pets.html', 'index.html']) {
+        assert.ok(!fs.readFileSync(f, 'utf8').includes('js/class-db.js'), `${f} 不得再載入已停用的 class-db.js`);
+    }
+    const stub = fs.readFileSync('js/class-db.js', 'utf8');
+    assert.ok(!/indexedDB|\bClassDB\s*=|function\s/.test(stub), 'class-db.js 只能是說明用的空殼');
+    vm.runInNewContext(stub, {});
+}
+
 console.log('✅ 舊手機相容：沒有 ||= 類語法、補丁位置與功能正確、沒有音效功能也不出錯');
