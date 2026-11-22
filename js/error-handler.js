@@ -279,6 +279,16 @@ const ErrorHandler = (function () {
     function setupGlobalErrorHandlers() {
         // 捕獲未處理的 Promise 錯誤
         window.addEventListener('unhandledrejection', (event) => {
+            // 沒帶任何原因的拒絕（undefined／null）：沒有訊息、沒有檔案位置，無從追查，多半是瀏覽器或外掛自己的程式。
+            // 原本會包成「未提供 Promise rejection 原因」推一張 Google Chat 錯誤卡（2026-11-22 12:14 iPhone Safari）。
+            // 帶了任何內容（錯誤物件、文字）照常通報。
+            if (event.reason === undefined || event.reason === null) {
+                event.preventDefault();
+                if (config.logToConsole) {
+                    console.warn('[ErrorHandler] 忽略沒有附帶原因的 Promise 拒絕');
+                }
+                return;
+            }
             const reason = event.reason instanceof Error
                 ? event.reason
                 : new Error(String(event.reason || '未提供 Promise rejection 原因'));

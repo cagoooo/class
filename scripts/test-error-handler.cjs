@@ -119,6 +119,18 @@ assert.equal(context.ErrorHandler.getHistory().length, 1, '本站程式自己丟
 context.ErrorHandler.clearHistory();
 console.log('PASS App 內建瀏覽器的樣式載入逾時不產生 webhook 錯誤，本站程式的照常通報');
 
+// 2026-11-22 iPhone Safari：Promise 被拒絕卻沒帶原因（undefined），無從追查，不送 webhook
+for (const empty of [undefined, null]) {
+    let emptyPrevented = false;
+    listeners.get('unhandledrejection')({ reason: empty, preventDefault() { emptyPrevented = true; } });
+    assert.equal(emptyPrevented, true, `沒帶原因（${empty}）的拒絕應被辨識`);
+    assert.equal(context.ErrorHandler.getHistory().length, 0, `沒帶原因（${empty}）的拒絕不得送出錯誤 webhook`);
+}
+listeners.get('unhandledrejection')({ reason: '儲存學生資料失敗', preventDefault() {} });
+assert.equal(context.ErrorHandler.getHistory().length, 1, '帶了文字原因的拒絕仍要通報');
+context.ErrorHandler.clearHistory();
+console.log('PASS 沒帶原因的 Promise 拒絕不產生 webhook 錯誤，帶原因的照常通報');
+
 context.ErrorHandler.handle(new Error('真正的資料寫入失敗'), 'STORAGE', 'students/save');
 assert.equal(context.ErrorHandler.getHistory().length, 1, '真正錯誤仍應保留紀錄');
 console.log('PASS 真正資料錯誤仍保留紀錄');
