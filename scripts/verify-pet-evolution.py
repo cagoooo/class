@@ -17,7 +17,7 @@ for kind, regions in palettes.items():
 heights = {}
 for kind in KINDS:
     heights[kind] = []
-    for stage in ['baby','junior','grown']:
+    for stage in ['baby','junior','grown','glory']:
         for mood in ['normal','happy','sleepy','wave','curious']:
             path = ROOT/'assets/pets/rendered'/f'{kind}-{stage}-{mood}.webp'
             with Image.open(path) as image:
@@ -29,8 +29,11 @@ for kind in KINDS:
                     errors.append(f'{path.name}: clipped/empty {bounds}')
                 if mood == 'normal' and bounds:
                     heights[kind].append(bounds[3]-bounds[1])
-    if len(heights[kind]) != 3 or heights[kind][1] < heights[kind][0]*1.12 or heights[kind][2] < heights[kind][1]*1.12:
+    if len(heights[kind]) != 4 or heights[kind][1] < heights[kind][0]*1.12 or heights[kind][2] < heights[kind][1]*1.12:
         errors.append(f'{kind}: stages need visible height growth {heights[kind]}')
+    # 閃耀期身形與成熟期相同，只多了皇冠：輪廓不會變矮，最多高出一頂皇冠（約 15%）；長耳朵、鹿角、獨角比皇冠高時幾乎不變
+    elif not (heights[kind][2] <= heights[kind][3] <= heights[kind][2]*1.18):
+        errors.append(f'{kind}: glory should add a crown without growing {heights[kind]}')
 if errors:
     raise SystemExit('\n'.join(errors))
-print('PASS 450 transparent renders: dimensions, no clipping; 30 species have >12% silhouette height growth at both evolutions and distinct body-region palettes')
+print('PASS 600 transparent renders: dimensions, no clipping; 30 species grow >12% at both evolutions, glory adds a crown without growing, distinct body-region palettes')

@@ -32,7 +32,7 @@ async def main():
                 if args.refined:
                     source=source.replace('def build(kind,stage,mood):','def base_build(kind,stage,mood):')+'\n'+(root/'art/pets/evolve-pets.py').read_text(encoding='utf-8-sig')+'\n'+(root/'art/pets/color-pets.py').read_text(encoding='utf-8-sig')+'\n'+(root/'art/pets/refine-pets.py').read_text(encoding='utf-8-sig')
                 kinds=['cat','dog','rabbit','panda','fox','bear','penguin','owl','turtle','dragon','capybara','axolotl','lion','tiger','elephant','giraffe','zebra','monkey','koala','redpanda','raccoon','otter','hedgehog','squirrel','sheep','pig','frog','seal','deer','unicorn']
-                jobs=[(k,stage,mood) for k in kinds for stage in ['baby','junior','grown'] for mood in (['normal','happy','sleepy','wave','curious'] if args.refined else ['normal','happy','sleepy'])]
+                jobs=[(k,stage,mood) for k in kinds for stage in ['baby','junior','grown','glory'] for mood in (['normal','happy','sleepy','wave','curious'] if args.refined else ['normal','happy','sleepy'])]
                 if not args.refined: jobs += [('mystery','egg',stage) for stage in ['rest','crack','splitting','hatching']]
                 if args.kinds: jobs=[job for job in jobs if job[0] in args.kinds.split(',')]
                 if args.moods: jobs=[job for job in jobs if job[2] in args.moods.split(',')]

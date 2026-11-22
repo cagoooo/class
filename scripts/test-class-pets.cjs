@@ -103,7 +103,7 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
         await pet.award([1],10,'努力'); assert.equal(pet.xpFor(1),40); await pet.undo([ctx.pointsHistory[0].id]); assert.equal(pet.xpFor(1),30);
     });
     await test('造型依既有等級分段，門檻前後不改變分數與成長算法',async()=>{
-        const {pet}=setup(); for(const [xp,id] of [[0,'egg'],[9,'egg'],[10,'baby'],[49,'baby'],[50,'junior'],[89,'junior'],[90,'grown'],[1000,'grown']]) assert.equal(pet.appearance(xp).id,id);
+        const {pet}=setup(); for(const [xp,id] of [[0,'egg'],[9,'egg'],[10,'baby'],[49,'baby'],[50,'junior'],[89,'junior'],[90,'grown'],[149,'grown'],[150,'glory'],[1000,'glory']]) assert.equal(pet.appearance(xp).id,id);
     });
     await test('跨多級只產生一次里程碑，扣分、撤銷與同級不觸發',async()=>{
         const {pet}=setup();assert.equal(pet.milestone(9,10).type,'hatch');assert.equal(pet.milestone(0,90).level,5);assert.equal(pet.milestone(10,90).type,'level');for(const pair of [[10,11],[30,10],[0,0]])assert.equal(pet.milestone(...pair),null);
@@ -251,13 +251,13 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
         const {pet,ctx}=setup(); await pet.award([1],10,'孵化');
         const kind=ctx.students[0].classPet;
         assert.equal(pet.collectionFor()[kind].maxLevel,1);
-        assert.equal(JSON.stringify(pet.collectionStagesFor(kind).map(v=>v.unlocked)),JSON.stringify([true,false,false]));
+        assert.equal(JSON.stringify(pet.collectionStagesFor(kind).map(v=>v.unlocked)),JSON.stringify([true,false,false,false]));
         await pet.award([1],40,'成長');
         assert.equal(pet.collectionFor()[kind].maxLevel,3);
-        assert.equal(JSON.stringify(pet.collectionStagesFor(kind).map(v=>v.unlocked)),JSON.stringify([true,true,false]));
+        assert.equal(JSON.stringify(pet.collectionStagesFor(kind).map(v=>v.unlocked)),JSON.stringify([true,true,false,false]));
         await pet.award([1],40,'成熟');
         assert.equal(pet.collectionFor()[kind].maxLevel,5);
-        assert.equal(JSON.stringify(pet.collectionStagesFor(kind).map(v=>v.unlocked)),JSON.stringify([true,true,true]));
+        assert.equal(JSON.stringify(pet.collectionStagesFor(kind).map(v=>v.unlocked)),JSON.stringify([true,true,true,false]));
     });
     await test('進化階段解鎖紀錄不因扣分或學生離班消失',async()=>{
         const {pet,ctx,persist}=setup(); await pet.award([1],50,'成長');
@@ -344,7 +344,7 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
         await pet.createQuest({name:'合作',target:1},'q');await pet.contributeQuest('q');await pet.claimQuest('q');
         assert.equal(await pet.hatchCollectionEgg('q'),true);assert.equal(await pet.hatchCollectionEgg('q'),false);
         assert.equal(pet.settings().collectionEggs[0].kind,'cat');
-        assert.equal(JSON.stringify(pet.collectionStagesFor('cat').map(v=>v.unlocked)),JSON.stringify([true,false,false]));
+        assert.equal(JSON.stringify(pet.collectionStagesFor('cat').map(v=>v.unlocked)),JSON.stringify([true,false,false,false]));
         vm.runInContext(fs.readFileSync('js/class-pets.js','utf8'),ctx);ctx.ClassPets.prepare();
         assert.equal(await ctx.ClassPets.hatchCollectionEgg('q'),false);
         assert.equal(ctx.ClassPets.settings().collectionEggs[0].kind,'cat');
@@ -408,6 +408,7 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name);}
         assert.equal(pet.assetName('cat',50,'wave'),'cat-junior-wave.webp');
         assert.equal(pet.assetName('cat',89,'curious'),'cat-junior-normal.webp');
         assert.equal(pet.assetName('cat',90,'curious'),'cat-grown-curious.webp');
+        assert.equal(pet.assetName('cat',150,'curious'),'cat-glory-curious.webp');assert.equal(pet.assetName('cat',149,'wave'),'cat-grown-wave.webp');assert.equal(pet.appearance(150).label,'閃耀');
     });
     await test('每一級都有獎勵：稱號、配件、星星、光環，Lv.5 以後仍持續',async()=>{
         const {pet,storage}=setup();const before=[...storage.data];

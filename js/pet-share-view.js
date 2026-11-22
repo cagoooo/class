@@ -225,7 +225,7 @@
             if (entry) {
                 const box = el('div', undefined, 'pet-avatar');
                 // 只展示全班已經達成過的最高造型。
-                box.append(P.interactivePortrait(kind, entry.maxLevel >= 5 ? 90 : entry.maxLevel >= 3 ? 50 : 10));
+                box.append(P.interactivePortrait(kind, entry.maxLevel >= 8 ? 150 : entry.maxLevel >= 5 ? 90 : entry.maxLevel >= 3 ? 50 : 10));
                 tile.append(number, box, el('strong', P.pets[kind][1]));
             } else tile.append(number, el('div', '？', 'psv-unknown'), el('strong', '未發現'));
             grid.append(tile);

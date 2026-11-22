@@ -2,6 +2,9 @@
 # The MCP client prepends build-pets.py with its build function renamed base_build.
 
 def build(kind, stage, mood):
+    # 閃耀期（glory）的身體、配色、勳章都沿用成熟期，只在 evolve_pet 加皇冠與星光。
+    glory = stage == 'glory'
+    if glory: stage = 'grown'
     scene = base_build(kind, stage, mood if mood in ['normal','happy','sleepy'] else 'normal')
     scene.render.resolution_x = 480
     scene.render.resolution_y = 540
@@ -86,7 +89,7 @@ def build(kind, stage, mood):
                 arm.location.z=1.47;arm.rotation_euler[1]=-.95
                 ball('GreetingPaw',(.63,-.20,1.62),(.09,.035,.105),pink)
         line('WaveTrail',[(.86,-.1,1.49),(.98,-.1,1.64),(.91,-.1,1.83)],gold,.017)
-    headz = evolve_pet(scene,kind,stage,headz,fur,light,gold)
+    headz = evolve_pet(scene,kind,'glory' if glory else stage,headz,fur,light,gold)
     color_pet(scene,kind,stage)
     if mood=='curious':
         pivot=bpy.data.objects.new('CuriousHeadPivot',None);scene.collection.objects.link(pivot);pivot.location=(0,0,headz)

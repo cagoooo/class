@@ -7,7 +7,8 @@
     const assetBase = document.currentScript?.src ? new URL('../assets/pets/rendered/', document.currentScript.src).href : 'assets/pets/rendered/';
     // 寵物圖放在不隨版本清掉的圖片快取（sw.js ART_CACHE），重新渲染後一定要改這個版本號，老師才會看到新圖。
     // 3.70.0：成熟期改成 Q 版比例（不再小頭大身體、拿掉肌肉般的肩膀圓球），Blender 5.3 重新渲染。
-    const PET_ART_REV = '3.70.0';
+    // 3.71.0：新增第四階段「閃耀」（Lv.8 起，戴皇冠、底座金環、星光；身形與成熟期相同）。
+    const PET_ART_REV = '3.71.0';
     function assetName(kind, xp, mood = 'normal') {
         kind = Object.hasOwn(pets, kind) ? kind : 'cat';
         const look = appearance(xp).id;
@@ -287,10 +288,10 @@
     }
     function appearance(xp) {
         const level = stage(xp).level;
-        return level === 0 ? { id: 'egg', label: eggStage(xp).label } : level < 3 ? { id: 'baby', label: '幼年' } : level < 5 ? { id: 'junior', label: '成長' } : { id: 'grown', label: '成熟' };
+        return level === 0 ? { id: 'egg', label: eggStage(xp).label } : level < 3 ? { id: 'baby', label: '幼年' } : level < 5 ? { id: 'junior', label: '成長' } : level < 8 ? { id: 'grown', label: '成熟' } : { id: 'glory', label: '閃耀' };
     }
     /**
-     * 每一級都有看得到的獎勵（v3.66.0）：造型只在 Lv.1／3／5 改變，其餘等級補上稱號、配件、星星與光環，
+     * 每一級都有看得到的獎勵（v3.66.0）：造型只在 Lv.1／3／5／8 改變，其餘等級補上稱號、配件、星星與光環，
      * Lv.5 以後也繼續有新東西。只是外觀，不影響成長值、金幣與加分規則；依目前等級顯示，和造型一致。
      */
     const LEVEL_TITLES = ['', '新手夥伴', '見習小幫手', '成長小隊員', '班級小隊長', '成熟守護者', '閃耀之星', '勇氣冒險家', '金光守護者', '智慧領航員', '彩虹傳說'];
@@ -307,6 +308,7 @@
     function levelUnlocks(level) {
         const parts = [];
         if (level === 3 || level === 5) parts.push('新造型與新姿態');
+        else if (level === 8) parts.push('閃耀造型（戴上皇冠、全身星光）');
         parts.push(`稱號「${levelTitle(level)}」`);
         const accessory = { 2: 'bow', 4: 'medal', 6: 'crown' }[level];
         if (accessory) parts.push(ACCESSORIES[accessory].join(' '));
@@ -340,6 +342,7 @@
         { xp: 10, level: 1 },
         { xp: 50, level: 3 },
         { xp: 90, level: 5 },
+        { xp: 150, level: 8 },
     ];
     const COLLECTION_MILESTONES = [1, 5, 10, 15, 20, 25, 30];
     function profileFor(id) {
@@ -424,7 +427,7 @@
     // 固定向量圖形與白名單色彩；不將學生姓名或輸入文字插入 SVG。
     function vectorPortrait(kind, xp) {
         kind = pets[kind] ? kind : 'cat';
-        const look = appearance(xp), grown = look.id === 'grown', baby = look.id === 'baby';
+        const look = appearance(xp), grown = look.id === 'grown' || look.id === 'glory', baby = look.id === 'baby';
         const colors = { cat: ['#f5b45f', '#ffe2b5'], dog: ['#b98259', '#f6d7b0'], rabbit: ['#e0c8ed', '#faf1ff'], panda: ['#f6f8fc', '#dce5f2'] };
         const [fur, belly] = colors[kind];
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -1291,7 +1294,7 @@
         const guideBody=el('div',undefined,'pet-guide-body');
         const growthGuide=el('section',undefined,'pet-guide-panel');growthGuide.append(el('h3','01　每一份努力，都讓牠長大'),el('p','啟用寵物成長後，正向加分會帶動成長，加幾分就長幾點成長值；自訂獎勵規則也一樣。'));
         const path=el('ol',undefined,'pet-guide-path');
-        for(const [amount,title,description] of [['10','Lv.1 · 孵化','隨機揭曉你的成長夥伴'],['50','Lv.3 · 成長','解鎖新造型與新姿態'],['90','Lv.5 · 成熟','解鎖進階姿態與對話']]) {const step=el('li');step.append(el('strong',amount+' 成長值'),el('span',title),el('small',description));path.append(step);}
+        for(const [amount,title,description] of [['10','Lv.1 · 孵化','隨機揭曉你的成長夥伴'],['50','Lv.3 · 成長','解鎖新造型與新姿態'],['90','Lv.5 · 成熟','解鎖進階姿態與對話'],['150','Lv.8 · 閃耀','戴上皇冠、全身閃閃發亮']]) {const step=el('li');step.append(el('strong',amount+' 成長值'),el('span',title),el('small',description));path.append(step);}
         growthGuide.append(path,el('p','以上為累積成長值；孵化後每增加 20 成長值升一級。','pet-guide-note'));
         const guideRules=el('div',undefined,'pet-guide-rules');
         for(const [title,copy] of [['分數與成長分開','一般扣分、分數歸零與金幣兌換不會讓寵物退化；撤銷誤加獎勵會回復該筆成長。'],['驚喜，留到解鎖那天',Object.keys(pets).length+' 種寵物隨機孵化，揭曉後固定保留；撤銷再加分不重抽。圖鑑只公開班級已獲得的種類與達成過的進化階段。'],['輕點互動，不花金幣','點按寵物會出現隨機動作與對話；表情與互動不增加或消耗成長值、分數或金幣。']]) {const item=el('section');item.append(el('h4',title),el('p',copy));guideRules.append(item);}
