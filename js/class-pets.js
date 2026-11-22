@@ -5,6 +5,9 @@
     const pets = { cat: ['🐱', '小貓'], dog: ['🐶', '小狗'], rabbit: ['🐰', '小兔'], panda: ['🐼', '熊貓'], fox: ['🦊', '狐狸'], bear: ['🐻', '小熊'], penguin: ['🐧', '企鵝'], owl: ['🦉', '貓頭鷹'], turtle: ['🐢', '烏龜'], dragon: ['🐲', '小龍'], capybara: ['🦫', '水豚'], axolotl: ['🪸', '六角恐龍'], lion: ['🦁', '獅子'], tiger: ['🐯', '老虎'], elephant: ['🐘', '大象'], giraffe: ['🦒', '長頸鹿'], zebra: ['🦓', '斑馬'], monkey: ['🐒', '猴子'], koala: ['🐨', '無尾熊'], redpanda: ['🐾', '小熊貓'], raccoon: ['🦝', '浣熊'], otter: ['🦦', '水獺'], hedgehog: ['🦔', '刺蝟'], squirrel: ['🐿️', '松鼠'], sheep: ['🐑', '綿羊'], pig: ['🐷', '小豬'], frog: ['🐸', '青蛙'], seal: ['🦭', '海豹'], deer: ['🦌', '小鹿'], unicorn: ['🦄', '獨角獸'] };
     const moods = { normal: '精神飽滿', happy: '開心歡呼', sleepy: '安心休息' };
     const assetBase = document.currentScript?.src ? new URL('../assets/pets/rendered/', document.currentScript.src).href : 'assets/pets/rendered/';
+    // 寵物圖放在不隨版本清掉的圖片快取（sw.js ART_CACHE），重新渲染後一定要改這個版本號，老師才會看到新圖。
+    // 3.70.0：成熟期改成 Q 版比例（不再小頭大身體、拿掉肌肉般的肩膀圓球），Blender 5.3 重新渲染。
+    const PET_ART_REV = '3.70.0';
     function assetName(kind, xp, mood = 'normal') {
         kind = Object.hasOwn(pets, kind) ? kind : 'cat';
         const look = appearance(xp).id;
@@ -21,7 +24,7 @@
         if (xp >= 10) { image.classList.add('pet-breathing'); image.style.setProperty('--pet-breath-duration', mood === 'sleepy' ? '6s' : mood === 'happy' ? '3.8s' : '4.6s'); }
         const permittedMood = (mood === 'wave' && stage(xp).level < 3) || (mood === 'curious' && stage(xp).level < 5) ? 'normal' : mood;
         image.alt = xp < 10 ? `神祕寵物蛋・${eggStage(xp).label}` : `${pets[kind][1]}・${appearance(xp).label}・${moods[permittedMood] || reactionMoods[permittedMood] || moods.normal}`;
-        image.src = assetBase + assetName(kind, xp, mood) + (xp < 10 ? '?v=3.36.0' : '?v=3.41.0-color1');
+        image.src = assetBase + assetName(kind, xp, mood) + (xp < 10 ? '?v=3.36.0' : '?v=' + PET_ART_REV);
         image.addEventListener('error', () => {
             if (xp >= 10 && ['cat', 'dog', 'rabbit', 'panda'].includes(kind)) image.replaceWith(vectorPortrait(kind, xp));
             else { const fallback = el('span', appearance(xp).id === 'egg' ? '🥚' : pets[kind][0], 'pet-portrait pet-fallback'); fallback.setAttribute('role', 'img'); fallback.setAttribute('aria-label', image.alt + '（簡易備援圖示）'); image.replaceWith(fallback); }
@@ -132,7 +135,7 @@
                     picture.src = pose.src;
                     picture.alt = pets[kind][1] + '・' + appearance(xp).label + '・' + (reactionMoods[reaction.mood] || moods[reaction.mood]);
                 };
-                pose.src = assetBase + assetName(kind,xp,reaction.mood) + '?v=3.41.0-color1';
+                pose.src = assetBase + assetName(kind,xp,reaction.mood) + '?v=' + PET_ART_REV;
             }
             timer = setTimeout(() => {
                 generation++; bubble.hidden = true; bubble.textContent = ''; delete target.dataset.reacting;

@@ -12,6 +12,7 @@ async def main():
     parser.add_argument('--batch',action='store_true')
     parser.add_argument('--kinds', default='')
     parser.add_argument('--moods', default='')
+    parser.add_argument('--stages', default='', help='baby,junior,grown')
     parser.add_argument('--force', action='store_true')
     parser.add_argument('--refined', action='store_true')
     parser.add_argument('--grouped', action='store_true', help='Render each species in one MCP request')
@@ -25,6 +26,9 @@ async def main():
             if args.batch:
                 root=Path(__file__).resolve().parents[1]
                 source=(root/'art/pets/build-pets.py').read_text(encoding='utf-8-sig')
+                # Blender 5.3 介面跟著系統語言時，新材質的節點名稱會變中文，nodes.get('Principled BSDF') 找不到而整隻變灰。
+                # 先關掉「翻譯新資料名稱」，既有建模程式不用改。
+                source='import bpy'+chr(10)+'bpy.context.preferences.view.use_translate_new_dataname=False'+chr(10)+source
                 if args.refined:
                     source=source.replace('def build(kind,stage,mood):','def base_build(kind,stage,mood):')+'\n'+(root/'art/pets/evolve-pets.py').read_text(encoding='utf-8-sig')+'\n'+(root/'art/pets/color-pets.py').read_text(encoding='utf-8-sig')+'\n'+(root/'art/pets/refine-pets.py').read_text(encoding='utf-8-sig')
                 kinds=['cat','dog','rabbit','panda','fox','bear','penguin','owl','turtle','dragon','capybara','axolotl','lion','tiger','elephant','giraffe','zebra','monkey','koala','redpanda','raccoon','otter','hedgehog','squirrel','sheep','pig','frog','seal','deer','unicorn']
@@ -32,6 +36,7 @@ async def main():
                 if not args.refined: jobs += [('mystery','egg',stage) for stage in ['rest','crack','splitting','hatching']]
                 if args.kinds: jobs=[job for job in jobs if job[0] in args.kinds.split(',')]
                 if args.moods: jobs=[job for job in jobs if job[2] in args.moods.split(',')]
+                if args.stages: jobs=[job for job in jobs if job[1] in args.stages.split(',')]
                 target=root/'art/pets/renders';target.mkdir(exist_ok=True)
                 blends=root/'art/pets/source';blends.mkdir(exist_ok=True)
                 if args.grouped:

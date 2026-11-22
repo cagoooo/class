@@ -4,36 +4,27 @@ def evolve_pet(scene, kind, stage, headz, fur, light, gold):
     # Same framing keeps actual growth visible instead of zooming each age to fill the card.
     scene.camera.data.ortho_scale = 4.35
     scene.camera.rotation_euler = (Vector((0,0,1.65))-scene.camera.location).to_track_quat('-Z','Y').to_euler()
-    target_head = [1.30,1.94,2.52][tier]
-    head_scale = [.96,1.0,.94][tier]
-    body_width = [.76,1.04,1.32][tier]
-    body_height = [.74,1.13,1.62][tier]
-    # Mature species gain anatomy, not merely a different badge.
+    # v3.70.0（2026-11-22）：長大靠「頭跟著變大、身體適度變大」的 Q 版比例，不再小頭大身體。
+    # 舊版成熟期身體寬 1.32、高 1.62、頭反而縮成 .94，加上肩膀／臀部圓球，老師反映看起來太壯、很醜。
+    # 頭與身體在脖子處維持約 .28 的重疊（身體頂端 .2+1.31×高；頭底 = 頭位置 − .54×頭比例）。
+    target_head = [1.30,1.83,2.17][tier]
+    head_scale = [.96,1.04,1.12][tier]
+    body_width = [.76,.92,1.02][tier]
+    body_height = [.74,1.04,1.26][tier]
+    # Mature species gain gentle species traits (tail, wings, fins, horns) — never muscle bulges.
     if tier == 2:
-        if kind in ['cat','fox','redpanda','raccoon','squirrel']:
-            for sign in [-1,1]:
-                tail=ball('EvolutionTail',(sign*.72,.35,.83),(.26,.25,.72),fur)
-                tail.rotation_euler[1]=sign*.62
-                ball('EvolutionTailTip',(sign*1.05,.29,1.26),(.22,.23,.26),light)
         if kind in ['dragon','owl','penguin','unicorn']:
             for sign in [-1,1]:
-                for j in range(4):
-                    wing=ball('EvolutionWing',(sign*(.64+j*.13),.25,1.32+j*.09),(.13,.085,.48-j*.045),light)
-                    wing.rotation_euler[1]=sign*(.75+j*.14)
-        if kind in ['lion','tiger','dog','bear','koala']:
+                for j in range(3):
+                    wing=ball('EvolutionWing',(sign*(.58+j*.11),.25,1.30+j*.08),(.11,.07,.36-j*.05),light)
+                    wing.rotation_euler[1]=sign*(.75+j*.16)
+        if kind=='lion':
             for j in range(9):
                 angle=math.pi*(j/8+.05)
-                ball('EvolutionRuff',(.67*math.cos(angle),.06,headz-.22+.33*math.sin(angle)),(.18,.23,.23),light)
-        if kind in ['panda','capybara','elephant','pig','monkey']:
-            for sign in [-1,1]:
-                ball('EvolutionHaunch',(sign*.43,.08,.53),(.31,.30,.35),fur)
-                ball('EvolutionShoulder',(sign*.47,.04,1.13),(.23,.26,.24),light)
-        if kind in ['rabbit','giraffe','zebra','deer']:
-            for sign in [-1,1]:
-                ball('EvolutionLeg',(sign*.31,-.10,.49),(.17,.23,.34),fur)
+                ball('EvolutionRuff',(.60*math.cos(angle),.08,headz-.18+.30*math.sin(angle)),(.14,.17,.17),light)
         if kind in ['axolotl','otter','frog','seal']:
             for sign in [-1,1]:
-                fin=ball('EvolutionFin',(sign*.61,.17,.72),(.29,.10,.42),light)
+                fin=ball('EvolutionFin',(sign*.58,.17,.74),(.22,.08,.32),light)
                 fin.rotation_euler[1]=sign*.72
         if kind=='turtle':
             for j in range(5):
@@ -70,7 +61,7 @@ def evolve_pet(scene, kind, stage, headz, fur, light, gold):
             obj.scale.x*=sx;obj.scale.y*=sx;obj.scale.z*=sz
         # Appendage growth changes the outline from little buds to pronounced species traits.
         if obj.type=='MESH' and obj.name.startswith(('LongEar','InnerEar','Horn','UnicornHorn','FeatheryGill','GillFringe','Mane','HedgehogSpine','SquirrelPlume','Shell','FluffyTail','RingTail','TailRing','ElephantEar','InnerElephantEar')):
-            factor=[.62,1.0,1.28][tier]
+            factor=[.62,1.0,1.16][tier]
             obj.scale*=factor
         if obj.name.startswith(('Antler','EvolutionAntler')) and tier==0: obj.hide_render=True
     return target_head
