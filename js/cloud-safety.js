@@ -197,6 +197,8 @@
     }
     async function publish(id = current(), options = {}) {
         if (navigator.onLine === false) throw Object.assign(Error('已存本機，恢復連線後再同步'), { code: 'sync-offline' });
+        // 這一班開機時有資料讀不出來（畫面先用空白代替）：不上傳，避免空白蓋掉雲端的完整資料（v3.71.1）
+        if (window.LocalDataHold?.has?.(id)) throw Object.assign(Error('這一班有資料讀不出來，已暫停上傳，避免蓋掉雲端的完整資料'), { code: 'sync-local-corrupt' });
         const c = writeContext(id);
         let autoMerged = null;
         // retried：上傳途中被別的裝置搶先寫入，重新讀雲端再走一次完整流程（只重試一次）
@@ -492,6 +494,7 @@
         const ops = keys().map(k => [keyFor(k, c.id), fromCloud(k, remote.values, localNow)]);
         ops.push([baseKey(c), baseline(remote.token, remote.values)]);
         if (!window.SafeStorage.writeRaw(ops, { context: '完整還原班級資料' })) return false;
+        window.LocalDataHold?.clear?.(c.id);   // 已換成雲端的完整資料，恢復這一班的同步
         clearLocalChange(c, fingerprint(remote.values));
         if (current() === c.id) refreshMemory(remote.values);
         delete conflicts[recoveryKey(c)];
@@ -638,6 +641,23 @@
     function report(error, id, silent) {
         // 同源分頁已在同步時，這次只是被鎖略過，不是需要老師處理的錯誤。
         if (error?.code === 'sync-busy' || error?.code === 'sync-merge-deferred') return;
+        // 本機資料讀不出來而暫停上傳：背景同步不吵老師；老師自己按同步時說明原因，並讓老師決定要不要以這台為準
+        if (error?.code === 'sync-local-corrupt') {
+            if (silent) return;
+            let useLocal = false;
+            try {
+                useLocal = window.confirm('這一班之前有資料讀不出來，為了不蓋掉雲端的完整資料，已先暫停上傳。\n\n'
+                    + '建議按「取消」，再到「備份」分頁按「從雲端取回」或匯入備份檔。\n\n'
+                    + '如果確定要以這台目前的資料為準，請按「確定」，之後就會恢復同步。');
+            } catch (e) { /* 無法顯示確認框時維持暫停 */ }
+            if (useLocal) {
+                window.LocalDataHold?.clear?.(id || current());
+                window.NotificationSystem?.success?.('已恢復這一班的同步，請再按一次同步');
+            } else {
+                window.NotificationSystem?.warning?.('這一班暫停上傳中：請到「備份」分頁從雲端取回或匯入備份檔');
+            }
+            return;
+        }
         if (isOfflineWait(error) && error?.code !== 'sync-offline') {
             error = Object.assign(Error('目前離線，恢復連線後會再同步'), { code: 'sync-offline' });
         }

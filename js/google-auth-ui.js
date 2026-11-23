@@ -1319,7 +1319,7 @@ ${cloudMenuItemsHTML()}
                         <div style="font-size:1.4rem;color:#2563eb;">→</div>
                         <div style="background:#d1fae5;border-radius:10px;padding:8px 16px;font-weight:700;color:#065f46;">☁️ 雲端</div>
                     </div>`,
-                warningText: `會把這台電腦上 <strong>${classCount} 個班級</strong> 的資料存到雲端，<strong>雲端上較舊的版本會被這次的資料取代</strong>。若其他電腦有較新的變更，系統會先停下來請你比較。`,
+                warningText: `會把這台電腦上 <strong>${classCount} 個班級</strong> 的資料存到雲端，<strong>雲端上較舊的版本會被這次的資料取代</strong>。若其他電腦有較新的變更，會自動把兩邊的紀錄合併；合併不了的班不會被覆蓋，會先停下來請你比較。`,
                 dataList: ['學生名單與分數', '加扣分記錄', '分組資料', '聯絡簿 / 作業 / 公告', '考試監考設定', '時鐘 / 抽籤設定', '作業繳交狀態'],
                 confirmLabel: '確定存到雲端',
                 confirmColor: '#2563eb',

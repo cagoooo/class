@@ -341,5 +341,44 @@ let passed=0;async function test(name,fn){await fn();console.log('PASS',name);pa
   addPoints(a,'from-a',2);await a.s.publish();assert.equal(b.s.needsUpload('A'),true);assert.equal(await b.s.fastForward('A'),'local-changes');
   assert.equal(JSON.parse(b.storage.getItem('pointsHistory-A')).some(r=>r.id==='from-b'),true);});
  await test('新的同步紀錄帶版本標記（tv），之後只用精確比對',async()=>{const a=setup();await a.s.publish();const b=JSON.parse(a.c.ClassAwareStorage.rawGet('cloudSafetyBase:teacher:A'));assert.equal(b.tv,2);});
+ // ── v3.71.1：「存全部班級到雲端」和一般同步走同一套保護，不再直接覆蓋雲端 ──
+ const oneClass=env=>env.storage.setItem('classProfiles',JSON.stringify([{id:'A',name:'甲班'}]));
+ const cloudOf=async env=>env.s.dataFor((await env.s.read()).values);
+ // 清單一定含預設班級，所以用班名找「甲班」那一列
+ const classA=results=>results.find(r=>r.name==='甲班');
+ await test('存全部班級：這台沒改過、雲端被另一台更新 → 不覆蓋，另一台的紀錄還在，這台也跟上',async()=>{const{a,b}=await mergePair();oneClass(b);
+  addPoints(a,'from-a',5);await a.s.publish();
+  const results=await b.c.syncAllClassesToCloud(()=>{});assert.equal(classA(results).status,'ok');
+  const cloud=await cloudOf(b);assert.equal(cloud.pointsHistory.some(r=>r.id==='from-a'),true);assert.equal(cloud.students[0].points,15);
+  assert.equal(JSON.parse(b.storage.getItem('pointsHistory-A')).some(r=>r.id==='from-a'),true);assert.equal(b.syncConflicts.length,0);});
+ await test('存全部班級：兩台都有新紀錄 → 自動合併，兩邊都保留',async()=>{const{a,b}=await mergePair();oneClass(b);
+  addPoints(a,'from-a',5);await a.s.publish();addPoints(b,'from-b',2);
+  const results=await b.c.syncAllClassesToCloud(()=>{});assert.equal(classA(results).status,'ok');
+  const ids=(await cloudOf(b)).pointsHistory.map(r=>r.id);assert.ok(ids.includes('from-a'));assert.ok(ids.includes('from-b'));});
+ await test('存全部班級：這台沒有同步基準、內容又和雲端不同 → 不覆蓋，回報該班沒有上傳',async()=>{const a=setup();addPoints(a,'from-a',5);await a.s.publish();
+  const b=setup(a.db);oneClass(b);addPoints(b,'from-b',2);
+  const rows=[];const results=await b.c.syncAllClassesToCloud((...args)=>rows.push(args));
+  assert.equal(classA(results).status,'fail');assert.match(classA(results).error,/沒有覆蓋/);
+  const cloud=await cloudOf(a);assert.equal(cloud.pointsHistory.some(r=>r.id==='from-a'),true);assert.equal(cloud.pointsHistory.some(r=>r.id==='from-b'),false);
+  const last=rows[rows.length-1];assert.equal(last[0],results.length,'進度條照完成數走');assert.ok(Number.isInteger(last[6]),'進度回報要帶這班在清單上的列號');assert.equal(last[2],'甲班','目前開著的班最後處理');});
+ await test('存全部班級：雲端沒變、這台有新紀錄 → 照常上傳',async()=>{const{a,b}=await mergePair();oneClass(b);addPoints(b,'from-b',2);
+  const results=await b.c.syncAllClassesToCloud(()=>{});assert.equal(classA(results).status,'ok');
+  assert.equal((await cloudOf(a)).pointsHistory.some(r=>r.id==='from-b'),true);});
+ await test('存全部班級：新電腦上這班是空白的、雲端有資料 → 不覆蓋雲端，直接換成雲端版本',async()=>{const a=setup();addPoints(a,'from-a',5);await a.s.publish();
+  const b=setup(a.db);oneClass(b);b.c.students=[];b.c.pointsHistory=[];b.c.groups=[];b.save();for(const k of [...b.storage.data.keys()])if(!/^(currentClassId|classProfiles|students-A|groups-A|pointsHistory-A)$/.test(k))b.storage.data.delete(k);
+  const results=await b.c.syncAllClassesToCloud(()=>{});assert.equal(classA(results).status,'ok');assert.equal(classA(results).adoptedCloud,true);
+  assert.equal((await cloudOf(a)).pointsHistory.some(r=>r.id==='from-a'),true);assert.equal(JSON.parse(b.storage.getItem('students-A')).length,1);assert.equal(b.syncConflicts.length,0);});
+ await test('存全部班級的程式不再使用直接覆蓋選項，確認文字也和實際行為一致',async()=>{
+  const src=fs.readFileSync('js/firebase-sync.js','utf8');const fn=src.slice(src.indexOf('async function syncAllClassesToCloud'),src.indexOf('async function syncPendingClasses'));
+  assert.doesNotMatch(fn,/allowRemoteOverwrite:\s*true/);assert.match(fn,/autoMerge:\s*'now'/);
+  const ui=fs.readFileSync('js/google-auth-ui.js','utf8');assert.match(ui,/合併不了的班不會被覆蓋/);});
+ // ── v3.71.1：本機資料讀不出來的班暫停上傳，避免空白蓋掉雲端 ──
+ await test('資料讀不出來的班：不上傳；從雲端取回後恢復同步',async()=>{const{a,b}=await mergePair();
+  b.c.LocalDataHold.set('A',['students-A']);b.c.students=[];b.save();
+  await assert.rejects(b.s.publish('A'),e=>e.code==='sync-local-corrupt');
+  assert.equal((await cloudOf(a)).students.length,1,'雲端的學生還在');
+  await b.s.report(Object.assign(Error('x'),{code:'sync-local-corrupt'}),'A',true);assert.equal(b.petErrors.length,0);assert.equal(b.syncConflicts.length,0);
+  assert.equal(await b.s.restore(await b.s.read()),true);assert.equal(b.c.LocalDataHold.has('A'),false);
+  assert.equal(JSON.parse(b.storage.getItem('students-A')).length,1);assert.equal(await b.s.publish('A'),true);});
  console.log(passed+' safety checks passed');
 })().catch(e=>{console.error(e);process.exitCode=1;});

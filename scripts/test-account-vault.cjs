@@ -196,5 +196,30 @@ async function test(name, fn) { await fn(); console.log('PASS', name); passed++;
         assert.match(ui, /AccountVault\.release\(\)/);
     });
 
+    await test('登出後重新整理（名冊自動補上預設班級）再用同一帳號登入：抽屜裡的班級資料會回來（v3.71.1）', async () => {
+        const a = setup(); classOf(a, '導師班', [{ name: '虛構甲' }]);
+        await a.V.claim('uidA'); a.setProfile({ uid: 'uidA' });
+        await a.V.release();
+        assert.equal(a.storage.getItem('students'), null);
+        const b = a.reloadPage();
+        // 重新整理後 class-profiles 一定會重建只有預設班級的名冊
+        b.storage.setItem('classProfiles', JSON.stringify([{ id: 'default', name: '預設班級', isDefault: true, icon: '📚', color: '#6366f1' }]));
+        assert.equal(b.V.hasData(b.V._snapshot()), false, '只有預設班級不算有資料');
+        assert.equal(await b.V.claim('uidA'), 'switched');
+        assert.deepEqual(studentsOf(b), ['虛構甲']);
+    });
+
+    await test('只有預設班級的空白工作區不會被收進抽屜，蓋在真正的資料上面（v3.71.1）', async () => {
+        const a = setup(); classOf(a, '導師班', [{ name: '虛構甲' }]);
+        await a.V.claim('uidA'); a.setProfile({ uid: 'uidA' });
+        await a.V.release();
+        const b = a.reloadPage();
+        b.storage.setItem('classProfiles', JSON.stringify([{ id: 'default', name: '預設班級', isDefault: true }]));
+        await b.V.claim('uidB');                                   // 另一位老師在同一台登入
+        const kept = [...b.drawers.values()].flatMap(d => d.snapshots || []).map(s => !!s.entries.students);
+        assert.ok(kept.length >= 1 && kept.every(Boolean), '抽屜裡每一份都應該是有學生的真資料');
+        assert.equal(b.V.hasData({ classProfiles: JSON.stringify([{ id: 'default' }, { id: '1001', name: '科任班' }]) }), true, '有自己建的班級仍算有資料');
+    });
+
     console.log(`${passed} account vault checks passed`);
 })().catch(e => { console.error(e); process.exit(1); });

@@ -54,7 +54,13 @@
         return Object.entries(entries).some(([k, v]) => {
             const base = k.replace(/-\d+$/, '');
             if (!['students', 'pointsHistory', 'notebookEntries', 'homeworkList', 'classProfiles'].includes(base)) return false;
-            try { const parsed = JSON.parse(v); return Array.isArray(parsed) ? parsed.length > 0 : !!parsed && Object.keys(parsed).length > 0; } catch { return false; }
+            try {
+                const parsed = JSON.parse(v);
+                // 重新整理後班級名冊一定會自動補上一個「預設班級」：只有它不算有資料，
+                // 否則登出再登入會以為這台已經有東西，不去拿抽屜裡真正的班級資料（v3.71.1）
+                if (base === 'classProfiles') return Array.isArray(parsed) && parsed.some(p => p && p.id !== 'default');
+                return Array.isArray(parsed) ? parsed.length > 0 : !!parsed && Object.keys(parsed).length > 0;
+            } catch { return false; }
         });
     }
     function snapshot() { const entries = {}; for (const k of workspaceKeys()) entries[k] = raw(k); return entries; }

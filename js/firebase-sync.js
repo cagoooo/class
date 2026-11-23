@@ -698,22 +698,44 @@ async function syncAllClassesToCloud(onProgress) {
     const results = [];
     try {
         const all = buildAllClassList(JSON.parse(localStorage.getItem('classProfiles') || '[]'));
-        for (const [i, cls] of all.entries()) {
-            onProgress?.(i, all.length, cls.name, 'syncing');
+        // 目前開著的班放最後：它合併到其他裝置的更新後頁面會重新載入，先把其他班處理完
+        const openId = String(CloudSafety.current());
+        const order = all.map((cls, i) => [i, cls]).sort((a, b) => (String(a[1].id) === openId) - (String(b[1].id) === openId));
+        let done = 0;
+        for (const [i, cls] of order) {
+            // 第 7 個參數是這班在清單上的列號：處理順序和清單順序不同，進度條照完成數走、圖示照列號更新
+            onProgress?.(done, all.length, cls.name, 'syncing', 0, '', i);
             try {
-                // 一鍵同步前已由老師確認「雲端舊資料將被覆蓋」。
-                // publish 會在同源分頁鎖內重新讀取最新雲端版本，避免把
-                // 另一個分頁剛完成的合法上傳誤判成衝突；真正跨裝置的
-                // 變更仍會由各自的 CAS 與比較流程保護。
-                await CloudSafety.publish(String(cls.id), { allowRemoteOverwrite: true });
+                // v3.71.1：和一般同步走同一套保護，不再直接覆蓋雲端。
+                // 以前這裡用 allowRemoteOverwrite 把雲端最新版本當成比對基準，等於不比對：久沒用的電腦按下去，
+                // 會把其他裝置較新的紀錄整班蓋掉。現在雲端沒變就照常上傳；雲端被其他裝置更新過就自動合併兩邊；
+                // 合併不了或這台沒有同步基準時停下來請老師比較。同分頁的重複上傳由 publish 內的鎖與內容指紋處理。
+                await CloudSafety.publish(String(cls.id), { autoMerge: 'now' });
                 const count = CloudSafety.dataFor(CloudSafety.capture(String(cls.id))).students.length;
                 results.push({ name: cls.name, status: 'ok', count });
-                onProgress?.(i + 1, all.length, cls.name, 'ok', count);
+                onProgress?.(++done, all.length, cls.name, 'ok', count, '', i);
             } catch (error) {
+                // 這台這一班是空白的、也沒同步過（例如新電腦上還沒開過的班），雲端卻有資料：
+                // 不是衝突，直接換成雲端版本（能不能換由 fastForward 自己把關，這台有任何內容就不會動）
+                if (error?.code === 'sync-conflict') {
+                    try {
+                        const state = await CloudSafety.fastForward(String(cls.id));
+                        if (state === 'updated' || state === 'current') {
+                            const count = CloudSafety.dataFor(CloudSafety.capture(String(cls.id))).students.length;
+                            results.push({ name: cls.name, status: 'ok', count, adoptedCloud: true });
+                            onProgress?.(++done, all.length, cls.name, 'ok', count, '', i);
+                            continue;
+                        }
+                    } catch (e) { /* 換不了就照下面回報，不覆蓋雲端 */ }
+                }
                 console.error(`[AllSync] ${cls.id}（${cls.name}）同步失敗:`, error);
                 await CloudSafety.report(error, String(cls.id), true);
-                results.push({ name: cls.name, status: 'fail', error: error.message });
-                onProgress?.(i + 1, all.length, cls.name, 'fail', 0, error.message);
+                const reason = error?.code === 'sync-conflict' ? '雲端有其他裝置的更新，沒有覆蓋；請切到這班比較兩份資料'
+                    : error?.code === 'sync-busy' ? '另一個分頁正在同步這一班，請稍後再試'
+                        : error?.code === 'sync-local-corrupt' ? '這班有資料讀不出來，已暫停上傳'
+                            : error.message;
+                results.push({ name: cls.name, status: 'fail', error: reason });
+                onProgress?.(++done, all.length, cls.name, 'fail', 0, reason, i);
             }
         }
         await uploadClassProfilesMerged();
@@ -811,11 +833,11 @@ async function showAllClassSyncModal() {
     document.body.appendChild(wrap);
 
     // 更新進度的回呼
-    const onProgress = (done, total, name, status, count, errorMessage) => {
+    const onProgress = (done, total, name, status, count, errorMessage, row) => {
         const bar = document.getElementById('acsm-bar');
         const label = document.getElementById('acsm-label');
         const counter = document.getElementById('acsm-counter');
-        const idx = done - (status === 'syncing' ? 0 : 1);
+        const idx = Number.isInteger(row) ? row : done - (status === 'syncing' ? 0 : 1);
 
         if (bar) bar.style.width = `${Math.round((done / total) * 100)}%`;
         if (counter) counter.textContent = `${done} / ${total}`;
@@ -828,17 +850,17 @@ async function showAllClassSyncModal() {
             if (info) info.textContent = '同步中...';
         } else if (status === 'ok') {
             if (label) label.textContent = `已完成：${name}`;
-            const rowIdx = done - 1;
+            const rowIdx = idx;
             const icon = document.getElementById(`acsm-icon-${rowIdx}`);
             const info = document.getElementById(`acsm-info-${rowIdx}`);
             if (icon) icon.textContent = '✅';
             if (info) info.textContent = `${count} 人`;
         } else if (status === 'fail') {
-            const rowIdx = done - 1;
+            const rowIdx = idx;
             const icon = document.getElementById(`acsm-icon-${rowIdx}`);
             const info = document.getElementById(`acsm-info-${rowIdx}`);
             if (icon) icon.textContent = '❌';
-            if (info) { info.textContent = errorMessage ? `失敗：${String(errorMessage).slice(0, 42)}` : '失敗'; info.style.color = '#ef4444'; info.title = errorMessage || '同步失敗'; }
+            if (info) { info.textContent = errorMessage ? `未上傳：${String(errorMessage).slice(0, 42)}` : '未上傳'; info.style.color = '#ef4444'; info.title = errorMessage || '同步失敗'; }
         }
     };
 
@@ -865,7 +887,7 @@ async function showAllClassSyncModal() {
     if (label) {
         label.textContent = failed === 0
             ? `✅ 所有 ${total} 個班級同步完成！`
-            : `⚠️ ${total - failed} 班成功，${failed} 班失敗`;
+            : `⚠️ ${total - failed} 班成功，${failed} 班沒有上傳（原因寫在該班那一列）`;
         label.style.color = failed === 0 ? '#16a34a' : '#d97706';
     }
     if (closeBtn) {

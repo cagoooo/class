@@ -348,6 +348,17 @@
         }
     }
 
+    // v3.71.1：依「現在能不能寫雲端」決定開或關，而且會持續檢查。
+    // 以前只在載入後 2 秒看一次，之後全靠 window.onGoogleSignIn——但整個專案沒有人呼叫它，
+    // 所以開頁後才按 Google 登入（或登入狀態還原超過 2 秒）的那次使用，整段時間都沒有定時自動同步，
+    // 恢復連線時也不會補同步。登出、換帳號收納期間 canWriteCloud 為假，會跟著停下來。
+    function followAuthState() {
+        let writable = false;
+        try { writable = !!window.FirebaseConfig?.canWriteCloud?.(); } catch (e) { writable = false; }
+        if (writable && !state.running) AutoSync.start();
+        else if (!writable && state.running) AutoSync.stop();
+    }
+
     // 攔截 GoogleAuthUI 的登入完成事件
     const _origOnSignIn = window.onGoogleSignIn;
     window.onGoogleSignIn = function (...args) {
@@ -368,6 +379,21 @@
     } else {
         setTimeout(tryAutoStart, 2000);
     }
+
+    // 之後每 15 秒確認一次登入狀態（只是比對幾個變數，不連網）；登入狀態一有變化也立刻確認
+    setInterval(followAuthState, 15000);
+    function hookAuthState(triesLeft) {
+        try {
+            const auth = (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) ? firebase.auth() : null;
+            if (auth) {
+                // 帳號收納／換人（AccountVault）要一點時間才完成，登入後多確認幾次
+                auth.onAuthStateChanged(() => { followAuthState(); setTimeout(followAuthState, 1500); setTimeout(followAuthState, 5000); });
+                return;
+            }
+        } catch (e) { /* Firebase 還沒準備好 */ }
+        if (triesLeft > 0) setTimeout(() => hookAuthState(triesLeft - 1), 1000);
+    }
+    hookAuthState(30);
 
     console.log('✅ auto-sync.js 已載入（自動定時同步模組）');
 })();

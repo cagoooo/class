@@ -238,6 +238,8 @@ class DataBackup {
             students = data.students || students;
             groups = data.groups || groups;
             pointsHistory = data.pointsHistory || pointsHistory;
+            // 已用備份檔換掉本機資料：若這一班先前因資料讀不出來而暫停上傳，在這裡恢復
+            try { if (window.LocalDataHold) window.LocalDataHold.clear(targetClass); } catch (e) { /* ignore */ }
 
             LoadingIndicator.hide();
             NotificationSystem.success('資料匯入成功，頁面即將重新載入');

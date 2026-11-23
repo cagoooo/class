@@ -58,12 +58,19 @@
      * - 預設班級或非 SHARED_KEYS：原 key 不變（向下相容）
      * - 其他班級且為 SHARED_KEYS：加上 `-{classId}` 後綴
      */
+    // 這一頁「載入時」的班級（v3.71.1）。
+    // 以前每次讀寫都重新去看 currentClassId：另一個分頁切到別班後，這頁手上還是原本那班的資料，
+    // 寫入卻會落到別班的 key，把別班的作業、聯絡簿、座位表蓋掉。
+    // 現在只跟著「這一頁自己」改的班級走；別的分頁改的不理會，並在安全時機重新整理這一頁。
+    const CLASS_ID_KEY = 'currentClassId';
+    let pageClassId = _origGet.call(localStorage, CLASS_ID_KEY) || 'default';
+    function notePageClass(key, value) {
+        if (key === CLASS_ID_KEY) pageClassId = value == null ? 'default' : (String(value) || 'default');
+    }
     function classKey(key) {
         if (!SHARED_KEYS.has(key)) return key;
-        // 注意：使用 _origGet 讀取 currentClassId，避免無限遞迴
-        const classId = _origGet.call(localStorage, 'currentClassId') || 'default';
-        if (classId === 'default') return key;
-        return key + '-' + classId;
+        if (pageClassId === 'default') return key;
+        return key + '-' + pageClassId;
     }
 
     // ───── 緊急清理：localStorage 滿時自動釋放非必要空間 ─────
@@ -226,7 +233,9 @@
         const actualKey = classKey(key);
         if (this === localStorage && blockedWrite(actualKey)) return;
         try {
-            return _origSet.call(this, actualKey, value);
+            const result = _origSet.call(this, actualKey, value);
+            if (this === localStorage) notePageClass(actualKey, value);
+            return result;
         } catch (err) {
             // QuotaExceededError 或 similar
             if (err && (err.name === 'QuotaExceededError' || err.code === 22 || err.code === 1014)) {
@@ -252,8 +261,56 @@
     _proto.removeItem = function (key) {
         const actualKey = classKey(key);
         if (this === localStorage && blockedWrite(actualKey)) return;
-        return _origRemove.call(this, actualKey);
+        const result = _origRemove.call(this, actualKey);
+        if (this === localStorage) notePageClass(actualKey, null);
+        return result;
     };
+
+    // ───── 另一個分頁切換了班級：這一頁的畫面與記憶體還是原本那班，找安全的時機重新整理 ─────
+    // 上課中（計時器在跑、全螢幕、對話框開著、正在打字）不打斷，等老師告一段落再換。
+    let classChangedElsewhere = false, staleTimer = null;
+    function pageIsBusy() {
+        try {
+            if (window.FirebaseConfig && window.FirebaseConfig.isPageBusy && window.FirebaseConfig.isPageBusy()) return true;
+            const el = document.activeElement;
+            if (el && typeof el.matches === 'function' && el.matches('input, textarea, select, [contenteditable]')) return true;
+        } catch (e) { return true; }
+        return false;
+    }
+    function reloadIfClassChangedElsewhere() {
+        if (!classChangedElsewhere) return;
+        const live = _origGet.call(localStorage, CLASS_ID_KEY) || 'default';
+        if (live === pageClassId) {   // 另一個分頁又切回同一班：不用重新整理
+            classChangedElsewhere = false;
+            if (staleTimer) { clearInterval(staleTimer); staleTimer = null; }
+            return;
+        }
+        if (pageIsBusy()) return;
+        try { sessionStorage.setItem('classChangedElsewhere', '1'); } catch (e) { /* 無痕模式 */ }
+        try { if (window.LeaveSyncGuard && window.LeaveSyncGuard.allowInternalNavigation) window.LeaveSyncGuard.allowInternalNavigation(); } catch (e) { /* ignore */ }
+        try { window.location.reload(); } catch (e) { /* 測試環境 */ }
+    }
+    try {
+        window.addEventListener('storage', function (event) {
+            if (event.key !== CLASS_ID_KEY) return;
+            if (event.storageArea && event.storageArea !== localStorage) return;
+            if ((event.newValue || 'default') === pageClassId) return;
+            classChangedElsewhere = true;
+            reloadIfClassChangedElsewhere();
+            if (classChangedElsewhere && !staleTimer) staleTimer = setInterval(reloadIfClassChangedElsewhere, 5000);
+        });
+        window.addEventListener('focus', reloadIfClassChangedElsewhere);
+        document.addEventListener('visibilitychange', function () { if (!document.hidden) reloadIfClassChangedElsewhere(); });
+        // 重新整理後告訴老師發生了什麼事
+        if (sessionStorage.getItem('classChangedElsewhere')) {
+            sessionStorage.removeItem('classChangedElsewhere');
+            setTimeout(function () {
+                try {
+                    if (window.NotificationSystem && window.NotificationSystem.info) window.NotificationSystem.info('另一個分頁切換了班級，這一頁已跟著換成目前的班級');
+                } catch (e) { /* ignore */ }
+            }, 2500);
+        }
+    } catch (e) { /* 測試環境沒有 window 事件 */ }
 
     // ───── 一次性遷移：保留升級前的現有資料 ─────
     // 場景：使用者升級到 v3.0.13 之前，若正在使用非預設班級，所有共用 key 的內容
@@ -320,8 +377,8 @@
 
         // 先拍快照（走一般 getItem，與 setItem 同一套班級 key 路由）
         const get = k => opts.raw ? _origGet.call(localStorage, k) : localStorage.getItem(k);
-        const set = (k, v) => opts.raw ? _origSet.call(localStorage, k, v) : localStorage.setItem(k, v);
-        const remove = k => opts.raw ? _origRemove.call(localStorage, k) : localStorage.removeItem(k);
+        const set = (k, v) => { if (!opts.raw) return localStorage.setItem(k, v); _origSet.call(localStorage, k, v); notePageClass(k, v); };
+        const remove = k => { if (!opts.raw) return localStorage.removeItem(k); _origRemove.call(localStorage, k); notePageClass(k, null); };
         const snapshot = list.map(p => [p[0], get(p[0])]);
         try {
             list.forEach(p => p[1] === null ? remove(p[0]) : set(p[0], p[1]));
@@ -362,6 +419,28 @@
         }
     }
 
+    // ==================== LocalDataHold：本機資料讀不出來時，先暫停上傳雲端 ====================
+    // v3.71.1：開機時某個班的學生名單／加扣分／作業等內容壞掉（不是合法資料），畫面會先用空白代替讓老師還能操作。
+    // 但空白資料如果照常同步，會把雲端完整的班級蓋掉，所以替這個班記一個「暫停上傳」的記號，
+    // 直到老師從雲端取回、匯入備份，或明確表示要以這台為準為止。
+    const HOLD_PREFIX = 'class-manager-corrupt-hold:';
+    window.LocalDataHold = {
+        set(classId, keys) {
+            try { _origSet.call(localStorage, HOLD_PREFIX + (classId || 'default'), JSON.stringify({ keys: keys || [], at: new Date().toISOString() })); }
+            catch (e) { /* 存不進去時，至少這次開頁期間仍由 window.__localDataCorrupt 擋住 */ }
+        },
+        has(classId) {
+            const id = classId || 'default';
+            if (id === pageClassId && Array.isArray(window.__localDataCorrupt) && window.__localDataCorrupt.length) return true;
+            return _origGet.call(localStorage, HOLD_PREFIX + id) !== null;
+        },
+        clear(classId) {
+            const id = classId || 'default';
+            try { _origRemove.call(localStorage, HOLD_PREFIX + id); } catch (e) { /* ignore */ }
+            if (id === pageClassId) window.__localDataCorrupt = [];
+        },
+    };
+
     window.SafeStorage = {
         write: safeWrite,
         writeRaw(pairs, opts) { return safeWrite(pairs, { ...opts, raw: true }); },
@@ -380,12 +459,14 @@
         },
         // 直接讀取（繞過攔截器，給 sync 模組用）
         rawGet(key) { return _origGet.call(localStorage, key); },
-        rawSet(key, value) { if (blockedWrite(key)) return; return _origSet.call(localStorage, key, value); },
-        rawRemove(key) { if (blockedWrite(key)) return; return _origRemove.call(localStorage, key); },
+        rawSet(key, value) { if (blockedWrite(key)) return; const r = _origSet.call(localStorage, key, value); notePageClass(key, value); return r; },
+        rawRemove(key) { if (blockedWrite(key)) return; const r = _origRemove.call(localStorage, key); notePageClass(key, null); return r; },
         // 只給 AccountVault 收納／切換使用：不經過上面的主人檢查
-        vaultSet(key, value) { return _origSet.call(localStorage, key, value); },
-        vaultRemove(key) { return _origRemove.call(localStorage, key); },
+        vaultSet(key, value) { const r = _origSet.call(localStorage, key, value); notePageClass(key, value); return r; },
+        vaultRemove(key) { const r = _origRemove.call(localStorage, key); notePageClass(key, null); return r; },
         setPageOwner(uid) { pageOwner = uid; },
+        /** 這一頁載入時的班級（另一個分頁切班不會改變它）。 */
+        pageClassId() { return pageClassId; },
     };
 
     console.log('[ClassAwareStorage] localStorage 攔截器已載入（' + SHARED_KEYS.size + ' 個共用 key 將依班級隔離）');
