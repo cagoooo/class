@@ -530,6 +530,7 @@ module.exports = {
   canonicalizeFeatureStats,
   isRecoverableOfflineSync,
   isExpectedSyncWait,
+  isStudentWrongClassroomCode,
   isSyncConflictEvent,
   summarizeEvents,
 };

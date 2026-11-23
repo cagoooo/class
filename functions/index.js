@@ -33,6 +33,7 @@ const {
   canonicalizeFeatureStats,
   isExpectedSyncWait,
   isRecoverableOfflineSync,
+  isStudentWrongClassroomCode,
   isSyncConflictEvent,
   resolveSourceApp,
   summarizeEvents,
@@ -635,9 +636,11 @@ exports.notifyUsage = onCall(
     const who = identityOf(request.auth);
     const isError = eventType === 'error';
     const recoverableOfflineSync = isRecoverableOfflineSync({ ...data, type: eventType });
+    // 剛好學學生打錯教室代碼（或老師還沒開課）：不是系統故障，只留底給每日戰報另列一行，不即時推 Chat。
+    const studentWrongCode = isError && isStudentWrongClassroomCode(data);
 
-    // 離線事件仍留底，但不消耗真正錯誤的每日推播額度。
-    const quota = await checkQuota(uid, isError && !recoverableOfflineSync);
+    // 離線事件、學生打錯代碼仍留底，但不消耗真正錯誤的每日推播額度。
+    const quota = await checkQuota(uid, isError && !recoverableOfflineSync && !studentWrongCode);
 
     // ① 留底（所有型別，含不推播的日常事件）
     let logStatus = 'skipped';
@@ -654,6 +657,9 @@ exports.notifyUsage = onCall(
 
     if (recoverableOfflineSync) {
       return { ok: true, logged: quota.log, pushed: false, reason: 'recoverable-offline-sync' };
+    }
+    if (studentWrongCode) {
+      return { ok: true, logged: quota.log, pushed: false, reason: 'student-wrong-code' };
     }
 
     // ② 打擾：只有真正錯誤才即時推 Chat；成功事件交給每日戰報。

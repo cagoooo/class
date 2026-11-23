@@ -5,6 +5,7 @@ const {
   canonicalizeFeatureStats,
   isExpectedSyncWait,
   isRecoverableOfflineSync,
+  isStudentWrongClassroomCode,
   isSyncConflictEvent,
   summarizeEvents,
 } = require('../functions/digest-summary');
@@ -146,6 +147,12 @@ test('剛好學：學生打錯教室代碼不算錯誤，另外列一行', () =>
   assert.match(card, /學生代碼打錯或老師尚未開課 3 次（smart116、6O1）/);
   const clean = summarizeEvents([{ type: 'error', app: 'akailao', uid: 'teacher-a', message: 'x' }]);
   assert.doesNotMatch(JSON.stringify(buildDigestPayload('2026-11-19', '11/19', clean, null).cardsV2), /學生代碼打錯/);
+});
+
+test('剛好學：學生打錯代碼的判斷可共用給即時通知（新舊格式都認得，其他錯誤不誤判）', () => {
+  assert.equal(isStudentWrongClassroomCode({ type: 'error', context: 'student-join-classroom-not-exists', message: 'x' }), true);
+  assert.equal(isStudentWrongClassroomCode({ type: 'error', message: '學生輸入的教室代碼「smart116」查無開啟中的教室（多為代碼打錯或老師尚未開課，非系統故障）' }), true);
+  assert.equal(isStudentWrongClassroomCode({ type: 'error', context: 'set-mode', message: 'Firestore 寫入失敗' }), false);
 });
 
 console.log(`✅ 每日戰報彙整測試通過：${passed} 項`);
