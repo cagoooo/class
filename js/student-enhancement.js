@@ -144,6 +144,71 @@ function showTagEditor(studentId) {
     document.body.appendChild(modal);
 }
 
+// ==================== 修改姓名／座號 ====================
+
+/**
+ * 顯示「修改姓名或座號」視窗。實際檢查與存檔交給 classnew.html 的 updateStudentIdentity()。
+ */
+function showStudentEditor(studentId) {
+    const student = students.find(s => String(s.id) === String(studentId));
+    if (!student || typeof updateStudentIdentity !== 'function') return;
+
+    document.getElementById('student-editor-modal')?.remove();
+    const make = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+
+    const modal = make('div', 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50');
+    modal.id = 'student-editor-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'student-editor-title');
+    const close = () => modal.remove();
+    modal.onclick = (e) => { if (e.target === modal) close(); };
+
+    const box = make('form', 'bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 animate-bounce-in');
+    const title = make('h3', 'text-xl font-bold text-gray-800 mb-1 text-center', '✏️ 修改姓名或座號');
+    title.id = 'student-editor-title';
+    const note = make('p', 'text-sm text-gray-500 text-center mb-4', '分數、加扣分紀錄、寵物和作業勾選都會保留');
+
+    const field = (labelText, input) => {
+        const label = make('label', 'block mb-3');
+        label.append(make('span', 'block text-sm font-medium text-gray-700 mb-1', labelText), input);
+        return label;
+    };
+    const inputClass = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base';
+    const nameInput = make('input', inputClass);
+    nameInput.type = 'text'; nameInput.maxLength = 50; nameInput.value = student.name || ''; nameInput.autocomplete = 'off';
+    const seatInput = make('input', inputClass);
+    seatInput.type = 'number'; seatInput.min = '1'; seatInput.max = '99999'; seatInput.step = '1'; seatInput.inputMode = 'numeric';
+    seatInput.value = student.number == null ? '' : student.number;
+
+    const error = make('p', 'text-sm text-red-600 mb-3');
+    error.setAttribute('role', 'alert');
+    error.hidden = true;
+
+    const actions = make('div', 'flex gap-2');
+    const cancel = make('button', 'flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors', '取消');
+    cancel.type = 'button';
+    cancel.onclick = close;
+    const save = make('button', 'flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors', '儲存');
+    save.type = 'submit';
+    actions.append(cancel, save);
+
+    box.onsubmit = (e) => {
+        e.preventDefault();
+        const result = updateStudentIdentity(studentId, nameInput.value, seatInput.value);
+        if (result.ok) { close(); return; }
+        error.textContent = result.message || '沒有修改成功，請再試一次';
+        error.hidden = false;
+    };
+    box.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+
+    box.append(title, note, field('姓名', nameInput), field('座號', seatInput), error, actions);
+    modal.append(box);
+    document.body.appendChild(modal);
+    nameInput.focus();
+    nameInput.select();
+}
+
 /**
  * 切換學生標籤
  */
@@ -287,11 +352,13 @@ function _doRenderStudents(container) {
                             <span class="font-semibold text-gray-800 text-sm truncate">${highlightedName}</span>
                         </div>
                         <div class="flex items-center flex-shrink-0">
-                            <button onclick="showTagEditor(${student.id})" 
+                            <button onclick="showTagEditor(${student.id})"
                                 class="text-sm p-0.5 text-blue-500 hover:text-blue-700" title="編輯標籤">🏷️</button>
                             <button onclick="showStudentReport(${student.id})" 
                                 class="text-sm p-0.5 text-green-500 hover:text-green-700" title="查看報告">📊</button>
-                            <button onclick="removeStudent(${student.id})" 
+                            <button onclick="showStudentEditor(${student.id})"
+                                class="text-sm p-0.5 text-blue-600 hover:text-blue-800" title="修改姓名或座號" aria-label="修改姓名或座號">✏️</button>
+                            <button onclick="removeStudent(${student.id})"
                                 class="text-sm p-0.5 text-red-500 hover:text-red-700" title="刪除學生">🗑️</button>
                         </div>
                     </div>

@@ -30,7 +30,9 @@
             root.querySelectorAll('button[onclick]').forEach(button => {
                 if (button.closest('.class-management-action')) return;
                 const action = button.getAttribute('onclick');
-                const label = /^removeStudent\(/.test(action) ? '刪除學生'
+                // 選單裡的字要短（和「刪除學生」一樣四個字），打開選單時才不會把旁邊的姓名擠成直排
+                const label = /^showStudentEditor\(/.test(action) ? '修改資料'
+                    : /^removeStudent\(/.test(action) ? '刪除學生'
                     : /^removeNotebook\(/.test(action) ? '刪除此事項'
                     : '';
                 if (!label) return;
@@ -45,7 +47,8 @@
                     button.before(menu);
                 }
                 button.textContent = label;
-                button.setAttribute('aria-label', label);
+                // 「修改資料」沿用按鈕原本比較完整的說明（修改姓名或座號）
+                button.setAttribute('aria-label', label === '修改資料' ? (button.getAttribute('title') || label) : label);
                 menu.append(button);
             });
         }

@@ -2087,10 +2087,11 @@
                 const nextExam = examSubjects.find(s => timeToMinutes(s.startTime) > currentMinutes);
 
                 if (nextExam) {
-                    const waitMinutes = timeToMinutes(nextExam.startTime) - currentMinutes;
-                    const mins = Math.floor(waitMinutes);
+                    // 用「總秒數」算，分鐘和秒才對得起來（舊算法分鐘多 1、整分時還會出現 60 秒）
                     const now = new Date();
-                    const secs = 60 - now.getSeconds();
+                    const left = breakSecondsLeft(nextExam.startTime, now);
+                    const mins = Math.floor(left / 60);
+                    const secs = left % 60;
 
                     // 選擇有趣的 emoji
                     const breakEmojis = ['☕', '🧘', '🎯', '📚', '💪', '🌟'];
@@ -2152,12 +2153,39 @@
 
         renderFullscreenSubjects();
 
-        // === 音效提醒問卵 ===
-        if (typeof ExamSounds !== 'undefined') {
-            const _examForSound = getCurrentExam();
-            const _remForSound = _examForSound ? getRemainingMinutes(_examForSound) : 0;
-            ExamSounds.onExamTick(_examForSound, _remForSound, false);
-        }
+        ringExamSounds();
+    }
+
+    // === 考試鈴聲 ===
+    // 只在全螢幕監考畫面開著時響。開始鈴、結束鈴要「親眼看到」狀態轉換才響：
+    // 考到一半才打開畫面不補響開始鈴；畫面關掉期間結束的科目也不補響結束鈴。
+    let soundSeen = false, soundPrevExam = null;
+    function resetExamSoundWatch() { soundSeen = false; soundPrevExam = null; }
+    function ringExamSounds() {
+        const sounds = window.ExamSounds;
+        if (!sounds) return;
+        const modal = document.getElementById('examFullscreenModal');
+        if (!modal || !modal.classList.contains('active')) return;
+        const exam = getCurrentExam() || null;
+        const changed = soundSeen && (exam ? exam.id : null) !== (soundPrevExam ? soundPrevExam.id : null);
+        const ended = changed && soundPrevExam;
+        const started = changed && exam;
+        try {
+            if (ended) sounds.onExamEnd(soundPrevExam);
+            if (exam) {
+                const tick = () => sounds.onExamTick(exam, getRemainingMinutes(exam), !!started);
+                // 兩科緊接著考：先讓結束鈴響完，再響下一科的開始鈴
+                if (ended && started) setTimeout(tick, 1600); else tick();
+            }
+        } catch (e) { console.warn('[ExamProctor] 鈴聲播放失敗:', e); }
+        soundSeen = true;
+        soundPrevExam = exam;
+    }
+
+    /** 距離下一科開始還有幾秒（不會是負數）。 */
+    function breakSecondsLeft(startTime, now) {
+        const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+        return Math.max(0, timeToMinutes(startTime) * 60 - nowSec);
     }
 
     // ========================================
@@ -2739,6 +2767,10 @@
             updateAnalogClock();
         }
 
+        // 鈴聲：放上靜音按鈕，並趁老師這次點擊把聲音打開（瀏覽器規定要有點擊才能出聲）
+        resetExamSoundWatch();
+        try { window.ExamSounds?.attachToggle?.(); window.ExamSounds?.unlock?.(); } catch (e) { /* 沒有鈴聲模組不影響監考 */ }
+
         currentReminderIndex = 0;
         updateFullscreenStatus();
 
@@ -2831,6 +2863,7 @@
 
         modal.classList.remove('active');
         document.body.style.overflow = '';
+        resetExamSoundWatch();
 
         if (examClockInterval) { clearInterval(examClockInterval); examClockInterval = null; }
         if (reminderRotationInterval) { clearInterval(reminderRotationInterval); reminderRotationInterval = null; }

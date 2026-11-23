@@ -116,5 +116,46 @@ async function test(name, fn) { await fn(); console.log('PASS', name); passed++;
         assert.equal(env.calls.filter(c => c[0] === 'volume' && c[1] < 50).length, 0);
     });
 
+    // timer:finished 的處理：pause → 還原音量 → setTimeout(0) 後若「自動播放開著、有網址、計時又在跑」就 play()
+    // 舊版：只有 pause，之後靠每半秒的檢查看「停了又開始」；番茄鐘在 timer:finished 的同一瞬間就開始下一段，
+    //       running 一直是 true、檢查看不到變化，音樂從此不再自己播（指令序列只有 play → pause）。
+    await test('番茄鐘：timer:finished 的同一瞬間就開始下一段（running 一直是 true）→ 事件後音樂接著播', async () => {
+        const env = makeEnv({ url: 'https://youtu.be/dQw4w9WgXcQ', enabled: true, volume: 60 });
+        env.setTimer({ running: true, total: 300 }); env.tick(); await env.settle(); env.tick();
+        assert.ok(env.calls.some(c => c[0] === 'play'), '先確認專注階段有在播');
+        env.calls.length = 0;
+        env.setTimer({ total: 1500 });            // 下一段已經開始，計時器從頭到尾都在跑
+        env.fire('timer:finished');
+        assert.deepEqual(env.calls.map(c => c[0]), ['pause', 'volume'], '事件當下先暫停並還原音量');
+        assert.deepEqual(env.calls.at(-1), ['volume', 60]);
+        await env.settle();                       // 執行 setTimeout(0) 的 callback
+        assert.equal(env.calls.at(-1)[0], 'play', '舊版這裡沒有 play，音樂就此停住');
+        assert.equal(env.calls.filter(c => c[0] === 'play').length, 1);
+        env.tick();                               // 之後每半秒的檢查不會重複下指令
+        assert.equal(env.calls.filter(c => c[0] === 'play').length, 1);
+    });
+
+    await test('一般倒數結束（running=false）：timer:finished 後音樂維持暫停，不再 play', async () => {
+        const env = makeEnv({ url: 'https://youtu.be/dQw4w9WgXcQ', enabled: true, volume: 60 });
+        env.setTimer({ running: true, total: 300 }); env.tick(); await env.settle(); env.tick();
+        env.calls.length = 0;
+        env.setTimer({ running: false, total: 300 });
+        env.fire('timer:finished');
+        await env.settle();
+        assert.ok(env.calls.some(c => c[0] === 'pause'));
+        assert.equal(env.calls.filter(c => c[0] === 'play').length, 0);
+        env.tick();
+        assert.equal(env.calls.filter(c => c[0] === 'play').length, 0);
+    });
+
+    await test('關閉自動播放或沒設定網址：timer:finished 即使計時又在跑也不硬播、不載入播放器', async () => {
+        const off = makeEnv({ url: 'https://youtu.be/dQw4w9WgXcQ', enabled: false, volume: 60 });
+        off.setTimer({ running: true }); off.fire('timer:finished'); await off.settle();
+        assert.equal(off.calls.filter(c => c[0] === 'play').length, 0);
+        const none = makeEnv();
+        none.setTimer({ running: true }); none.fire('timer:finished'); await none.settle();
+        assert.equal(none.calls.length, 0);
+    });
+
     console.log(`${passed} timer bgm checks passed`);
 })().catch(e => { console.error(e); process.exit(1); });

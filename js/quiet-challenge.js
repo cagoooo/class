@@ -701,7 +701,8 @@
         const btn = (act, cls, label, dis) => `<button type="button" class="qc-btn ${cls}" data-act="${act}" ${dis ? 'disabled' : ''}>${label}</button>`;
         let h = '';
         if (!audio.stream) {
-            h = btn('mic', 'qc-btn-main qc-btn-big', '🎤 開始偵測音量');
+            h = micPending ? btn('none', 'qc-btn-main qc-btn-big', '🎤 等待麥克風授權……', true)
+                : btn('mic', 'qc-btn-main qc-btn-big', '🎤 開始偵測音量');
         } else if (calib) {
             h = btn('none', 'qc-btn-soft', '🎯 校正中……', true);
         } else if (challenge && challenge.state === 'done') {
@@ -794,7 +795,11 @@
     }
 
     // ───────────── 麥克風 ─────────────
+    // 正在等老師按「允許麥克風」時的請求編號。等待期間再按一次開始不會重複開；
+    // 等待中按了關閉或切到別頁，編號會作廢，晚到的麥克風一拿到就關掉。
+    let micRequest = 0, micPending = false;
     async function startMic(forceCalib) {
+        if (micPending || audio.stream) return;
         setMsg('');
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             setMsg('這個瀏覽器不能使用麥克風。請改用 Chrome 或 Edge，並確認網址是 https 開頭。');
@@ -806,8 +811,16 @@
             setMsg('這個瀏覽器無法分析聲音（可能是 App 內建瀏覽器或 iPhone 鎖定模式）。請改用 Safari、Chrome 或 Edge 開啟。');
             return;
         }
+        const request = ++micRequest;
+        micPending = true;
+        renderActions();
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+            if (request !== micRequest) {
+                // 等授權的時候老師已經離開或按了關閉：這支麥克風不能留著
+                stream.getTracks().forEach(t => { try { t.stop(); } catch (e) { /* ignore */ } });
+                return;
+            }
             const ctx = new Ctx();
             if (ctx.state === 'suspended') { try { await ctx.resume(); } catch (e) { /* 部分瀏覽器要等下次點擊 */ } }
             if (ctx.state === 'suspended') document.addEventListener('pointerdown', () => { try { ctx.resume(); } catch (e) { /* ignore */ } }, { once: true });
@@ -826,15 +839,19 @@
             if (forceCalib || cfg.floorDb == null) startCalib(!forceCalib);
             else { renderActions(); setMood('calm', true); }
         } catch (err) {
+            if (request !== micRequest) return;   // 已經取消的請求，不必再顯示錯誤
             const n = err && err.name;
             if (n === 'NotAllowedError' || n === 'SecurityError') setMsg('麥克風被拒絕了。請點網址列左邊的 🔒 圖示，把「麥克風」改成允許，再按一次開始。');
             else if (n === 'NotFoundError' || n === 'OverconstrainedError') setMsg('找不到麥克風。請確認電腦有接麥克風（或筆電內建麥克風沒有被關閉）。');
             else if (n === 'NotReadableError') setMsg('麥克風正被其他程式使用中（例如視訊會議），請先關掉那個程式再試一次。');
             else setMsg('麥克風啟動失敗，請重新整理頁面再試一次。');
+        } finally {
+            if (request === micRequest) { micPending = false; renderActions(); }
         }
     }
 
     function stopMic() {
+        micRequest++; micPending = false;   // 還在等授權的請求一併作廢
         if (audio.timer) clearInterval(audio.timer);
         if (audio.stream) audio.stream.getTracks().forEach(t => { try { t.stop(); } catch (e) { /* ignore */ } });
         if (audio.ctx) { try { audio.ctx.close(); } catch (e) { /* ignore */ } }
@@ -1070,7 +1087,7 @@
         suspend() {
             if (fsOn) exitFs();
             if (challenge && challenge.state === 'running') endChallenge(true);
-            if (audio.stream) stopMic();
+            if (audio.stream || micPending) stopMic();
         },
         /** 挑戰或偵測進行中：自動更新、同步提醒不要打斷。 */
         isActive() { return !!audio.stream; }

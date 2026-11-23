@@ -79,7 +79,9 @@ class DataBackup {
             const _hist = Array.isArray(data.pointsHistory) ? data.pointsHistory : [];
             const _hasReset = PointsReset.lastResetId(_hist) > 0;
             const _mine = PointsReset.sinceReset(_hist).filter(r => r.studentId === s.id);
-            (_mine.length || _hasReset ? _mine : (s.records || [])).forEach(r => {
+            // 撤銷是把按錯的收回，不算一次扣分：被撤銷的那筆和撤銷紀錄一起不列入次數（明細工作表仍保留）
+            const _net = list => (PointsReset.withoutUndone ? PointsReset.withoutUndone(list) : list);
+            _net(_mine.length || _hasReset ? _mine : (s.records || [])).forEach(r => {
                 if (r.points > 0) { addN++; addSum += r.points; }
                 else if (r.points < 0) { subN++; subSum += r.points; }
             });

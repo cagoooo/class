@@ -155,7 +155,14 @@
         wasRunning = now;
         syncFloating();
     }
-    window.addEventListener('timer:finished', () => { pause(); try { player?.setVolume?.(settings.volume); } catch { /* 忽略 */ } });
+    window.addEventListener('timer:finished', () => {
+        pause();
+        try { player?.setVolume?.(settings.volume); } catch { /* 忽略 */ }
+        fadeVolume = null;
+        // 番茄鐘在同一瞬間就開始下一段（休息或下一個專注），上面每半秒看一次的檢查看不到「停了又開始」，
+        // 音樂會從此不再自己播。等其他模組處理完這個事件後再看一次：計時又在跑就接著播。
+        setTimeout(() => { if (settings.enabled && settings.url && running()) play(); }, 0);
+    });
 
     // 全螢幕計時：播放器縮到右下角，學生看得到時間、老師也能隨時暫停音樂
     function syncFloating() {

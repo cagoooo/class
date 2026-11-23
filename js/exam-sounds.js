@@ -19,12 +19,23 @@
         _ctx: null,
         _enabled: localStorage.getItem(SOUNDS_STORAGE_KEY) !== 'false', // 預設開啟
 
-        // 已觸發的聲音標記，防止重複播放（以分鐘為單位）
-        _triggered: {
-            fiveMin: -1,  // 上次觸發「5分鐘」提醒的 examId
-            oneMin: -1,  // 上次觸發「1分鐘」提醒的 examId
-            end: -1,  // 上次觸發「結束」鈴聲的 examId
-            start: -1,  // 上次觸發「開始」鈴聲的 examId
+        // 已經響過的鈴聲（「日期｜科目編號｜哪一種鈴」），同一科同一種鈴一天只響一次。
+        // 多日考試每天第一科的編號都是 1，所以一定要帶日期，不然第二天的鈴會被當成響過了。
+        _rung: {},
+
+        /** 這一科的這種鈴今天還沒響過就記下來並回傳 true。 */
+        _once(kind, exam) {
+            const d = new Date();
+            const key = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate() + '|' + exam.id + '|' + kind;
+            if (this._rung[key]) return false;
+            this._rung[key] = true;
+            return true;
+        },
+
+        /** 在老師按按鈕的當下先把聲音打開（瀏覽器規定要有點擊才能出聲）。 */
+        unlock() {
+            const ctx = this._getCtx();
+            if (ctx && ctx.state === 'suspended') { try { ctx.resume(); } catch (e) { /* 等下一次點擊 */ } }
         },
 
         // =============================================
@@ -181,7 +192,8 @@
         _updateBtnIcon(btn) {
             if (!btn) return;
             btn.textContent = this._enabled ? '🔔' : '🔇';
-            btn.title = this._enabled ? '關閉音效' : '開啟音效';
+            btn.title = this._enabled ? '考試鈴聲：開（點一下關閉）' : '考試鈴聲：關（點一下開啟）';
+            btn.setAttribute('aria-label', btn.title);
         },
 
         // =============================================
@@ -198,27 +210,22 @@
         onExamTick(currentExam, remainingMin, justStarted) {
             if (!currentExam) return;
 
-            const id = currentExam.id;
-
             // 考試開始
-            if (justStarted && this._triggered.start !== id) {
-                this._triggered.start = id;
+            if (justStarted && this._once('start', currentExam)) {
                 this.playStart();
                 this._showToast('🔔 ' + currentExam.name + ' 開始！');
                 return;
             }
 
             // 倒數 1 分鐘（優先於 5 分鐘）
-            if (remainingMin <= 1 && this._triggered.oneMin !== id) {
-                this._triggered.oneMin = id;
+            if (remainingMin <= 1 && this._once('oneMin', currentExam)) {
                 this.playOneMinWarning();
                 this._showToast('🚨 最後 1 分鐘！請確認姓名');
                 return;
             }
 
             // 倒數 5 分鐘
-            if (remainingMin <= 5 && remainingMin > 1 && this._triggered.fiveMin !== id) {
-                this._triggered.fiveMin = id;
+            if (remainingMin <= 5 && remainingMin > 1 && this._once('fiveMin', currentExam)) {
                 this.playFiveMinWarning();
                 this._showToast('⚠️ 還剩 5 分鐘！開始收尾');
                 return;
@@ -231,8 +238,7 @@
          */
         onExamEnd(exam) {
             if (!exam) return;
-            if (this._triggered.end === exam.id) return;
-            this._triggered.end = exam.id;
+            if (!this._once('end', exam)) return;
             this.playEnd();
             this._showToast('🔔 ' + exam.name + ' 考試時間結束！');
         },
@@ -297,106 +303,31 @@
         },
 
         // =============================================
-        // 初始化：Hook 考試模組 & 注入靜音按鈕
+        // 靜音按鈕（考試全螢幕左上角的控制列）
         // =============================================
+        // 什麼時候該響鈴由 exam-proctor.js 每秒判斷後呼叫 onExamTick／onExamEnd。
+        // 舊版改成在這裡去包 window.updateFullscreenStatus，但那個函式從來沒有掛到 window 上，
+        // 結果開始鈴、結束鈴、靜音按鈕全部沒有作用（2026-11-23 全站檢測發現）。
 
-        init() {
-            // 等待 DOM + 其他模組載入
+        /** 把 🔔／🔇 按鈕放進考試全螢幕的控制列（已經有就不重複放）。 */
+        attachToggle() {
             const _self = this;
-            let _prevExam = null;
-
-            // === Hook 1：exam-proctor.js 的 updateFullscreenStatus ===
-            // 此函式每秒被呼叫一次更新考試狀態畫面
-            const _origUpdateFullscreen = window.updateFullscreenStatus;
-            if (typeof _origUpdateFullscreen === 'function') {
-                window.updateFullscreenStatus = function () {
-                    _origUpdateFullscreen.apply(this, arguments);
-
-                    // 取得當前考試（exam-proctor.js 中的 global fn）
-                    const currentExam = typeof window.getCurrentExam === 'function'
-                        ? window.getCurrentExam()
-                        : null;
-
-                    // 取得剩餘分鐘（exam-proctor.js 中的 global fn）
-                    const remainingMin = (currentExam && typeof window.getRemainingMinutes === 'function')
-                        ? window.getRemainingMinutes(currentExam)
-                        : 0;
-
-                    const justStarted = !!currentExam && !_prevExam;
-
-                    // 考試結束判斷（上次有考試，現在沒了）
-                    if (!currentExam && _prevExam) {
-                        _self.onExamEnd(_prevExam);
-                    } else {
-                        _self.onExamTick(currentExam, remainingMin, justStarted);
-                    }
-
-                    _prevExam = currentExam;
-                };
-                console.log('[ExamSounds] ✅ 已 Hook updateFullscreenStatus');
-            } else {
-                // 若模組尚未載入，等待後再 hook
-                window.addEventListener('load', () => {
-                    setTimeout(() => _self.init(), 500);
-                });
-                return;
-            }
-
-            // === Hook 2：計時器歸零提醒 ===
-            // 監聽原始計時器的完成事件（透過 MutationObserver 監看顯示文字）
-            setTimeout(() => {
-                const timerDisplay = document.getElementById('timerDisplay');
-                if (timerDisplay) {
-                    let _lastTimerText = timerDisplay.textContent;
-                    const timerObserver = new MutationObserver(() => {
-                        const current = timerDisplay.textContent;
-                        if (_lastTimerText !== '00:00' && current === '00:00') {
-                            _self.onTimerEnd();
-                        }
-                        _lastTimerText = current;
-                    });
-                    timerObserver.observe(timerDisplay, { characterData: true, childList: true, subtree: true });
-                    console.log('[ExamSounds] ✅ 已監聽計時器顯示元素');
-                }
-            }, 1000);
-
-            // === 注入靜音切換按鈕 ===
-            _self._injectSoundToggleBtn();
-
-            console.log(`[ExamSounds] ✅ 音效系統已初始化 (預設：${_self._enabled ? '開啟' : '關閉'})`);
+            const controlArea = document.querySelector('.exam-fullscreen-controls');
+            if (!controlArea || document.getElementById('examSoundToggleBtn')) return;
+            const btn = document.createElement('button');
+            btn.id = 'examSoundToggleBtn';
+            btn.className = 'exam-control-btn exam-sound-toggle-btn';
+            btn.style.cssText = 'background:rgba(250,204,21,0.18); border:none; cursor:pointer;';
+            _self._updateBtnIcon(btn);
+            btn.onclick = () => {
+                _self.toggle();
+                _self.unlock();
+            };
+            controlArea.appendChild(btn);
         },
 
-        // =============================================
-        // 注入靜音按鈕（考試全螢幕控制列）
-        // =============================================
-
-        _injectSoundToggleBtn() {
-            const _self = this;
-
-            // 等待考試全螢幕控制列出現後注入
-            const checkAndInject = () => {
-                const controlArea = document.querySelector('.exam-fullscreen-controls');
-                if (controlArea && !document.getElementById('examSoundToggleBtn')) {
-                    const btn = document.createElement('button');
-                    btn.id = 'examSoundToggleBtn';
-                    btn.className = 'exam-control-btn exam-sound-toggle-btn';
-                    btn.style.cssText = 'background:rgba(250,204,21,0.18); border:none; cursor:pointer;';
-                    _self._updateBtnIcon(btn);
-                    btn.onclick = () => {
-                        _self.toggle();
-                        // 解鎖 AudioContext（需用戶互動）
-                        const ctx = _self._getCtx();
-                        if (ctx && ctx.state === 'suspended') ctx.resume();
-                    };
-                    controlArea.appendChild(btn);
-                    console.log('[ExamSounds] ✅ 靜音按鈕已注入考試全螢幕');
-                }
-            };
-
-            // 使用 MutationObserver 監聽 exam modal
-            const observer = new MutationObserver(checkAndInject);
-            observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
-            checkAndInject();
+        init() {
+            this.attachToggle();
         },
     };
 
@@ -406,28 +337,12 @@
     window.ExamSounds = ExamSounds;
 
     // =============================================
-    // 自動初始化
+    // 自動初始化：控制列是頁面上原本就有的，載入完就把靜音按鈕放上去
     // =============================================
-    function tryInit() {
-        // 等待 exam-proctor.js 載入完畢（updateFullscreenStatus 存在）
-        if (typeof window.updateFullscreenStatus === 'function') {
-            ExamSounds.init();
-        } else {
-            // 使用 MutationObserver 以最低開銷等待
-            const bodyObserver = new MutationObserver(() => {
-                if (typeof window.updateFullscreenStatus === 'function') {
-                    bodyObserver.disconnect();
-                    ExamSounds.init();
-                }
-            });
-            bodyObserver.observe(document.body, { childList: true, subtree: false });
-        }
-    }
-
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', tryInit);
+        document.addEventListener('DOMContentLoaded', () => ExamSounds.init());
     } else {
-        tryInit();
+        ExamSounds.init();
     }
 
 })();

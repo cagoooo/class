@@ -89,3 +89,160 @@ for (const m of moods) {
 assert.deepEqual(Object.keys(qc.SPRITE_FRAMES).sort(), [...moods].sort(), '動作圖心情與小幫手心情一致');
 
 console.log('✅ 安靜挑戰邏輯測試全部通過');
+
+// ───────────────────────────────────────────────────────────
+// 麥克風「等待授權中」防重複（startMic 的 micPending／micRequest）
+// 舊版：瀏覽器跳出授權視窗、老師還沒按允許時，按鈕沒有消失也沒有 disabled，再按一次就要第二支麥克風；
+//       第一支串流永遠沒人關（stopMic 只關得到第二支），而且第一個 50ms 計時器停不掉。
+//       等待中離開本頁（suspend）也一樣：晚到的串流會留下計時器與 AudioContext，離開後仍在收音。
+// 這一段載入真正的 js/quiet-challenge.js，放進假 DOM、假麥克風（getUserMedia 由測試手動 resolve）。
+// ───────────────────────────────────────────────────────────
+const vm = require('node:vm');
+
+function micEnv() {
+    const timers = new Map(); let seq = 0;
+    const registry = {};
+    function el(id) {
+        if (registry[id]) return registry[id];
+        const e = registry[id] = {
+            id, value: '', textContent: '', className: '', style: {}, dataset: {}, hidden: false, children: [], __l: {}, innerHTML: '',
+            addEventListener(t, f) { (e.__l[t] = e.__l[t] || []).push(f); }, removeEventListener() {},
+            appendChild(c) { e.children.push(c); return c; }, append() {}, replaceChildren() {}, insertAdjacentElement(_, c) { return c; },
+            setAttribute() {}, toggleAttribute() {}, querySelector: sel => el(sel), querySelectorAll: () => [], closest: () => null,
+            remove() {}, focus() {}, parentElement: null, parentNode: { appendChild() {}, insertBefore() {} },
+        };
+        e.classList = { _s: new Set(), add(...c) { c.forEach(x => this._s.add(x)); }, remove(...c) { c.forEach(x => this._s.delete(x)); }, contains(c) { return this._s.has(c); }, toggle(c, f) { if (f === undefined ? !this._s.has(c) : f) this._s.add(c); else this._s.delete(c); } };
+        return e;
+    }
+    const gum = [];            // 每次 getUserMedia：{ stream, resolve, reject }
+    const ctxs = [];
+    const sb = {
+        console, Date, Math, Number, String, Array, Object, Set, Map, JSON, Promise, URL, parseInt, isNaN, Error, Float32Array,
+        performance: { now: () => Date.now() },
+        setInterval: (fn, ms) => { const id = ++seq; timers.set(id, { fn, ms }); return id; },
+        clearInterval: id => timers.delete(id),
+        setTimeout: (fn, ms) => { const id = ++seq; timers.set(id, { fn, ms, once: true }); return id; },
+        clearTimeout: id => timers.delete(id),
+        requestIdleCallback: f => f(), Image: class { set src(v) {} },
+        localStorage: { _d: {}, getItem(k) { return this._d[k] ?? null; }, setItem(k, v) { this._d[k] = String(v); }, removeItem(k) { delete this._d[k]; } },
+        document: {
+            getElementById: id => el(id), createElement: () => el('x' + Math.random()), querySelector: () => null, querySelectorAll: () => [],
+            addEventListener() {}, body: el('body'), head: el('head'), documentElement: el('html'), readyState: 'complete', hidden: false, currentScript: null,
+        },
+        addEventListener() {}, matchMedia: () => ({ matches: false }), location: { origin: 'http://x', search: '' },
+        navigator: {
+            mediaDevices: {
+                getUserMedia: () => new Promise((resolve, reject) => {
+                    const tracks = [{ stopped: false, stop() { this.stopped = true; }, addEventListener() {} }];
+                    const stream = { tracks, getTracks: () => tracks, getAudioTracks: () => tracks };
+                    gum.push({ stream, resolve: () => resolve(stream), reject: err => reject(err) });
+                }),
+            },
+        },
+        AudioContext: class {
+            constructor() { this.state = 'running'; this.destination = {}; this.closed = false; ctxs.push(this); }
+            resume() { return Promise.resolve(); } close() { this.closed = true; }
+            createMediaStreamSource() { return { connect() {} }; }
+            createAnalyser() { return { fftSize: 0, connect() {}, getFloatTimeDomainData(b) { b.fill(0.01); } }; }
+        },
+    };
+    sb.window = sb;
+    vm.createContext(sb);
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'quiet-challenge.js'), 'utf8'), sb);
+    sb.QuietChallenge.init();
+    const flush = async () => { for (let i = 0; i < 5; i++) await new Promise(r => setImmediate(r)); };
+    const press = act => el('qc-actions').__l.click[0]({ target: { closest: () => ({ dataset: { act }, disabled: false }) } });   // 老師按按鈕
+    return {
+        sb, gum, ctxs, el, flush, press,
+        scanTimers: () => [...timers.values()].filter(t => t.ms === 50).length,
+        liveStreams: () => gum.filter(g => g.stream.tracks.some(t => !t.stopped)).length,
+        actionsHtml: () => el('qc-actions').innerHTML,
+    };
+}
+
+(async () => {
+    let n = 0;
+    const t = async (name, fn) => { await fn(); console.log('PASS', name); n++; };
+
+    await t('等授權時再按一次開始：只會要一支麥克風（舊版要 2 支）', async () => {
+        const e = micEnv();
+        e.press('mic');
+        e.press('mic');                  // 按鈕在舊版沒有消失也沒有 disabled
+        assert.equal(e.gum.length, 1, 'getUserMedia 只能被呼叫 1 次');
+        e.gum[0].resolve(); await e.flush();
+        assert.equal(e.gum.length, 1);
+        assert.equal(e.ctxs.length, 1, '只建一個 AudioContext');
+        assert.equal(e.scanTimers(), 1, '偵測計時器只有 1 個');
+        assert.equal(e.sb.QuietChallenge.isActive(), true);
+        e.press('mic');                  // 已經在收音，再按也不會再要
+        assert.equal(e.gum.length, 1);
+    });
+
+    await t('等待中按鈕顯示「等待麥克風授權……」且 disabled，拿到麥克風後恢復', async () => {
+        const e = micEnv();
+        assert.match(e.actionsHtml(), /data-act="mic"/);
+        e.press('mic');
+        const waiting = e.actionsHtml();
+        assert.match(waiting, /等待麥克風授權……/);
+        assert.match(waiting, /disabled/);
+        assert.doesNotMatch(waiting, /data-act="mic"/, '等待中不該再有可按的「開始」按鈕');
+        e.gum[0].resolve(); await e.flush();
+        assert.doesNotMatch(e.actionsHtml(), /等待麥克風授權/);
+    });
+
+    await t('等授權時呼叫 suspend()：晚到的串流立刻 track.stop()，不留計時器與 AudioContext（舊版離開後仍在收音）', async () => {
+        const e = micEnv();
+        e.press('mic');
+        e.sb.QuietChallenge.suspend();   // 老師切到別的功能頁
+        assert.match(e.actionsHtml(), /data-act="mic"/, '離開後按鈕恢復成「開始偵測」');
+        e.gum[0].resolve(); await e.flush();
+        assert.equal(e.liveStreams(), 0, '晚到的麥克風必須被關掉');
+        assert.equal(e.gum[0].stream.tracks[0].stopped, true);
+        assert.equal(e.scanTimers(), 0, '不能留下 50ms 計時器');
+        assert.equal(e.ctxs.length, 0, '不能建立 AudioContext');
+        assert.equal(e.sb.QuietChallenge.isActive(), false);
+        assert.doesNotMatch(e.actionsHtml(), /等待麥克風授權/);
+    });
+
+    await t('等授權時按「關閉麥克風」（stopMic）：同樣關掉晚到的串流', async () => {
+        const e = micEnv();
+        e.press('mic');
+        e.press('micoff');
+        e.gum[0].resolve(); await e.flush();
+        assert.equal(e.liveStreams(), 0);
+        assert.equal(e.scanTimers(), 0);
+        assert.equal(e.ctxs.length, 0);
+    });
+
+    await t('取消後可以重新開始：新的請求正常取得麥克風，作廢的舊請求不影響它', async () => {
+        const e = micEnv();
+        e.press('mic'); e.sb.QuietChallenge.suspend();
+        e.press('mic');
+        assert.equal(e.gum.length, 2, '取消後再按一次要重新要麥克風');
+        e.gum[0].resolve(); await e.flush();         // 舊請求先到：被關掉，不能拆掉新請求的等待狀態
+        assert.equal(e.gum[0].stream.tracks[0].stopped, true);
+        assert.match(e.actionsHtml(), /等待麥克風授權/, '新請求還在等，按鈕仍是等待中');
+        e.gum[1].resolve(); await e.flush();
+        assert.equal(e.gum[1].stream.tracks[0].stopped, false, '新請求的串流保留');
+        assert.equal(e.scanTimers(), 1);
+        assert.equal(e.ctxs.length, 1);
+        e.sb.QuietChallenge.suspend();
+        assert.equal(e.liveStreams(), 0);
+        assert.equal(e.scanTimers(), 0);
+        assert.equal(e.ctxs[0].closed, true);
+    });
+
+    await t('已取消的請求後來才被拒絕：不跳出錯誤訊息；沒取消時被拒絕才顯示', async () => {
+        const e = micEnv();
+        e.press('mic'); e.sb.QuietChallenge.suspend();
+        e.gum[0].reject({ name: 'NotAllowedError' }); await e.flush();
+        assert.equal(e.el('qc-msg').textContent, '');
+        const f = micEnv();
+        f.press('mic');
+        f.gum[0].reject({ name: 'NotAllowedError' }); await f.flush();
+        assert.match(f.el('qc-msg').textContent, /麥克風被拒絕/);
+        assert.match(f.actionsHtml(), /data-act="mic"/, '被拒絕後按鈕要恢復，才能再試');
+    });
+
+    console.log(`${n} quiet-challenge mic-pending checks passed`);
+})().catch(err => { console.error(err); process.exit(1); });

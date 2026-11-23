@@ -240,8 +240,9 @@
 
         // 計算統計數據
         const records = recordsOf(student);
-        const positiveRecords = records.filter(r => r.points > 0);
-        const negativeRecords = records.filter(r => r.points < 0);
+        const counted = netRecords(records);   // 撤銷掉的不算進累積加扣分
+        const positiveRecords = counted.filter(r => r.points > 0);
+        const negativeRecords = counted.filter(r => r.points < 0);
         const totalPositive = positiveRecords.reduce((sum, r) => sum + r.points, 0);
         const totalNegative = Math.abs(negativeRecords.reduce((sum, r) => sum + r.points, 0));
 
@@ -363,7 +364,7 @@
         let csv = '\uFEFF座號,姓名,分數,加分次數,扣分次數,標籤\n';
 
         students.forEach(s => {
-            const records = recordsOf(s);
+            const records = netRecords(recordsOf(s));
             const positiveCount = records.filter(r => r.points > 0).length;
             const negativeCount = records.filter(r => r.points < 0).length;
             const tags = (s.tags || []).join(';');
@@ -546,6 +547,12 @@
         const mine = scoped.filter(r => r && r.studentId === student.id);
         if (mine.length || (PR && PR.lastResetId(hist) > 0)) return mine;
         return Array.isArray(student.records) ? student.records : [];
+    }
+
+    /** 統計次數用：被撤銷的那筆與撤銷紀錄一起不算（撤銷不是扣分）。 */
+    function netRecords(records) {
+        const PR = window.PointsReset;
+        return PR && typeof PR.withoutUndone === 'function' ? PR.withoutUndone(records) : records;
     }
 
     const BACKUP_KEY = 'classManager_autoBackup';

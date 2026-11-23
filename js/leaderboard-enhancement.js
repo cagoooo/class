@@ -481,6 +481,26 @@
     }
 
     /**
+     * 排名次：同分同名次（1、1、3），同分的人依座號排，每次順序都一樣。
+     * 獎牌只給分數大於 0 的前三名；全班同分（例如開學大家都是 0 分）時不發獎牌。
+     */
+    function rankStudents(list) {
+        const pts = s => Number(s && s.points) || 0;
+        const seat = s => { const n = parseInt(s && s.number, 10); return Number.isFinite(n) ? n : 1e9; };
+        const sorted = (Array.isArray(list) ? list : []).filter(Boolean).sort((a, b) => (pts(b) - pts(a)) || (seat(a) - seat(b)));
+        const tiedAll = sorted.length > 1 && sorted.every(s => pts(s) === pts(sorted[0]));
+        let rank = 0;
+        const rows = sorted.map((student, index) => {
+            if (index === 0 || pts(student) !== pts(sorted[index - 1])) rank = index + 1;
+            return { student, rank, points: pts(student), medal: !tiedAll && rank <= 3 && pts(student) > 0 ? rank : 0 };
+        });
+        return { rows, tiedAll, hasMedal: rows.some(r => r.medal > 0) };
+    }
+    window.LeaderboardRank = { rank: rankStudents };
+
+    const escapeText = text => String(text == null ? '' : text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    /**
      * 排行榜真實內容渲染（內部函式）
      */
     function _renderLeaderboardContent(modal) {
@@ -497,8 +517,9 @@
             console.warn('[Leaderboard] Failed to read students from localStorage', error);
         }
 
-        const sortedStudents = [...students].sort((a, b) => b.points - a.points);
-        const maxPoints = Math.max(...sortedStudents.map(s => Math.abs(s.points)), 1);
+        const ranking = rankStudents(students);
+        const sortedStudents = ranking.rows;
+        const maxPoints = Math.max(...sortedStudents.map(r => Math.abs(r.points)), 1);
 
         // 構建增強版 HTML
         let contentHTML = '';
@@ -512,38 +533,26 @@
                 </div>
             `;
         } else {
-            contentHTML = sortedStudents.map((student, index) => {
-                const rank = index + 1;
-                let medalHTML = '';
-                let rankClass = 'rank-other';
-
-                if (rank === 1) {
-                    medalHTML = '<span class="leaderboard-medal gold">🥇</span>';
-                    rankClass = 'rank-1';
-                } else if (rank === 2) {
-                    medalHTML = '<span class="leaderboard-medal">🥈</span>';
-                    rankClass = 'rank-2';
-                } else if (rank === 3) {
-                    medalHTML = '<span class="leaderboard-medal">🥉</span>';
-                    rankClass = 'rank-3';
-                } else {
-                    medalHTML = `<span class="leaderboard-rank-number">#${rank}</span>`;
-                }
-
-                const scorePercentage = maxPoints > 0 ? Math.abs(student.points) / maxPoints * 100 : 0;
-                const scoreClass = student.points >= 0 ? 'positive' : 'negative';
-                const animationDelay = index * 0.08;
+            const MEDALS = { 1: '<span class="leaderboard-medal gold">🥇</span>', 2: '<span class="leaderboard-medal">🥈</span>', 3: '<span class="leaderboard-medal">🥉</span>' };
+            const tiedNote = ranking.tiedAll
+                ? `<p class="text-sm text-center text-gray-500 py-2">目前全班都是 ${sortedStudents[0].points} 分，還沒有分出名次 😊</p>` : '';
+            contentHTML = tiedNote + sortedStudents.map((row, index) => {
+                const medalHTML = MEDALS[row.medal] || `<span class="leaderboard-rank-number">#${row.rank}</span>`;
+                const rankClass = row.medal ? `rank-${row.medal}` : 'rank-other';
+                const scorePercentage = maxPoints > 0 ? Math.abs(row.points) / maxPoints * 100 : 0;
+                const scoreClass = row.points >= 0 ? 'positive' : 'negative';
+                const animationDelay = Math.min(index, 20) * 0.08;
 
                 return `
                     <div class="leaderboard-item ${rankClass}" style="animation-delay: ${animationDelay}s;">
                         ${medalHTML}
                         <div class="leaderboard-student-info">
-                            <div class="leaderboard-student-name">${student.name}</div>
+                            <div class="leaderboard-student-name">${escapeText(row.student.name)}</div>
                             <div class="leaderboard-score-bar-container">
                                 <div class="leaderboard-score-bar ${scoreClass}" style="width: ${scorePercentage}%; animation-delay: ${animationDelay + 0.3}s;"></div>
                             </div>
                         </div>
-                        <span class="leaderboard-score ${scoreClass}">${student.points} 分</span>
+                        <span class="leaderboard-score ${scoreClass}">${row.points} 分</span>
                     </div>
                 `;
             }).join('');
@@ -567,12 +576,14 @@
             </div>
         `;
 
-        // 觸發特效
-        if (typeof triggerConfetti === 'function') {
-            triggerConfetti();
-        }
-        if (typeof playCheerSound === 'function') {
-            playCheerSound();
+        // 有人拿到獎牌才放彩花與歡呼（全班同分或都還沒有分數時不慶祝）
+        if (ranking.hasMedal) {
+            if (typeof triggerConfetti === 'function') {
+                triggerConfetti();
+            }
+            if (typeof playCheerSound === 'function') {
+                playCheerSound();
+            }
         }
     }
 
