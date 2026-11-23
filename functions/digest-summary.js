@@ -304,9 +304,21 @@ function summarizeOtherApp(events) {
   const errors = [];
   const wrongCodes = [];
   let guestEvents = 0;
+  // 課堂活動（剛好學專屬事件）：開課、下課、AI 使用、課堂功能
+  const classrooms = new Set();
+  const featureCounts = {};
+  let creates = 0, classEnds = 0, classEndStudents = 0, aiCalls = 0;
   events.forEach((d) => {
     if (d.uid) (d.anonymous ? anonymousUids : googleUids).add(d.uid);
     else if (d.type === 'session_start') guestEvents++;
+    if (d.type === 'create') { creates++; if (d.classroom) classrooms.add(String(d.classroom)); return; }
+    if (d.type === 'class_end') { classEnds++; classEndStudents += safeInteger(d.studentCount); return; }
+    if (d.type === 'ai_api') { aiCalls++; return; }
+    if (d.type === 'feature') {
+      const label = clip(d.label || d.feature || '', 40).trim();
+      if (label) featureCounts[label] = (featureCounts[label] || 0) + 1;
+      return;
+    }
     if (d.type === 'error' && isStudentWrongClassroomCode(d)) {
       const code = /「([^」]{1,40})」/.exec(String(d.message || ''));
       wrongCodes.push(code ? code[1] : '');
@@ -320,7 +332,24 @@ function summarizeOtherApp(events) {
     events: events.length, accounts: googleUids.size, anonymous: anonymousUids.size, guestEvents, errors,
     wrongCodeCount: wrongCodes.length,
     wrongCodeSamples: [...new Set(wrongCodes.filter(Boolean))].slice(0, 3),
+    creates, classEnds, classEndStudents, aiCalls,
+    hotFeatures: Object.keys(featureCounts)
+      .map((label) => ({ label, count: featureCounts[label] }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 4),
   };
+}
+
+/** 剛好學的課堂活動一行；今天完全沒有就不顯示（回傳空字串，呼叫端會濾掉）。 */
+function akailaoActivityLine(a) {
+  const parts = [
+    a.creates && `開課 ${a.creates} 次`,
+    a.classEnds && `下課 ${a.classEnds} 次` + (a.classEndStudents ? `（學生共 ${a.classEndStudents} 人次）` : ''),
+    a.aiCalls && `AI 使用 ${a.aiCalls} 次`,
+    a.hotFeatures && a.hotFeatures.length
+      && `功能：${a.hotFeatures.map((f) => `${clip(f.label, 20)} ${f.count}`).join('、')}`,
+  ].filter(Boolean);
+  return parts.length ? `🏫 課堂：${parts.join(' · ')}` : '';
 }
 
 function backupLine(backup) {
@@ -450,6 +479,7 @@ function buildDigestPayload(day, dateLabel, sum, backup, prune) {
           topLabel: '今日狀態',
           text: [
             `👥 有事件帳號：${people}`,
+            akailaoActivityLine(akailao),
             akailao.errors.length
               ? `🐞 錯誤 ${akailao.errors.length} 則：` + akailao.errors.slice(0, 3).map((error) => clip(error.message, 60)).join('；')
               : '🐞 錯誤 0 則 ✅',

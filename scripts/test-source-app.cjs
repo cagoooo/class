@@ -106,6 +106,8 @@ test('戰報：剛好學的帳號、訪客、錯誤不混進班級小管家', ()
     events: 5, accounts: 1, anonymous: 1, guestEvents: 1,
     errors: [{ message: '剛好學壞了', context: 'error · @ :1009 · 教師', who: '' }],
     wrongCodeCount: 0, wrongCodeSamples: [],
+    // 課堂活動（開課、下課、AI 使用、課堂功能）：這批事件沒有，全部是 0
+    creates: 0, classEnds: 0, classEndStudents: 0, aiCalls: 0, hotFeatures: [],
   });
 });
 

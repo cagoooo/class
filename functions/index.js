@@ -9,9 +9,16 @@
  *    存在 Cloud Functions 的 Secret（Secret Manager）：
  *      firebase functions:secrets:set GOOGLE_CHAT_WEBHOOK
  *
- * 部署（學校帳號、需 Blaze 方案）：
- *      firebase deploy --only functions --project <你的專案ID> \
- *        --account=ipad@mail2.smes.tyc.edu.tw
+ * 部署（需 Blaze 方案）：這個 Firebase 專案和「剛好學」共用，一定要「點名」要部署的函式。
+ *      FUNCTIONS_DISCOVERY_TIMEOUT=60 firebase deploy \
+ *        --only functions:notifyUsage,functions:dailyUsageDigest \
+ *        --project class-4719f --account cagooo@gmail.com
+ *    🚫 不可以只寫 `--only functions`：Firebase 會把這份程式裡沒有的函式當成要刪除，
+ *       剛好學的 callGemini 會被刪掉（細節見 repo 根目錄的 CLAUDE.md）。
+ *
+ * 誰可以呼叫：前端有沒有登入都會呼叫（訪客造訪數、登入前發生的錯誤都靠它），所以不能直接
+ * 拒絕未登入的呼叫。防洗版靠三層：每個身分每天的上限、沒登入 Google 的訪客另外共用一個
+ * 全站額度池、送到 Chat 前把內容裡的標籤與連結處理掉（chat-safe.js）。
  *
  * 區域固定 asia-east1（台灣最近），前端呼叫端也要用同一區域。
  */
@@ -40,6 +47,7 @@ const {
   withSourceApp,
 } = require('./digest-summary');
 const { redactEventData, redactLegacyStudentNames } = require('./privacy-redact');
+const { defangLinks, neutralizeMarkup } = require('./chat-safe');
 const { dumpTree, buildDump, verifyDump } = require('./purge-backup');
 const { KEEP_DAYS, groupSnapshotParts, planClassPrune } = require('./snapshot-prune');
 
@@ -60,6 +68,12 @@ const EVENT_META = {
   error:           { emoji: '🐞', title: '系統發生錯誤' },
   sync_conflict:  { emoji: '⚠️', title: '雲端同步衝突提醒' },
   sync_upgrade:   { emoji: '🔄', title: '舊版雲端資料已自動升級' },   // 只進每日戰報，不即時推播
+  // 剛好學才會送的四種事件：只留底給每日戰報統計，不即時推播。
+  // 以前這裡沒有列，事件被當成「不認得的型別」直接丟掉，戰報的剛好學區塊一直少算（2026-11-23 全站檢測）。
+  create:          { emoji: '🏫', title: '老師開了一間教室' },
+  feature:         { emoji: '🧩', title: '使用了課堂功能' },
+  ai_api:          { emoji: '🤖', title: '使用了 AI 功能' },
+  class_end:       { emoji: '🔔', title: '下課（課堂統計）' },
   ...PET_EVENT_META,
 };
 
@@ -119,6 +133,12 @@ function buildCard(type, data, who) {
       { decoratedText: { topLabel: '時間', text: timeText, wrapText: true } }
     ]
   };
+  // 沒登入 Google 的訪客，身分和內容都沒辦法查證：提醒看通知的人不要照著內容去點連結。
+  if (type === 'error' && who.anonymous) {
+    baseSection.widgets.push({
+      decoratedText: { topLabel: '提醒', text: '訪客送出的內容未經驗證，請勿點擊其中的連結', wrapText: true },
+    });
+  }
 
   // 詳細內容區塊
   const contentWidgets = [];
@@ -299,7 +319,7 @@ function buildCard(type, data, who) {
     }
     if (data.ua) {
       let device = '未知裝置';
-      const ua = data.ua;
+      const ua = String(data.ua);   // 呼叫端送物件進來時 includes 會丟例外，整則通報就送不出去
       if (ua.includes('iPad')) device = 'iPad 📱';
       else if (ua.includes('iPhone')) device = 'iPhone 📱';
       else if (ua.includes('Macintosh')) device = 'Mac 💻';
@@ -400,6 +420,9 @@ const INSTANT_PUSH_TYPES = new Set([
   'error',
 ]);
 
+// 剛好學才會送的事件：只留底（欄位見 logUsageEvent），戰報的剛好學區塊統計用
+const AKAILAO_LOG_ONLY_TYPES = new Set(['create', 'feature', 'ai_api', 'class_end']);
+
 // 每個身分每日上限：error 推播 5 則（沿用舊規則）、事件留底 200 筆（防呆用）。
 const MAX_ERROR_PUSH_PER_DAY = 5;
 const MAX_EVENTS_PER_DAY = 300;
@@ -423,38 +446,92 @@ function expiryTimestamp() {
  *
  * 前端 usage-notify.js 的節流只在前端生效，若有人繞過前端直接呼叫這支
  * callable，那些節流形同虛設；這裡在伺服端再把關一次。
- * 配額檢查本身出錯則 fail-open 全部放行，避免限流機制的 bug 反而吞掉
- * 真正需要被看到的錯誤通報。
+ *
+ * 訪客額度池（untrusted＝沒有登入 Google：匿名帳號或完全沒登入）：
+ *   匿名帳號誰都能開、要開幾個就開幾個，如果只算「每個身分 5 則」，換一個帳號就多 5 則，
+ *   等於沒有上限。所以匿名帳號除了自己的額度，還要從「全站訪客共用的池子」扣：
+ *   分成 POOL_SHARDS 份（避免大家搶同一筆文件），合計每天最多推 30 則、留底 10000 筆。
+ *   完全沒登入的呼叫本來就共用 no-auth 這一筆（每天 5 則／300 筆），不必再進池子。
+ *   已登入 Google 的老師不受池子影響，訪客被洗版時老師的錯誤通報照常送得出來。
+ *
+ * 配額檢查本身出錯時：已登入 Google 的老師照舊全部放行（限流機制自己壞掉不能吞掉真正的
+ * 錯誤通報）；訪客只留底、不推播——有人同時送大量請求把交易擠爆時，不能變成無上限推播。
  */
-async function checkQuota(uid, isError) {
+async function checkQuota(uid, isError, untrusted) {
   const key = uid || 'no-auth';
   const day = taipeiDay();
-  const ref = admin.firestore().collection('_usageRateLimits').doc(`${key}_${day}`);
+  const limits = admin.firestore().collection('_usageRateLimits');
+  const ref = limits.doc(`${key}_${day}`);
+  const poolRef = uid && untrusted ? limits.doc(`guest-pool-${poolShard(uid)}_${day}`) : null;
   try {
     return await admin.firestore().runTransaction(async (tx) => {
+      // 交易裡要先讀完再寫
       const snap = await tx.get(ref);
+      const poolSnap = poolRef ? await tx.get(poolRef) : null;
       const d = snap.exists ? (snap.data() || {}) : {};
+      const pool = poolSnap && poolSnap.exists ? (poolSnap.data() || {}) : {};
       const total = d.total || 0;
       // 舊版欄位叫 count（只算 error），保留相容避免升級當天配額被重置
       const errors = (d.errors != null ? d.errors : d.count) || 0;
+      const poolTotal = pool.total || 0;
+      const poolErrors = pool.errors || 0;
 
-      const canLog = total < MAX_EVENTS_PER_DAY;
-      const canPush = !isError || errors < MAX_ERROR_PUSH_PER_DAY;
+      const canLog = total < MAX_EVENTS_PER_DAY && (!poolRef || poolTotal < POOL_EVENTS_PER_SHARD);
+      const canPush = !isError
+        || (errors < MAX_ERROR_PUSH_PER_DAY && (!poolRef || poolErrors < POOL_ERROR_PUSH_PER_SHARD));
 
-      const patch = {
+      const stamp = {
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         expireAt: expiryTimestamp(),
       };
+      const patch = { ...stamp };
       if (canLog) patch.total = total + 1;
       if (isError && canPush) patch.errors = errors + 1;
       tx.set(ref, patch, { merge: true });
 
+      if (poolRef && (canLog || (isError && canPush))) {
+        const poolPatch = { ...stamp };
+        if (canLog) poolPatch.total = poolTotal + 1;
+        if (isError && canPush) poolPatch.errors = poolErrors + 1;
+        tx.set(poolRef, poolPatch, { merge: true });
+      }
+
       return { log: canLog, push: canPush };
     });
   } catch (e) {
-    logger.error('[Quota] 配額檢查失敗，預設放行', e);
-    return { log: true, push: true };
+    logger.error('[Quota] 配額檢查失敗' + (untrusted ? '，訪客只留底不推播' : '，預設放行'), e);
+    return { log: true, push: !untrusted };
   }
+}
+
+// 訪客額度池：分 10 份，每份每天最多推 3 則、留底 1000 筆（合計 30 則／10000 筆）
+const POOL_SHARDS = 10;
+const POOL_ERROR_PUSH_PER_SHARD = 3;
+const POOL_EVENTS_PER_SHARD = 1000;
+
+/** 這個身分用哪一份池子（同一個身分固定同一份）。 */
+function poolShard(key) {
+  let hash = 0;
+  for (const ch of String(key)) hash = (hash * 31 + ch.codePointAt(0)) >>> 0;
+  return hash % POOL_SHARDS;
+}
+
+/** 文件編號裡只留英數、底線、連字號（斜線會變成寫進子集合）。 */
+function safeIdPart(value, fallback) {
+  return String(value || fallback).replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 80);
+}
+
+/**
+ * 功能統計是「某一天的累計值」，日期由前端帶上來。只接受最近 30 天內（含明天，容許時區差）
+ * 格式正確的日期，其餘一律記在今天：不讓人把統計灌進任意日期。
+ */
+function summaryDay(claimed) {
+  const today = taipeiDay();
+  const text = String(claimed || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return today;
+  const oldest = taipeiDay(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+  const newest = taipeiDay(new Date(Date.now() + 24 * 60 * 60 * 1000));
+  return text >= oldest && text <= newest ? text : today;
 }
 
 /**
@@ -470,7 +547,7 @@ async function logUsageEvent(eventType, data, who, uid) {
   try {
     const db = admin.firestore();
     const day = eventType === 'feature_summary' && data.date
-      ? String(data.date).slice(0, 10)
+      ? summaryDay(data.date)
       : taipeiDay();
 
     const doc = {
@@ -533,10 +610,29 @@ async function logUsageEvent(eventType, data, who, uid) {
       doc.deviceId = clip(data.deviceId, 40);
     }
 
+    // 剛好學的四種事件：只留戰報要統計的欄位，長度一律裁切
+    if (AKAILAO_LOG_ONLY_TYPES.has(eventType)) {
+      const count = (value, max) => {
+        const n = Math.round(Number(value));
+        return Number.isFinite(n) && n >= 0 ? Math.min(n, max) : 0;
+      };
+      if (data.classroom) doc.classroom = clip(data.classroom, 40);
+      if (data.role) doc.role = clip(data.role, 20);
+      if (eventType === 'feature' || eventType === 'ai_api') {
+        doc.feature = clip(data.feature, 40);
+        doc.label = clip(data.label || data.feature, 40);
+      }
+      if (eventType === 'ai_api' && data.keyType) doc.keyType = clip(data.keyType, 30);
+      if (eventType === 'class_end') {
+        doc.studentCount = count(data.studentCount, 500);
+        if (data.durationMin != null) doc.durationMin = count(data.durationMin, 1440);
+      }
+    }
+
     if (eventType === 'feature_summary') {
       // 當日累計值，同裝置重送要覆寫而不是累加
-      const device = doc.deviceId || 'unknown';
-      const id = `feat_${day}_${uid || 'anon'}_${device}`;
+      const device = safeIdPart(doc.deviceId, 'unknown');
+      const id = `feat_${day}_${safeIdPart(uid, 'anon')}_${device}`;
       await db.collection(EVENT_LOG_COLLECTION).doc(id).set(doc, { merge: true });
       return 'ok';
     }
@@ -590,7 +686,8 @@ async function postToChat(webhook, payload) {
     const resp = await fetch(webhook, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json; charset=UTF-8' },
-      body: JSON.stringify(payload),
+      // 內容裡的角括號一律換成全形，Chat 不會把它當成標籤或連結（見 chat-safe.js）
+      body: JSON.stringify(neutralizeMarkup(payload)),
     });
     if (!resp.ok) {
       const body = await resp.text().catch(() => '');
@@ -640,7 +737,8 @@ exports.notifyUsage = onCall(
     const studentWrongCode = isError && isStudentWrongClassroomCode(data);
 
     // 離線事件、學生打錯代碼仍留底，但不消耗真正錯誤的每日推播額度。
-    const quota = await checkQuota(uid, isError && !recoverableOfflineSync && !studentWrongCode);
+    // who.anonymous＝沒有登入 Google（匿名帳號或完全沒登入）：身分無法查證，另受訪客額度池限制
+    const quota = await checkQuota(uid, isError && !recoverableOfflineSync && !studentWrongCode, who.anonymous);
 
     // ① 留底（所有型別，含不推播的日常事件）
     let logStatus = 'skipped';
@@ -682,7 +780,9 @@ exports.notifyUsage = onCall(
 
     // 標上來源系統：剛好學也共用這支函式，不標的話一律看起來像班級小管家
     const app = resolveSourceApp({ ...data, type: eventType });
-    const pushed = await postToChat(webhook, withSourceApp(buildCard(eventType, data, who), app));
+    // 訪客送來的內容，網址不讓 Chat 自動變成可以點的連結
+    const card = who.anonymous ? defangLinks(buildCard(eventType, data, who)) : buildCard(eventType, data, who);
+    const pushed = await postToChat(webhook, withSourceApp(card, app));
     return { ok: true, logged: quota.log, pushed };
   }
 );
