@@ -4,8 +4,11 @@
  *
  * 功能：
  * - 觸控左右滑動切換功能區（對應 showSection + 功能選單順序）
- * - 長按學生卡片顯示快捷動作選單
  * - 雙指捏合/放大：保留系統預設（不攔截）
+ *
+ * v3.73.2：拿掉「長按學生卡片快捷選單」。它從上線起就不會出現（綁的卡片屬性全站沒有、
+ * 找學生時先查一份永遠是空的舊名單），選單裡的加分也寫錯欄位、不寫紀錄、不存檔。
+ * 加扣分請用加扣分頁或學生卡片的「管理」選單。
  *
  * 依賴：
  * - window.showSection()（classnew.html 主邏輯）
@@ -267,143 +270,6 @@
         return false;
     }
 
-    // ==================== 應用：學生卡片長按快捷選單 ====================
-
-    /** 長按學生卡片顯示快捷操作選單 */
-    function initStudentCardLongPress() {
-        // 使用事件委派，監聽動態新增的學生卡片
-        const studentsSection = document.getElementById('students-section') || document.body;
-
-        studentsSection.addEventListener('touchstart', (e) => {
-            const card = e.target.closest('.student-card, [data-student-id]');
-            if (!card) return;
-
-            let moved = false;
-            let timer = null;
-
-            const onMove = () => { moved = true; clearTimeout(timer); };
-            const onEnd = () => {
-                clearTimeout(timer);
-                card.removeEventListener('touchmove', onMove);
-                card.removeEventListener('touchend', onEnd);
-            };
-
-            card.addEventListener('touchmove', onMove, { passive: true });
-            card.addEventListener('touchend', onEnd, { passive: true });
-
-            timer = setTimeout(() => {
-                if (!moved) {
-                    const studentId = card.dataset.studentId ||
-                        card.getAttribute('data-student-id');
-                    if (studentId) showStudentQuickMenu(studentId, card);
-                }
-            }, CONFIG.longPressDelay);
-        }, { passive: true });
-    }
-
-    /** 顯示學生快捷選單 */
-    function showStudentQuickMenu(studentId, anchorEl) {
-        // 若已有選單，先移除
-        document.getElementById('gesture-student-menu')?.remove();
-
-        // 安全取得學生資料
-        const student = (window.AppState?.students || window.students || [])
-            .find(s => String(s.id) === String(studentId));
-        if (!student) return;
-
-        const menu = document.createElement('div');
-        menu.id = 'gesture-student-menu';
-
-        const rect = anchorEl.getBoundingClientRect();
-        const menuTop = Math.min(rect.bottom + 8, window.innerHeight - 210);
-        const menuLeft = Math.max(8, Math.min(rect.left, window.innerWidth - 208));
-
-        menu.style.cssText = `
-            position: fixed;
-            top: ${menuTop}px;
-            left: ${menuLeft}px;
-            background: white;
-            border-radius: 1rem;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.18);
-            z-index: 9998;
-            overflow: hidden;
-            min-width: 200px;
-            animation: gestureMenuIn 0.2s cubic-bezier(0.34,1.56,0.64,1);
-        `;
-
-        const actions = [
-            { icon: '⭐', label: `加 1 分給 ${student.name}`, action: () => _quickAddScore(studentId, 1) },
-            { icon: '➕', label: '加 2 分', action: () => _quickAddScore(studentId, 2) },
-            { icon: '➖', label: '扣 1 分', action: () => _quickAddScore(studentId, -1) },
-            {
-                icon: '👤', label: '查看資料', action: () => {
-                    window.showSection?.('students');
-                    showGestureToast(`切至 ${student.name} 的資料`);
-                }
-            },
-        ];
-
-        menu.innerHTML = `
-            <div style="padding:0.6rem 1rem;background:#3b82f6;color:white;font-weight:700;font-size:0.9rem;">
-                ✋ ${escapeHtml(student.name)}
-            </div>
-            ${actions.map((a, i) => `
-                <button data-idx="${i}" style="
-                    display:block;width:100%;text-align:left;
-                    padding:0.65rem 1rem;font-size:0.9rem;
-                    background:white;border:none;cursor:pointer;
-                    border-top:1px solid #f1f5f9;
-                    transition:background 0.15s;
-                " onmouseenter="this.style.background='#eff6ff'"
-                   onmouseleave="this.style.background='white'">
-                    ${a.icon} ${escapeHtml(a.label)}
-                </button>
-            `).join('')}
-        `;
-
-        // 綁定動作
-        menu.querySelectorAll('button[data-idx]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const idx = parseInt(btn.dataset.idx, 10);
-                actions[idx]?.action();
-                menu.remove();
-                document.removeEventListener('touchstart', _menuDismiss);
-            });
-        });
-
-        document.body.appendChild(menu);
-
-        // 觸控其他區域關閉選單
-        setTimeout(() => {
-            document.addEventListener('touchstart', _menuDismiss, { passive: true, once: true });
-        }, 100);
-    }
-
-    function _menuDismiss(e) {
-        const menu = document.getElementById('gesture-student-menu');
-        if (menu && !menu.contains(e.target)) menu.remove();
-    }
-
-    /** 快速加減分（依賴現有全域函數） */
-    function _quickAddScore(studentId, delta) {
-        // 優先使用現有的加分函數
-        if (typeof window.adjustScore === 'function') {
-            window.adjustScore(studentId, delta);
-        } else if (typeof window.addPoints === 'function') {
-            window.addPoints(studentId, delta);
-        } else {
-            // 後備：直接修改 AppState
-            const students = window.AppState?.students || window.students;
-            const s = students?.find(x => String(x.id) === String(studentId));
-            if (s) {
-                s.score = (s.score || 0) + delta;
-                if (typeof window.renderStudents === 'function') window.renderStudents();
-                if (typeof window.saveData === 'function') window.saveData();
-            }
-        }
-        showGestureToast(delta > 0 ? `+${delta} ⭐` : `${delta} 💫`);
-    }
-
     // ==================== CSS 注入 ====================
 
     function injectStyles() {
@@ -411,11 +277,6 @@
         const style = document.createElement('style');
         style.id = 'gesture-handler-styles';
         style.textContent = `
-            @keyframes gestureMenuIn {
-                from { opacity: 0; transform: scale(0.85) translateY(-8px); }
-                to   { opacity: 1; transform: scale(1)    translateY(0); }
-            }
-
             /* 手勢操作指示器（滑動中顯示） */
             .gesture-swipe-indicator {
                 position: fixed;
@@ -448,8 +309,7 @@
     function init() {
         injectStyles();
         initContentSwipe();
-        initStudentCardLongPress();
-        console.log('✅ 手勢操作模組已載入（左右滑動切換功能區 | 長按學生卡片快捷選單）');
+        console.log('✅ 手勢操作模組已載入（左右滑動切換功能區）');
     }
 
     if (document.readyState === 'loading') {
