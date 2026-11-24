@@ -21,7 +21,7 @@
 - 正本：`H:\Akailao\firestore.rules`。本 repo 的 `firestore.rules` 是**完全相同的複本**（檔頭有註明）。
 - 要改規則（包括班級小管家自己的路徑，例如 `users`、`petShares`）：
   1. 改 `H:\Akailao\firestore.rules`
-  2. 用模擬資料庫跑規則測試（做法見 skill `firestore-shared-code-ownership`）
+  2. 用模擬資料庫跑規則測試：`cd H:/Akailao/tests/firestore-rules && npm install && npm test`（13 項，含班級小管家的 `users`、`petShares`；改到新路徑時在那支測試補案例）
   3. 在 `H:\Akailao` 部署：`firebase deploy --only firestore:rules --project class-4719f --account cagooo@gmail.com`
   4. `cp H:/Akailao/firestore.rules H:/Class/firestore.rules`，再 `cmp` 確認兩份相同，兩邊都 commit
 - 🚫 **不要在本 repo 跑 `firebase deploy --only firestore` 或不加 `--only` 的 `firebase deploy`**：只要兩份不同步，就會把另一個網站的規則蓋掉。

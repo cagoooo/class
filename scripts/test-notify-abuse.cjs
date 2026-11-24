@@ -272,5 +272,26 @@ async function test(name, fn) { reset(); await fn(); console.log('PASS', name); 
         assert.ok(src.includes('--account cagooo@gmail.com'));
     });
 
+    await test('維運後台：信箱一樣但沒驗證過、或不是用 Google 登入的帳號進不去（舊版只比對信箱文字）', async () => {
+        const src = fs.readFileSync(path.join(FN_DIR, 'index.js'), 'utf8');
+        const adminEmail = /const ADMIN_EMAILS = \['([^']+)'\]/.exec(src)[1];   // 從原始碼讀，測試檔不另外寫一份
+        const googleLogin = { firebase: { sign_in_provider: 'google.com' } };
+        const call = (token) => fns.getTeacherOrphanDetails.run({ data: {}, auth: token && { uid: 'A', token } });
+        const denied = (token) => assert.rejects(call(token), (e) => e.code === 'permission-denied');
+        await assert.rejects(call(null), (e) => e.code === 'unauthenticated');
+        await denied({ email: adminEmail, ...googleLogin });                                            // 沒有「已驗證」
+        await denied({ email: adminEmail, email_verified: false, ...googleLogin });
+        await denied({ email: adminEmail, email_verified: 'true', ...googleLogin });                    // 不是真的 true
+        await denied({ email: adminEmail, email_verified: true, firebase: { sign_in_provider: 'password' } });
+        await denied({ email: adminEmail, email_verified: true, firebase: { sign_in_provider: 'anonymous' } });
+        await denied({ email: adminEmail, email_verified: true });                                      // 看不出登入方式
+        await denied({ email: 'someone-else@example.test', email_verified: true, ...googleLogin });
+        // 真正的管理員（信箱大小寫不同也算）：通過身分檢查，停在後面的參數檢查
+        await assert.rejects(call({ email: adminEmail.toUpperCase(), email_verified: true, ...googleLogin }), (e) => e.code === 'invalid-argument');
+        // 五支維運函式都走同一套檢查，沒有人自己另外比對信箱
+        assert.equal((src.match(/^\s+(?:const \w+ = )?requireAdmin\(request\);/gm) || []).length, 5);
+        assert.equal(src.split('ADMIN_EMAILS.includes').length - 1, 1);
+    });
+
     console.log(passed + ' notify-abuse checks passed');
 })().catch((e) => { console.error(e); process.exit(1); });

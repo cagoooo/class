@@ -1167,9 +1167,13 @@ function requireAdmin(request) {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', '必須先進行 Google 登入才能調用此介面');
   }
-  const userEmail = (request.auth.token.email || '').toLowerCase().trim();
-  if (!ADMIN_EMAILS.includes(userEmail)) {
-    logger.warn(`未經授權的後台存取嘗試: ${userEmail}`);
+  const token = request.auth.token || {};
+  const userEmail = String(token.email || '').toLowerCase().trim();
+  // 只比對信箱文字不夠：哪天專案開了其他登入方式，別人可以弄出一個「信箱一樣、但沒驗證過」的帳號。
+  // 所以還要確認這個信箱是 Google 驗證過的，而且真的是用 Google 登入。
+  const provider = (token.firebase && token.firebase.sign_in_provider) || '';
+  if (!ADMIN_EMAILS.includes(userEmail) || token.email_verified !== true || provider !== 'google.com') {
+    logger.warn(`未經授權的後台存取嘗試: ${userEmail}`, { provider, emailVerified: token.email_verified === true });
     throw new HttpsError('permission-denied', '您沒有存取系統維運後台的權限');
   }
   return userEmail;
@@ -1178,16 +1182,8 @@ function requireAdmin(request) {
 exports.getAdminStats = onCall(
   { region: REGION, cors: true, maxInstances: 5 },
   async (request) => {
-    // 1. 身分與權限核驗
-    if (!request.auth) {
-      throw new HttpsError('unauthenticated', '必須先進行 Google 登入才能調用此介面');
-    }
-
-    const userEmail = (request.auth.token.email || '').toLowerCase().trim();
-    if (!ADMIN_EMAILS.includes(userEmail)) {
-      logger.warn(`未經授權的後台存取嘗試: ${userEmail}`);
-      throw new HttpsError('permission-denied', '您沒有存取系統維運後台的權限');
-    }
+    // 1. 身分與權限核驗（和其他維運函式共用同一套檢查）
+    const userEmail = requireAdmin(request);
 
     try {
       logger.info(`管理員 ${userEmail} 正在存取系統維運後台數據`);
