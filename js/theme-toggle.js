@@ -269,6 +269,65 @@
             color: var(--text-muted) !important;
         }
 
+        /*
+         * 深色模式下文字太暗的地方（2026-11-24，全站檢測第 25 項；逐一量過對比，原本 1.05～3.1，修正後都在 4.5 以上）
+         *
+         * 一、深色字留在變深的底上：各功能自己的說明文字、綠／琥珀／紅色字原本是配白底的，
+         *     底變成深藍灰之後就看不清楚，改用同色系的淺色。
+         *     只針對確定是深色底的位置寫（帶上區塊名稱），不整站改 text-amber-700 這類工具類別：
+         *     淺色提示框裡的同色深字本來是清楚的，整站改掉反而會變成淺底配淺字。
+         */
+        .dark .empty-state-title { color: var(--text-primary) !important; }
+        .dark .empty-state-desc { color: var(--text-secondary) !important; }
+        .dark .cb-sub,
+        .dark .cg-sub { color: #c4b5fd !important; }
+        .dark .bc-title { color: #67e8f9 !important; }
+        .dark .zslot-subtitle,
+        .dark .zslot-stats { color: #fdba74 !important; }
+        .dark .cg-name-row > label { color: var(--text-primary) !important; }
+        .dark .gp-roster,
+        .dark .gp-absent-help,
+        .dark .lt-poolinfo { color: #94a3b8 !important; }
+        .dark .gp-roster > span,
+        .dark .lt-poolinfo > span { color: inherit !important; }
+        .dark #studentsList .class-management-action summary { color: var(--text-secondary) !important; }
+        .dark #backup-section .text-emerald-600,
+        .dark #backup-section .text-emerald-700,
+        .dark #backup-section .text-emerald-800 { color: #6ee7b7 !important; }
+        /* 備份頁的淡綠色狀態框沒有變深，裡面的綠字維持深色 */
+        .dark #backup-section .bg-emerald-50.text-emerald-700,
+        .dark #backup-section .bg-emerald-50.text-emerald-800,
+        .dark #backup-section .bg-emerald-50 .text-emerald-700,
+        .dark #backup-section .bg-emerald-50 .text-emerald-800 { color: #065f46 !important; }
+        .dark #backup-section .bg-slate-50 .text-amber-700 { color: #fcd34d !important; }
+        .dark #studentsList .text-red-500,
+        .dark #studentsList .text-red-600 { color: #f87171 !important; }
+        .dark #danger-zone .text-red-700 { color: #fca5a5 !important; }
+        /* 彈出視窗：學生報告卡的統計標籤、作業儀表板沒選到的檢視按鈕 */
+        .dark .report-stat-label { color: var(--text-secondary) !important; }
+        .dark .homework-view-btn:not(.active) { color: #cbd5e1 !important; }
+
+        /*
+         * 二、淺色字落在沒有變深的淺色卡片上：上面的規則把 text-gray-600／700／800 一律改成淺色，
+         *     但這幾張卡片的底是淺色漸層或白色（公告表單、考試科目列、計時顯示區、淡紫色提示），
+         *     字就幾乎看不見。卡片維持原樣，把裡面的字改回深色。
+         */
+        .dark .ann-form-card .text-gray-700,
+        .dark .ann-form-card .text-gray-800,
+        .dark #examSubjectList > div .text-gray-700,
+        .dark #examSubjectList > div .text-gray-800,
+        .dark #examSubjectList > div .text-gray-900 { color: #1f2937 !important; }
+        .dark #examSubjectList > div .text-gray-500,
+        .dark #examSubjectList > div .text-gray-600,
+        .dark .bg-violet-50.text-gray-600,
+        .dark .bg-violet-50.text-gray-700,
+        .dark .bg-violet-50 .text-gray-600,
+        .dark .bg-violet-50 .text-gray-700,
+        .dark #timerTitleDisplay,
+        .dark #timerAlarmNext { color: #4b5563 !important; }
+        .dark #examSubjectList > div .text-teal-600,
+        .dark #examSubjectList > div .text-teal-700 { color: #0f766e !important; }
+
         /* 主題切換按鈕 */
         .theme-toggle-btn {
             background: rgba(255, 255, 255, 0.15);
