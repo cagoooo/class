@@ -515,8 +515,13 @@ function filterStudents(studentList, query) {
     return studentList.filter(student => {
         // 比對姓名
         const nameMatch = student.name.toLowerCase().includes(lowerQuery);
-        // 比對座號（轉為字串比對）
-        const numberMatch = String(student.number).includes(query);
+        // 比對座號：完全相同，或打的是五碼座號的後兩碼（例如 60105 打「5」或「05」）。
+        // 以前用「包含」：打「1」會選到 1、10～19 號，五碼座號的班級更是全班都中（v3.74.0）
+        const seat = String(student.number == null ? '' : student.number).trim();
+        const q = query.trim();
+        const numberMatch = /^\d+$/.test(q)
+            ? (seat === q || (seat.length === 5 && Number(seat.slice(-2)) === Number(q)) || (seat !== '' && Number(seat) === Number(q)))
+            : seat.includes(q);
 
         return nameMatch || numberMatch;
     });

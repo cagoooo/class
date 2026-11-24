@@ -833,6 +833,8 @@
             meter.loud = { loud: false, aboveMs: 0, belowMs: 0 };
             meter.last = performance.now();
             audio.timer = setInterval(tick, TICK_MS);
+            // 麥克風開著（安靜挑戰進行或投影中）時保持螢幕不休眠；主頁面是舊版時沒有這個功能就略過
+            try { if (window.ScreenAwake) window.ScreenAwake.hold('quiet'); } catch (e) { /* ignore */ }
             stream.getAudioTracks().forEach(t => t.addEventListener('ended', () => { stopMic(); setMsg('麥克風被中斷了（可能被拔掉或被其他程式占用），請再按一次開始。'); }));
             if (cfg.animal === 'random') curAnimal = randomAnimal();
             show('qc-meter', true);
@@ -856,6 +858,7 @@
         if (audio.stream) audio.stream.getTracks().forEach(t => { try { t.stop(); } catch (e) { /* ignore */ } });
         if (audio.ctx) { try { audio.ctx.close(); } catch (e) { /* ignore */ } }
         Object.assign(audio, { stream: null, ctx: null, analyser: null, buf: null, timer: null });
+        try { if (window.ScreenAwake) window.ScreenAwake.drop('quiet'); } catch (e) { /* ignore */ }
         calib = null;
         endChallenge(false);
         meter.level = 0;
@@ -995,9 +998,9 @@
         }
         awarded = true;
         renderActions();
-        let ok = false;
-        try { ok = !!(await window.awardPointsToAll(cfg.reward, `安靜挑戰成功（${cfg.minutes} 分鐘）`)); } catch (e) { console.error('[QuietChallenge] 加分失敗:', e); }
-        if (ok) setMsg(`✅ 已幫全班每人加 ${cfg.reward} 分（可到「加扣分」查看或撤銷）`, true);
+        let ok = false, count = 0;
+        try { const r = await window.awardPointsToAll(cfg.reward, `安靜挑戰成功（${cfg.minutes} 分鐘）`); ok = !!r; count = typeof r === 'number' ? r : 0; } catch (e) { console.error('[QuietChallenge] 加分失敗:', e); }
+        if (ok) setMsg(count ? `✅ 已幫今天到校的 ${count} 位同學每人加 ${cfg.reward} 分（請假的不算；可到「加扣分」查看或撤銷）` : `✅ 已幫全班每人加 ${cfg.reward} 分（可到「加扣分」查看或撤銷）`, true);
         else { awarded = false; setMsg('加分沒有成功，請到「加扣分」頁面再試一次。'); }
         renderActions();
     }

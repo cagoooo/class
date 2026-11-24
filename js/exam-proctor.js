@@ -37,11 +37,29 @@
         }
     };
 
-    let examDayPresets = JSON.parse(localStorage.getItem('examDayPresets') || 'null');
+    // 讀本機資料：內容壞掉（不是合法資料或形狀不對）時用預設值，不讓整個監考模組停擺（v3.74.0）
+    function readStored(key, fallback, isValid) {
+        try {
+            const raw = localStorage.getItem(key);
+            if (raw === null || raw === '') return fallback;
+            const value = JSON.parse(raw);
+            return value !== null && isValid(value) ? value : fallback;
+        } catch (e) {
+            console.warn('[ExamProctor] 讀不出 ' + key + '，改用預設值', e);
+            return fallback;
+        }
+    }
+    const isPlainObject = v => !!v && typeof v === 'object' && !Array.isArray(v);
+    /** 本地日期 YYYY-MM-DD（toISOString 是世界標準時間，台灣早上 8 點前會差一天） */
+    function localDay(d = new Date()) {
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    let examDayPresets = readStored('examDayPresets', null, v => isPlainObject(v) && isPlainObject(v.days));
 
     // 遷移：如果 examDayPresets 不存在（舊版升級），從現有 examSubjects 建立
     if (!examDayPresets) {
-        const existingSubjects = JSON.parse(localStorage.getItem('examSubjects') || 'null');
+        const existingSubjects = readStored('examSubjects', null, Array.isArray);
         if (existingSubjects && existingSubjects.length > 0) {
             // 舊資料存為第一天，第二天使用預設
             examDayPresets = {
@@ -58,10 +76,14 @@
     }
 
     // 考試科目列表（載入目前天數的科目）
-    let examSubjects = examDayPresets.days[String(examDayPresets.currentDay)] || DEFAULT_DAY_PRESETS.days["1"];
+    if (!Array.isArray(examDayPresets.days[String(examDayPresets.currentDay)])) {
+        examDayPresets.currentDay = Number(Object.keys(examDayPresets.days).find(k => Array.isArray(examDayPresets.days[k]))) || 1;
+        if (!Array.isArray(examDayPresets.days[String(examDayPresets.currentDay)])) examDayPresets.days[String(examDayPresets.currentDay)] = JSON.parse(JSON.stringify(DEFAULT_DAY_PRESETS.days["1"]));
+    }
+    let examSubjects = examDayPresets.days[String(examDayPresets.currentDay)];
 
     // 多則提醒語（考試中 + 下課休息）
-    let examReminders = JSON.parse(localStorage.getItem('examReminders')) || {
+    let examReminders = readStored('examReminders', null, v => isPlainObject(v) && (Array.isArray(v.exam) || Array.isArray(v.break))) || {
         exam: [
             '考卷記得寫上班級姓名座號',
             '有問題舉手問老師，需要撿東西請監考老師幫',
@@ -86,15 +108,33 @@
     let reminderRotationInterval = null;
 
     // 缺考記錄（擴展版 - 支援各科目缺考學生記錄）
-    let examAttendance = JSON.parse(localStorage.getItem('examAttendance')) || {
+    let examAttendance = readStored('examAttendance', null, isPlainObject) || {
         expected: 0,
         present: 0,
         absentNote: ''
     };
+    // 舊資料少了其中一組提醒語時補上空的，免得下課時畫面讀不到
+    if (!Array.isArray(examReminders.exam)) examReminders.exam = [];
+    if (!Array.isArray(examReminders.break)) examReminders.break = [];
+
+    /**
+     * 實到人數與缺考備註是「當天」的：以前存一份就一直沿用，隔天打開還是昨天的人數和備註（v3.74.0）。
+     * 存檔時記下日期（saveData）；之後換了一天，畫面上的備註清空、實到人數回到應到人數。
+     * 只改記憶體、不在開頁時寫回（出席資料會同步到雲端，開頁就寫入會讓每台電腦每天都被當成「有修改」）。
+     * 改版前存的資料沒有日期，無法判斷是不是今天的，就維持原樣。
+     */
+    function rollAttendanceDay() {
+        const today = localDay();
+        if (!examAttendance.day || examAttendance.day === today) return false;
+        examAttendance.day = today;
+        examAttendance.absentNote = '';
+        examAttendance.present = examAttendance.expected;
+        return true;
+    }
+    rollAttendanceDay();
 
     // 缺考學生詳細記錄（防禦：localStorage / 雲端資料若非陣列，.find 會整段崩潰）
-    let absenceRecords = JSON.parse(localStorage.getItem('examAbsenceRecords')) || [];
-    if (!Array.isArray(absenceRecords)) absenceRecords = [];
+    let absenceRecords = readStored('examAbsenceRecords', [], Array.isArray);
 
     // 缺考原因類型
     const AbsenceTypes = {
@@ -1846,7 +1886,18 @@
             now.getSeconds().toString().padStart(2, '0');
     }
 
+    /** 科目依開始時間排好：判斷「下一科」「上一科」的程式都假設已排序（以前新增時只接在最後面；v3.74.0） */
+    function sortSubjects() {
+        if (!Array.isArray(examSubjects)) return;
+        examSubjects.sort((a, b) => {
+            const d = timeToMinutes(String(a.startTime || '00:00')) - timeToMinutes(String(b.startTime || '00:00'));
+            return d || (Number(a.id) || 0) - (Number(b.id) || 0);
+        });
+    }
+
     function saveData() {
+        sortSubjects();
+        examAttendance.day = localDay();
         localStorage.setItem('examSubjects', JSON.stringify(examSubjects));
         localStorage.setItem('examReminders', JSON.stringify(examReminders));
         localStorage.setItem('examAttendance', JSON.stringify(examAttendance));
@@ -2028,6 +2079,11 @@
     }
 
     function updateFullscreenStatus() {
+        // 監考畫面開著過夜：換日時把昨天的實到人數與備註清掉
+        if (rollAttendanceDay()) {
+            const noteInput = document.getElementById('examAbsentNote');
+            if (noteInput && document.activeElement !== noteInput) noteInput.value = '';
+        }
         const dateEl = document.getElementById('examFullscreenDate');
         const timeEl = document.getElementById('examFullscreenTime');
         const statusEl = document.getElementById('examFullscreenStatus');
@@ -2214,6 +2270,10 @@
             if (typeof NotificationSystem !== 'undefined') NotificationSystem.warning('結束時間必須晚於開始時間');
             return;
         }
+
+        // 和現有科目時間重疊：先提醒（以前偵測程式寫好了卻沒有接上；v3.74.0）
+        const conflicts = checkTimeConflicts({ id: null, startTime, endTime }, examSubjects);
+        if (conflicts.length && !showConflictWarning(conflicts, name)) return;
 
         const newId = examSubjects.length > 0 ? Math.max(...examSubjects.map(s => s.id)) + 1 : 1;
         examSubjects.push({ id: newId, name, startTime, endTime });
@@ -2547,21 +2607,32 @@
         const selectedHour = activeTimePicker.querySelector('#hourPicker .selected');
         const selectedMin = activeTimePicker.querySelector('#minPicker .selected');
 
-        if (selectedHour && selectedMin) {
-            const hour = selectedHour.dataset.hour.padStart(2, '0');
-            const min = selectedMin.dataset.min.padStart(2, '0');
-            const newTime = `${hour}:${min}`;
+        // 原本的時間不是 5 分鐘的倍數（例如 08:47）時，分鐘欄沒有預先選取的格子：
+        // 以前按「確定」什麼都不做也不說；現在沒選的那一欄沿用原本的時間（v3.74.0）
+        const oldTime = String((timeType === 'start' ? subject.startTime : subject.endTime) || '00:00');
+        const [oldH, oldM] = oldTime.split(':');
+        const hour = String(selectedHour ? selectedHour.dataset.hour : oldH).padStart(2, '0');
+        const min = String(selectedMin ? selectedMin.dataset.min : oldM).padStart(2, '0');
+        const newTime = `${hour}:${min}`;
+        const nextStart = timeType === 'start' ? newTime : subject.startTime;
+        const nextEnd = timeType === 'start' ? subject.endTime : newTime;
 
-            if (timeType === 'start') {
-                subject.startTime = newTime;
-            } else {
-                subject.endTime = newTime;
-            }
-
-            saveData();
-            renderSubjectList();
-            updateFullscreenStatus();
+        if (timeToMinutes(nextStart) >= timeToMinutes(nextEnd)) {
+            showNotification('結束時間必須晚於開始時間', 'warning');
+            return;   // 保留選擇器讓老師改
         }
+        const conflicts = checkTimeConflicts({ id: subject.id, startTime: nextStart, endTime: nextEnd }, examSubjects);
+        if (conflicts.length && !showConflictWarning(conflicts, subject.name)) return;
+
+        if (timeType === 'start') {
+            subject.startTime = newTime;
+        } else {
+            subject.endTime = newTime;
+        }
+
+        saveData();
+        renderSubjectList();
+        updateFullscreenStatus();
 
         activeTimePicker.remove();
         activeTimePicker = null;
@@ -2858,6 +2929,7 @@
             const previousNote = String(examAttendance.absentNote ?? '');
             if (nextNote !== previousNote) {
                 examAttendance.absentNote = nextNote;
+                examAttendance.day = localDay();
                 localStorage.setItem('examAttendance', JSON.stringify(examAttendance));
             }
         }
@@ -3018,7 +3090,7 @@
         if (!record) {
             record = {
                 examId: examId,
-                date: new Date().toISOString().split('T')[0],
+                date: localDay(),
                 subjects: []
             };
             absenceRecords.push(record);

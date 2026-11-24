@@ -485,8 +485,16 @@
         renderArmed();
         syncPressed();
     }
+    // 連續給分模式：同一位、同一個項目在 0.6 秒內又點一次，當成雙擊誤觸，不再加第二次（v3.74.0）
+    let lastArmedTap = { key: '', item: null, at: 0 };
     function onStudent(key) {
-        if (state.armed) { apply([key], state.armed); return; }
+        if (state.armed) {
+            const now = Date.now();
+            if (lastArmedTap.key === key && lastArmedTap.item === state.armed && now - lastArmedTap.at < 600) return;
+            lastArmedTap = { key, item: state.armed, at: now };
+            apply([key], state.armed);
+            return;
+        }
         if (state.selected.has(key)) state.selected.delete(key); else state.selected.add(key);
         const card = $('pointsStudentList')?.querySelector(`.pt-stu[data-id="${CSS.escape(key)}"]`);
         if (card) card.setAttribute('aria-pressed', String(state.selected.has(key)));
@@ -905,7 +913,13 @@
     window.selectQuickAction = a => a && onItem({ points: Number(a.points), reason: String(a.reason || '') }, 'panel');
     window.finishBatchPoints = () => { disarm(); clearSelection(); };
     // 安靜挑戰成功時，老師按「全班加分」才呼叫；走同一套給分（可撤銷、寵物同步）
-    window.awardPointsToAll = (points, reason) => apply(getStudents().map(s => String(s.id)), { points, reason });
+    // 今天請假的同學不算在「全班」裡（和「全選」相同；v3.74.0）。回傳實際加分人數，0 代表沒有人可加
+    window.awardPointsToAll = (points, reason) => {
+        const absent = absentSet();
+        const ids = getStudents().map(s => String(s.id)).filter(id => !absent.has(id));
+        if (!ids.length) return Promise.resolve(0);
+        return Promise.resolve(apply(ids, { points, reason })).then(ok => (ok ? ids.length : 0));
+    };
     window.applyPointsToStudentFromList = id => onStudent(String(id));
     window.addCustomPoints = () => $('ptCustomBox')?.querySelector('input')?.focus();
     window.PointsUI = { apply: (ids, points, reason) => apply(ids.map(String), { points, reason }), undo: undoRecords, refresh: () => { renderGrid(); renderHistory(); } };

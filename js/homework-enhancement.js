@@ -1168,11 +1168,29 @@
     };
 
     // === 全部設定狀態 ===
-    window.setAllHomeworkStatus = function (status) {
+    window.setAllHomeworkStatus = async function (status) {
         const homeworkId = document.getElementById('checkHomework').value;
         if (!homeworkId || typeof homeworkChecks === 'undefined') return;
 
         if (!homeworkChecks[homeworkId]) homeworkChecks[homeworkId] = {};
+
+        // 會蓋掉已經登記的狀態時先確認（例如已標「缺交」「遲交」的同學被一鍵改成完成；v3.74.0）
+        const current = homeworkChecks[homeworkId];
+        const changed = getRoster().filter(st => {
+            const now = current[st.id];
+            return now && now !== 'unchecked' && now !== status;
+        }).length;
+        if (changed > 0) {
+            const label = status === 'unchecked' ? '全部重置' : '全部標為完成';
+            const ask = `有 ${changed} 位同學已經登記了其他狀態，${label}會蓋掉這些紀錄。確定嗎？`;
+            let ok = false;
+            try {
+                ok = typeof ConfirmDialog !== 'undefined' && ConfirmDialog.show
+                    ? await ConfirmDialog.show({ title: label, message: ask, type: 'danger', confirmText: label, cancelText: '取消' })
+                    : window.confirm(ask);
+            } catch (e) { ok = false; }
+            if (!ok) return;
+        }
 
         const prevChecks = Object.assign({}, homeworkChecks[homeworkId]);
         getRoster().forEach(student => {
@@ -1525,16 +1543,23 @@
         let csvContent = '\uFEFF'; // BOM for UTF-8
         csvContent += '作業名稱,繳交日期,完成人數,未交人數,待訂正人數,遲交人數,未檢查人數,完成率\n';
 
+        // CSV 一格：雙引號要寫兩次，名稱裡有引號、逗號才不會把欄位切錯；
+        // 以 = + - @ 開頭的文字在 Excel 會被當成公式，前面加 ' 當成純文字（v3.74.0）
+        function csvCell(value) {
+            let text = value === null || value === undefined ? '' : String(value);
+            if (/^[=+\-@\t\r]/.test(text)) text = "'" + text;
+            return '"' + text.replace(/"/g, '""') + '"';
+        }
         homeworkList.forEach(homework => {
             const stats = getHomeworkStats(homework.id, studentList, checks);
-            csvContent += `"${homework.name}",${homework.due},${stats.completed},${stats.incomplete},${stats.needs_correction},${stats.late},${stats.unchecked},${stats.rate}%\n`;
+            csvContent += `${csvCell(homework.name)},${csvCell(homework.due)},${stats.completed},${stats.incomplete},${stats.needs_correction},${stats.late},${stats.unchecked},${stats.rate}%\n`;
         });
 
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `作業統計報告_${new Date().toISOString().split('T')[0]}.csv`;
+        link.download = `作業統計報告_${(() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })()}.csv`;
         link.click();
         URL.revokeObjectURL(url);
 

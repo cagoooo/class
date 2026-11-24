@@ -593,11 +593,16 @@
             }
             return;
         }
+        // 今天請假的同學不抽（和抽籤、分組相同；v3.74.0）；全班都請假就照舊全部可抽
+        let absent = new Set();
+        try { if (window.TodayAttendance) absent = TodayAttendance.load(); } catch (e) { /* 讀不到就不排除 */ }
+        const present = list.filter(s => !absent.has(String(s.id)));
+        const roster = present.length ? present : list;
         // 過濾掉本輪已抽過的；全抽完就重置（人人輪一次）
-        let pool = list.filter(s => !pickedIds.includes(s.id));
+        let pool = roster.filter(s => !pickedIds.includes(s.id));
         if (pool.length === 0) {
             pickedIds = [];
-            pool = list.slice();
+            pool = roster.slice();
             if (typeof window.NotificationSystem !== 'undefined' && NotificationSystem.info) {
                 NotificationSystem.info('全班都輪過一次囉！重新開始新一輪 🎉');
             }

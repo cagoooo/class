@@ -378,7 +378,7 @@
             const negativeCount = records.filter(r => r.points < 0).length;
             const tags = (s.tags || []).join(';');
 
-            csv += `${s.number},"${s.name}",${s.points},${positiveCount},${negativeCount},"${tags}"\n`;
+            csv += `${csvCell(s.number)},${csvCell(s.name)},${Number(s.points) || 0},${positiveCount},${negativeCount},${csvCell(tags)}\n`;
         });
 
         downloadFile('班級成績單.csv', csv);
@@ -403,7 +403,7 @@
         let csv = '\uFEFF日期,學生,分數變動,原因\n';
         history.forEach(h => {
             if (h && h.type === 'reset') { csv += h.archived ? `"${h.date || ''}","📦 學期封存",,"之前的紀錄已收進封存"\n` : `"${h.date || ''}","🔄 全班分數重置",,"分數歸零（之前的紀錄仍保留）"\n`; return; }
-            csv +=`"${h.date || ''}","${h.studentName || ''}",${h.points > 0 ? '+' : ''}${h.points},"${h.reason || ''}"\n`;
+            csv += `${csvCell(h.date || '')},${csvCell(h.studentName || '')},${h.points > 0 ? '+' : ''}${Number(h.points) || 0},${csvCell(h.reason || '')}\n`;
         });
 
         downloadFile('分數歷史記錄.csv', csv);
@@ -411,6 +411,14 @@
             NotificationSystem.success('已匯出分數歷史');
         }
     };
+
+    // CSV 一格：雙引號要寫兩次，名稱裡有引號、逗號才不會把欄位切錯；
+    // 以 = + - @ 開頭的文字在 Excel 會被當成公式，前面加 ' 當成純文字（v3.74.0）
+    function csvCell(value) {
+        let text = value === null || value === undefined ? '' : String(value);
+        if (/^[=+\-@\t\r]/.test(text)) text = "'" + text;
+        return '"' + text.replace(/"/g, '""') + '"';
+    }
 
     /**
      * 下載檔案

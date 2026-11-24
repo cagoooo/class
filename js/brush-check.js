@@ -176,7 +176,19 @@
             updateCount();
             if (nowOn && rosterNumbers().length > 0 && completedCount() === rosterNumbers().length && typeof window.triggerConfetti === 'function') window.triggerConfetti();
         },
-        reset() {
+        // 「全部重來」緊鄰勾選格，投影時容易誤觸：有勾選時先確認（v3.74.0）
+        async reset() {
+            checked = load();
+            if (checked.length) {
+                const ask = '確定要清掉今天已勾選的 ' + checked.length + ' 位同學，全部重來嗎？';
+                let ok = false;
+                try {
+                    ok = typeof ConfirmDialog !== 'undefined' && ConfirmDialog.show
+                        ? await ConfirmDialog.show({ title: '潔牙勾選全部重來', message: ask, type: 'danger', confirmText: '全部重來', cancelText: '取消' })
+                        : window.confirm(ask);
+                } catch (e) { ok = false; }
+                if (!ok) return;
+            }
             checked = [];
             save(checked);
             renderTeeth();
@@ -184,6 +196,14 @@
         }
     };
     window.BrushCheck = api;
+
+    // 頁面開著過夜（或隔天切回來）：換日後勾選表要變成新的一天
+    let shownDay = today();
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden || shownDay === today()) return;
+        shownDay = today();
+        if (document.getElementById('bc-teeth')) api.init();
+    });
 
     // 另一個分頁勾了潔牙：這一頁的勾選表跟著更新（v3.73.0）
     try {

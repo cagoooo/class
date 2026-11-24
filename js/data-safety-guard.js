@@ -161,7 +161,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = '班級小管家_完整備份_' + new Date().toISOString().split('T')[0] + '.json';
+            a.download = '班級小管家_完整備份_' + (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })() + '.json';
             a.click();
             URL.revokeObjectURL(url);
             rawSet(LS_LAST_BACKUP, String(Date.now()));

@@ -193,7 +193,20 @@
     const selected = new Set();
     let lastText = '';
 
-    const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+    // 可重現的亂數：打姓名、改字數上限時沿用同一組句子，不會每打一個字整段換掉（v3.74.0）
+    let wordingSeed = (Date.now() >>> 0) || 1;
+    let rand = Math.random;
+    function seeded(seed) {
+        let a = seed >>> 0;
+        return function () {
+            a = (a + 0x6D2B79F5) >>> 0;
+            let t = a;
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+    }
+    const pick = arr => arr[Math.floor(rand() * arr.length)];
     // 同一次生成內對同一語句池「不放回」抽樣（用完才重置）→ 句子不會重複
     function uniquePicker() {
         const used = new Map();
@@ -204,7 +217,7 @@
             if (set.size >= arr.length) set.clear();
             const avail = [];
             for (let i = 0; i < arr.length; i++) if (!set.has(i)) avail.push(i);
-            const idx = avail[Math.floor(Math.random() * avail.length)];
+            const idx = avail[Math.floor(rand() * avail.length)];
             set.add(idx);
             return arr[idx];
         };
@@ -379,6 +392,11 @@
 
     function generate() {
         injectCSS();
+        // 從姓名或字數上限欄位觸發：沿用上一次的句子；其他（點特質、換語氣、按「換句話說」）換一組新的
+        const from = document.activeElement && document.activeElement.id;
+        if (from !== 'cg-name' && from !== 'cg-cap') wordingSeed = (Math.floor(Math.random() * 4294967295) >>> 0) || 1;
+        rand = seeded(wordingSeed);
+        const skipped = [];
         const name = (document.getElementById('cg-name').value || '').trim();
         const tone = document.getElementById('cg-tone').value;
         const len = document.getElementById('cg-length').value;
@@ -395,6 +413,7 @@
             cat.neg.forEach((t, i) => { if (selected.has(cat.key + '|n|' + i)) N.push(t.p); });
             if (!P.length && !N.length) return;
             const Pp = P.slice(0, L.max), Nn = N.slice(0, L.max);
+            P.slice(L.max).concat(N.slice(L.max)).forEach(t => skipped.push(t));
             const sj = used ? '' : subj;     // 主詞只放在第一句，其餘以省略主詞承接
             const lead = pu(LEADS).replace('{L}', cat.label);
             let s;
@@ -419,6 +438,9 @@
             ? fitToCap(opening, clauses, extra, close, cap)
             : full;
         output(text, false);
+        // 長度設定限制每一類最多幾項：選多了以前會默默略過，現在告訴老師哪些沒用到
+        const cc = document.getElementById('cg-charcount');
+        if (cc && skipped.length) cc.textContent += `　｜這個長度每一類最多用 ${L.max} 項，沒用到：${skipped.join('、')}（可改選較長的長度）`;
     }
 
     // ───────────── 複製 / 清除 ─────────────
@@ -439,8 +461,9 @@
             const ta = document.createElement('textarea');
             ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
             document.body.appendChild(ta); ta.select();
-            document.execCommand('copy'); ta.remove(); done();
-        } catch (e) { toast('複製失敗，請手動選取'); }
+            const ok = document.execCommand('copy'); ta.remove();
+            if (ok) done(); else toast('複製失敗，請手動選取評語文字後複製');
+        } catch (e) { toast('複製失敗，請手動選取評語文字後複製'); }
     }
     function clear() {
         selected.clear();

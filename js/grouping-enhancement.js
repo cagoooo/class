@@ -191,6 +191,7 @@
             .gp-proj-title { flex:1; min-width:160px; font-size:20px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
             .gp-proj-bar button { min-height:40px; padding:6px 14px; border-radius:10px; border:1px solid rgba(255,255,255,.35); background:rgba(255,255,255,.12); color:#fff; font-size:15px; font-weight:700; cursor:pointer; }
             .gp-proj-bar button:hover { background:rgba(255,255,255,.24); }
+            .gp-proj-bar button.gp-armed { background:#b45309; border-color:#fbbf24; }
             .gp-proj-bar button:focus-visible { outline:3px solid #67e8f9; outline-offset:2px; }
             .gp-proj-grid { flex:1; min-height:0; display:grid; gap:14px; padding:14px; grid-template-columns:repeat(var(--cols,2),minmax(0,1fr)); grid-auto-rows:minmax(0,1fr); }
             .gp-proj .gp-card { font-size:var(--pj-size,28px); overflow:hidden; min-height:0; padding:.5em .65em .45em; gap:.35em; }
@@ -1006,7 +1007,19 @@
             b.addEventListener('click', handler);
             return b;
         };
-        const regroup = btn('🔀 重新分組', () => startFlow({ instant: true }));
+        // 投影中誤點會直接打散全班分組：要在 3 秒內再按一次才重新分組（v3.74.0；之後仍可在分組頁「復原」）
+        let regroupArmed = null;
+        const regroup = btn('🔀 重新分組', () => {
+            if (!regroupArmed) {
+                regroup.textContent = '⚠️ 再按一次重新分組';
+                regroup.classList.add('gp-armed');
+                regroupArmed = setTimeout(() => { regroupArmed = null; regroup.textContent = '🔀 重新分組'; regroup.classList.remove('gp-armed'); }, 3000);
+                return;
+            }
+            clearTimeout(regroupArmed); regroupArmed = null;
+            regroup.textContent = '🔀 重新分組'; regroup.classList.remove('gp-armed');
+            startFlow({ instant: true });
+        });
         const leaders = btn('👑 抽組長', pickAllLeaders);
         const full = btn('⛶ 全螢幕', () => {
             try {

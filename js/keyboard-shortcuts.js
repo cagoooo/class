@@ -424,9 +424,16 @@
             return;
         }
 
-        // 取得按鍵
+        // 取得按鍵：開著大寫鎖定（Caps Lock）時 e.key 是大寫，對照表用的是小寫（v3.74.0）
         let key = e.key;
         if (key === ' ') key = 'Space';
+        else if (typeof key === 'string' && key.length === 1) key = key.toLowerCase();
+
+        // 按住不放時瀏覽器會一直重送同一個鍵：只認第一下，免得計時器反覆開始／暫停、抽籤被跳過
+        if (e.repeat && SHORTCUTS[key] && SHORTCUTS[key].action !== 'closeModal') {
+            e.preventDefault();
+            return;
+        }
 
         // 焦點在按鈕／連結上時，空白鍵是「按下這個按鈕」，不要同時開始計時器
         if (key === 'Space' && target && target.closest('button, a[href], summary, [role="button"], [role="radio"]')) {

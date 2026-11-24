@@ -43,6 +43,8 @@ function makeEnv() {
         alert() {},
         setInterval: (cb, ms) => { const id = ++seq; intervals.set(id, { cb, ms }); return id; },
         clearInterval: id => intervals.delete(id),
+        // 計時進行中要保持螢幕不休眠（v3.74.0）：記下 hold／drop 的理由
+        ScreenAwake: { held: new Set(), hold(r) { this.held.add(r); }, drop(r) { this.held.delete(r); } },
     };
     ctx.window = ctx;
     vm.createContext(ctx);
@@ -240,6 +242,32 @@ test('原始碼：startTimer 不再有 totalSeconds-- 與 totalSeconds++；timer
     assert.match(FN.timerTick, /Date\.now\(\)/);
     assert.match(FN.startTimer, /setInterval\(timerTick,\s*250\)/);
     assert.match(SRC, /addEventListener\('visibilitychange',\s*\(\)\s*=>\s*\{\s*if \(!document\.hidden\) timerTick\(\);/, '回到分頁要立刻對時');
+});
+
+test('計時進行中保持螢幕不休眠，停止或時間到就放掉（v3.74.0）', () => {
+    const env = makeEnv();
+    env.setInput(0, 3);
+    env.start();
+    assert.ok(env.ctx.ScreenAwake.held.has('timer'));
+    env.advance(4000);
+    assert.equal(env.finished, 1);
+    assert.ok(!env.ctx.ScreenAwake.held.has('timer'));
+    env.set({ mode: 'stopwatch', total: 0, original: 0 });
+    env.start();
+    assert.ok(env.ctx.ScreenAwake.held.has('timer'));
+    env.start();   // 再按一次＝暫停
+    assert.ok(!env.ctx.ScreenAwake.held.has('timer'));
+});
+
+test('時間到：畫面停在 00:00「時間到！」，不會馬上跳回設定的時間；嗶三聲；鍵盤也能啟用聲音（v3.74.0）', () => {
+    const finished = SRC.slice(SRC.indexOf('function timerFinished()'), SRC.indexOf('// --- 音效函式 ---'));
+    const after = finished.slice(finished.indexOf('resetTimer();'));
+    assert.match(after, /timerDisplay'\)\.textContent = '00:00'/);
+    assert.match(after, /timerTitleDisplay'\)\.textContent = '時間到！'/);
+    assert.ok(after.indexOf("'00:00'") < after.indexOf('timer:finished'), '先停在時間到，再通知番茄鐘');
+    const sound = SRC.slice(SRC.indexOf('function playTimerEndSound()'), SRC.indexOf('function playLotteryTickSound()'));
+    assert.match(sound, /\[0, 0\.7, 1\.4\]/);
+    assert.match(SRC, /addEventListener\('keydown', initAudioContext/);
 });
 
 console.log(`${passed} timer wall-clock checks passed`);

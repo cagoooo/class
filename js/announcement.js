@@ -603,8 +603,11 @@
         if (!isoString) return '';
         const d = new Date(isoString);
         const now = new Date();
-        const diffDays = Math.ceil((d - now) / (1000 * 60 * 60 * 24));
-        if (diffDays < 0) return '已過期';
+        if (d <= now) return '已過期';
+        // 用「日曆上差幾天」算：到期時間存成當天 23:59:59，以前用時間差無條件進位，
+        // 當天早上會顯示「明日到期」、前一天顯示「2 天後到期」（v3.74.0）
+        const dayStart = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+        const diffDays = Math.round((dayStart(d) - dayStart(now)) / (1000 * 60 * 60 * 24));
         if (diffDays === 0) return '今日到期';
         if (diffDays === 1) return '明日到期';
         return `${diffDays} 天後到期`;

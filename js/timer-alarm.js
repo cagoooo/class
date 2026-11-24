@@ -536,8 +536,12 @@
         setInterval(check, 1000);
         setInterval(render, 30000); // 更新「幾分鐘後」文字
         document.addEventListener('visibilitychange', () => { if (!document.hidden) { check(); render(); } });
-        // 任何一次點擊都先解鎖音效，避免鬧鈴時被瀏覽器靜音
-        document.addEventListener('click', ensureAudio, { once: true });
+        // 任何一次點擊、觸控或按鍵都先解鎖音效，避免鬧鈴時被瀏覽器靜音。
+        // 以前只聽第一次點擊：重新整理後只用鍵盤、或還沒點過畫面，鬧鈴就沒聲音；
+        // 分頁閒置久了瀏覽器也會再把聲音暫停，所以每次操作都順便叫醒（v3.74.0）
+        ['pointerdown', 'keydown', 'touchstart'].forEach(type => document.addEventListener(type, () => {
+            if (!audioCtx || audioCtx.state !== 'running') ensureAudio();
+        }, { capture: true, passive: true }));
         window.TimerAlarm = { check, list: () => alarms.slice(), stop: stopRinging };
     }
 
