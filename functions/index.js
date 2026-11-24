@@ -42,7 +42,9 @@ const {
   isRecoverableOfflineSync,
   isStudentWrongClassroomCode,
   isSyncConflictEvent,
+  readAllPages,
   resolveSourceApp,
+  selectDigestEvents,
   summarizeEvents,
   withSourceApp,
 } = require('./digest-summary');
@@ -843,13 +845,16 @@ exports.dailyUsageDigest = onSchedule(
     }
 
     const day = taipeiDay();
-    const snap = await admin.firestore()
-      .collection(EVENT_LOG_COLLECTION)
-      .where('day', '==', day)
-      .limit(3000)
-      .get();
+    const yesterday = taipeiDay(new Date(Date.now() - 86400000));
+    // 分頁讀完（以前一次最多 3000 筆、超過就默默截斷）；昨天 21:00 以後的事件也要算進來（v3.74.4）
+    const byDay = (d) => admin.firestore().collection(EVENT_LOG_COLLECTION)
+      .where('day', '==', d).orderBy(admin.firestore.FieldPath.documentId());
+    const [todayRead, yesterdayRead] = await Promise.all([readAllPages(byDay(day), 1000, 20000), readAllPages(byDay(yesterday), 1000, 20000)]);
+    const toEvent = (doc) => ({ ...(doc.data() || {}), _documentId: doc.id });
+    const events = selectDigestEvents(todayRead.docs.map(toEvent), yesterdayRead.docs.map(toEvent), day, yesterday);
+    const truncated = todayRead.truncated || yesterdayRead.truncated;
 
-    if (snap.empty) {
+    if (!events.length) {
       logger.info(`[Digest] ${day} 無任何使用事件，靜默略過`);
       return;
     }
@@ -876,7 +881,6 @@ exports.dailyUsageDigest = onSchedule(
       logger.warn('[Digest] 讀取舊快照清理狀態失敗', e);
     }
 
-    const events = snap.docs.map((doc) => ({ ...(doc.data() || {}), _documentId: doc.id }));
     const sum = summarizeEvents(events);
     const dateLabel = new Date().toLocaleDateString('zh-TW', {
       timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit', weekday: 'short',
@@ -884,8 +888,9 @@ exports.dailyUsageDigest = onSchedule(
 
     const ok = await postToChat(webhook, buildDigestPayload(day, dateLabel, sum, backup, prune));
     logger.info(`[Digest] ${day} 戰報${ok ? '已送出' : '送出失敗'}`, {
-      events: snap.size, activeTeachers: sum.activeTeachers, errors: sum.errors.length,
+      events: events.length, activeTeachers: sum.activeTeachers, errors: sum.errors.length, truncated,
     });
+    if (truncated) logger.warn(`[Digest] ${day} 事件超過讀取上限，戰報只統計了前 20000 筆`);
   }
 );
 
@@ -1728,11 +1733,12 @@ exports.getUsageAnalytics = onCall(
       // ── ② _usageEvents：近 30 天趨勢與功能熱度 ──
       const since = new Date(Date.now() - 30 * 86400000)
         .toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
-      const snap = await admin.firestore()
+      // 依日期排序分頁讀完（以前一次 limit 20000 又沒排序，超過時丟掉的常是最新幾天；v3.74.4）
+      const eventsRead = await readAllPages(admin.firestore()
         .collection(EVENT_LOG_COLLECTION)
         .where('day', '>=', since)
-        .limit(20000)
-        .get();
+        .orderBy('day'), 1000, 60000);
+      const snap = eventsRead.docs;
 
       const dayMap = {};
       const featureTotals = {};
@@ -1817,7 +1823,7 @@ exports.getUsageAnalytics = onCall(
           personalDomains: Object.keys(personalMap)
             .map((d) => ({ domain: d, teachers: personalMap[d] }))
             .sort((a, b) => b.teachers - a.teachers),
-          events: { days, features, totalEvents: snap.size, errors },
+          events: { days, features, totalEvents: snap.length, errors, truncated: eventsRead.truncated },
         },
       };
     } catch (error) {

@@ -1348,7 +1348,7 @@
         // 事件留底是 2026-09-03 才上線的，之前沒有歷史；講清楚免得誤以為沒人用
         const eventsNote = days.length <= 1
             ? '事件留底自 2026-09-03 起才開始記錄，趨勢要幾天後才看得出來。'
-            : '近 ' + days.length + ' 天，共 ' + (ev.totalEvents || 0) + ' 筆事件。';
+            : '近 ' + days.length + ' 天，共 ' + (ev.totalEvents || 0) + ' 筆事件' + (ev.truncated ? '（超過讀取上限，只統計了前面這些）' : '') + '。';
 
         let html = '<div class="kpi-grid">'
             + kpi('註冊老師', a.teachers || 0, '位')

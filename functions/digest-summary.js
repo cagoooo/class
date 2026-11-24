@@ -546,8 +546,68 @@ function buildDigestPayload(day, dateLabel, sum, backup, prune) {
   };
 }
 
+/** 戰報在每天 21:00（台北）送出；這個時間點之後的事件算進隔天的戰報。 */
+const DIGEST_HOUR = 21;
+function digestCutoffMs(day) {
+  return Date.parse(`${day}T${String(DIGEST_HOUR).padStart(2, '0')}:00:00+08:00`);
+}
+/** 事件寫入時間（毫秒）；拿不到就回 null。 */
+function eventTimeMs(e) {
+  const c = e && e.createdAt;
+  if (c && typeof c.toMillis === 'function') return c.toMillis();
+  const t = Date.parse((e && e.ts) || '');
+  return Number.isFinite(t) ? t : null;
+}
+/** 會被同一份文件反覆覆寫的累計型事件（功能使用統計、升級紀錄）：只算在自己那一天，不跨日搬移。 */
+function isCumulativeEvent(e) {
+  return !!e && (e.type === 'feature_summary' || String(e._documentId || '').startsWith('upg_'));
+}
+/**
+ * 挑出這一次戰報要算的事件（v3.74.4）。
+ * 以前只算「今天」的事件，而戰報 21:00 就送出：21:00 以後的事件哪一天的戰報都不會出現。
+ * 現在：昨天 21:00 以後 ＋ 今天 21:00 以前；累計型事件照舊只看今天那一份。
+ */
+function selectDigestEvents(todayEvents, yesterdayEvents, today, yesterday) {
+  const todayCut = digestCutoffMs(today), yesterdayCut = digestCutoffMs(yesterday);
+  const late = (yesterdayEvents || []).filter((e) => {
+    if (isCumulativeEvent(e)) return false;
+    const t = eventTimeMs(e);
+    return t !== null && t >= yesterdayCut;
+  });
+  const early = (todayEvents || []).filter((e) => {
+    if (isCumulativeEvent(e)) return true;
+    const t = eventTimeMs(e);
+    return t === null || t < todayCut;
+  });
+  return late.concat(early);
+}
+
+/**
+ * 分頁讀完一個查詢（每頁 pageSize 筆，最多 max 筆）。以前用 limit 一次讀，超過上限就默默截斷，
+ * 而且因為沒有排序，截掉的常是最新幾天（v3.74.4）。
+ * @param {FirebaseFirestore.Query} query 已經排好序的查詢
+ * @returns {Promise<{docs: Array, truncated: boolean}>}
+ */
+async function readAllPages(query, pageSize = 1000, max = 50000) {
+  const docs = [];
+  let last = null;
+  while (docs.length < max) {
+    let q = query.limit(Math.min(pageSize, max - docs.length));
+    if (last) q = q.startAfter(last);
+    const snap = await q.get();
+    snap.docs.forEach((d) => docs.push(d));
+    if (snap.size < pageSize) return { docs, truncated: false };
+    last = snap.docs[snap.docs.length - 1];
+  }
+  return { docs, truncated: true };
+}
+
 module.exports = {
   APP_LABELS,
+  DIGEST_HOUR,
+  digestCutoffMs,
+  readAllPages,
+  selectDigestEvents,
   appLabel,
   resolveSourceApp,
   withSourceApp,

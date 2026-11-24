@@ -3,6 +3,8 @@
 !manifest.json
 !package.json
 !firebase.json
+# 雲端函式的相依套件鎖定檔要入庫，部署時才會裝到一樣的版本（v3.74.4）
+!functions/package-lock.json
 
 # 系統檔案
 .DS_Store
