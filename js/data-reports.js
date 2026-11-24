@@ -437,11 +437,12 @@
 
         // 分數分佈
         const scoreRanges = [
-            { label: '負分', min: -999, max: -1, color: '#ef4444' },
-            { label: '0-9', min: 0, max: 9, color: '#f59e0b' },
-            { label: '10-19', min: 10, max: 19, color: '#eab308' },
-            { label: '20-29', min: 20, max: 29, color: '#84cc16' },
-            { label: '30+', min: 30, max: 999, color: '#10b981' }
+            // text：長條裡人數的字色。紅色配白字（紅色調深一階才夠清楚），黃、綠這幾個亮色配深色字。
+            { label: '負分', min: -999, max: -1, color: '#dc2626', text: '#ffffff' },
+            { label: '0-9', min: 0, max: 9, color: '#f59e0b', text: '#422006' },
+            { label: '10-19', min: 10, max: 19, color: '#eab308', text: '#422006' },
+            { label: '20-29', min: 20, max: 29, color: '#84cc16', text: '#1a2e05' },
+            { label: '30+', min: 30, max: 999, color: '#10b981', text: '#022c22' }
         ];
 
         const distribution = scoreRanges.map(range => ({
@@ -453,7 +454,7 @@
 
         modal.innerHTML = `
             <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-auto" onclick="event.stopPropagation()">
-                <div class="flex items-center justify-between p-4 border-b bg-gradient-to-r from-green-500 to-teal-500 rounded-t-2xl">
+                <div class="flex items-center justify-between p-4 border-b bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-t-2xl">
                     <h3 class="text-xl font-bold text-white">📊 數據統計面板</h3>
                     <button onclick="document.getElementById('data-panel-modal').remove()" class="text-white hover:text-gray-200 text-2xl">✕</button>
                 </div>
@@ -487,7 +488,7 @@
                                 <div class="bar-item">
                                     <div class="bar-label">${d.label}</div>
                                     <div class="bar-track">
-                                        <div class="bar-fill" style="width: ${(d.count / maxCount) * 100}%; background: ${d.color};">
+                                        <div class="bar-fill" style="width: ${(d.count / maxCount) * 100}%; background: ${d.color}; color: ${d.text};">
                                             ${d.count > 0 ? d.count : ''}
                                         </div>
                                     </div>

@@ -33,15 +33,17 @@
 
     // ── 班級視覺差異化：顏色 + Emoji 調色盤（v3.1.0 新增） ──
     // 新增班級時自動分配下一個未用過的組合，老師可視覺立即辨識
+    // gradient 是班級按鈕（白字）的底色：比 color 深一點，白字對比才夠（2026-11-24 由 scripts/build-contrast-css.cjs 的 darken 算出）。
+    // color 是班級的代表色（選單裡的色點等），維持原本的亮色。
     const CLASS_PALETTE = [
-        { color: '#6366f1', gradient: 'linear-gradient(135deg,#6366f1,#818cf8)', shadow: 'rgba(99,102,241,0.35)', icon: '📚' },
-        { color: '#10b981', gradient: 'linear-gradient(135deg,#10b981,#34d399)', shadow: 'rgba(16,185,129,0.35)', icon: '🌟' },
-        { color: '#f59e0b', gradient: 'linear-gradient(135deg,#f59e0b,#fbbf24)', shadow: 'rgba(245,158,11,0.35)', icon: '🎨' },
-        { color: '#ef4444', gradient: 'linear-gradient(135deg,#ef4444,#f87171)', shadow: 'rgba(239,68,68,0.35)', icon: '🚀' },
-        { color: '#06b6d4', gradient: 'linear-gradient(135deg,#06b6d4,#22d3ee)', shadow: 'rgba(6,182,212,0.35)', icon: '🌈' },
-        { color: '#8b5cf6', gradient: 'linear-gradient(135deg,#8b5cf6,#a78bfa)', shadow: 'rgba(139,92,246,0.35)', icon: '🎯' },
-        { color: '#ec4899', gradient: 'linear-gradient(135deg,#ec4899,#f472b6)', shadow: 'rgba(236,72,153,0.35)', icon: '🌸' },
-        { color: '#14b8a6', gradient: 'linear-gradient(135deg,#14b8a6,#2dd4bf)', shadow: 'rgba(20,184,166,0.35)', icon: '🍀' },
+        { color: '#6366f1', gradient: 'linear-gradient(135deg,#5e61f1,#5664f6)', shadow: 'rgba(99,102,241,0.35)', icon: '📚' },
+        { color: '#10b981', gradient: 'linear-gradient(135deg,#0c855d,#1d845f)', shadow: 'rgba(16,185,129,0.35)', icon: '🌟' },
+        { color: '#f59e0b', gradient: 'linear-gradient(135deg,#a06707,#956c03)', shadow: 'rgba(245,158,11,0.35)', icon: '🎨' },
+        { color: '#ef4444', gradient: 'linear-gradient(135deg,#e71414,#e80b0b)', shadow: 'rgba(239,68,68,0.35)', icon: '🚀' },
+        { color: '#06b6d4', gradient: 'linear-gradient(135deg,#047f94,#0b8092)', shadow: 'rgba(6,182,212,0.35)', icon: '🌈' },
+        { color: '#8b5cf6', gradient: 'linear-gradient(135deg,#8452f5,#7e55f8)', shadow: 'rgba(139,92,246,0.35)', icon: '🎯' },
+        { color: '#ec4899', gradient: 'linear-gradient(135deg,#dd1779,#df117d)', shadow: 'rgba(236,72,153,0.35)', icon: '🌸' },
+        { color: '#14b8a6', gradient: 'linear-gradient(135deg,#0e8376,#1b8376)', shadow: 'rgba(20,184,166,0.35)', icon: '🍀' },
     ];
 
     /** 依 index 取得調色盤（超過 8 個自動循環） */
@@ -451,7 +453,7 @@
         const curPalette = CLASS_PALETTE.find(p => p.icon === curProfile?.icon)
             || paletteAt(loadProfiles().findIndex(p => p.id === getCurrentId()));
         const curIcon = curProfile?.icon || '📚';
-        const curGradient = curPalette?.gradient || 'linear-gradient(135deg,#6366f1,#818cf8)';
+        const curGradient = curPalette?.gradient || 'linear-gradient(135deg,#5e61f1,#5664f6)';
         const curShadow = curPalette?.shadow || 'rgba(99,102,241,0.35)';
 
         // 桌面版：注入到 auth-nav-slot 左側的佔位 div
