@@ -1898,15 +1898,19 @@
     function saveData() {
         sortSubjects();
         examAttendance.day = localDay();
-        localStorage.setItem('examSubjects', JSON.stringify(examSubjects));
-        localStorage.setItem('examReminders', JSON.stringify(examReminders));
-        localStorage.setItem('examAttendance', JSON.stringify(examAttendance));
-        localStorage.setItem('examLightMode', JSON.stringify(isLightMode));
         // v3.1.2：同步目前天的科目到 presets
-        if (examDayPresets) {
-            examDayPresets.days[String(examDayPresets.currentDay)] = examSubjects;
-            localStorage.setItem('examDayPresets', JSON.stringify(examDayPresets));
-        }
+        if (examDayPresets) examDayPresets.days[String(examDayPresets.currentDay)] = examSubjects;
+        const pairs = [
+            ['examSubjects', JSON.stringify(examSubjects)],
+            ['examReminders', JSON.stringify(examReminders)],
+            ['examAttendance', JSON.stringify(examAttendance)],
+            ['examLightMode', JSON.stringify(isLightMode)],
+        ];
+        if (examDayPresets) pairs.push(['examDayPresets', JSON.stringify(examDayPresets)]);
+        // 幾項一起存：空間不足時整批退回，不會只存一半（以前逐項存，可能科目存了、天數設定沒存；v3.74.1）
+        if (window.SafeStorage && window.SafeStorage.write) return window.SafeStorage.write(pairs, { context: '儲存考試設定' });
+        pairs.forEach(p => localStorage.setItem(p[0], p[1]));
+        return true;
     }
 
     function escapeHtml(text) {
@@ -1965,9 +1969,10 @@
         examDayPresets.currentDay = Number(dayKey);
         examSubjects = examDayPresets.days[dayKey] || [];
 
-        // 持久化
-        localStorage.setItem('examDayPresets', JSON.stringify(examDayPresets));
-        localStorage.setItem('examSubjects', JSON.stringify(examSubjects));
+        // 持久化（兩項一起存，不會只存一半）
+        const dayPairs = [['examDayPresets', JSON.stringify(examDayPresets)], ['examSubjects', JSON.stringify(examSubjects)]];
+        if (window.SafeStorage && window.SafeStorage.write) window.SafeStorage.write(dayPairs, { context: '切換考試天數' });
+        else dayPairs.forEach(p => localStorage.setItem(p[0], p[1]));
 
         // 重繪
         renderSubjectList();

@@ -628,6 +628,24 @@
 
     // ==================== 公開 API ====================
 
+    /** 刪除某一班在本機 localStorage 的資料鍵（只刪名稱剛好是「資料名-班級編號」的鍵） */
+    function removeClassKeys(id) {
+        if (!id || id === DEFAULT_ID) return 0;
+        const CAS = window.ClassAwareStorage;
+        const bases = ['students', 'groups', 'pointsHistory', 'todayAbsent', 'dsg_recordsMigrated_v1'].concat((CAS && CAS.SHARED_KEYS) || []);
+        const keys = bases.map(b => b + '-' + id).concat(['class-manager-corrupt-hold:' + id]);
+        let removed = 0;
+        keys.forEach(k => {
+            try {
+                const has = CAS && CAS.rawGet ? CAS.rawGet(k) !== null : localStorage.getItem(k) !== null;
+                if (!has) return;
+                if (CAS && CAS.rawRemove) CAS.rawRemove(k); else localStorage.removeItem(k);
+                removed++;
+            } catch (e) { /* 刪不掉就留著，不影響其他班 */ }
+        });
+        return removed;
+    }
+
     const ClassProfiles = {
         list: loadProfiles,
         /** 名冊被跨裝置對齊更新後，重畫頁首的班級選擇器。 */
@@ -760,6 +778,9 @@
 
             profiles.splice(idx, 1);
             saveProfiles(profiles);
+            // 這一班在本機的資料也一起清掉：以前只刪名冊和 IndexedDB，學生、紀錄、作業等鍵一直留著占空間，
+            // 而且再也選不到、用不到（v3.74.1）
+            removeClassKeys(id);
             // 先在本機記下這次刪除：即使現在離線或未登入，下次名冊對齊時也會把刪除帶上雲端，
             // 不會因為雲端還留著這個班，就又被帶回這台。
             try { window.FirebaseSync?.rememberClassDeletion?.(id); } catch (e) { /* 記不下來時維持原本行為 */ }

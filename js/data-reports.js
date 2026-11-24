@@ -577,6 +577,7 @@
     const BACKUP_INTERVAL = 5 * 60 * 1000; // 5 分鐘
     const BACKUP_MAX_COUNT = 2;  // 每個班級保留幾份（v3.1.4：5 → 2，大幅減少 localStorage 用量）
     const BACKUP_MAX_TOTAL = 8;  // 全部班級合計上限；超過時先丟其他班級最舊的
+    const BACKUP_MAX_CHARS = 1200000;   // 全部快照合計約 1.2 MB 字元（localStorage 通常只有 5 MB）
     const LEGACY_KEEP_MS = 7 * 24 * 60 * 60 * 1000;   // 沒記班級的舊版快照最多留 7 天
 
     // ───── 每份快照都記下是哪一班的（v3.73.1）─────
@@ -630,7 +631,9 @@
             counts[bucket] = (counts[bucket] || 0) + 1;
             return counts[bucket] <= BACKUP_MAX_COUNT;
         });
-        while (kept.length > BACKUP_MAX_TOTAL) {
+        // 也要看大小：快照是整班資料，班級多、紀錄多時 8 份可能占掉大半儲存空間（加扣分會寫不進去）
+        const tooBig = () => kept.length > 1 && JSON.stringify(kept).length > BACKUP_MAX_CHARS;
+        while (kept.length > BACKUP_MAX_TOTAL || tooBig()) {
             let drop = -1;
             for (let i = kept.length - 1; i >= 0; i--) { if (String(kept[i].classId) !== here) { drop = i; break; } }
             if (drop < 0) drop = kept.length - 1;

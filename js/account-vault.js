@@ -21,7 +21,9 @@
     // 這台電腦的偏好與登入狀態：不屬於任何一位老師的班級資料，不跟著收納
     const DEVICE_KEYS = new Set(['theme', 'clockSettings', 'timerFullscreenLight', 'petReduceMotion', 'petViewMode', 'noRepeatLottery',
         'homeworkDashboardView', 'examLightMode', 'examAnalogClock', 'examSoundsEnabled', 'firebaseUserId', 'firebaseUserProfile',
-        'classdb_migrated_v1', 'classAwareStorageMigrated_v1', OWNER, SWITCHING]);
+        'classdb_migrated_v1', 'classAwareStorageMigrated_v1', OWNER, SWITCHING,
+        // v3.74.1：這台電腦的麥克風校正、番茄鐘與背景音樂設定、備份提醒的「稍後」——換老師登入時不跟著收走
+        'quietChallengeCfg', 'pomodoroSettings', 'timerBgmSettings', 'dsg_bannerSnoozeUntil']);
     const DEVICE_PREFIXES = ['firebase', 'firestore', 'un_', 'pwa', 'sw', 'critical', 'cloudSafetyBase:', 'cloudSafetyDirty:', 'workspace'];
     const isDeviceKey = k => DEVICE_KEYS.has(k) || DEVICE_PREFIXES.some(p => k.startsWith(p));
 

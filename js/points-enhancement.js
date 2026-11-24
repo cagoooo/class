@@ -296,8 +296,16 @@
         if (!items || !items.length) items = DEFAULT_ITEMS.map(x => ({ ...x }));
         return items;
     }
+    // 存不進去（通常是瀏覽器儲存空間滿了）時要讓老師知道；30 秒內只提醒一次（v3.74.1）
+    let saveWarnedAt = 0;
+    function warnNotSaved(err) {
+        console.warn('[加扣分項目] 存檔失敗', err);
+        if (Date.now() - saveWarnedAt < 30000) return;
+        saveWarnedAt = Date.now();
+        try { if (window.NotificationSystem && NotificationSystem.error) NotificationSystem.error('加扣分項目沒有存檔（瀏覽器儲存空間可能已滿），請先備份或登入雲端同步'); } catch (e) { /* ignore */ }
+    }
     function saveItems() {
-        try { localStorage.setItem(ITEMS_KEY, JSON.stringify(items)); } catch (e) { /* 只是常用項目 */ }
+        try { localStorage.setItem(ITEMS_KEY, JSON.stringify(items)); } catch (e) { warnNotSaved(e); }
     }
 
     function itemButton(item, context) {

@@ -36,7 +36,15 @@
         } catch (e) { }
         return [];
     }
-    function save(ids) { try { localStorage.setItem(K, JSON.stringify({ date: today(), ids })); } catch (e) { } }
+    // 存不進去（通常是瀏覽器儲存空間滿了）時要讓老師知道；30 秒內只提醒一次（v3.74.1）
+    let saveWarnedAt = 0;
+    function warnNotSaved(err) {
+        console.warn('[潔牙勾選] 存檔失敗', err);
+        if (Date.now() - saveWarnedAt < 30000) return;
+        saveWarnedAt = Date.now();
+        try { if (window.NotificationSystem && NotificationSystem.error) NotificationSystem.error('潔牙勾選沒有存檔（瀏覽器儲存空間可能已滿），請先備份或登入雲端同步'); } catch (e) { /* ignore */ }
+    }
+    function save(ids) { try { localStorage.setItem(K, JSON.stringify({ date: today(), ids })); } catch (e) { warnNotSaved(e); } }
 
     let checked = [];
 

@@ -79,8 +79,46 @@
         }
         return parts;
     }
+    /**
+     * 分組、加扣分紀錄裡編號重複的項目換一個新編號（v3.74.1）。
+     * 以前只要有一筆重複，整份備份（含老師拿來登成績的 Excel）就匯不出來、也還原不了。
+     * 學生的編號會被紀錄引用，重複時無法判斷是誰，不在這裡修。
+     * @returns {{data: Object, fixed: number}} 不改動原物件
+     */
+    function repair(data) {
+        if (!data || typeof data !== 'object' || Array.isArray(data)) return { data, fixed: 0 };
+        const copy = Object.assign({}, data);
+        let fixed = 0;
+        for (const key of ['groups', 'pointsHistory']) {
+            if (!Array.isArray(copy[key])) continue;
+            const seen = new Set();
+            copy[key] = copy[key].map(item => {
+                if (!item || typeof item !== 'object' || item.id == null) return item;
+                const id = String(item.id);
+                if (!seen.has(id)) { seen.add(id); return item; }
+                let n = 2, next = id + '-' + n;
+                while (seen.has(next)) next = id + '-' + (++n);
+                seen.add(next); fixed++;
+                return Object.assign({}, item, { id: next });
+            });
+        }
+        return { data: copy, fixed };
+    }
+    /** 驗證；不通過時試著修好重複編號再驗一次。修不好回傳 null。 */
+    function validated(data) {
+        if (validate(data)) return data;
+        const r = repair(data);
+        return r.fixed && validate(r.data) ? r.data : null;
+    }
+    /**
+     * 匯出時不因為資料有小問題就整份不給（老師要用這份 Excel 登成績）：能修就修，修不好照原樣存並回報。
+     * @returns {Array} Excel 列；另外在 encode.lastIssue 記下這次的狀況（'' / 'repaired' / 'invalid'）
+     */
     function encode(data) {
-        if (!validate(data)) throw Error('備份資料格式不完整，未匯出');
+        const ok = validated(data);
+        encode.lastIssue = ok === data ? '' : ok ? 'repaired' : 'invalid';
+        if (ok) data = ok;
+        else console.warn('[BackupIntegrity] 備份資料有格式問題，仍照原樣匯出（這份檔案可能無法用來還原）');
         const json = JSON.stringify(data), parts = split(json, 28000);
         const rows = [['⚠️ 還原專用資料，請勿修改或刪除'], ['CHUNKS_V2', parts.length, json.length, checksum(json)]];
         parts.forEach((text, index) => rows.push(['DATA', text, index]));
@@ -92,9 +130,9 @@
         if (headers.length !== 1 || !Number.isSafeInteger(headers[0][1]) || headers[0][1] < 1 || chunks.length !== headers[0][1] || chunks.some(r => typeof r[1] !== 'string')) throw Error('備份分段遺失或數量不符，未還原');
         const header = headers[0], json = chunks.map(r => r[1]).join('');
         if (header[0] === 'CHUNKS_V2' && (chunks.some((r, i) => r[2] !== i) || json.length !== header[2] || checksum(json) !== header[3])) throw Error('備份順序或完整性檢查失敗，未還原');
-        const data = JSON.parse(json);
-        if (!validate(data)) throw Error('備份資料格式不完整，未還原');
+        const data = validated(JSON.parse(json));
+        if (!data) throw Error('備份資料格式不完整，未還原');
         return data;
     }
-    window.BackupIntegrity = { checksum, validate, encode, decode, split };
+    window.BackupIntegrity = { checksum, validate, validated, repair, encode, decode, split };
 })();

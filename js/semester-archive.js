@@ -23,7 +23,8 @@ const SemesterArchive = (() => {
     const CURRENT_MONTH = new Date().getMonth() + 1;
     // 台灣學制：2～7月為下學期(S2)，8月～隔年1月為上學期(S1)
     const CURRENT_SEMESTER = (CURRENT_MONTH >= 2 && CURRENT_MONTH <= 7) ? 'S2' : 'S1';
-    const DEFAULT_ARCHIVE_KEY = `${CURRENT_YEAR}-${CURRENT_SEMESTER}`;
+    // 1 月還是 8 月開學的那個上學期：年份要用前一年（以前 2027 年 1 月會標成 2027-S1，應為 2026-S1；v3.74.1）
+    const DEFAULT_ARCHIVE_KEY = `${CURRENT_MONTH === 1 ? CURRENT_YEAR - 1 : CURRENT_YEAR}-${CURRENT_SEMESTER}`;
 
     // 取得目前班級 ID（支援多班級）
     function getCurClassId() {

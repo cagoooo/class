@@ -144,8 +144,21 @@
             { key: 'classManager_autoBackup', alwaysSafe: false },
         ];
         CLEANUP_TARGETS.forEach(target => {
-            // 未登入 + 非 alwaysSafe → 跳過，保留本地備份
-            if (!target.alwaysSafe && !isLoggedIn) return;
+            // 未登入：本機自動備份是唯一副本，不整個刪；只留這一班最新的一份，其他快照清掉（v3.74.1）
+            if (!target.alwaysSafe && !isLoggedIn) {
+                if (target.key !== 'classManager_autoBackup') return;
+                const v = _origGet.call(localStorage, target.key);
+                if (v === null) return;
+                try {
+                    const list = JSON.parse(v);
+                    if (!Array.isArray(list) || list.length <= 1) return;
+                    const keep = list.find(b => b && String(b.classId) === pageClassId) || list[0];
+                    const next = JSON.stringify([keep]);
+                    _origSet.call(localStorage, target.key, next);
+                    freedBytes += (v.length - next.length) * 2;
+                } catch (e) { /* 讀不懂就不動 */ }
+                return;
+            }
             const v = _origGet.call(localStorage, target.key);
             if (v !== null) {
                 freedBytes += (target.key.length + v.length) * 2;  // UTF-16 roughly 2 bytes/char
@@ -260,10 +273,25 @@
     // 另一個分頁換了帳號（資料已換成另一位老師的），或正在收納切換時，這頁手上的舊資料寫回去就會混到別人的班級。
     // 主題、登入狀態等這台電腦的設定不受影響（由 AccountVault.isDeviceKey 判斷）。
     let pageOwner = _origGet.call(localStorage, 'workspaceOwner');
+    // 這一頁自己在換帳號時 pageOwner 是 '__switching__'（AccountVault 設定），不算「別的分頁」
+    function switchingElsewhere() {
+        if (pageOwner === '__switching__') return false;
+        try {
+            const mark = JSON.parse(_origGet.call(localStorage, 'workspaceSwitching') || 'null');
+            if (!mark || !mark.at) return false;
+            const age = Date.now() - Date.parse(mark.at);
+            return age >= 0 && age < 120000;
+        } catch (e) { return false; }
+    }
     function blockedWrite(key) {
         const isDevice = window.AccountVault && window.AccountVault.isDeviceKey;
         if (!isDevice || isDevice(key)) return false;
         const now = _origGet.call(localStorage, 'workspaceOwner');
+        // 另一個分頁正在換帳號（收納中，兩分鐘內的標記才算；當掉留下的舊標記不擋）：這段期間的寫入會混進別人的資料（v3.74.1）
+        if (switchingElsewhere()) {
+            console.warn('[ClassAwareStorage] 另一個分頁正在切換帳號，這次寫入先不存：' + key);
+            return true;
+        }
         if (pageOwner !== '__switching__' && (now || null) === (pageOwner || null)) return false;
         console.warn('[ClassAwareStorage] 這台電腦的班級資料已切換給另一個帳號，這頁的舊資料不再寫入：' + key);
         return true;

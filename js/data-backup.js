@@ -146,7 +146,13 @@ class DataBackup {
         XLSX.utils.book_append_sheet(wb, wsRaw, '備份資料(請勿刪除)');
 
         XLSX.writeFile(wb, `班級小管家備份_${className ? className + '_' : ''}${this.getDateString()}.xlsx`);
-        if (typeof NotificationSystem !== 'undefined') NotificationSystem.success('Excel 備份已下載（含成績登記表）');
+        if (typeof NotificationSystem !== 'undefined') {
+            if (BackupIntegrity.encode.lastIssue === 'invalid') {
+                NotificationSystem.warning('Excel 備份已下載（成績登記表可以用），但班級資料有格式問題，這份檔案可能無法用來還原。請改用雲端同步保存，或聯絡資訊組協助。');
+            } else {
+                NotificationSystem.success('Excel 備份已下載（含成績登記表）');
+            }
+        }
     }
 
     // 從 Excel 備份的「備份資料(請勿刪除)」工作表重組出 JSON 物件
@@ -175,9 +181,17 @@ class DataBackup {
                 data = JSON.parse(text);
             }
 
-            // 驗證資料格式
-            if (!this.validateBackupData(data)) {
+            // 驗證資料格式（分組、紀錄的編號重複會自動換新編號，其他問題就不匯入）
+            data = BackupIntegrity.validated(data);
+            if (!data) {
                 throw new Error('備份檔案格式不正確');
+            }
+            // 其他資料（聯絡簿、作業、公告、考試…）的型別也要對：壞掉的那一項不寫入、保留目前內容，
+            // 以前會原樣寫進去，下次開頁那個功能就整個出錯（v3.74.1）
+            const skipped = DataBackup.invalidExtraKeys(data);
+            if (skipped.length) {
+                data = Object.assign({}, data);
+                skipped.forEach(k => { delete data[k]; });
             }
 
             LoadingIndicator.hide();
@@ -220,6 +234,7 @@ class DataBackup {
             const ops = [];
             allowed.forEach(k => {
                 if (Object.prototype.hasOwnProperty.call(data, k)) return;
+                if (skipped.includes(k)) return;   // 備份裡這一項壞掉：保留目前的內容，不刪也不寫
                 const key = k === 'students' ? window.STUDENTS_KEY : k === 'groups' ? window.GROUPS_KEY : k === 'pointsHistory' ? window.POINTS_HISTORY_KEY : k;
                 ops.push([key || k, null]);
             });
@@ -244,7 +259,8 @@ class DataBackup {
             try { if (window.LocalDataHold) window.LocalDataHold.clear(targetClass); } catch (e) { /* ignore */ }
 
             LoadingIndicator.hide();
-            NotificationSystem.success('資料匯入成功，頁面即將重新載入');
+            if (skipped.length) NotificationSystem.warning(`資料已匯入；備份檔裡有 ${skipped.length} 項格式不對（${skipped.join('、')}），這幾項保留原本的內容。頁面即將重新載入`);
+            else NotificationSystem.success('資料匯入成功，頁面即將重新載入');
             setTimeout(() => location.reload(), 1500);
 
         } catch (error) {
@@ -256,6 +272,25 @@ class DataBackup {
 
     static validateBackupData(data) {
         return BackupIntegrity.validate(data);
+    }
+
+    /** 備份裡除了學生／分組／紀錄之外，型別不對的項目（陣列、物件、文字各有規定）。 */
+    static invalidExtraKeys(data) {
+        const ARRAYS = ['notebookEntries', 'homeworkList', 'lotteryHistory', 'classAnnouncements', 'examSubjects', 'examAbsenceRecords',
+            'drawnStudentIds', 'quietChallengeLog', 'pointsQuickActions'];
+        const OBJECTS = ['homeworkChecks', 'petSettings', 'examReminders', 'examAttendance', 'seatingConfig', 'examDayPresets',
+            'boardNoteStyle', 'boardLotteryCfg', 'brushChecked'];
+        const STRINGS = ['boardNote', 'boardActivity'];
+        const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
+        const bad = [];
+        Object.keys(data || {}).forEach(k => {
+            const v = data[k];
+            if (v === null || v === undefined) return;
+            if (ARRAYS.includes(k) && !Array.isArray(v)) bad.push(k);
+            else if (OBJECTS.includes(k) && !isObj(v)) bad.push(k);
+            else if (STRINGS.includes(k) && typeof v !== 'string') bad.push(k);
+        });
+        return bad;
     }
 
     static getDateString() {

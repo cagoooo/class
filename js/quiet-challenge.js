@@ -252,7 +252,15 @@
     }
 
     function lsGet(k, fb) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; } catch (e) { return fb; } }
-    function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* 存不了不影響使用 */ } }
+    // 存不進去（通常是瀏覽器儲存空間滿了）時要讓老師知道；30 秒內只提醒一次（v3.74.1）
+    let saveWarnedAt = 0;
+    function warnNotSaved(err) {
+        console.warn('[安靜挑戰紀錄] 存檔失敗', err);
+        if (Date.now() - saveWarnedAt < 30000) return;
+        saveWarnedAt = Date.now();
+        try { if (window.NotificationSystem && NotificationSystem.error) NotificationSystem.error('安靜挑戰紀錄沒有存檔（瀏覽器儲存空間可能已滿），請先備份或登入雲端同步'); } catch (e) { /* ignore */ }
+    }
+    function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { warnNotSaved(e); } }
     function loadCfg() {
         const c = Object.assign({}, DEFAULT_CFG, lsGet(K_CFG, {}));
         c.threshold = Math.max(10, Math.min(99, Number(c.threshold) || DEFAULT_CFG.threshold));

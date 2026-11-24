@@ -175,7 +175,8 @@
     function downloadBackup() {
         hookBackup();
         const DB = getDB();
-        if (DB && DB.export) {
+        // 備份模組還沒載入完成（備援物件）：改用這裡自己的完整快照下載，不能把「沒匯出」當成功（v3.74.1）
+        if (DB && DB.export && !DB.__fallback) {
             try {
                 return DB.export() !== false;
             } catch (e) { return snapshotFallback(); }
@@ -373,19 +374,17 @@
 
     function checkStorage(force) {
         if (!hasMeaningfulData()) return;
-        if (!force) {
-            const snooze = parseInt(rawGet(LS_SNOOZE) || '0', 10);
-            if (Date.now() < snooze) return;
-            // 安靜挑戰常投影在大螢幕上，麥克風開著時先不跳提醒；每 10 分鐘會再檢查一次
-            if (window.QuietChallenge?.isActive?.()) return;
-        }
+        // 「30 天內不用提醒我」只管「很久沒備份」；儲存空間快滿照樣要說，否則加扣分寫不進去時老師毫無預警（v3.74.1）
+        const snoozed = !force && Date.now() < parseInt(rawGet(LS_SNOOZE) || '0', 10);
+        // 安靜挑戰常投影在大螢幕上，麥克風開著時先不跳提醒；每 10 分鐘會再檢查一次
+        if (!force && window.QuietChallenge?.isActive?.()) return;
         estimateUsage().then(est => {
             const ratio = est.quota ? est.usage / est.quota : 0;
             // localStorage 才是加扣分寫不進去的主因；estimate() 的總用量只當極端情況的第二道
             const lsBytes = localStorageBytes();
             const pressure = lsBytes >= LS_PRESSURE_BYTES || ratio >= PRESSURE_RATIO;
             est.lsBytes = lsBytes;
-            const stale = daysSince(lastBackupAt()) >= STALE_DAYS;
+            const stale = !snoozed && daysSince(lastBackupAt()) >= STALE_DAYS;
             if (pressure || stale) showBanner({ pressure, stale, est });
             else document.getElementById('dsg-banner')?.remove();
         });
