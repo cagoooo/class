@@ -906,7 +906,8 @@ exports.dailyUsageDigest = onSchedule(
  * 前置作業（已於 2026-09-03 完成，重建專案時要重做）：
  *   1. 建桶：gcloud storage buckets create gs://class-4719f-firestore-backups
  *              --location=asia-east1 --uniform-bucket-level-access
- *   2. 生命週期：舊備份 30 天自動刪除（避免儲存費無限累積）
+ *   2. 生命週期（2026-11-25 起分兩條）：firestore_backups/ 每日備份 30 天自動刪除（避免儲存費無限累積）；
+ *      deleted_leftovers/ 刪除班級前留的備份保留 365 天（以前同一條 30 天規則也會刪到它）
  *   3. 授權服務帳號 528903484088-compute@developer.gserviceaccount.com：
  *      - 專案層：roles/datastore.importExportAdmin
  *      - 備份桶：roles/storage.objectAdmin
