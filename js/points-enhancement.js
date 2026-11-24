@@ -35,6 +35,10 @@
         sheet: null
     };
     let items = null;
+    // 另一個分頁改了加扣分項目：這一頁沒在編輯就換成新的，不用重新整理；正在編輯則等安全時機重新整理（v3.73.0）
+    try {
+        window.ClassAwareStorage?.onOtherTabChange?.(ITEMS_KEY, () => { if (state.editing) return false; items = null; renderPanel(); return true; });
+    } catch (e) { /* 沒有攔截器（測試環境）就照舊 */ }
     let queue = Promise.resolve();
     let toastTimer = null;
 

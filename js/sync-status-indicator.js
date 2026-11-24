@@ -410,7 +410,11 @@
             // localStorage。內容沒有改變就不應被當成老師的新操作，否則
             // 只切換班級也會留下 cloudSafetyDirty 標記並跳出離開提醒。
             let changed = true;
-            try { changed = this.getItem(key) !== String(value); } catch (e) { /* 寫入仍照常進行 */ }
+            // 用 peek 看目前內容：這只是比對，不算這一頁「讀過最新資料」（兩個分頁同一班的保護靠這個區分）
+            try {
+                const peek = this === localStorage && window.ClassAwareStorage && window.ClassAwareStorage.peek;
+                changed = (peek ? peek(key) : this.getItem(key)) !== String(value);
+            } catch (e) { /* 寫入仍照常進行 */ }
             const result = orig.call(this, key, value);
             try {
                 if (changed && this === localStorage && isUserKey(key) && currentState !== 'offline') {

@@ -898,6 +898,11 @@
         // Hook showSection
         hookShowSection();
 
+        // 另一個分頁改了公告：這一頁手上那份換成新的並重畫，不用重新整理（v3.73.0）
+        try {
+            window.ClassAwareStorage?.onOtherTabChange?.('classAnnouncements', () => { loadData(); renderList(); return true; });
+        } catch (e) { /* 沒有攔截器（測試環境）就照舊 */ }
+
         console.log('✅ 班級公告系統已載入');
     }
 

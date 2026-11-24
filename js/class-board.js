@@ -286,6 +286,16 @@
     };
     window.ClassBoard = api;
 
+    // 另一個分頁（例如老師筆電上的那一頁）改了白板：投影中的這一頁跟著換，不用重新整理（v3.73.0）
+    try {
+        window.ClassAwareStorage?.onOtherTabChange?.([K_NOTE, K_STYLE, K_ACT], () => {
+            const ta = document.getElementById('cb-text');
+            if (!ta || !ta.__cbWired) return;                     // 白板還沒開過：開的時候會讀最新的
+            if (document.activeElement !== ta) ta.value = lsGet(K_NOTE, '');   // 正在這一頁打字就不換，以免打到一半被改掉
+            renderToolbar(); applyTextStyle(); renderActivities();
+        });
+    } catch (e) { /* 沒有攔截器（測試環境）就照舊 */ }
+
     // ───────────── 號碼抽籤 popup ─────────────
     let drawnSet = [];     // 本場已抽出的號碼（不重複用）
     function lotCfg() {

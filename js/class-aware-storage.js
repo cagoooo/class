@@ -66,11 +66,55 @@
     let pageClassId = _origGet.call(localStorage, CLASS_ID_KEY) || 'default';
     function notePageClass(key, value) {
         if (key === CLASS_ID_KEY) pageClassId = value == null ? 'default' : (String(value) || 'default');
+        noteSeen(key, value);
     }
     function classKey(key) {
         if (!SHARED_KEYS.has(key)) return key;
         if (pageClassId === 'default') return key;
         return key + '-' + pageClassId;
+    }
+
+    // ───── 同一班開在兩個分頁：記住「這一頁最後看到的內容」（v3.73.0）─────
+    // 每個分頁各自在記憶體留一份班級資料，存檔時整包寫回，另一個分頁剛寫的內容就會被蓋掉。
+    // 這裡替這一頁這一班的每一項資料記下最後一次讀到或寫入的內容；之後要寫入時，
+    // 如果 localStorage 裡的內容已經不是這一頁看過的那份，代表別的分頁改過，這次寫入就是拿舊資料去蓋新的。
+    const CORE_KEYS = ['students', 'groups', 'pointsHistory'];
+    // 主頁面放在全域變數裡的資料：另一個分頁寫入時可以直接就地換成新的
+    const MEMORY_SHAPE = {
+        students: [], groups: [], pointsHistory: [], notebookEntries: [], homeworkList: [],
+        homeworkChecks: {}, lotteryHistory: [], drawnStudentIds: [],
+    };
+    // 頁面（或模組）載入時讀一次、之後一直用手上那份整包寫回的資料。
+    // 這些資料「之後又被讀到」不代表手上那份有更新（備份、同步狀態都會順手讀），所以只認第一次讀取與自己的寫入。
+    const HELD = new Set(Object.keys(MEMORY_SHAPE).concat(['classAnnouncements', 'pointsQuickActions',
+        'examSubjects', 'examReminders', 'examAttendance', 'examAbsenceRecords', 'examDayPresets']));
+    // 小設定：模組每次操作都重新讀取，或後寫的蓋掉先寫的也無妨。另一邊改了不必重新整理，也不擋寫入。
+    const RELAXED = new Set(['boardNote', 'boardNoteStyle', 'boardActivity', 'boardLotteryCfg', 'brushChecked', 'quietChallengeLog']);
+    const seen = new Map();                         // 實際的鍵 → 這一頁手上那份對應的內容（沒有這一項是 null）
+    let watchedFor = null, watched = new Map();     // 實際的鍵 → 程式裡的名稱（只有這一頁這一班的班級資料）
+    function watchedName(actualKey) {
+        if (watchedFor !== pageClassId) {
+            watchedFor = pageClassId; watched = new Map(); seen.clear();
+            CORE_KEYS.forEach(function (k) { watched.set(pageClassId === 'default' ? k : k + '-' + pageClassId, k); });
+            SHARED_KEYS.forEach(function (k) { watched.set(classKey(k), k); });
+        }
+        return watched.get(actualKey);
+    }
+    function noteSeen(actualKey, value, isRead) {
+        const name = watchedName(actualKey);
+        if (!name) return;
+        if (isRead && HELD.has(name) && seen.has(actualKey)) return;
+        seen.set(actualKey, value == null ? null : String(value));
+    }
+    /** 這一頁沒看過 localStorage 現在的內容（別的分頁改過），卻要拿手上的資料寫回去。 */
+    function isStaleWrite(actualKey, value) {
+        const name = watchedName(actualKey);
+        if (!name || RELAXED.has(name) || !seen.has(actualKey)) return false;
+        const live = _origGet.call(localStorage, actualKey);
+        if (live === seen.get(actualKey)) return false;
+        // 要寫的內容和現在存的一模一樣（例如兩個分頁同時開機、各自補上相同的預設值）：沒有東西會被蓋掉
+        if (live === (value == null ? null : String(value))) { seen.set(actualKey, live); return false; }
+        return true;
     }
 
     // ───── 緊急清理：localStorage 滿時自動釋放非必要空間 ─────
@@ -227,11 +271,15 @@
 
     // ───── 攔截 localStorage 方法（v3.1.4 加入 quota-safe 包裝） ─────
     _proto.getItem = function (key) {
-        return _origGet.call(this, classKey(key));
+        const actualKey = classKey(key);
+        const value = _origGet.call(this, actualKey);
+        if (this === localStorage) noteSeen(actualKey, value, true);
+        return value;
     };
     _proto.setItem = function (key, value) {
         const actualKey = classKey(key);
         if (this === localStorage && blockedWrite(actualKey)) return;
+        if (this === localStorage && isStaleWrite(actualKey, value)) { rejectStaleWrite(actualKey); return; }
         try {
             const result = _origSet.call(this, actualKey, value);
             if (this === localStorage) notePageClass(actualKey, value);
@@ -244,7 +292,9 @@
                 if (freed > 0) {
                     console.log('[ClassAwareStorage] 已釋放 ' + (freed / 1024).toFixed(1) + ' KB，重試儲存');
                     try {
-                        return _origSet.call(this, actualKey, value);
+                        const retried = _origSet.call(this, actualKey, value);
+                        if (this === localStorage) notePageClass(actualKey, value);
+                        return retried;
                     } catch (retryErr) {
                         // 仍失敗 → 顯示對話框讓使用者處理
                         showQuotaDialog();
@@ -261,6 +311,7 @@
     _proto.removeItem = function (key) {
         const actualKey = classKey(key);
         if (this === localStorage && blockedWrite(actualKey)) return;
+        if (this === localStorage && isStaleWrite(actualKey, null)) { rejectStaleWrite(actualKey); return; }
         const result = _origRemove.call(this, actualKey);
         if (this === localStorage) notePageClass(actualKey, null);
         return result;
@@ -308,6 +359,192 @@
                 try {
                     if (window.NotificationSystem && window.NotificationSystem.info) window.NotificationSystem.info('另一個分頁切換了班級，這一頁已跟著換成目前的班級');
                 } catch (e) { /* ignore */ }
+            }, 2500);
+        }
+    } catch (e) { /* 測試環境沒有 window 事件 */ }
+
+    // ───── 同一班開在兩個分頁：另一個分頁寫入後，這一頁怎麼跟上（v3.73.0）─────
+    // 1. 學生、加扣分、分組、聯絡簿、作業、抽籤：主頁面放在全域變數裡，直接就地換成新內容並重畫，不用重新整理。
+    // 2. 其餘資料（公告、考試、座位表、白板……各模組自己留一份）：記下「這一頁是舊的」，
+    //    等老師回到這一頁（切回分頁、點進視窗、開始操作）而且沒在上課操作時才重新整理；投影中的畫面不會被打斷。
+    // 3. 萬一還是拿舊資料寫入（上面第 2 類還沒來得及重新整理）：擋下來、告訴老師，不讓它蓋掉另一個分頁的內容。
+    const REDRAW = ['renderStudents', 'renderGroups', 'renderPointsStudentList', 'renderPointsHistory',
+        'renderNotebook', 'renderHomework', 'refreshHomeworkSelectKeep', 'updateHomeworkCheckList',
+        'renderLotteryHistory', 'updateLotteryStats'];
+    const KEY_LABELS = {
+        students: '學生名單', groups: '分組', pointsHistory: '加扣分紀錄', petSettings: '寵物設定',
+        notebookEntries: '聯絡簿', homeworkList: '作業', homeworkChecks: '作業繳交', lotteryHistory: '抽籤紀錄',
+        classAnnouncements: '公告', examSubjects: '考試科目', examReminders: '考試提醒', examAttendance: '考試出缺席',
+        examAbsenceRecords: '缺考記錄', seatingConfig: '座位表', drawnStudentIds: '抽籤名單', examDayPresets: '考試日程',
+        boardNote: '白板公告', boardNoteStyle: '白板樣式', boardActivity: '白板狀態', boardLotteryCfg: '白板抽籤設定',
+        brushChecked: '潔牙勾選', quietChallengeLog: '安靜挑戰紀錄', pointsQuickActions: '加扣分項目',
+    };
+    const STALE_NOTICE = 'class-manager-tab-refreshed';     // 重新整理後要告訴老師的話（只存在這個分頁）
+    const RELOAD_LOG = 'class-manager-tab-reloads';         // 最近幾次自動重新整理的時間，避免兩個分頁互相觸發
+    const staleNames = new Set();       // 另一個分頁改過、這一頁還是舊的
+    const refreshedNames = new Set();   // 剛就地換成新內容、還沒重畫
+    const refreshers = {};              // 名稱 → 模組登記的「重新讀取並重畫」函式
+    let redrawTimer = null, staleTicker = null, rejectedAt = 0, rejectedSomething = false, tabReloading = false, lastTypedAt = 0;
+    const TYPING = 'textarea, [contenteditable], input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=button])';
+    function label(name) { return KEY_LABELS[name] || name; }
+    function notify(kind, text, ms) {
+        try {
+            const N = window.NotificationSystem;
+            if (!N) return;
+            if (typeof N.show === 'function') N.show(text, kind, ms || 8000);
+            else if (typeof N[kind] === 'function') N[kind](text);
+        } catch (e) { /* 通知失敗不影響資料 */ }
+    }
+    function ownerChangedElsewhere() {
+        const now = _origGet.call(localStorage, 'workspaceOwner');
+        return pageOwner === '__switching__' || (now || null) !== (pageOwner || null);
+    }
+
+    /** 把主頁面記憶體裡的那一份換成 localStorage 現在的內容。換不了（形狀不對、不是主頁面）回傳 false。 */
+    function adoptIntoMemory(actualKey, rawValue) {
+        const name = watchedName(actualKey);
+        if (!name || !Object.prototype.hasOwnProperty.call(MEMORY_SHAPE, name) || !(name in window)) return false;
+        const wantArray = Array.isArray(MEMORY_SHAPE[name]);
+        let parsed = null;
+        try { parsed = rawValue == null || rawValue === '' ? null : JSON.parse(rawValue); }
+        catch (e) { return false; }
+        if (parsed === null) parsed = wantArray ? [] : {};
+        if (typeof parsed !== 'object' || Array.isArray(parsed) !== wantArray) return false;
+        window[name] = parsed;
+        seen.set(actualKey, rawValue == null ? null : String(rawValue));
+        scheduleRedraw(name);
+        return true;
+    }
+    function scheduleRedraw(name) {
+        refreshedNames.add(name);
+        if (!redrawTimer) redrawTimer = setTimeout(redrawAfterRefresh, 150);
+    }
+    function redrawAfterRefresh() {
+        redrawTimer = null;
+        const names = Array.from(refreshedNames); refreshedNames.clear();
+        if (!names.length) return;
+        if (names.some(function (n) { return Object.prototype.hasOwnProperty.call(MEMORY_SHAPE, n); })) {
+            REDRAW.forEach(function (fn) {
+                try { if (typeof window[fn] === 'function') window[fn](); }
+                catch (e) { console.warn('[ClassAwareStorage] 重畫失敗：' + fn, e); }
+            });
+        }
+        try { if (window.ClassPets) { if (window.ClassPets.prepare) window.ClassPets.prepare(); if (window.ClassPets.render) window.ClassPets.render(); } }
+        catch (e) { console.warn('[ClassAwareStorage] 寵物重畫失敗', e); }
+        try { window.dispatchEvent(new CustomEvent('class-data-refreshed', { detail: { names: names } })); }
+        catch (e) { /* 舊瀏覽器或測試環境 */ }
+    }
+
+    function onOtherTabWrite(actualKey) {
+        const name = watchedName(actualKey);
+        if (!name || ownerChangedElsewhere()) return;     // 換帳號由 AccountVault 處理
+        const live = _origGet.call(localStorage, actualKey);   // 事件可能排隊，以現在實際的內容為準
+        if (seen.has(actualKey) && seen.get(actualKey) === live) return;   // 這一頁已經是最新的
+        if (adoptIntoMemory(actualKey, live)) return;
+        if (!seen.has(actualKey)) return;                 // 這一頁沒讀過這一項，手上沒有舊的
+        let reloaded = false;                             // 模組說它已經重新讀取並重畫（回傳 true）
+        (refreshers[name] || []).forEach(function (fn) {
+            try { if (fn(name) === true) reloaded = true; }
+            catch (e) { console.warn('[ClassAwareStorage] 重新讀取失敗：' + name, e); }
+        });
+        if (reloaded || RELAXED.has(name)) { seen.set(actualKey, live); return; }
+        if (name === 'petSettings' && window.ClassPets) scheduleRedraw(name);   // 寵物重畫時會重新讀取設定
+        if (seen.get(actualKey) === live) return;
+        markStale(name);
+    }
+    /** 回到這一頁時補檢查一次：背景分頁可能被瀏覽器凍結，沒收到另一邊寫入的通知。 */
+    function catchUp() {
+        if (tabReloading || classChangedElsewhere) return;
+        watchedName(CLASS_ID_KEY);     // 確保清單是這一頁目前的班級
+        Array.from(watched.keys()).forEach(function (actualKey) {
+            if (seen.has(actualKey) && seen.get(actualKey) !== _origGet.call(localStorage, actualKey)) onOtherTabWrite(actualKey);
+        });
+    }
+    function markStale(name) {
+        staleNames.add(name);
+        if (!staleTicker) staleTicker = setInterval(function () { reloadIfStale(false); }, 5000);
+    }
+    /** 這一頁沒看過最新內容就要寫入：不寫，並讓老師知道。 */
+    function rejectStaleWrite(actualKey) {
+        const name = watchedName(actualKey);
+        console.warn('[ClassAwareStorage] 另一個分頁已改過這項資料，這一頁的舊內容不寫入：' + actualKey);
+        const live = _origGet.call(localStorage, actualKey);
+        const adopted = adoptIntoMemory(actualKey, live);
+        if (!adopted) { markStale(name); rejectedSomething = true; }
+        const now = Date.now();
+        if (now - rejectedAt > 10000) {
+            rejectedAt = now;
+            notify('warning', adopted
+                ? '另一個分頁剛改過「' + label(name) + '」，這次修改沒有存檔。畫面已換成最新內容，請再操作一次。'
+                : '另一個分頁已改過「' + label(name) + '」，為了不蓋掉那邊的內容，這次修改沒有存檔。這一頁會重新整理成最新內容，請之後再改一次。', 12000);
+        }
+        if (!adopted) setTimeout(function () { reloadIfStale(true); }, 1500);
+    }
+    function recentReloads() {
+        try {
+            const list = JSON.parse(sessionStorage.getItem(RELOAD_LOG) || '[]');
+            return Array.isArray(list) ? list.filter(function (t) { return Date.now() - t < 120000; }) : [];
+        } catch (e) { return []; }
+    }
+    /**
+     * 這一頁有舊資料時找時機重新整理。
+     * @param {boolean} userIsHere 老師正在這一頁（切回分頁、點進視窗、開始操作，或剛有修改被擋下）
+     */
+    function reloadIfStale(userIsHere) {
+        if (!staleNames.size || tabReloading || classChangedElsewhere) return;
+        // 這一頁後來自己重新讀過（例如切到那個功能頁時重新載入）就不算舊的了
+        watched.forEach(function (name, actualKey) {
+            if (staleNames.has(name) && seen.get(actualKey) === _origGet.call(localStorage, actualKey)) staleNames.delete(name);
+        });
+        if (!staleNames.size) {
+            if (staleTicker) { clearInterval(staleTicker); staleTicker = null; }
+            return;
+        }
+        try { if (document.hidden) return; } catch (e) { return; }
+        if (!userIsHere) { try { if (!document.hasFocus()) return; } catch (e) { return; } }   // 只是投影著、沒人在操作：不打斷
+        if (pageIsBusy() || Date.now() - lastTypedAt < 60000) return;   // 剛打過字：可能有還沒存的內容，晚一點再換
+        const recent = recentReloads();
+        if (recent.length >= 3) return;     // 兩分鐘內已自動重新整理 3 次：先停，寫入保護仍然有效
+        try {
+            recent.push(Date.now());
+            sessionStorage.setItem(RELOAD_LOG, JSON.stringify(recent));
+            sessionStorage.setItem(STALE_NOTICE, rejectedSomething ? 'rejected' : 'refreshed');
+        } catch (e) { /* 無痕模式 */ }
+        tabReloading = true;
+        try { if (window.LeaveSyncGuard && window.LeaveSyncGuard.allowInternalNavigation) window.LeaveSyncGuard.allowInternalNavigation(); } catch (e) { /* ignore */ }
+        try { window.location.reload(); } catch (e) { /* 測試環境 */ }
+    }
+    try {
+        window.addEventListener('storage', function (event) {
+            if (!event.key || event.key === CLASS_ID_KEY) return;
+            if (event.storageArea && event.storageArea !== localStorage) return;
+            onOtherTabWrite(event.key);
+        });
+        window.addEventListener('focus', function () { catchUp(); reloadIfStale(true); });
+        document.addEventListener('visibilitychange', function () { if (!document.hidden) { catchUp(); reloadIfStale(true); } });
+        // 老師開始操作這一頁：先換成最新內容再讓他操作；正在重新整理時，這一下點擊或按鍵不交給舊畫面
+        ['pointerdown', 'keydown'].forEach(function (type) {
+            document.addEventListener(type, function (event) {
+                if (!staleNames.size && !tabReloading) return;
+                if (!tabReloading) reloadIfStale(true);
+                if (tabReloading) { try { event.stopImmediatePropagation(); event.preventDefault(); } catch (e) { /* ignore */ } }
+            }, true);
+        });
+        document.addEventListener('input', function (event) {
+            try { if (event.target && event.target.matches && event.target.matches(TYPING)) lastTypedAt = Date.now(); } catch (e) { /* ignore */ }
+        }, true);
+        ['click', 'pointerup', 'keyup', 'submit'].forEach(function (type) {
+            document.addEventListener(type, function (event) {
+                if (tabReloading) { try { event.stopImmediatePropagation(); event.preventDefault(); } catch (e) { /* ignore */ } }
+            }, true);
+        });
+        const notice = sessionStorage.getItem(STALE_NOTICE);
+        if (notice) {
+            sessionStorage.removeItem(STALE_NOTICE);
+            setTimeout(function () {
+                notify(notice === 'rejected' ? 'warning' : 'info', notice === 'rejected'
+                    ? '這一頁已換成另一個分頁更新後的最新內容。剛才沒有存檔的那次修改，請再做一次。'
+                    : '另一個分頁更新了這一班的資料，這一頁已換成最新內容。', notice === 'rejected' ? 12000 : 6000);
             }, 2500);
         }
     } catch (e) { /* 測試環境沒有 window 事件 */ }
@@ -374,6 +611,16 @@
         const list = (pairs || []).filter(p => Array.isArray(p) && p[0]);
         if (!list.length) return true;
         if (list.some(p => blockedWrite(opts.raw ? p[0] : classKey(p[0])))) return false;
+        // 一般寫入（不是同步、還原這類「明確要換掉」的寫入）：這一頁手上是舊資料就整批不寫
+        if (!opts.raw) {
+            const staleKeys = list.filter(p => isStaleWrite(classKey(p[0]), p[1])).map(p => classKey(p[0]));
+            if (staleKeys.length) {
+                try { if (typeof opts.rollback === 'function') opts.rollback(); }
+                catch (e) { console.error('[SafeStorage] rollback 失敗:', e); }
+                staleKeys.forEach(rejectStaleWrite);
+                return false;
+            }
+        }
 
         // 先拍快照（走一般 getItem，與 setItem 同一套班級 key 路由）
         const get = k => opts.raw ? _origGet.call(localStorage, k) : localStorage.getItem(k);
@@ -467,6 +714,20 @@
         setPageOwner(uid) { pageOwner = uid; },
         /** 這一頁載入時的班級（另一個分頁切班不會改變它）。 */
         pageClassId() { return pageClassId; },
+        /**
+         * 模組登記「另一個分頁改了這項資料時，重新從 localStorage 讀取並重畫」的函式。
+         * 函式把模組手上那份換成新的並重畫後回傳 true，這一頁就算跟上了，不必重新整理；
+         * 回傳其他值（例如正在編輯、不方便換）則照舊等安全時機重新整理。
+         * @param {string|string[]} names 程式裡寫的名稱，例如 'classAnnouncements'
+         * @param {Function} fn
+         */
+        onOtherTabChange(names, fn) {
+            (Array.isArray(names) ? names : [names]).forEach(function (n) { (refreshers[n] = refreshers[n] || []).push(fn); });
+        },
+        /** 只是看一眼目前存的內容（例如比對有沒有變），不代表這一頁手上那份已經更新。 */
+        peek(key) { return _origGet.call(localStorage, classKey(key)); },
+        /** 另一個分頁改過、這一頁還沒跟上的資料名稱（診斷與測試用）。 */
+        staleNames() { return Array.from(staleNames); },
     };
 
     console.log('[ClassAwareStorage] localStorage 攔截器已載入（' + SHARED_KEYS.size + ' 個共用 key 將依班級隔離）');

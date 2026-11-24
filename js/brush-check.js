@@ -185,6 +185,11 @@
     };
     window.BrushCheck = api;
 
+    // 另一個分頁勾了潔牙：這一頁的勾選表跟著更新（v3.73.0）
+    try {
+        window.ClassAwareStorage?.onOtherTabChange?.(K, () => { if (document.getElementById('bc-teeth')) api.init(); });
+    } catch (e) { /* 沒有攔截器（測試環境）就照舊 */ }
+
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectCSS);
     else injectCSS();
 })();
