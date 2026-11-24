@@ -40,6 +40,7 @@
         running: false,
         retryTimer: null,
         retryDelay: 5000,
+        retryCount: 0,   // 連續失敗幾次；太多次就先停，等下一次修改、恢復連線或 10 分鐘的定時同步再試（v3.74.2）
         intervalMs: DEFAULTS.intervalMin * 60 * 1000,
     };
 
@@ -144,8 +145,10 @@
             if (ok && silent) {
                 if (window.CloudSafety?.status() === 'synced') showSilentToast('☁️ 已自動同步');
             }
-            if (ok) { state.retryDelay = 5000; clearTimeout(state.retryTimer); }
-            else if (navigator.onLine && window.CloudSafety?.status() !== 'conflict') {
+            if (ok) { state.retryDelay = 5000; state.retryCount = 0; clearTimeout(state.retryTimer); }
+            else if (navigator.onLine && window.CloudSafety?.status() !== 'conflict' && state.retryCount < 6) {
+                // 權限不足、額度用完這類「再試也一樣」的失敗，以前會每分鐘一直重試、一直讀雲端
+                state.retryCount++;
                 clearTimeout(state.retryTimer);
                 state.retryTimer = setTimeout(() => { if (state.running) trySync(true); }, state.retryDelay);
                 state.retryDelay = Math.min(state.retryDelay * 2, 60000);

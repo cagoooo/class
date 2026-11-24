@@ -186,7 +186,7 @@ let passed=0;async function test(name,fn){await fn();console.log('PASS',name);pa
  await test('讀取過程換帳號不能還原',async()=>{const a=setup();await a.s.publish();const remote=await a.s.read();a.c.FirebaseConfig.getCurrentUserId=()=> 'other';await assert.rejects(a.s.restore(remote),/帳號/);});
  await test('還原失敗整批回復，不更新記憶體與同步基準',async()=>{const a=setup();await a.s.publish();const remote=await a.s.read();a.c.students[0].points=77;a.save();const before=a.s.fingerprint(a.s.capture());a.storage.failKey='groups-A';assert.equal(await a.s.restore(remote),false);assert.equal(a.s.fingerprint(a.s.capture()),before);assert.equal(a.c.students[0].points,77);assert.equal(a.recovery.get('teacher:A').students[0].points,77);});
  await test('無法保存還原前副本時不覆蓋',async()=>{const a=setup();await a.s.publish();const remote=await a.s.read();a.c.LocalRecovery.put=async()=>{throw Error('quota')};a.c.students[0].points=60;a.save();await assert.rejects(a.s.restore(remote));assert.equal(a.c.students[0].points,60);});
- await test('損壞雲端分段不得回退讀取過期集合',async()=>{const a=setup();await a.s.publish();const token=(await a.s.read()).token;a.db.data.delete('users/teacher/classes/A/syncSnapshots/'+token+'/parts/0');await assert.rejects(a.s.read(),/分段不完整/);});
+ await test('損壞雲端分段不得回退讀取過期集合',async()=>{const a=setup();await a.s.publish();const token=a.db.data.get('users/teacher/classes/A/appSettings/syncRevision').token;/* v3.74.2 起讀過的版本會記住，這裡不先讀，直接看版本頭 */a.db.data.delete('users/teacher/classes/A/syncSnapshots/'+token+'/parts/0');await assert.rejects(a.s.read(),/分段不完整/);});
  await test('超過 500 筆紀錄以分段完整往返',async()=>{const a=setup();a.c.pointsHistory=Array.from({length:1200},(_,i)=>({id:'r'+i,studentId:1,points:1,petEvent:true,petXp:1,coinDelta:1,reason:'努力🥚'.repeat(15)}));a.save();await a.s.publish();assert.equal(a.s.dataFor((await a.s.read()).values).pointsHistory.length,1200);});
  await test('舊雲端首次匯入後才能建立新版本，原集合不刪除',async()=>{const a=setup();a.db.data.set('users/teacher/classes/A/students/99',{id:99,name:'原學生',points:4});await assert.rejects(a.s.publish(),e=>e.code==='sync-conflict');const old=await a.s.read();await a.s.restore(old);await a.s.publish();assert.equal(a.db.data.get('users/teacher/classes/A/students/99').name,'原學生');});
  await test('完整備份 codec 含多段、emoji 與寵物成果',async()=>{const a=setup();const data=a.c.DataBackup.collectData();data.boardNote='🦄'.repeat(30000);const rows=a.c.BackupIntegrity.encode(data);assert.ok(rows.length>3);assert.deepEqual(JSON.parse(JSON.stringify(a.c.BackupIntegrity.decode(rows))),JSON.parse(JSON.stringify(data)));for(const r of rows.slice(2)){assert.ok(!/[\uD800-\uDBFF]$/.test(r[1]));assert.ok(!/^[\uDC00-\uDFFF]/.test(r[1]));}});
@@ -290,8 +290,9 @@ let passed=0;async function test(name,fn){await fn();console.log('PASS',name);pa
  await test('存不了合併前副本：不合併',async()=>{const{a,b}=await mergePair();addPoints(a,'from-a',2);await a.s.publish();addPoints(b,'from-b',3);b.c.LocalRecovery.put=async()=>{throw Error('quota')};
   const error=await syncNow(b).catch(e=>e);assert.equal(error.mergeBlock,'no-recovery');});
  await test('沒動過的班：只有裝置偏好不同時不上傳，也不會撞假衝突',async()=>{const{a,b}=await mergePair();addPoints(a,'from-a',2);await a.s.publish();b.storage.setItem('theme','dark');
-  assert.equal(b.s.status('A'),'pending');assert.equal(b.s.needsUpload('A'),false);
-  b.s.markLocalChange('A');assert.equal(b.s.needsUpload('A'),true);});
+  // v3.74.2：只差裝置偏好不再亮黃燈（全站檢測同步第 9 項）
+  assert.equal(b.s.status('A'),'synced');assert.equal(b.s.needsUpload('A'),false);
+  b.s.markLocalChange('A');assert.equal(b.s.status('A'),'pending');assert.equal(b.s.needsUpload('A'),true);});
  await test('這台沒有新內容、雲端較新：直接跟上，不多上傳一份，裝置偏好保留',async()=>{const{a,b}=await mergePair();addPoints(a,'from-a',2);await a.s.publish();const token=(await a.s.read()).token;b.storage.setItem('theme','dark');
   await syncNow(b);assert.equal((await b.s.read()).token,token);assert.equal(b.storage.getItem('theme'),'dark');assert.equal(JSON.parse(b.storage.getItem('pointsHistory-A')).some(r=>r.id==='from-a'),true);assert.equal(b.c.merged.length,1);
   assert.equal(b.s.needsUpload('A'),false);});

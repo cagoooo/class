@@ -17,6 +17,19 @@
     const blocked = path => Object.assign(Error('無法自動合併：' + path), { code: 'merge-blocked', path: path.split('.').slice(0, 2).join('.').slice(0, 60) });
     const same = (a, b) => a === b || JSON.stringify(a) === JSON.stringify(b);
     const isObject = v => v !== null && typeof v === 'object' && !Array.isArray(v);
+    /** 一筆明細的時間（毫秒）：createdAtMs → 像時間戳的編號 → 可解析的 date／timestamp → 0 */
+    function stampOf(r) {
+        if (!r) return 0;
+        const ms = Number(r.createdAtMs);
+        if (Number.isFinite(ms) && ms > 0) return ms;
+        const id = Number(r.id);
+        if (Number.isFinite(id) && id > 1e12 && id < 1e14) return id;
+        for (const f of ['timestamp', 'date']) {
+            const t = Date.parse(r[f]);
+            if (Number.isFinite(t)) return t;
+        }
+        return 0;
+    }
 
     /** 明細清單要以編號對齊才能合併；同編號重複（舊資料）用出現順序區分。 */
     function keyed(list) {
@@ -30,7 +43,29 @@
         return items;
     }
 
+    const isPrimitive = v => v === null || ['string', 'number', 'boolean'].includes(typeof v);
+    const SET_PATHS = new Set(['drawnStudentIds', 'brushChecked.ids']);
+    /**
+     * 數字或文字組成的清單（已抽出的學生、今天已潔牙的座號）當成「集合」合併（v3.74.2）：
+     * 兩邊各自新增的都保留，任一邊刪掉的就刪掉。以前只要兩邊都改過，整班合併就放棄、要老師自己選。
+     */
+    function mergeSet(base, local, remote) {
+        const k = v => typeof v + ':' + String(v);
+        const b = new Set(base.map(k)), l = new Set(local.map(k)), r = new Set(remote.map(k));
+        const keep = v => (l.has(k(v)) || !b.has(k(v))) && (r.has(k(v)) || !b.has(k(v)));
+        const out = [], seen = new Set();
+        for (const v of local.concat(remote)) {
+            const key = k(v);
+            if (seen.has(key) || !keep(v)) continue;
+            if (!l.has(key) && !r.has(key)) continue;
+            seen.add(key); out.push(v);
+        }
+        return out;
+    }
+
     function mergeList(path, base, local, remote) {
+        // 只有「順序不重要」的清單才能這樣合；座位表這類「第幾格是誰」的清單不猜，照舊交給老師
+        if (SET_PATHS.has(path) && [base, local, remote].every(list => list.every(isPrimitive))) return mergeSet(base, local, remote);
         if (![base, local, remote].every(list => list.every(isObject))) throw blocked(path);
         const b = keyed(base), l = keyed(local), r = keyed(remote);
         const merged = new Map();
@@ -43,7 +78,9 @@
         const [first, second] = localLeads ? [l, r] : [r, l];
         const order = [...new Set([...first.keys(), ...second.keys()])].filter(k => merged.has(k));
         const list = order.map(k => merged.get(k));
-        if (path === 'pointsHistory') list.sort((x, y) => (Number(y.createdAtMs) || 0) - (Number(x.createdAtMs) || 0));
+        // 明細依時間由新到舊；舊紀錄（例如全班分數重置的標記）沒有 createdAtMs 時，用時間戳格式的編號或日期代替，
+        // 不會因為算成 0 就全部排到最後（v3.74.2）
+        if (path === 'pointsHistory') list.sort((x, y) => stampOf(y) - stampOf(x));
         return list;
     }
 

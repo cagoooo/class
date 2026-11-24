@@ -275,8 +275,11 @@
         return Math.floor(diff / 86400) + ' 天前';
     }
 
+    let changedDuringSync = false;   // 同步進行中老師又改了資料：同步完成後不能顯示「已同步」
     function setState(name) {
         if (!STATES[name]) return;
+        if (name === 'synced' && changedDuringSync) name = 'pending';
+        if (name !== 'syncing') changedDuringSync = false;
         currentState = name;
         updateUI();
     }
@@ -425,10 +428,13 @@
                         // 自動同步才能辨識這是老師剛剛的修改，而非初始化整理。
                         window.CloudSafety?.markLocalChange?.(localStorage.getItem('currentClassId') || 'default');
                         setState('disconnected');
-                    } else if (currentState !== 'syncing') {
+                    } else {
+                        // 同步進行中的修改也要留下異動標記（v3.74.2）：以前同步中改的資料不留標記，
+                        // 同步完成後燈號變綠、自動同步不會上傳，關頁也不提醒
                         lastChangedAt = Date.now();
                         window.CloudSafety?.markLocalChange?.(localStorage.getItem('currentClassId') || 'default');
-                        if (currentState === 'synced' || currentState === 'disconnected') {
+                        if (currentState === 'syncing') changedDuringSync = true;
+                        else if (currentState === 'synced' || currentState === 'disconnected') {
                             setState('pending');
                         }
                     }

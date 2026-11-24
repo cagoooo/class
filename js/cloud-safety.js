@@ -172,6 +172,7 @@
         if (prefs.exists) for (const k of globalKeys.filter(k => !['clockSettings','noRepeatLottery'].includes(k))) if (prefs.data()[k] != null) values[k] = String(prefs.data()[k]);
         return { values, token: `legacy:${fingerprint(values)}`, empty: !hasData };
     }
+    const readCache = new Map();   // 帳號:班級:版本 → 已驗證的雲端內容（文字，取用時再轉成物件，避免被改到）
     async function read(id = current()) {
         // 一定要帶 code：publish() 檢查完網路後要等同步鎖（非同步）才走到這裡，這段空檔斷線
         // 若沒有 code，report() 會把它當成寵物同步失敗推播給開發者（2026-10-06 實際發生）
@@ -186,6 +187,14 @@
         }
         const head = snap.data();
         if (head.schema !== 1 || !Number.isSafeInteger(head.count) || head.count < 1 || head.count > 200) throw Error('雲端版本格式無法讀取，未還原');
+        // 同一個版本的雲端快照內容不會變（換內容一定換 token）：讀過就不必再下載全部分段（v3.74.2）。
+        // 以前每次同步、每次失敗重試都整份重新下載，紀錄多的班會多讀很多文件
+        const cacheKey = `${c.uid}:${c.id}:${head.token}`;
+        const hit = readCache.get(cacheKey);
+        if (hit) {
+            sameAccount(c);
+            return { values: JSON.parse(hit), token: head.token, uid: c.uid, classId: c.id, at: head.at, empty: false };
+        }
         const parts = await Promise.all(Array.from({ length: head.count }, (_, i) => root(c).collection('syncSnapshots').doc(head.token).collection('parts').doc(String(i)).get({ source: 'server' })));
         if (parts.some((p, i) => !p.exists || p.data().index !== i || typeof p.data().text !== 'string')) throw Error('雲端備份分段不完整，未還原');
         const json = parts.map(p => p.data().text).join('');
@@ -193,6 +202,8 @@
         const payload = JSON.parse(json); ensure(payload.values);
         if (payload.classId !== c.id) throw Error('雲端班級不符，未還原');
         sameAccount(c);
+        readCache.set(cacheKey, JSON.stringify(payload.values));
+        while (readCache.size > 6) readCache.delete(readCache.keys().next().value);
         return { values: payload.values, token: head.token, uid: c.uid, classId: c.id, at: head.at, empty: false };
     }
     async function publish(id = current(), options = {}) {
@@ -583,7 +594,13 @@
         try {
             const c = context(id);
             if (conflicts[recoveryKey(c)]) return 'conflict';
-            return base(c)?.fingerprint === fingerprint(capture(id)) ? 'synced' : 'pending';
+            const known = base(c), local = capture(id);
+            if (known?.fingerprint === fingerprint(local)) return 'synced';
+            // 只差在這台電腦的偏好（主題、時鐘樣式…）不算「還沒同步」：以前只改裝置偏好就一直亮黃燈（v3.74.2）。
+            // 判斷方式和背景同步決定要不要上傳的 needsUpload 相同
+            if (!raw(dirtyKey(c.uid, c.id)) && trackedMatches(known, local)
+                && (!known.tracked2 || known.tracked2 === tracked2Fingerprint(local))) return 'synced';
+            return 'pending';
         } catch { return 'offline'; }
     }
     function download(data, name) {
@@ -593,7 +610,8 @@
     const BLOCK_LABELS = {
         coins: '兩邊都有兌換，合併後金幣會變成負數。', 'no-base': '這台太久沒有同步，已找不到兩邊共同的舊版本。', legacy: '雲端是舊版程式留下的資料。',
         students: '同一位學生的資料兩邊改得不一樣。', pointsHistory: '同一筆紀錄兩邊改得不一樣。', groups: '小組資料兩邊改得不一樣。', petSettings: '寵物或商店設定兩邊改得不一樣。',
-        seatingConfig: '座位表兩邊改得不一樣。', homeworkList: '作業資料兩邊改得不一樣。', homeworkChecks: '作業繳交狀態兩邊改得不一樣。'
+        seatingConfig: '座位表兩邊改得不一樣。', homeworkList: '作業資料兩邊改得不一樣。', homeworkChecks: '作業繳交狀態兩邊改得不一樣。',
+        drawnStudentIds: '抽籤名單兩邊改得不一樣。', brushChecked: '潔牙勾選兩邊改得不一樣。'
     };
     const conflictTarget = () => { const ids = conflictIds(); return ids.includes(current()) || !ids.length ? current() : ids[0]; };
     async function showConflict(id = conflictTarget()) {
@@ -736,8 +754,13 @@
     async function downloadRecovery() {
         try {
             const uid = window.FirebaseConfig?.getCurrentUserId() || 'local';
-            const copies = await Promise.all([`${uid}:${current()}`, `auto-merge:${uid}:${current()}`].map(k => LocalRecovery.get(k)));
-            const copy = copies.filter(Boolean).sort((a, b) => String(b.exportDate).localeCompare(String(a.exportDate)))[0];
+            // 「找不到共同舊版本」與「雲端是舊版資料」時另存的副本也要拿得到（以前只讀前兩種；v3.74.2）
+            const keys = ['', 'auto-merge:', 'no-base:', 'legacy-cloud:'].map(p => `${p}${uid}:${current()}`);
+            const copies = await Promise.all(keys.map(k => LocalRecovery.get(k).catch(() => null)));
+            const when = x => String(x.exportDate || x.savedAt || '');
+            let copy = copies.filter(Boolean).sort((a, b) => when(b).localeCompare(when(a)))[0];
+            // 「雲端是舊版資料」那份存的是原始內容：整理成一般備份檔的格式，才能用「匯入備份」還原
+            if (copy && !copy.version && copy.values) copy = { version: '1.2', classId: copy.classId, exportDate: copy.savedAt, ...dataFor(copy.values) };
             if (!copy) throw Error('此班目前沒有還原前副本');
             download(copy, '班級成果_還原前副本.json');
         } catch (e) { window.NotificationSystem?.error(e.message); }

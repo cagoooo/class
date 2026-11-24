@@ -24,6 +24,10 @@
     function busy() {
         try {
             if (document.fullscreenElement) return true;
+            // 計時器在跑、對話框開著、正在打字：都不要自動重新載入（v3.74.2）
+            if (window.FirebaseConfig?.isPageBusy?.()) return true;
+            const el = document.activeElement;
+            if (el && typeof el.matches === 'function' && el.matches('input:not([type=checkbox]):not([type=radio]):not([type=button]), textarea, select, [contenteditable]')) return true;
             if (window.QuietChallenge?.isActive?.()) return true;   // 安靜挑戰進行中，老師不會碰鍵盤滑鼠
             const exam = document.getElementById('examFullscreenModal');
             if (exam && getComputedStyle(exam).display !== 'none' && getComputedStyle(exam).visibility !== 'hidden') return true;
