@@ -418,16 +418,16 @@
         const items = profiles.map(p => `
             <div class="cs-class-row">
                 <button class="cs-class-item ${p.id === curId ? 'active' : ''}"
-                        onclick="ClassProfiles.switchTo('${p.id}')"
-                        ${p.id === curId ? `style="border-left:4px solid ${p.color || '#6366f1'};"` : ''}>
-                    <span><span class="cs-item-icon" style="color:${p.color || '#6366f1'};">${p.icon || '📚'}</span> ${_esc(p.name)}</span>
+                        onclick="ClassProfiles.switchTo('${safeId(p.id)}')"
+                        ${p.id === curId ? `style="border-left:4px solid ${_esc(p.color || '#6366f1')};"` : ''}>
+                    <span><span class="cs-item-icon" style="color:${_esc(p.color || '#6366f1')};">${_esc(p.icon || '📚')}</span> ${_esc(p.name)}</span>
                     ${p.id === curId ? '<span class="cs-check">✓</span>' : ''}
                 </button>
                 ${p.id !== DEFAULT_ID ? `
                     <button class="cs-class-delete-btn"
                             title="刪除「${_esc(p.name)}」"
                             aria-label="刪除「${_esc(p.name)}」"
-                            onclick="event.stopPropagation(); ClassProfiles._uiDelete('${p.id}')">🗑️</button>
+                            onclick="event.stopPropagation(); ClassProfiles._uiDelete('${safeId(p.id)}')">🗑️</button>
                 ` : ''}
             </div>
         `).join('');
@@ -441,7 +441,7 @@
             <div class="cs-divider"></div>
             <button class="cs-action-btn" onclick="ClassProfiles._uiAdd()">➕ 新增班級</button>
             <button class="cs-action-btn" onclick="ClassProfiles._uiRename()">✏️ 重新命名目前班級</button>
-            ${canDelete ? `<button class="cs-action-btn danger" onclick="ClassProfiles._uiDelete('${curId}')">🗑️ 刪除「${_esc(curProfile?.name || '')}」</button>` : ''}
+            ${canDelete ? `<button class="cs-action-btn danger" onclick="ClassProfiles._uiDelete('${safeId(curId)}')">🗑️ 刪除「${_esc(curProfile?.name || '')}」</button>` : ''}
         `;
     }
 
@@ -461,7 +461,7 @@
                 <div id="class-selector-wrap">
                     <button id="class-selector-btn" onclick="ClassProfiles.toggleDropdown()"
                         style="background:${curGradient};box-shadow:0 2px 8px ${curShadow};">
-                        <span>${curIcon}</span>
+                        <span>${_esc(curIcon)}</span>
                         <span class="cs-name" id="cs-current-name">${_esc(_getCurrentName())}</span>
                         <span>▾</span>
                     </button>
@@ -485,7 +485,7 @@
                             border:none;border-radius:50px;cursor:pointer;font-size:0.75rem;
                             font-weight:700;color:#fff;box-shadow:0 2px 8px ${curShadow};
                         ">
-                        ${curIcon}
+                        ${_esc(curIcon)}
                     </button>
                     <div id="class-selector-dropdown-mobile"
                         style="display:none;position:fixed;top:72px;right:12px;width:min(300px, calc(100vw - 24px));

@@ -79,7 +79,9 @@ test('已經留過一份原內容就不再覆蓋（保住最早那份）', () =>
 // ───────── 2. 作業統計 ─────────
 function statsEnv() {
     const box = { innerHTML: '' };
-    const ctx = { document: { getElementById: id => id === 'checkHomework' ? { value: '1' } : box }, students: [], homeworkChecks: {}, currentVisibleList: null };
+    // 頁面上的 escapeHtml 由 Validator.escapeHtml 提供；測試沙盒放一個等價的小函式
+    const escapeHtml = t => (t == null ? '' : String(t)).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const ctx = { document: { getElementById: id => id === 'checkHomework' ? { value: '1' } : box }, students: [], homeworkChecks: {}, currentVisibleList: null, escapeHtml };
     vm.createContext(ctx);
     vm.runInContext(grabFunction('function updateHomeworkStats()') + ';this.run = updateHomeworkStats;', ctx);
     const numbers = () => [...box.innerHTML.matchAll(/font-bold text-[a-z]+-600">(-?[\d.]+%?)</g)].map(m => m[1]);

@@ -1129,10 +1129,10 @@
 
             return `
                 <div class="homework-student-card ${status}" 
-                     onclick="cycleHomeworkStatus(${homeworkId}, ${student.id})"
+                     onclick="cycleHomeworkStatus(${safeId(homeworkId)}, ${safeId(student.id)})"
                      title="點擊切換狀態">
-                    <div class="homework-student-number">${student.number || '?'}</div>
-                    <div class="homework-student-name">${student.name}</div>
+                    <div class="homework-student-number">${escapeHtml(student.number || '?')}</div>
+                    <div class="homework-student-name">${escapeHtml(student.name)}</div>
                     <div class="homework-student-status">${config.icon}</div>
                 </div>
             `;
@@ -1414,7 +1414,7 @@
                 <thead>
                     <tr>
                         <th class="sticky-col">作業名稱 / 學生</th>
-                        ${studentList.map(s => `<th>${s.number ? s.number + '.' : ''}${s.name}</th>`).join('')}
+                        ${studentList.map(s => `<th>${s.number ? escapeHtml(s.number) + '.' : ''}${escapeHtml(s.name)}</th>`).join('')}
                     </tr>
                 </thead>
                 <tbody>
@@ -1423,7 +1423,7 @@
         sortedHomeworks.forEach(homework => {
             html += `
                 <tr>
-                    <td class="sticky-col hover:text-indigo-600 cursor-pointer" onclick="openHomeworkFromDashboard(${homework.id})">
+                    <td class="sticky-col hover:text-indigo-600 cursor-pointer" onclick="openHomeworkFromDashboard(${safeId(homework.id)})">
                         ${escapeHtml(homework.name)}
                     </td>
             `;
@@ -1433,8 +1433,8 @@
                 const config = STATUS_CONFIG[status];
                 html += `
                     <td class="homework-table-cell ${status}" 
-                        onclick="cycleTableStatus(${homework.id}, ${student.id}, this)"
-                        title="${student.name}: ${config.label}">
+                        onclick="cycleTableStatus(${safeId(homework.id)}, ${safeId(student.id)}, this)"
+                        title="${escapeHtml(student.name)}: ${config.label}">
                         ${config.icon}
                     </td>
                 `;
@@ -1679,7 +1679,7 @@
             const formattedDate = `${dueDate.getFullYear()}/${dueDate.getMonth() + 1}/${dueDate.getDate()}`;
 
             return `
-                <div class="homework-card" onclick="openHomeworkFromDashboard(${homework.id})">
+                <div class="homework-card" onclick="openHomeworkFromDashboard(${safeId(homework.id)})">
                     <div class="homework-card-name">${escapeHtml(homework.name)}</div>
                     <div class="homework-card-date">${formattedDate}</div>
                     <div class="homework-card-tags">
@@ -1725,9 +1725,8 @@
 
     // === HTML 轉義 ===
     function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        return String(text == null ? '' : text).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     // === ESC 關閉儀表板 ===

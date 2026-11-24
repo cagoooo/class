@@ -105,9 +105,12 @@ const ErrorHandler = (function () {
             // 建立簡易通知
             const notification = document.createElement('div');
             notification.className = 'error-handler-notification';
+            // 訊息可能夾帶使用者輸入的文字，跳脫後才放進 HTML（這裡不依賴其他檔案的 escapeHtml）
+            const safeMessage = String(message == null ? '' : message)
+                .replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
             notification.innerHTML = `
                 <span class="error-icon">${errorInfo.icon}</span>
-                <span class="error-message">${message}</span>
+                <span class="error-message">${safeMessage}</span>
                 <button class="error-close" onclick="this.parentElement.remove()">✕</button>
             `;
             notification.style.cssText = `

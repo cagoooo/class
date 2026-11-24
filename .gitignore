@@ -27,3 +27,6 @@ art/*.err
 
 # 清查污染資料前的雲端備份（含學生資料，不入庫）
 cleanup-backups/
+
+# GitHub Pages 發布用的整理資料夾（scripts/build-site.cjs 產生）
+_site/

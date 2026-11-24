@@ -54,3 +54,5 @@
 
 - 回覆與 commit 訊息用繁體中文（前綴 `fix:`／`feat:` 可保留英文）。
 - 測試正式站時攔截 `notifyUsage`，避免觸發真的 Chat 通知。
+- GitHub Pages 只發布網站需要的檔案（2026-11-24 起）：清單在 `scripts/build-site.cjs`（根目錄幾個檔案＋`js`、`css`、`assets`、`icons`）。網站要用到新的根目錄檔案或資料夾時，一定要加進清單，否則正式站會 404；`scripts/test-site-publish-scope.cjs` 會檢查頁面與 Service Worker 參考到的檔案都有發布。GitHub 上的 repo 本身仍是公開的，尚未修補的弱點細節一樣不要寫進 repo。
+- 把使用者輸入的文字放進 `innerHTML` 一律用 `escapeHtml()`；把資料編號放進 `onclick="…"` 一律用 `safeId()`（兩個都定義在 `classnew.html`）。`pets.html` 會載入的檔案不能依賴這兩個函式。

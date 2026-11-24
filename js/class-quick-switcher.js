@@ -201,7 +201,7 @@
 
         list.innerHTML = filteredProfiles.map((p, i) => `
             <div class="cqs-item ${i === selectedIndex ? 'selected' : ''}" data-idx="${i}">
-                <span class="cqs-item-icon">${p.icon || '📚'}</span>
+                <span class="cqs-item-icon">${escapeHtml(p.icon || '📚')}</span>
                 <span class="cqs-item-name">${escapeHtml(p.name)}</span>
                 ${p.id === curId ? '<span class="cqs-item-current">目前</span>' : ''}
                 ${i < 9 ? `<span class="cqs-item-kbd">${i + 1}</span>` : ''}

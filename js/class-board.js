@@ -266,7 +266,7 @@
                 openFs(html, 'linear-gradient(135deg,#fdf4ff,#eff6ff)');
                 return;
             }
-            const html = `<div class="cb-fs-note" style="font-size:${so.vw}vw;color:${s.color};font-weight:${s.bold ? 900 : 400}">${esc(text)}</div>`;
+            const html = `<div class="cb-fs-note" style="font-size:${so.vw}vw;color:${esc(s.color)};font-weight:${s.bold ? 900 : 400}">${esc(text)}</div>`;
             openFs(html, 'linear-gradient(135deg,#fdf4ff,#eff6ff)');
         },
         fullscreenActivity() {
@@ -303,8 +303,8 @@
         mask.innerHTML = `
             <div class="cb-lot" role="dialog" aria-modal="true">
                 <h3>🎲 號碼抽籤</h3>
-                <div class="cb-lot-row"><label>最大號碼</label><input type="number" id="cb-lot-max" min="1" max="999" value="${c.max}"></div>
-                <div class="cb-lot-row"><label>一次抽幾位</label><input type="number" id="cb-lot-count" min="1" max="50" value="${c.count}"></div>
+                <div class="cb-lot-row"><label>最大號碼</label><input type="number" id="cb-lot-max" min="1" max="999" value="${esc(c.max)}"></div>
+                <div class="cb-lot-row"><label>一次抽幾位</label><input type="number" id="cb-lot-count" min="1" max="50" value="${esc(c.count)}"></div>
                 <div class="cb-lot-row"><label class="cb-lot-chk"><input type="checkbox" id="cb-lot-norepeat" ${c.noRepeat ? 'checked' : ''}> 不重複（記住已抽過）</label></div>
                 <div class="cb-lot-display" id="cb-lot-display"><span style="color:#94a3b8;font-weight:700">按下「開始抽籤」🎉</span></div>
                 <button class="cb-lot-btn cb-lot-go" id="cb-lot-go">🎉 開始抽籤</button>

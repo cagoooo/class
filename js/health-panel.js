@@ -133,7 +133,7 @@
         body.innerHTML =
             row('App 版本', 'v' + ver) +
             row('Service Worker', '查詢中…') +
-            row('登入帳號', acct.email, acct.loggedIn ? 'hp-acct' : 'hp-warn') +
+            row('登入帳號', escapeHtml(acct.email), acct.loggedIn ? 'hp-acct' : 'hp-warn') +
             row('上次同步', lastSync) +
             row('本地班級數', localN + ' 個') +
             row('雲端班級數', acct.loggedIn ? '查詢中…' : '（未登入）');
@@ -142,7 +142,7 @@
         body.innerHTML =
             row('App 版本', 'v' + ver) +
             row('Service Worker', sw.text) +
-            row('登入帳號', acct.email + (acct.name ? `<br><span style="font-weight:400;color:#94a3b8;font-size:.78rem">${acct.name}</span>` : ''), acct.loggedIn ? 'hp-acct' : 'hp-warn') +
+            row('登入帳號', escapeHtml(acct.email) + (acct.name ? `<br><span style="font-weight:400;color:#94a3b8;font-size:.78rem">${escapeHtml(acct.name)}</span>` : ''), acct.loggedIn ? 'hp-acct' : 'hp-warn') +
             row('上次同步', lastSync) +
             row('本地班級數', localN + ' 個') +
             row('雲端班級數', acct.loggedIn ? (cloudN == null ? '讀取失敗' : cloudN + ' 個') : '（未登入）');

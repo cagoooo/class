@@ -345,7 +345,7 @@
 
         menu.innerHTML = `
             <div style="padding:0.6rem 1rem;background:#3b82f6;color:white;font-weight:700;font-size:0.9rem;">
-                ✋ ${student.name}
+                ✋ ${escapeHtml(student.name)}
             </div>
             ${actions.map((a, i) => `
                 <button data-idx="${i}" style="
@@ -356,7 +356,7 @@
                     transition:background 0.15s;
                 " onmouseenter="this.style.background='#eff6ff'"
                    onmouseleave="this.style.background='white'">
-                    ${a.icon} ${a.label}
+                    ${a.icon} ${escapeHtml(a.label)}
                 </button>
             `).join('')}
         `;

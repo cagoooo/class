@@ -643,11 +643,11 @@
                 ${expiry ? `<span class="${isExpired ? 'ann-expires' : ''}">${expiry}</span>` : ''}
                 <div class="ann-actions">
                     <button class="ann-btn${ann.isPinned ? ' pin-active' : ''}"
-                        onclick="toggleAnnPin('${ann.id}')" title="${ann.isPinned ? '取消置頂' : '置頂'}">
+                        onclick="toggleAnnPin('${safeId(ann.id)}')" title="${ann.isPinned ? '取消置頂' : '置頂'}">
                         ${ann.isPinned ? '📌 取消置頂' : '📌 置頂'}
                     </button>
                     <button class="ann-btn delete"
-                        onclick="deleteAnn('${ann.id}')" title="刪除">🗑️</button>
+                        onclick="deleteAnn('${safeId(ann.id)}')" title="刪除">🗑️</button>
                 </div>
             </div>
         </div>`;
@@ -696,9 +696,8 @@
     }
 
     function escapeHtml(text) {
-        const d = document.createElement('div');
-        d.textContent = text;
-        return d.innerHTML;
+        return String(text == null ? '' : text).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     // =============================================

@@ -357,7 +357,7 @@ test('原始碼：addStudent 用 validateSeatNumber，不再有 validateNumber(n
 });
 
 test('原始碼：學生卡片有「✏️ 修改」按鈕呼叫 showStudentEditor(id)，且該函式已定義並呼叫 updateStudentIdentity', () => {
-    assert.match(ENH, /onclick="showStudentEditor\(\$\{student\.id\}\)"/);
+    assert.match(ENH, /onclick="showStudentEditor\(\$\{safeId\(student\.id\)\}\)"/);
     assert.match(ENH, /function showStudentEditor\(studentId\)/);
     const body = (() => {
         const start = ENH.indexOf('function showStudentEditor(');

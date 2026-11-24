@@ -50,7 +50,7 @@ function showAvatarPicker(studentId = null) {
                 ${DEFAULT_AVATARS.map(avatar => `
                     <button class="avatar-option w-12 h-12 text-2xl rounded-xl hover:bg-blue-100 transition-all
                         ${avatar === currentAvatar ? 'bg-blue-200 ring-2 ring-blue-500' : 'bg-gray-100'}"
-                        data-avatar="${avatar}" onclick="selectAvatar('${avatar}', ${studentId})">
+                        data-avatar="${avatar}" onclick="selectAvatar('${avatar}', ${safeId(studentId)})">
                         ${avatar}
                     </button>
                 `).join('')}
@@ -120,7 +120,7 @@ function showTagEditor(studentId) {
     modal.innerHTML = `
         <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 animate-bounce-in">
             <h3 class="text-xl font-bold text-gray-800 mb-2 text-center">🏷️ 編輯標籤</h3>
-            <p class="text-gray-600 text-center mb-4">${student.name}</p>
+            <p class="text-gray-600 text-center mb-4">${escapeHtml(student.name)}</p>
             <div class="space-y-2 mb-6" id="tag-options">
                 ${Object.entries(STUDENT_TAGS).map(([key, tag]) => `
                     <label class="flex items-center p-3 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors
@@ -128,7 +128,7 @@ function showTagEditor(studentId) {
                         <input type="checkbox" value="${key}" 
                             ${student.tags.includes(key) ? 'checked' : ''}
                             class="w-5 h-5 rounded text-blue-500 mr-3"
-                            onchange="toggleStudentTag(${studentId}, '${key}')">
+                            onchange="toggleStudentTag(${safeId(studentId)}, '${key}')">
                         <span class="text-lg mr-2">${tag.icon}</span>
                         <span class="${student.tags.includes(key) ? tag.textClass : 'text-gray-700'} font-medium">${tag.name}</span>
                     </label>
@@ -310,7 +310,7 @@ function _doRenderStudents(container) {
         container.innerHTML = `
             <div class="col-span-full text-center p-6 bg-gray-50 rounded-lg">
                 <div class="text-4xl mb-3">🔍</div>
-                <div class="text-gray-500">找不到符合「<span class="font-semibold text-gray-700">${currentSearchQuery}</span>」的學生</div>
+                <div class="text-gray-500">找不到符合「<span class="font-semibold text-gray-700">${escapeHtml(currentSearchQuery)}</span>」的學生</div>
                 <div class="text-sm text-gray-400 mt-2">試試其他關鍵字或清除搜尋</div>
             </div>`;
     } else {
@@ -344,27 +344,27 @@ function _doRenderStudents(container) {
                 <div class="flex flex-col gap-1">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2 min-w-0 flex-1">
-                            <button onclick="showAvatarPicker(${student.id})" 
+                            <button onclick="showAvatarPicker(${safeId(student.id)})"
                                 class="text-xl hover:scale-110 transition-transform cursor-pointer flex-shrink-0"
                                 title="點擊更換頭像">
-                                ${avatar}
+                                ${escapeHtml(avatar)}
                             </button>
                             <span class="font-semibold text-gray-800 text-sm truncate">${highlightedName}</span>
                         </div>
                         <div class="flex items-center flex-shrink-0">
-                            <button onclick="showTagEditor(${student.id})"
+                            <button onclick="showTagEditor(${safeId(student.id)})"
                                 class="text-sm p-0.5 text-blue-500 hover:text-blue-700" title="編輯標籤">🏷️</button>
-                            <button onclick="showStudentReport(${student.id})" 
+                            <button onclick="showStudentReport(${safeId(student.id)})" 
                                 class="text-sm p-0.5 text-green-500 hover:text-green-700" title="查看報告">📊</button>
-                            <button onclick="showStudentEditor(${student.id})"
+                            <button onclick="showStudentEditor(${safeId(student.id)})"
                                 class="text-sm p-0.5 text-blue-600 hover:text-blue-800" title="修改姓名或座號" aria-label="修改姓名或座號">✏️</button>
-                            <button onclick="removeStudent(${student.id})"
+                            <button onclick="removeStudent(${safeId(student.id)})"
                                 class="text-sm p-0.5 text-red-500 hover:text-red-700" title="刪除學生">🗑️</button>
                         </div>
                     </div>
                     <div class="text-xs text-gray-500 pl-7">
                         <span>座號：${highlightedNumber}</span>
-                        <span class="ml-2 font-medium ${student.points >= 0 ? 'text-green-600' : 'text-red-600'}">分數：${student.points}</span>
+                        <span class="ml-2 font-medium ${student.points >= 0 ? 'text-green-600' : 'text-red-600'}">分數：${escapeHtml(student.points)}</span>
                     </div>
                     ${tagsHTML}
                 </div>
@@ -525,13 +525,25 @@ function filterStudents(studentList, query) {
  * @returns {string} - 帶有高亮標記的 HTML
  */
 function highlightSearchText(text, query) {
-    if (!query) return text;
+    const raw = (text === null || text === undefined) ? '' : String(text);
+    if (!query) return escapeHtml(raw);
 
     // 轉義正則表達式特殊字元
-    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escapedQuery = String(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const regex = new RegExp(`(${escapedQuery})`, 'gi');
 
-    return text.replace(regex, '<mark class="bg-yellow-200 px-0.5 rounded">$1</mark>');
+    // 先在原文找出符合的位置，再把每一段文字跳脫後才組成 HTML，
+    // 這樣姓名裡的 < > & 不會被當成標籤，也不會因為 &amp; 被切到一半而壞掉
+    let result = '';
+    let last = 0;
+    let m;
+    while ((m = regex.exec(raw)) !== null) {
+        if (m[0] === '') { regex.lastIndex++; continue; }
+        result += escapeHtml(raw.slice(last, m.index))
+            + '<mark class="bg-yellow-200 px-0.5 rounded">' + escapeHtml(m[0]) + '</mark>';
+        last = m.index + m[0].length;
+    }
+    return result + escapeHtml(raw.slice(last));
 }
 
 /**
@@ -549,7 +561,7 @@ function updateSearchStats(filtered, total) {
     }
 
     if (filtered === 0) {
-        searchStats.innerHTML = `<span class="text-red-500">❌ 找不到符合「${currentSearchQuery}」的學生</span>`;
+        searchStats.innerHTML = `<span class="text-red-500">❌ 找不到符合「${escapeHtml(currentSearchQuery)}」的學生</span>`;
     } else if (filtered === total) {
         searchStats.innerHTML = `<span class="text-green-600">✅ 顯示全部 ${total} 位學生</span>`;
     } else {

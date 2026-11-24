@@ -345,8 +345,8 @@ function buildSyncPreviewHTML(direction, local, cloud, extraWarnHtml = '') {
     })();
     const title = isUpload ? `存目前班級到雲端（這台電腦 → 雲端）` : `取回目前班級（雲端 → 這台電腦）`;
     const warn = isUpload
-        ? `⚠️ <b>只同步「${currentClassName}」班的資料</b>至雲端，將建立完整雲端版本；若其他裝置已更新，會先停止並請你比較資料。`
-        : `⚠️ <b>只取回「${currentClassName}」班的資料</b>到這台電腦。會先自動保存一份這台原本的資料，再換成雲端的版本；雲端上的資料不會被改動。`;
+        ? `⚠️ <b>只同步「${escapeHtml(currentClassName)}」班的資料</b>至雲端，將建立完整雲端版本；若其他裝置已更新，會先停止並請你比較資料。`
+        : `⚠️ <b>只取回「${escapeHtml(currentClassName)}」班的資料</b>到這台電腦。會先自動保存一份這台原本的資料，再換成雲端的版本；雲端上的資料不會被改動。`;
     const btnText = isUpload ? '✅ 確認存到雲端' : '✅ 確認取回';
     const btnClass = isUpload ? 'gauth-btn-primary' : 'gauth-btn-danger';
 
@@ -408,7 +408,7 @@ function buildSyncPreviewHTML(direction, local, cloud, extraWarnHtml = '') {
         <!-- Header -->
         <div style="background:linear-gradient(135deg,#3b82f6,#6366f1);padding:18px 24px;color:#fff">
           <div style="font-size:1.4rem;font-weight:700">${icon} ${title}</div>
-          <div style="font-size:.85rem;opacity:.85;margin-top:4px">⚡ 僅同步 <b style="background:rgba(255,255,255,.2);padding:1px 8px;border-radius:12px">${currentClassName}</b> 班的資料，其他班級不受影響</div>
+          <div style="font-size:.85rem;opacity:.85;margin-top:4px">⚡ 僅同步 <b style="background:rgba(255,255,255,.2);padding:1px 8px;border-radius:12px">${escapeHtml(currentClassName)}</b> 班的資料，其他班級不受影響</div>
         </div>
 
         <!-- Table -->
@@ -797,7 +797,7 @@ async function showAllClassSyncModal() {
         const rows = allClasses.map((cls, i) =>
             `<div id="acsm-row-${i}" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0f0;">
                 <span id="acsm-icon-${i}" style="font-size:1.2rem;width:24px;text-align:center;">⬜</span>
-                <span style="flex:1;font-weight:600;color:#374151;">${cls.name}</span>
+                <span style="flex:1;font-weight:600;color:#374151;">${escapeHtml(cls.name)}</span>
                 <span id="acsm-info-${i}" style="color:#9ca3af;font-size:.85rem;"></span>
             </div>`
         ).join('');
@@ -1377,7 +1377,7 @@ async function showAllClassDownloadModal() {
     const rows = allClasses.map((cls, i) =>
         `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0f0;">
             <span id="acdm-icon-${i}" style="font-size:1.2rem;width:24px;text-align:center;">⬜</span>
-            <span style="flex:1;font-weight:600;color:#374151;">${cls.name}</span>
+            <span style="flex:1;font-weight:600;color:#374151;">${escapeHtml(cls.name)}</span>
             <span id="acdm-info-${i}" style="color:#9ca3af;font-size:.85rem;"></span>
         </div>`
     ).join('');

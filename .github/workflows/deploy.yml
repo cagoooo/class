@@ -60,6 +60,7 @@ jobs:
           node scripts/test-purge-backup.cjs
           node scripts/test-snapshot-prune.cjs
           node scripts/test-source-app.cjs
+          node scripts/test-site-publish-scope.cjs
 
       - name: Inject Secrets 💉
         run: python .github/inject.py
@@ -74,10 +75,16 @@ jobs:
       - name: Setup Pages ⚙️
         uses: actions/configure-pages@v4
 
+      # 只發布網站需要的檔案（頁面、js、css、圖片）。以前上傳整個 repo，雲端函式原始碼、
+      # 測試腳本、說明文件、資料庫規則都能從網站網址讀到。清單在 scripts/build-site.cjs。
+      # 一定要排在注入金鑰之後：要發布的是注入過的檔案。
+      - name: Build site folder 📦
+        run: node scripts/build-site.cjs _site
+
       - name: Upload artifact 📤
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: '_site'
 
       # 檔案包剛上傳完的幾秒內，GitHub 還查不到它；馬上發布會回報
       # 「No artifacts named github-pages were found」而失敗（2026-11-24 連續發生三次）。

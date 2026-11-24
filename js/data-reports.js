@@ -264,14 +264,14 @@
         modal.innerHTML = `
             <div class="report-card" onclick="event.stopPropagation()">
                 <div class="report-header">
-                    <div class="report-avatar">${student.avatar || '😊'}</div>
-                    <div class="report-name">${student.name}</div>
-                    <div class="report-number">座號：${student.number}</div>
+                    <div class="report-avatar">${escapeHtml(student.avatar || '😊')}</div>
+                    <div class="report-name">${escapeHtml(student.name)}</div>
+                    <div class="report-number">座號：${escapeHtml(student.number)}</div>
                 </div>
 
                 <div class="report-stats">
                     <div class="report-stat">
-                        <div class="report-stat-value" style="color: ${student.points >= 0 ? '#10b981' : '#ef4444'}">${student.points}</div>
+                        <div class="report-stat-value" style="color: ${student.points >= 0 ? '#10b981' : '#ef4444'}">${escapeHtml(student.points)}</div>
                         <div class="report-stat-label">目前分數</div>
                     </div>
                     <div class="report-stat">
@@ -288,7 +288,7 @@
                 <div class="report-section">
                     <div class="report-section-title">🏷️ 標籤</div>
                     <div class="report-tags">
-                        ${tags.map(t => `<span class="report-tag">${tagConfig[t]?.icon || ''} ${tagConfig[t]?.name || t}</span>`).join('')}
+                        ${tags.map(t => `<span class="report-tag">${tagConfig[t]?.icon || ''} ${escapeHtml(tagConfig[t]?.name || t)}</span>`).join('')}
                     </div>
                 </div>
                 ` : ''}
@@ -298,9 +298,9 @@
                     <div class="report-history">
                         ${records.length > 0 ? records.slice(-10).reverse().map(r => `
                             <div class="report-history-item">
-                                <span>${r.reason || '無說明'}</span>
+                                <span>${escapeHtml(r.reason || '無說明')}</span>
                                 <span style="color: ${r.points >= 0 ? '#10b981' : '#ef4444'}; font-weight: 600;">
-                                    ${r.points > 0 ? '+' : ''}${r.points}
+                                    ${r.points > 0 ? '+' : ''}${escapeHtml(r.points)}
                                 </span>
                             </div>
                         `).join('') : '<div class="text-gray-500 text-center py-4">尚無記錄</div>'}
@@ -312,7 +312,7 @@
                         class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
                         關閉
                     </button>
-                    <button onclick="exportStudentReport(${studentId})"
+                    <button onclick="exportStudentReport(${safeId(studentId)})"
                         class="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
                         📥 匯出
                     </button>
@@ -503,9 +503,9 @@
                             ${[...(students || [])].sort((a, b) => b.points - a.points).slice(0, 5).map((s, i) => `
                                 <div class="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
                                     <span class="text-lg">${['🥇', '🥈', '🥉', '4️⃣', '5️⃣'][i]}</span>
-                                    <span class="text-xl">${s.avatar || '😊'}</span>
-                                    <span class="flex-1 font-medium">${s.name}</span>
-                                    <span class="font-bold text-green-600">${s.points} 分</span>
+                                    <span class="text-xl">${escapeHtml(s.avatar || '😊')}</span>
+                                    <span class="flex-1 font-medium">${escapeHtml(s.name)}</span>
+                                    <span class="font-bold text-green-600">${escapeHtml(s.points)} 分</span>
                                 </div>
                             `).join('')}
                         </div>

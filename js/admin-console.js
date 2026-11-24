@@ -1499,7 +1499,7 @@
                 tbody.innerHTML = `
                     <tr class="admin-empty-row">
                         <td colspan="8" style="text-align:center;padding:2rem;color:#ef4444;font-weight:600;">
-                            ❌ 載入失敗: ${error.message || '請確認您擁有管理員權限'}
+                            ❌ 載入失敗: ${esc(error.message || '請確認您擁有管理員權限')}
                         </td>
                     </tr>
                 `;

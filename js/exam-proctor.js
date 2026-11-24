@@ -1769,7 +1769,7 @@
 
         const notif = document.createElement('div');
         notif.className = 'exam-toast-notification';
-        notif.innerHTML = `<span>${style.icon}</span><span>${message}</span>`;
+        notif.innerHTML = `<span>${style.icon}</span><span>${escapeHtml(message)}</span>`;
         notif.style.cssText = `
             position: fixed;
             top: 20px;
@@ -1857,9 +1857,8 @@
     }
 
     function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        return String(text == null ? '' : text).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     // ========================================
@@ -1897,7 +1896,7 @@
                 </button>
             </div>
             <div style="font-size:0.75rem;color:#9ca3af;margin-top:4px;">
-                目前：第${curDay}天（${examSubjects.map(s => s.name).join('、') || '無科目'}）
+                目前：第${escapeHtml(curDay)}天（${examSubjects.map(s => escapeHtml(s.name)).join('、') || '無科目'}）
             </div>
         `;
     }
@@ -1963,18 +1962,18 @@
         container.innerHTML = examSubjects.map(subject => `
             <div class="flex flex-col sm:flex-row items-center justify-center sm:justify-between bg-gradient-to-r from-gray-50 to-white p-4 sm:p-5 rounded-xl mb-3 hover:shadow-md transition-all duration-300 border border-gray-100">
                 <div class="flex flex-wrap items-center justify-center sm:justify-start gap-3 sm:gap-4 mb-2 sm:mb-0">
-                    <span class="font-bold text-gray-800 text-lg sm:text-xl cursor-pointer hover:text-teal-600 hover:underline transition-colors" onclick="editSubjectName(${subject.id})">${escapeHtml(subject.name)}</span>
+                    <span class="font-bold text-gray-800 text-lg sm:text-xl cursor-pointer hover:text-teal-600 hover:underline transition-colors" onclick="editSubjectName(${safeId(subject.id)})">${escapeHtml(subject.name)}</span>
                     <div class="flex items-center gap-2 text-base sm:text-lg">
-                        <span class="text-teal-600 font-semibold cursor-pointer hover:text-teal-800 hover:underline px-2 py-1 rounded hover:bg-teal-50 transition-colors" onclick="openSubjectTimePicker(${subject.id}, 'start', event)">
-                            🕐 ${subject.startTime}
+                        <span class="text-teal-600 font-semibold cursor-pointer hover:text-teal-800 hover:underline px-2 py-1 rounded hover:bg-teal-50 transition-colors" onclick="openSubjectTimePicker(${safeId(subject.id)}, 'start', event)">
+                            🕐 ${escapeHtml(subject.startTime)}
                         </span>
                         <span class="text-gray-400 font-medium">~</span>
-                        <span class="text-teal-600 font-semibold cursor-pointer hover:text-teal-800 hover:underline px-2 py-1 rounded hover:bg-teal-50 transition-colors" onclick="openSubjectTimePicker(${subject.id}, 'end', event)">
-                            ${subject.endTime} 🕐
+                        <span class="text-teal-600 font-semibold cursor-pointer hover:text-teal-800 hover:underline px-2 py-1 rounded hover:bg-teal-50 transition-colors" onclick="openSubjectTimePicker(${safeId(subject.id)}, 'end', event)">
+                            ${escapeHtml(subject.endTime)} 🕐
                         </span>
                     </div>
                 </div>
-                <button onclick="deleteExamSubject(${subject.id})" 
+                <button onclick="deleteExamSubject(${safeId(subject.id)})" 
                     class="text-red-400 hover:text-red-600 text-lg px-3 py-2 rounded-lg hover:bg-red-50 transition-colors">
                     🗑️
                 </button>
@@ -2011,14 +2010,14 @@
             const period = startHour < 12 ? '上午' : '下午';
             return `
                 <div class="exam-subject-item ${isActive ? 'active' : ''}" data-id="${subject.id}">
-                    <span class="exam-subject-name" onclick="editSubjectName(${subject.id})" style="cursor: pointer;" title="點擊編輯科目名稱">${escapeHtml(subject.name)}</span>
-                    <span class="exam-subject-time" onclick="openTimePicker(${subject.id}, 'start', event)">
+                    <span class="exam-subject-name" onclick="editSubjectName(${safeId(subject.id)})" style="cursor: pointer;" title="點擊編輯科目名稱">${escapeHtml(subject.name)}</span>
+                    <span class="exam-subject-time" onclick="openTimePicker(${safeId(subject.id)}, 'start', event)">
                         <span class="clock-icon">${isActive ? '🔴' : '🕐'}</span>
-                        ${period} ${subject.startTime}
+                        ${period} ${escapeHtml(subject.startTime)}
                     </span>
                     <span style="color: inherit; opacity: 0.5;">~</span>
-                    <span class="exam-subject-time" onclick="openTimePicker(${subject.id}, 'end', event)">
-                        ${period} ${subject.endTime}
+                    <span class="exam-subject-time" onclick="openTimePicker(${safeId(subject.id)}, 'end', event)">
+                        ${period} ${escapeHtml(subject.endTime)}
                         <span class="clock-icon">🕐</span>
                     </span>
                 </div>
@@ -2100,7 +2099,7 @@
                     statusEl.innerHTML = `
                         <div class="exam-break-countdown">
                             <div class="exam-break-emoji">${breakEmojis[emojiIndex]}</div>
-                            <div class="exam-break-message">距離 ${nextExam.name} 開始</div>
+                            <div class="exam-break-message">距離 ${escapeHtml(nextExam.name)} 開始</div>
                             <div class="exam-break-time">
                                 <div>
                                     <div class="exam-break-digit">${mins.toString().padStart(2, '0')}</div>
@@ -2474,7 +2473,7 @@
                     </div>
                 </div>
             </div>
-            <button style="width: 100%; margin-top: 0.75rem; padding: 0.5rem; background: #14b8a6; color: white; border: none; border-radius: 0.375rem; cursor: pointer; font-weight: 500;" onclick="confirmTimePicker(${subjectId}, '${timeType}')">確定</button>
+            <button style="width: 100%; margin-top: 0.75rem; padding: 0.5rem; background: #14b8a6; color: white; border: none; border-radius: 0.375rem; cursor: pointer; font-weight: 500;" onclick="confirmTimePicker(${safeId(subjectId)}, '${timeType}')">確定</button>
         `;
 
         document.body.appendChild(picker);
@@ -3191,8 +3190,8 @@
                     <div class="absence-subject-selector">
                         <select id="absenceSubjectSelect" onchange="switchAbsenceSubject(this.value)">
                             ${examSubjects.map(s => `
-                                <option value="${s.id}" ${s.id === currentSubject.id ? 'selected' : ''}>
-                                    ${escapeHtml(s.name)} (${s.startTime}-${s.endTime})
+                                <option value="${escapeHtml(s.id)}" ${s.id === currentSubject.id ? 'selected' : ''}>
+                                    ${escapeHtml(s.name)} (${escapeHtml(s.startTime)}-${escapeHtml(s.endTime)})
                                 </option>
                             `).join('')}
                         </select>
@@ -3206,7 +3205,7 @@
                         <div class="absence-add-form">
                             <select id="absenceStudentSelect" class="absence-input">
                                 <option value="">-- 選擇學生 --</option>
-                                ${students.map(s => `<option value="${escapeHtml(s.name)}">${s.number ? s.number + '. ' : ''}${escapeHtml(s.name)}</option>`).join('')}
+                                ${students.map(s => `<option value="${escapeHtml(s.name)}">${s.number ? escapeHtml(s.number) + '. ' : ''}${escapeHtml(s.name)}</option>`).join('')}
                             </select>
                             <input type="text" id="absenceStudentName" class="absence-input" placeholder="或直接輸入姓名">
                             <select id="absenceTypeSelect" class="absence-input">
@@ -3283,7 +3282,7 @@
                     <span class="absence-name">${escapeHtml(absence.name)}</span>
                     <span class="absence-type-label">${typeInfo.label}</span>
                     ${absence.note ? `<span class="absence-note">${escapeHtml(absence.note)}</span>` : ''}
-                    <button class="absence-remove-btn" onclick="removeAbsentStudent(${subjectId}, ${absence.id}); refreshAbsenceList(${subjectId});">🗑️</button>
+                    <button class="absence-remove-btn" onclick="removeAbsentStudent(${safeId(subjectId)}, ${safeId(absence.id)}); refreshAbsenceList(${safeId(subjectId)});">🗑️</button>
                 </div>
             `;
         }).join('');

@@ -387,9 +387,9 @@
 
                 if (student) {
                     seat.innerHTML = `
-                        <span class="seat-avatar">${student.avatar || '😊'}</span>
-                        <span class="seat-name">${student.name}</span>
-                        <span class="seat-number">${student.number}</span>
+                        <span class="seat-avatar">${escapeHtml(student.avatar || '😊')}</span>
+                        <span class="seat-name">${escapeHtml(student.name)}</span>
+                        <span class="seat-number">${escapeHtml(student.number)}</span>
                     `;
                 } else {
                     seat.innerHTML = `
@@ -436,10 +436,10 @@
                 <h4 class="font-bold mb-3">選擇學生入座</h4>
                 <div class="grid grid-cols-3 gap-2">
                     ${unassigned.map(s => `
-                        <button onclick="assignSeat('${key}', ${s.id}); this.closest('.fixed').remove();"
+                        <button onclick="assignSeat('${key}', ${safeId(s.id)}); this.closest('.fixed').remove();"
                             class="p-2 bg-gray-50 rounded-lg hover:bg-blue-100 transition-colors text-center">
-                            <div class="text-2xl">${s.avatar || '😊'}</div>
-                            <div class="text-xs truncate">${s.name}</div>
+                            <div class="text-2xl">${escapeHtml(s.avatar || '😊')}</div>
+                            <div class="text-xs truncate">${escapeHtml(s.name)}</div>
                         </button>
                     `).join('')}
                 </div>
