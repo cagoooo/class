@@ -79,6 +79,11 @@ jobs:
         with:
           path: '.'
 
+      # 檔案包剛上傳完的幾秒內，GitHub 還查不到它；馬上發布會回報
+      # 「No artifacts named github-pages were found」而失敗（2026-11-24 連續發生三次）。
+      - name: Wait for the artifact to be listed ⏳
+        run: sleep 20
+
       - name: Deploy to GitHub Pages 🚀
         id: deployment
         uses: actions/deploy-pages@v4
