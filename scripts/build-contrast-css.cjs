@@ -127,7 +127,7 @@ const MODULES = [
 function build() {
     const out = [];
     out.push('/*');
-    out.push(' * 白字配亮色底的對比修正。這份檔案是 scripts/build-contrast-css.cjs 產生的，不要直接改：');
+    out.push(' * 文字對比修正（白字配亮色底、淺色模式的淺灰與亮色小字）。這份檔案是 scripts/build-contrast-css.cjs 產生的，不要直接改：');
     out.push(' * 要調整請改那支腳本裡的清單，再執行 node scripts/build-contrast-css.cjs。');
     out.push(' * 原則：色相與彩度不變，只把底色調深到白字對比 4.6（WCAG AA 是 4.5）；黃、琥珀色改用深棕色字。');
     out.push(' */');
@@ -181,10 +181,94 @@ function build() {
     out.push('/* 開運拉霸：拉桿旁的小字原本是淡粉色，改成白色 */');
     out.push('.zslot-lever-hint { color: #ffffff !important; }');
     out.push('');
+
+    out.push('/* ── 三、淺色模式的文字：淺灰小字、亮色字配淺色底（深色模式另有自己的規則，這裡不碰） ── */');
+    out.push('/*');
+    out.push(' * 通用類別（text-gray-400 這類）：把字調深到「放在淡色底（例如淡藍色提示框）上」也有 4.6。');
+    out.push(' * 不加 !important，選擇器只比原本多一點點權重：滑鼠移過（hover:text-…）與各功能更精確的規則仍然優先。');
+    out.push(' */');
+    for (const [name, shades] of Object.entries(PALETTE)) {
+        shades.slice(0, 3).forEach((hex, i) => {
+            if (contrast(hex, TINT_REF) >= 4.5) return;
+            out.push(`${LIGHT}.text-${name}-${SHADES[i]} { color: ${darkenText(hex, TINT_REF)}; }`);
+        });
+    }
+    out.push('/* 各功能自己的文字顏色（依實際所在的底色計算） */');
+    for (const [title, rules] of TEXTS) {
+        out.push(`/* ${title} */`);
+        for (const [selector, fg, bg, scope] of rules) {
+            // scope 是 'both' 的：這個元素的底色在深色模式下也是淺的，兩種模式都要調
+            const selectors = selector.split(',').map((s) => (scope === 'both' ? '' : LIGHT) + s.trim()).join(', ');
+            out.push(`${selectors} { color: ${darkenText(fg, bg)} !important; }`);
+        }
+    }
+    out.push('');
     return out.join('\n');
 }
 
-module.exports = { build, darken, contrast, PALETTE, MODULES, TARGET, DARK_TEXT, KEEP_BRIGHT };
+// 只在淺色模式生效；:where() 不增加權重，所以整條規則只比原本的類別多一個 body 的權重
+const LIGHT = ':where(html:not(.dark)) body ';
+// 通用文字類別要能放在各種淡色底上：以最暗的淡色底（淡藍 blue-100）當基準
+const TINT_REF = '#dbeafe';
+
+/** 色相與彩度不變，把文字亮度往下調到在指定底色上達標為止。 */
+function darkenText(fg, bg, target = TARGET) {
+    const hsl = toHsl(fg);
+    let out = fg.toLowerCase();
+    for (let i = 0; i < 200 && contrast(out, bg) < target; i++) { hsl.l -= 0.005; out = fromHsl(hsl); }
+    return out;
+}
+
+// 各功能自己的文字：[選擇器, 原本的字色, 它所在的底色（有多種時取最暗的）, 'both'（選填）]
+// 第四個值寫 'both'：這個元素的底色在深色模式下也維持淺色（例如白板的工具列、評語的特質分類），兩種模式都套用。
+// 沒寫的只在淺色模式套用（深色模式下它的底會變深，字色由 js/theme-toggle.js 處理）。
+// 會隨滑鼠移過變色的元素加上 :not(:hover)，原本的 hover 顏色才不會被蓋掉。
+const TEXTS = [
+    ['座位表、加扣分、分組：座號與時間的小字', [
+        ['.seat-number', '#94a3b8', '#f8fafc'],
+        ['.pt-stu-seat, .pt-htime, .gp-seat', '#94a3b8', '#ffffff'],
+        ['.pt-hpts.pt-plus', '#16a34a', '#ffffff'],
+    ]],
+    ['公告：沒選到的類型與分頁、則數、清除', [
+        ['.ann-type-btn:not(.selected), .ann-tab:not(.active)', '#6b7280', '#f3f4f6', 'both'],
+        ['#annCount', '#9ca3af', '#ffffff'],
+        ['.ann-form-card button[onclick*="annExpiresInput"]', '#9ca3af', '#ffffff', 'both'],
+    ]],
+    ['考試：沒選到的天數、目前第幾天的說明（顏色寫在元素上）', [
+        ['#examDayTabs button[style*="#6b7280"]', '#6b7280', '#f3f4f6', 'both'],
+        ['#examDayTabs div[style*="#9ca3af"]', '#9ca3af', '#ffffff'],
+    ]],
+    ['抽籤：不重複抽取的說明、這一輪進度、空白提示、示範標籤', [
+        ['.lt-norepeat small, #lotteryRound, #lotteryRound span, .lt-idle-text', '#6b7280', '#f5f3ff'],
+        ['.lt-stu.lt-demo', '#64748b', '#f1f5f9'],
+    ]],
+    ['作業：刪除（沒移過去時）、儀表板沒選到的檢視、未檢查與未繳標籤', [
+        ['.hw-act-del:not(:hover)', '#94a3b8', '#eef2ff'],
+        ['.homework-view-btn:not(.active), .homework-card-tag.unchecked', '#64748b', '#f1f5f9'],
+        ['.homework-card-tag.incomplete', '#dc2626', '#fee2e2'],
+    ]],
+    ['白板：工具列標籤、目前狀態、操作提示', [
+        ['.cb-board-col .lbl', '#6b7280', '#eff6ff', 'both'],
+        ['.cb-cur', '#6b7280', '#f3f4f6', 'both'],
+        ['.cb-hint', '#9ca3af', '#ffffff', 'both'],
+    ]],
+    ['安靜挑戰：目前班級', [
+        ['.qc-head .class-context', '#64748b', '#eef2ff'],
+    ]],
+    ['評語生成：特質分類標題、空白提示', [
+        ['.cg-group.pos .cg-group-t', '#16a34a', '#f5f3ff', 'both'],
+        ['.cg-group.neg .cg-group-t', '#d97706', '#f5f3ff', 'both'],
+        ['.cg-output.placeholder', '#9ca3af', '#fffef9', 'both'],
+    ]],
+    ['開運拉霸：籤詩出處', [
+        ['.zf-credit', '#9ca3af', '#fee2e2', 'both'],
+    ]],
+    ['排行榜：正分（金牌列的底最暗）', [
+        ['.leaderboard-score.positive', '#059669', '#fde68a'],
+    ]],
+];
+
+module.exports = { build, darken, darkenText, contrast, PALETTE, MODULES, TEXTS, TARGET, TINT_REF, LIGHT, DARK_TEXT, KEEP_BRIGHT };
 
 if (require.main === module) {
     const file = path.join(__dirname, '..', 'css', 'contrast.css');

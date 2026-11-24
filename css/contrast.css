@@ -1,5 +1,5 @@
 /*
- * 白字配亮色底的對比修正。這份檔案是 scripts/build-contrast-css.cjs 產生的，不要直接改：
+ * 文字對比修正（白字配亮色底、淺色模式的淺灰與亮色小字）。這份檔案是 scripts/build-contrast-css.cjs 產生的，不要直接改：
  * 要調整請改那支腳本裡的清單，再執行 node scripts/build-contrast-css.cjs。
  * 原則：色相與彩度不變，只把底色調深到白字對比 4.6（WCAG AA 是 4.5）；黃、琥珀色改用深棕色字。
  */
@@ -298,3 +298,95 @@
 .zslot-pick-btn { background: linear-gradient(135deg, #e80d33, #e11d48) !important; }
 /* 開運拉霸：拉桿旁的小字原本是淡粉色，改成白色 */
 .zslot-lever-hint { color: #ffffff !important; }
+
+/* ── 三、淺色模式的文字：淺灰小字、亮色字配淺色底（深色模式另有自己的規則，這裡不碰） ── */
+/*
+ * 通用類別（text-gray-400 這類）：把字調深到「放在淡色底（例如淡藍色提示框）上」也有 4.6。
+ * 不加 !important，選擇器只比原本多一點點權重：滑鼠移過（hover:text-…）與各功能更精確的規則仍然優先。
+ */
+:where(html:not(.dark)) body .text-red-400 { color: #d00a0a; }
+:where(html:not(.dark)) body .text-red-500 { color: #cd1212; }
+:where(html:not(.dark)) body .text-red-600 { color: #c82020; }
+:where(html:not(.dark)) body .text-orange-400 { color: #a74d03; }
+:where(html:not(.dark)) body .text-orange-500 { color: #ac4904; }
+:where(html:not(.dark)) body .text-orange-600 { color: #b24309; }
+:where(html:not(.dark)) body .text-amber-400 { color: #866102; }
+:where(html:not(.dark)) body .text-amber-500 { color: #8f5c06; }
+:where(html:not(.dark)) body .text-amber-600 { color: #9b5504; }
+:where(html:not(.dark)) body .text-yellow-400 { color: #7b6303; }
+:where(html:not(.dark)) body .text-yellow-500 { color: #806204; }
+:where(html:not(.dark)) body .text-yellow-600 { color: #8b5f03; }
+:where(html:not(.dark)) body .text-lime-400 { color: #4c710e; }
+:where(html:not(.dark)) body .text-lime-500 { color: #4a720c; }
+:where(html:not(.dark)) body .text-lime-600 { color: #467109; }
+:where(html:not(.dark)) body .text-green-400 { color: #167739; }
+:where(html:not(.dark)) body .text-green-500 { color: #147739; }
+:where(html:not(.dark)) body .text-green-600 { color: #107636; }
+:where(html:not(.dark)) body .text-emerald-400 { color: #197453; }
+:where(html:not(.dark)) body .text-emerald-500 { color: #0a7552; }
+:where(html:not(.dark)) body .text-emerald-600 { color: #047653; }
+:where(html:not(.dark)) body .text-teal-400 { color: #187468; }
+:where(html:not(.dark)) body .text-teal-500 { color: #0d7368; }
+:where(html:not(.dark)) body .text-teal-600 { color: #0a736a; }
+:where(html:not(.dark)) body .text-cyan-400 { color: #0a7281; }
+:where(html:not(.dark)) body .text-cyan-500 { color: #047082; }
+:where(html:not(.dark)) body .text-cyan-600 { color: #066f89; }
+:where(html:not(.dark)) body .text-sky-400 { color: #056e9c; }
+:where(html:not(.dark)) body .text-sky-500 { color: #096e9c; }
+:where(html:not(.dark)) body .text-sky-600 { color: #026da4; }
+:where(html:not(.dark)) body .text-blue-400 { color: #0761d1; }
+:where(html:not(.dark)) body .text-blue-500 { color: #0a5de4; }
+:where(html:not(.dark)) body .text-blue-600 { color: #195bea; }
+:where(html:not(.dark)) body .text-indigo-400 { color: #4050f4; }
+:where(html:not(.dark)) body .text-indigo-500 { color: #4c4fef; }
+:where(html:not(.dark)) body .text-violet-400 { color: #6e3ff7; }
+:where(html:not(.dark)) body .text-violet-500 { color: #753df4; }
+:where(html:not(.dark)) body .text-purple-400 { color: #8d20fa; }
+:where(html:not(.dark)) body .text-purple-500 { color: #8f24f5; }
+:where(html:not(.dark)) body .text-purple-600 { color: #8f2ce9; }
+:where(html:not(.dark)) body .text-fuchsia-400 { color: #af09c8; }
+:where(html:not(.dark)) body .text-fuchsia-500 { color: #ae11c6; }
+:where(html:not(.dark)) body .text-fuchsia-600 { color: #ac22bd; }
+:where(html:not(.dark)) body .text-pink-400 { color: #c50f6f; }
+:where(html:not(.dark)) body .text-pink-500 { color: #c6156c; }
+:where(html:not(.dark)) body .text-pink-600 { color: #c32069; }
+:where(html:not(.dark)) body .text-rose-400 { color: #d00623; }
+:where(html:not(.dark)) body .text-rose-500 { color: #ce0c2d; }
+:where(html:not(.dark)) body .text-rose-600 { color: #ca1a41; }
+:where(html:not(.dark)) body .text-gray-400 { color: #606876; }
+:where(html:not(.dark)) body .text-gray-500 { color: #616773; }
+:where(html:not(.dark)) body .text-slate-400 { color: #566881; }
+:where(html:not(.dark)) body .text-slate-500 { color: #59687c; }
+/* 各功能自己的文字顏色（依實際所在的底色計算） */
+/* 座位表、加扣分、分組：座號與時間的小字 */
+:where(html:not(.dark)) body .seat-number { color: #5f738f !important; }
+:where(html:not(.dark)) body .pt-stu-seat, :where(html:not(.dark)) body .pt-htime, :where(html:not(.dark)) body .gp-seat { color: #617592 !important; }
+:where(html:not(.dark)) body .pt-hpts.pt-plus { color: #12863d !important; }
+/* 公告：沒選到的類型與分頁、則數、清除 */
+.ann-type-btn:not(.selected), .ann-tab:not(.active) { color: #686e7c !important; }
+:where(html:not(.dark)) body #annCount { color: #6c7586 !important; }
+.ann-form-card button[onclick*="annExpiresInput"] { color: #6c7586 !important; }
+/* 考試：沒選到的天數、目前第幾天的說明（顏色寫在元素上） */
+#examDayTabs button[style*="#6b7280"] { color: #686e7c !important; }
+:where(html:not(.dark)) body #examDayTabs div[style*="#9ca3af"] { color: #6c7586 !important; }
+/* 抽籤：不重複抽取的說明、這一輪進度、空白提示、示範標籤 */
+:where(html:not(.dark)) body .lt-norepeat small, :where(html:not(.dark)) body #lotteryRound, :where(html:not(.dark)) body #lotteryRound span, :where(html:not(.dark)) body .lt-idle-text { color: #686e7c !important; }
+:where(html:not(.dark)) body .lt-stu.lt-demo { color: #606f85 !important; }
+/* 作業：刪除（沒移過去時）、儀表板沒選到的檢視、未檢查與未繳標籤 */
+:where(html:not(.dark)) body .hw-act-del:not(:hover) { color: #5b6e89 !important; }
+:where(html:not(.dark)) body .homework-view-btn:not(.active), :where(html:not(.dark)) body .homework-card-tag.unchecked { color: #606f85 !important; }
+:where(html:not(.dark)) body .homework-card-tag.incomplete { color: #c82020 !important; }
+/* 白板：工具列標籤、目前狀態、操作提示 */
+.cb-board-col .lbl { color: #686e7c !important; }
+.cb-cur { color: #686e7c !important; }
+.cb-hint { color: #6c7586 !important; }
+/* 安靜挑戰：目前班級 */
+:where(html:not(.dark)) body .qc-head .class-context { color: #5f6e84 !important; }
+/* 評語生成：特質分類標題、空白提示 */
+.cg-group.pos .cg-group-t { color: #117f3a !important; }
+.cg-group.neg .cg-group-t { color: #a55a05 !important; }
+.cg-output.placeholder { color: #6b7484 !important; }
+/* 開運拉霸：籤詩出處 */
+.zf-credit { color: #5e6775 !important; }
+/* 排行榜：正分（金牌列的底最暗） */
+:where(html:not(.dark)) body .leaderboard-score.positive { color: #047351 !important; }

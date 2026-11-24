@@ -74,6 +74,12 @@
             color: #3b82f6;
         }
 
+        /* 正分、負分的字色：淺色模式用深綠、深紅；深色模式底是深的，改用亮一點的綠與紅 */
+        .report-pos { color: #047857; }
+        .report-neg { color: #dc2626; }
+        .dark .report-pos { color: #34d399; }
+        .dark .report-neg { color: #f87171; }
+
         .report-stat-label {
             font-size: 0.75rem;
             color: #6b7280;
@@ -271,15 +277,15 @@
 
                 <div class="report-stats">
                     <div class="report-stat">
-                        <div class="report-stat-value" style="color: ${student.points >= 0 ? '#10b981' : '#ef4444'}">${escapeHtml(student.points)}</div>
+                        <div class="report-stat-value ${student.points >= 0 ? 'report-pos' : 'report-neg'}">${escapeHtml(student.points)}</div>
                         <div class="report-stat-label">目前分數</div>
                     </div>
                     <div class="report-stat">
-                        <div class="report-stat-value" style="color: #10b981">+${totalPositive}</div>
+                        <div class="report-stat-value report-pos">+${totalPositive}</div>
                         <div class="report-stat-label">累積加分</div>
                     </div>
                     <div class="report-stat">
-                        <div class="report-stat-value" style="color: #ef4444">-${totalNegative}</div>
+                        <div class="report-stat-value report-neg">-${totalNegative}</div>
                         <div class="report-stat-label">累積扣分</div>
                     </div>
                 </div>
@@ -299,7 +305,7 @@
                         ${records.length > 0 ? records.slice(-10).reverse().map(r => `
                             <div class="report-history-item">
                                 <span>${escapeHtml(r.reason || '無說明')}</span>
-                                <span style="color: ${r.points >= 0 ? '#10b981' : '#ef4444'}; font-weight: 600;">
+                                <span class="${r.points >= 0 ? 'report-pos' : 'report-neg'}" style="font-weight: 600;">
                                     ${r.points > 0 ? '+' : ''}${escapeHtml(r.points)}
                                 </span>
                             </div>

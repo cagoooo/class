@@ -106,4 +106,54 @@ test('主頁面載入這份樣式，離線快取清單也有；班級顏色與�
     assert.ok(reports.includes('color: ${d.text};'));
 });
 
+// ───────── 淺色模式的文字（淺灰小字、亮色字配淺色底） ─────────
+// 瀏覽器實測：淺色模式不合格的 124 處 → 0，深色模式原本就偏低的 30 處 → 0（各約 830 個文字元素）。
+const { darkenText, TEXTS, TINT_REF, LIGHT } = require('./build-contrast-css.cjs');
+
+test('通用文字類別：調深後放在白底與淡色底上都有 4.5，而且只在淺色模式生效、不加 !important', () => {
+    const lines = CSS.split('\n').filter((l) => l.startsWith(LIGHT + '.text-'));
+    assert.ok(lines.length > 40, '應該有很多條通用文字規則（實際 ' + lines.length + '）');
+    const tints = ['#ffffff', '#f9fafb', '#f3f4f6', '#eef2ff', '#eff6ff', '#f5f3ff', '#dcfce7', '#fce7f3', TINT_REF];
+    for (const l of lines) {
+        const color = /color: (#[0-9a-f]{6});/.exec(l)[1];
+        for (const bg of tints) assert.ok(contrast(color, bg) >= 4.5, `${l.slice(LIGHT.length, LIGHT.length + 22)} ${color} 在 ${bg} 上只有 ${contrast(color, bg).toFixed(2)}`);
+        assert.ok(!l.includes('!important'), '通用文字規則不加 !important（滑鼠移過的顏色與各功能更精確的規則要能蓋過它）：' + l);
+    }
+    // 淺灰字：原本 2.54，現在看得清楚
+    assert.ok(contrast('#9ca3af', '#ffffff') < 3);
+    assert.match(CSS, /:where\(html:not\(\.dark\)\) body \.text-gray-400 \{ color: #[0-9a-f]{6}; \}/);
+    assert.match(CSS, /:where\(html:not\(\.dark\)\) body \.text-gray-500 \{ color: #[0-9a-f]{6}; \}/);
+    // 本來就夠深的不動（text-gray-600 以上沒有規則）
+    assert.doesNotMatch(CSS, /body \.text-gray-600 \{/);
+    assert.doesNotMatch(CSS, /body \.text-(gray|slate)-700 \{/);
+});
+
+test('各功能的文字：依它實際所在的底色調到 4.5 以上；色相不變', () => {
+    let n = 0;
+    for (const [, rules] of TEXTS) {
+        for (const [selector, fg, bg, scope] of rules) {
+            const fixed = darkenText(fg, bg);
+            assert.ok(contrast(fg, bg) < 4.5, selector + ' 原本就合格的話不需要列在這裡');
+            assert.ok(contrast(fixed, bg) >= 4.5, `${selector} ${fixed} 在 ${bg} 上只有 ${contrast(fixed, bg).toFixed(2)}`);
+            const diff = Math.abs(hue(fixed) - hue(fg));
+            assert.ok(Math.min(diff, 360 - diff) <= 4, `${selector} ${fg} → ${fixed} 色相跑掉了`);
+            const first = selector.split(',')[0].trim();
+            // 只在淺色模式生效的要帶範圍；底色在深色模式也是淺色的（both）兩種模式都套用
+            assert.ok(CSS.includes((scope === 'both' ? '\n' : LIGHT) + first), selector + ' 的範圍不對');
+            if (scope !== 'both') assert.ok(!CSS.includes('\n' + first + ' {') && !CSS.includes('\n' + first + ','), selector + ' 不可以在深色模式也生效');
+            n++;
+        }
+    }
+    assert.ok(n >= 20);
+});
+
+test('會隨滑鼠移過變色的元素保留原本的 hover；報告卡的正負分兩種模式各有顏色', () => {
+    assert.ok(CSS.includes('.hw-act-del:not(:hover)'), '作業的「刪除」移過去要變紅，不能被蓋掉');
+    const reports = fs.readFileSync('js/data-reports.js', 'utf8');
+    for (const rule of ['.report-pos { color: #047857; }', '.report-neg { color: #dc2626; }', '.dark .report-pos { color: #34d399; }', '.dark .report-neg { color: #f87171; }']) assert.ok(reports.includes(rule), '少了 ' + rule);
+    assert.ok(contrast('#047857', '#f8fafc') >= 4.5 && contrast('#dc2626', '#f8fafc') >= 4.5, '淺色模式');
+    assert.ok(contrast('#34d399', '#1e293b') >= 4.5 && contrast('#f87171', '#1e293b') >= 4.5, '深色模式');
+    assert.doesNotMatch(reports.slice(reports.indexOf('window.showStudentReport'), reports.indexOf('window.exportStudentReport')), /color: (#10b981|#ef4444)|'#10b981' : '#ef4444'/, '報告卡不可以再用寫死的亮綠、亮紅');
+});
+
 console.log(passed + ' button-contrast checks passed');

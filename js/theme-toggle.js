@@ -306,6 +306,12 @@
         /* 彈出視窗：學生報告卡的統計標籤、作業儀表板沒選到的檢視按鈕 */
         .dark .report-stat-label { color: var(--text-secondary) !important; }
         .dark .homework-view-btn:not(.active) { color: #cbd5e1 !important; }
+        /* 分組名單的座號、作業列的「刪除」、數據面板的負分（淡紅色卡片在深色模式會變深） */
+        .dark .gp-seat { color: #cbd5e1 !important; }
+        .dark .hw-act-del:not(:hover) { color: #cbd5e1 !important; }
+        .dark .bg-red-50 .text-red-500,
+        .dark .bg-red-50 .text-red-600,
+        .dark .bg-red-50 .text-red-700 { color: #fca5a5 !important; }
 
         /*
          * 二、淺色字落在沒有變深的淺色卡片上：上面的規則把 text-gray-600／700／800 一律改成淺色，
