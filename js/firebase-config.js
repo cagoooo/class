@@ -13,6 +13,27 @@ const firebaseConfig = {
     appId: "__FIREBASE_APP_ID__"
 };
 
+// v3.74.5 App Check：讓資料庫與雲端函式能分辨「真的從這個網站來的連線」。
+// reCAPTCHA 企業版金鑰只登記了 cagoooo.github.io（網站金鑰本來就是公開的，不是密碼）；
+// 本機與其他網址不啟用，否則每次換發票證都會失敗、在主控台一直報錯。
+// 目前只送出驗證、不擋人：要等統計確認幾乎所有連線都通過，才會在後台開啟強制檢查。
+const APP_CHECK_SITE_KEY = '6Ld13zAuAAAAAJsfm00p6Ehh06EU1GUy1MRvbLJn';
+let appCheckActive = false;
+function activateAppCheck() {
+    try {
+        if (appCheckActive) return true;
+        if (location.hostname !== 'cagoooo.github.io') return false;
+        // 舊版主頁面沒有載入 App Check 程式（GitHub Pages 不看 ?v=，可能拿到舊頁面配新程式）：直接略過
+        if (typeof firebase.appCheck !== 'function' || !firebase.appCheck.ReCaptchaEnterpriseProvider) return false;
+        firebase.appCheck().activate(new firebase.appCheck.ReCaptchaEnterpriseProvider(APP_CHECK_SITE_KEY), true);
+        appCheckActive = true;
+        return true;
+    } catch (e) {
+        console.warn('App Check 啟用失敗（不影響使用）:', e && e.message);
+        return false;
+    }
+}
+
 // Firebase 實例
 let firebaseApp = null;
 let firebaseAuth = null;
@@ -35,6 +56,8 @@ async function initializeFirebase() {
         } else {
             firebaseApp = firebase.app();
         }
+        // 要在第一次用登入、資料庫之前啟用，連線才會帶上驗證票證
+        activateAppCheck();
 
         firebaseAuth = firebase.auth();
         firebaseDb = firebase.firestore();

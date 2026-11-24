@@ -1,12 +1,12 @@
 /**
  * 班級小管家 Service Worker
- * @version 3.74.4
+ * @version 3.74.5
  * @description PWA 離線支援與快取策略優化
  */
 
-const CACHE_NAME = 'class-manager-v3.74.4';
-const STATIC_CACHE = 'class-manager-static-v3.74.4';
-const DYNAMIC_CACHE = 'class-manager-dynamic-v3.74.4';
+const CACHE_NAME = 'class-manager-v3.74.5';
+const STATIC_CACHE = 'class-manager-static-v3.74.5';
+const DYNAMIC_CACHE = 'class-manager-dynamic-v3.74.5';
 // v3.69.1：寵物、安靜挑戰小幫手等圖片放在不跟著版本清掉的快取。
 // 原本放在 DYNAMIC_CACHE，每次發新版就整個清空，老師幾乎每次更新後都要重新下載一次，小幫手要等很久才出現。
 const ART_CACHE = 'class-manager-art-v1';
@@ -210,6 +210,10 @@ self.addEventListener('fetch', (event) => {
 
     // YouTube 播放器（計時背景音樂）交給瀏覽器自己處理：快取住舊的播放器程式會讓影片播不出來
     if (/(^|\.)(youtube\.com|youtube-nocookie\.com|ytimg\.com|googlevideo\.com)$/.test(url.hostname)) return;
+
+    // reCAPTCHA（App Check 用）交給瀏覽器：載入檔會指向 Google 每次更新的版本，存住舊的會讓驗證失效（v3.74.5）
+    if (/(^|\.)(google\.com|recaptcha\.net)$/.test(url.hostname)) return;
+    if (url.hostname === 'www.gstatic.com' && url.pathname.startsWith('/recaptcha/')) return;
 
     // 只攔截 GET：POST/PUT 等（Cloud Functions callable、Firestore 寫入…）一律放行給瀏覽器。
     // 否則 cacheFirst 內 cache.put(POST) 會丟錯，請求被攔截成 503（會讓 callable 通知失敗）。
