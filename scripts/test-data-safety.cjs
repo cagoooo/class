@@ -248,60 +248,63 @@ let passed=0;async function test(name,fn){await fn();console.log('PASS',name);pa
  const mergePair=async()=>{const a=setup();await a.s.publish();const b=setup(a.db);await b.s.restore(await b.s.read());return{a,b};};
  const addPoints=(env,id,points,coinDelta=0)=>{env.c.pointsHistory.unshift({id,createdAtMs:Date.now(),studentId:1,points,petEvent:true,petXp:points,coinDelta});env.c.students[0].points+=points;env.save();};
  const away=env=>env.storage.setItem('currentClassId','other');
+ // 目前開著的班合併到別台的內容後，會先重新載入、再上傳（合併後的內容不能被這一頁的舊資料寫回去）。
+ // syncNow 模擬老師按同步：第一次合併並要求重新載入，接著是重新載入後的那一次同步。
+ const syncNow=async(env,id='A')=>{try{return await env.s.publish(id,{autoMerge:'now'});}catch(e){if(e.code==='sync-merge-deferred'&&e.reloading)return env.s.publish(id,{autoMerge:'now'});throw e;}};
  await test('自動合併：兩台都加分，雲端與本機都留下兩邊的紀錄，分數加總',async()=>{const{a,b}=await mergePair();addPoints(a,'from-a',2);await a.s.publish();addPoints(b,'from-b',3);
-  assert.equal(await b.s.publish('A',{autoMerge:'now'}),true);
+  assert.equal(await syncNow(b),true);
   const cloud=b.s.dataFor((await b.s.read()).values);assert.deepEqual(Array.from(cloud.pointsHistory.filter(r=>r.id.startsWith('from-')).map(r=>r.id).sort()),['from-a','from-b']);assert.equal(cloud.students[0].points,15);
   const local=JSON.parse(b.storage.getItem('pointsHistory-A'));assert.equal(local.length,cloud.pointsHistory.length);assert.equal(b.syncConflicts.length,0);
   assert.equal(b.c.merged.length,1);assert.equal(b.recovery.has('auto-merge:teacher:A'),true);assert.equal(b.s.status('A'),'synced');
-  assert.equal(await a.s.publish('A',{autoMerge:'now'}),true);assert.equal(a.c.merged.length,1);assert.equal(a.s.status('A'),'synced');});
+  assert.equal(await syncNow(a),true);assert.equal(a.c.merged.length,1);assert.equal(a.s.status('A'),'synced');});
  await test('目前開著的班不在上課中合併：先等待，不動資料也不算衝突',async()=>{const{a,b}=await mergePair();addPoints(a,'from-a',2);await a.s.publish();addPoints(b,'from-b',3);const before=b.storage.getItem('pointsHistory-A');
   await assert.rejects(b.s.publish('A',{autoMerge:'quiet'}),e=>e.code==='sync-merge-deferred');assert.equal(b.storage.getItem('pointsHistory-A'),before);assert.equal(b.s.isMergeWaiting('A'),true);assert.equal(b.s.status('A'),'pending');
   await b.s.report(Object.assign(Error('x'),{code:'sync-merge-deferred'}),'A',true);assert.equal(b.syncConflicts.length,0);
-  await b.s.publish('A',{autoMerge:'now'});assert.equal(b.s.isMergeWaiting('A'),false);});
+  await syncNow(b);assert.equal(b.s.isMergeWaiting('A'),false);});
  await test('背景同步到其他班：直接合併，告訴老師，不重新載入',async()=>{const{a,b}=await mergePair();addPoints(a,'from-a',2);await a.s.publish();addPoints(b,'from-b',3);away(b);
   assert.equal(await b.s.publish('A',{autoMerge:'quiet'}),true);assert.equal(b.c.merged.length,0);assert.match(b.notices.at(-1),/自動合併/);});
  await test('學期封存等其他流程：不自動合併，維持原本的停車',async()=>{const{a,b}=await mergePair();addPoints(a,'from-a',2);await a.s.publish();addPoints(b,'from-b',3);await assert.rejects(b.s.publish('A'),e=>e.code==='sync-conflict');});
  await test('同一欄位兩邊改得不同：停車、通知，原因帶進事件，資料不動',async()=>{const{a,b}=await mergePair();a.c.students[0].classPet='cat';a.save();await a.s.publish();b.c.students[0].classPet='fox';b.save();const before=b.storage.getItem('students-A');
-  const error=await b.s.publish('A',{autoMerge:'now'}).catch(e=>e);assert.equal(error.code,'sync-conflict');assert.equal(error.mergeBlock,'students.classPet');assert.equal(b.storage.getItem('students-A'),before);
+  const error=await syncNow(b).catch(e=>e);assert.equal(error.code,'sync-conflict');assert.equal(error.mergeBlock,'students.classPet');assert.equal(b.storage.getItem('students-A'),before);
   await b.s.report(error,'A',true);assert.equal(b.syncConflicts[0][1].notify,true);assert.match(b.syncConflicts[0][1].context,/students\.classPet/);assert.deepEqual([...b.s.conflictIds()],['A']);});
  await test('兩邊都兌換、合併後金幣變負：不自動合併',async()=>{const{a,b}=await mergePair();addPoints(a,'spend-a',1,-6);await a.s.publish();addPoints(b,'spend-b',1,-6);
-  const error=await b.s.publish('A',{autoMerge:'now'}).catch(e=>e);assert.equal(error.code,'sync-conflict');assert.equal(error.mergeBlock,'coins');});
+  const error=await syncNow(b).catch(e=>e);assert.equal(error.code,'sync-conflict');assert.equal(error.mergeBlock,'coins');});
  await test('共同舊版本已被清理、兩邊各自加分：以雲端為主補上這台的紀錄，分數加總並留下本機副本',async()=>{const{a,b}=await mergePair();const token=(await b.s.read()).token;addPoints(a,'from-a',2);await a.s.publish();addPoints(b,'from-b',3);a.db.data.delete(`users/teacher/classes/A/syncSnapshots/${token}/parts/0`);
   let saved;const put=b.c.LocalRecovery.put;b.c.LocalRecovery.put=async(key,value)=>{if(key.startsWith('no-base:'))saved=value;return put(key,value);};
-  assert.equal(await b.s.publish('A',{autoMerge:'now'}),true);const cloud=b.s.dataFor((await b.s.read()).values);
+  assert.equal(await syncNow(b),true);const cloud=b.s.dataFor((await b.s.read()).values);
   assert.equal(cloud.pointsHistory.filter(r=>/^from-/.test(r.id)).map(r=>r.id).sort().join(),'from-a,from-b');assert.equal(cloud.students[0].points,15);
   assert.equal(saved.replaced,'local-merged');assert.equal(saved.pointsHistory.some(r=>r.id==='from-b'),true);assert.equal(b.s.status('A'),'synced');});
  await test('共同舊版本已被清理、這台多了雲端沒有的學生：不猜，交給老師',async()=>{const{a,b}=await mergePair();const token=(await b.s.read()).token;addPoints(a,'from-a',2);await a.s.publish();addPoints(b,'from-b',3);b.c.students.push({id:2,name:'虛構新生',points:0});b.save();a.db.data.delete(`users/teacher/classes/A/syncSnapshots/${token}/parts/0`);
-  const error=await b.s.publish('A',{autoMerge:'now'}).catch(e=>e);assert.equal(error.code,'sync-conflict');assert.equal(error.mergeBlock,'no-base');});
+  const error=await syncNow(b).catch(e=>e);assert.equal(error.code,'sync-conflict');assert.equal(error.mergeBlock,'no-base');});
  await test('共同舊版本已被清理、雲端之後重新計分過：不合併，交給老師',async()=>{const{a,b}=await mergePair();const token=(await b.s.read()).token;addPoints(b,'from-b',3);
   a.c.pointsHistory.unshift({id:Date.now()+5000,type:'reset',studentId:null,points:0});a.c.students[0].points=0;a.save();await a.s.publish();a.db.data.delete(`users/teacher/classes/A/syncSnapshots/${token}/parts/0`);
-  const error=await b.s.publish('A',{autoMerge:'now'}).catch(e=>e);assert.equal(error.mergeBlock,'no-base');});
+  const error=await syncNow(b).catch(e=>e);assert.equal(error.mergeBlock,'no-base');});
  await test('共同舊版本已被清理、本機紀錄完整包含雲端：採用本機並留下雲端副本',async()=>{const{a,b}=await mergePair();const token=(await b.s.read()).token;a.c.students[0].name='雲端改名';a.save();await a.s.publish();addPoints(b,'from-b',3);a.db.data.delete(`users/teacher/classes/A/syncSnapshots/${token}/parts/0`);
   let saved;const put=b.c.LocalRecovery.put;b.c.LocalRecovery.put=async(key,value)=>{if(key.startsWith('no-base:'))saved=value;return put(key,value);};
-  assert.equal(await b.s.publish('A',{autoMerge:'now'}),true);const cloud=b.s.dataFor((await b.s.read()).values);assert.equal(cloud.pointsHistory.some(r=>r.id==='from-b'),true);assert.equal(saved.replaced,'cloud');assert.equal(saved.students[0].name,'雲端改名');assert.equal(b.s.status('A'),'synced');});
+  assert.equal(await syncNow(b),true);const cloud=b.s.dataFor((await b.s.read()).values);assert.equal(cloud.pointsHistory.some(r=>r.id==='from-b'),true);assert.equal(saved.replaced,'cloud');assert.equal(saved.students[0].name,'雲端改名');assert.equal(b.s.status('A'),'synced');});
  await test('共同舊版本已被清理、雲端紀錄完整包含本機：本機跟上雲端並留下本機副本',async()=>{const{a,b}=await mergePair();const token=(await b.s.read()).token;addPoints(a,'from-a',2);await a.s.publish();b.c.students[0].name='本機改名';b.save();a.db.data.delete(`users/teacher/classes/A/syncSnapshots/${token}/parts/0`);
   let saved;const put=b.c.LocalRecovery.put;b.c.LocalRecovery.put=async(key,value)=>{if(key.startsWith('no-base:'))saved=value;return put(key,value);};const cloudToken=(await b.s.read()).token;
-  assert.equal(await b.s.publish('A',{autoMerge:'now'}),true);assert.equal((await b.s.read()).token,cloudToken);assert.equal(JSON.parse(b.storage.getItem('pointsHistory-A')).some(r=>r.id==='from-a'),true);assert.equal(saved.replaced,'local');assert.equal(saved.students[0].name,'本機改名');});
+  assert.equal(await syncNow(b),true);assert.equal((await b.s.read()).token,cloudToken);assert.equal(JSON.parse(b.storage.getItem('pointsHistory-A')).some(r=>r.id==='from-a'),true);assert.equal(saved.replaced,'local');assert.equal(saved.students[0].name,'本機改名');});
  await test('共同舊版本已被清理、兩邊紀錄相同只差內容：不猜，交給老師',async()=>{const{a,b}=await mergePair();const token=(await b.s.read()).token;a.c.students[0].name='甲';a.save();await a.s.publish();b.c.students[0].name='乙';b.save();a.db.data.delete(`users/teacher/classes/A/syncSnapshots/${token}/parts/0`);
-  const error=await b.s.publish('A',{autoMerge:'now'}).catch(e=>e);assert.equal(error.mergeBlock,'no-base');});
+  const error=await syncNow(b).catch(e=>e);assert.equal(error.mergeBlock,'no-base');});
  await test('存不了合併前副本：不合併',async()=>{const{a,b}=await mergePair();addPoints(a,'from-a',2);await a.s.publish();addPoints(b,'from-b',3);b.c.LocalRecovery.put=async()=>{throw Error('quota')};
-  const error=await b.s.publish('A',{autoMerge:'now'}).catch(e=>e);assert.equal(error.mergeBlock,'no-recovery');});
+  const error=await syncNow(b).catch(e=>e);assert.equal(error.mergeBlock,'no-recovery');});
  await test('沒動過的班：只有裝置偏好不同時不上傳，也不會撞假衝突',async()=>{const{a,b}=await mergePair();addPoints(a,'from-a',2);await a.s.publish();b.storage.setItem('theme','dark');
   assert.equal(b.s.status('A'),'pending');assert.equal(b.s.needsUpload('A'),false);
   b.s.markLocalChange('A');assert.equal(b.s.needsUpload('A'),true);});
  await test('這台沒有新內容、雲端較新：直接跟上，不多上傳一份，裝置偏好保留',async()=>{const{a,b}=await mergePair();addPoints(a,'from-a',2);await a.s.publish();const token=(await a.s.read()).token;b.storage.setItem('theme','dark');
-  await b.s.publish('A',{autoMerge:'now'});assert.equal((await b.s.read()).token,token);assert.equal(b.storage.getItem('theme'),'dark');assert.equal(JSON.parse(b.storage.getItem('pointsHistory-A')).some(r=>r.id==='from-a'),true);assert.equal(b.c.merged.length,1);
+  await syncNow(b);assert.equal((await b.s.read()).token,token);assert.equal(b.storage.getItem('theme'),'dark');assert.equal(JSON.parse(b.storage.getItem('pointsHistory-A')).some(r=>r.id==='from-a'),true);assert.equal(b.c.merged.length,1);
   assert.equal(b.s.needsUpload('A'),false);});
- await test('比較視窗可以處理不是目前開著的班',async()=>{const{a,b}=await mergePair();a.c.students[0].classPet='cat';a.save();await a.s.publish();b.c.students[0].classPet='fox';b.save();const error=await b.s.publish('A',{autoMerge:'now'}).catch(e=>e);await b.s.report(error,'A',true);away(b);
+ await test('比較視窗可以處理不是目前開著的班',async()=>{const{a,b}=await mergePair();a.c.students[0].classPet='cat';a.save();await a.s.publish();b.c.students[0].classPet='fox';b.save();const error=await syncNow(b).catch(e=>e);await b.s.report(error,'A',true);away(b);
   assert.deepEqual([...b.s.conflictIds()],['A']);assert.equal(b.s.status('other'),'pending');});
  // 2026-11-09：上傳途中另一台裝置剛好先寫入（交易時版本頭已變），要走自動合併流程，不可直接推播衝突
  const raceOnce=(env,other)=>{const orig=env.db.runTransaction.bind(env.db);env.db.runTransaction=async fn=>{env.db.runTransaction=orig;await other.s.publish();return orig(fn);};};
  await test('上傳途中被搶先寫入：目前開著的班改成等待安靜時合併，不算衝突',async()=>{const{a,b}=await mergePair();addPoints(b,'from-b',3);addPoints(a,'from-a',2);raceOnce(b,a);
   await assert.rejects(b.s.publish('A',{autoMerge:'quiet'}),e=>e.code==='sync-merge-deferred');assert.equal(b.syncConflicts.length,0);assert.equal(b.s.isMergeWaiting('A'),true);
-  assert.equal(await b.s.publish('A',{autoMerge:'now'}),true);const cloud=b.s.dataFor((await b.s.read()).values);
+  assert.equal(await syncNow(b),true);const cloud=b.s.dataFor((await b.s.read()).values);
   assert.deepEqual(Array.from(cloud.pointsHistory.filter(r=>r.id.startsWith('from-')).map(r=>r.id).sort()),['from-a','from-b']);assert.equal(cloud.students[0].points,15);});
  await test('上傳途中被搶先寫入：老師按同步時直接合併，兩邊紀錄都在',async()=>{const{a,b}=await mergePair();addPoints(b,'from-b',3);addPoints(a,'from-a',2);raceOnce(b,a);
-  assert.equal(await b.s.publish('A',{autoMerge:'now'}),true);assert.equal(b.syncConflicts.length,0);const cloud=b.s.dataFor((await b.s.read()).values);
+  assert.equal(await syncNow(b),true);assert.equal(b.syncConflicts.length,0);const cloud=b.s.dataFor((await b.s.read()).values);
   assert.deepEqual(Array.from(cloud.pointsHistory.filter(r=>r.id.startsWith('from-')).map(r=>r.id).sort()),['from-a','from-b']);assert.equal(cloud.students[0].points,15);});
  await test('上傳途中被搶先寫入：沒有要求合併的流程（學期封存等）仍停下來回報衝突',async()=>{const{a,b}=await mergePair();addPoints(b,'from-b',3);addPoints(a,'from-a',2);raceOnce(b,a);const before=b.storage.getItem('pointsHistory-A');
   const error=await b.s.publish('A').catch(e=>e);assert.equal(error.code,'sync-conflict');assert.equal(b.storage.getItem('pointsHistory-A'),before);});
@@ -317,7 +320,7 @@ let passed=0;async function test(name,fn){await fn();console.log('PASS',name);pa
   assert.equal(await a.s.fastForward('A'),'local-changes');assert.equal(a.storage.getItem('pointsQuickActions'),ITEMS);
   const old=await a.s.read();assert.equal(old.values.pointsQuickActions??null,null);await a.s.restore(old);assert.equal(a.storage.getItem('pointsQuickActions'),ITEMS);});
  await test('加扣分項目：兩台各改一項，自動合併兩邊都留下',async()=>{const{a,b}=await mergePair();a.storage.setItem('pointsQuickActions',JSON.stringify([{reason:'跑步',points:2}]));await a.s.publish();
-  b.storage.setItem('pointsQuickActions',JSON.stringify([{reason:'飯菜吃光',points:2}]));assert.equal(await b.s.publish('A',{autoMerge:'now'}),true);
+  b.storage.setItem('pointsQuickActions',JSON.stringify([{reason:'飯菜吃光',points:2}]));assert.equal(await syncNow(b),true);
   const items=JSON.parse((await b.s.read()).values.pointsQuickActions).map(x=>x.reason).sort();assert.deepEqual(Array.from(items),['跑步','飯菜吃光'].sort());});
  // 2026-11-09 v3.64.3：白板、潔牙等班級設定單獨修改也會同步
  const oldBase=env=>{const k='cloudSafetyBase:teacher:A';const b=JSON.parse(env.c.ClassAwareStorage.rawGet(k));delete b.tracked2;env.c.ClassAwareStorage.rawSet(k,JSON.stringify(b));};
@@ -354,6 +357,12 @@ let passed=0;async function test(name,fn){await fn();console.log('PASS',name);pa
  await test('存全部班級：兩台都有新紀錄 → 自動合併，兩邊都保留',async()=>{const{a,b}=await mergePair();oneClass(b);
   addPoints(a,'from-a',5);await a.s.publish();addPoints(b,'from-b',2);
   const results=await b.c.syncAllClassesToCloud(()=>{});assert.equal(classA(results).status,'ok');
+  // 目前開著的班：合併結果先寫進本機並要求重新載入（不在舊畫面上繼續上傳），這時雲端還是另一台的版本，沒有被蓋掉
+  assert.equal(classA(results).mergedPending,true);assert.equal(b.c.merged.length,1);
+  const local=JSON.parse(b.storage.getItem('pointsHistory-A')).map(r=>r.id);assert.ok(local.includes('from-a'));assert.ok(local.includes('from-b'));
+  assert.ok((await cloudOf(b)).pointsHistory.some(r=>r.id==='from-a'));assert.equal(b.s.needsUpload('A'),true);
+  // 重新載入後的同步把合併結果傳上去
+  assert.equal(await b.s.publish('A',{autoMerge:'quiet'}),true);
   const ids=(await cloudOf(b)).pointsHistory.map(r=>r.id);assert.ok(ids.includes('from-a'));assert.ok(ids.includes('from-b'));});
  await test('存全部班級：這台沒有同步基準、內容又和雲端不同 → 不覆蓋，回報該班沒有上傳',async()=>{const a=setup();addPoints(a,'from-a',5);await a.s.publish();
   const b=setup(a.db);oneClass(b);addPoints(b,'from-b',2);
@@ -380,5 +389,69 @@ let passed=0;async function test(name,fn){await fn();console.log('PASS',name);pa
   await b.s.report(Object.assign(Error('x'),{code:'sync-local-corrupt'}),'A',true);assert.equal(b.petErrors.length,0);assert.equal(b.syncConflicts.length,0);
   assert.equal(await b.s.restore(await b.s.read()),true);assert.equal(b.c.LocalDataHold.has('A'),false);
   assert.equal(JSON.parse(b.storage.getItem('students-A')).length,1);assert.equal(await b.s.publish('A'),true);});
+ // ───────── v3.72.2：學期封存後，久沒同步的電腦不能把舊紀錄補回雲端 ─────────
+ // 情境共通：兩台原本同步；A 做了學期封存（明細清空、分數歸零、成長與金幣轉成期初值）；
+ // B 超過 14 天沒同步（共同舊版本已被清理），手上還有整學期舊紀錄和一筆沒上傳的加分。
+ const timed=async()=>{const a=setup();a.c.pointsHistory.forEach((r,i)=>r.createdAtMs=Date.parse('2026-09-01T00:00:00Z')+i*1000);a.save();await a.s.publish();const b=setup(a.db);await b.s.restore(await b.s.read());return{a,b,token:(await b.s.read()).token};};
+ const prune=(env,token)=>{for(const k of [...env.db.data.keys()])if(k.includes('/syncSnapshots/'+token+'/'))env.db.data.delete(k);};
+ const archiveOn=(env,{marker=false,carryXp=14,carryCoins=9}={})=>{const s=env.c.students[0];s.points=0;s.petCarryXp=carryXp;s.petCarryCoins=carryCoins;
+  env.c.pointsHistory=marker?[{id:Date.now(),createdAtMs:Date.now(),type:'reset',archived:true,studentId:null,points:0}]:[];env.save();};
+ const blockedNoBase=async env=>{const before=['students-A','pointsHistory-A'].map(k=>env.storage.getItem(k));
+  const error=await env.s.publish('A',{autoMerge:'quiet'}).catch(e=>e);
+  assert.equal(error.code,'sync-conflict','應該停下來請老師比較，實際：'+(error===true?'自動合併並上傳':error.code));assert.equal(error.mergeBlock,'no-base');
+  assert.deepEqual(['students-A','pointsHistory-A'].map(k=>env.storage.getItem(k)),before,'這台的資料不動');};
+ await test('學期封存後：雲端明細清空，舊電腦不能把整學期紀錄整份蓋回去（舊版會悄悄復原封存）',async()=>{const{a,b,token}=await timed();
+  archiveOn(a);await a.s.publish();addPoints(b,'from-b',3);prune(a,token);away(b);
+  await blockedNoBase(b);
+  const cloud=await cloudOf(a);assert.equal(cloud.pointsHistory.length,0,'封存清掉的明細沒有回到雲端');assert.equal(cloud.students[0].points,0);assert.equal(cloud.students[0].petCarryXp,14,'雲端的期初值沒有被蓋回去');});
+ await test('學期封存後：就算期初值沒有變（沒用寵物的班），雲端沒有任何加扣分時也不整份採用這台',async()=>{const{a,b,token}=await timed();
+  archiveOn(a,{carryXp:4,carryCoins:2});await a.s.publish();addPoints(b,'from-b',3);prune(a,token);away(b);
+  await blockedNoBase(b);assert.equal((await cloudOf(a)).pointsHistory.length,0);});
+ await test('學期封存後雲端又加了分：舊電腦的整學期紀錄不會被當成「這台新增的」補上去（舊版分數與金幣重複計算）',async()=>{const{a,b,token}=await timed();
+  archiveOn(a);await a.s.publish();addPoints(a,'after-archive',1,1);await a.s.publish();addPoints(b,'from-b',3,3);prune(a,token);away(b);
+  await blockedNoBase(b);
+  const cloud=await cloudOf(a);assert.deepEqual(Array.from(cloud.pointsHistory.map(r=>r.id)),['after-archive']);assert.equal(cloud.students[0].points,1);});
+ await test('新版封存留下的標記：舊電腦看得出雲端封存過，一樣停下來',async()=>{const{a,b,token}=await timed();
+  archiveOn(a,{marker:true,carryXp:4,carryCoins:2});await a.s.publish();addPoints(b,'from-b',3);prune(a,token);away(b);
+  await blockedNoBase(b);const cloud=await cloudOf(a);assert.equal(cloud.pointsHistory.length,1);assert.equal(cloud.pointsHistory[0].archived,true);});
+ await test('雲端少掉的是「舊紀錄」（不是還沒收到新紀錄）：不當成舊版本',async()=>{const{a,b,token}=await timed();
+  a.c.pointsHistory=a.c.pointsHistory.filter(r=>r.id!=='earn');a.save();await a.s.publish();addPoints(b,'from-b',3);prune(a,token);away(b);
+  await blockedNoBase(b);assert.ok(!(await cloudOf(a)).pointsHistory.some(r=>r.id==='earn'));});
+ await test('沒有封存的正常情況不受影響：雲端只是比較舊，這台多的紀錄都比共有的新 → 照舊採用這台',async()=>{const{a,b,token}=await timed();
+  a.c.students[0].name='雲端改名';a.save();await a.s.publish();addPoints(b,'from-b',3);prune(a,token);away(b);
+  assert.equal(await b.s.publish('A',{autoMerge:'quiet'}),true);const cloud=await cloudOf(a);assert.ok(cloud.pointsHistory.some(r=>r.id==='from-b'));assert.equal(cloud.students[0].points,13);});
+ await test('remoteLooksCleared：各種情況的判斷',()=>{const M=setup().c.CloudMerge;const pack=(students,history)=>({students:JSON.stringify(students),pointsHistory:JSON.stringify(history)});
+  const stu=(xp=0,coins=0)=>[{id:1,petCarryXp:xp,petCarryCoins:coins}],rec=(id,t)=>({id,createdAtMs:t,studentId:1,points:1});
+  assert.equal(M.remoteLooksCleared(pack(stu(),[rec('a',1),rec('b',2),rec('c',3)]),pack(stu(),[rec('a',1),rec('b',2)])),false,'雲端只是少了最新一筆');
+  assert.equal(M.remoteLooksCleared(pack(stu(),[rec('a',1)]),pack(stu(),[rec('a',1)])),false,'兩邊一樣');
+  assert.equal(M.remoteLooksCleared(pack(stu(),[]),pack(stu(),[])),false,'兩邊都沒有紀錄');
+  assert.equal(M.remoteLooksCleared(pack(stu(),[rec('a',1)]),pack(stu(),[])),true,'雲端一筆都沒有');
+  assert.equal(M.remoteLooksCleared(pack(stu(),[rec('a',1),rec('b',2),rec('c',3)]),pack(stu(),[rec('c',3)])),true,'雲端少的是舊紀錄');
+  assert.equal(M.remoteLooksCleared(pack(stu(5,0),[rec('a',1)]),pack(stu(9,0),[rec('a',1)])),true,'期初值不同');
+  assert.equal(M.remoteLooksCleared({students:'[]',pointsHistory:'{"x":1}'},pack(stu(),[])),true,'格式看不懂時當成有疑慮');});
+
+ // ───────── v3.72.2：合併到別台的內容後先重新載入、再上傳 ─────────
+ await test('目前開著的班合併後：不在舊畫面上繼續上傳，先要求重新載入；這段期間舊資料沒有機會寫回去',async()=>{const{a,b}=await mergePair();
+  addPoints(a,'from-a',2);await a.s.publish();addPoints(b,'from-b',3);
+  // 舊版：合併結果寫進本機後還要花幾秒上傳，這時畫面上的舊資料寫回去，另一台的 2 分就從學生分數消失
+  let staged=false;b.db.afterStage=()=>{staged=true;};
+  const error=await b.s.publish('A',{autoMerge:'now'}).catch(e=>e);
+  assert.equal(error.code,'sync-merge-deferred');assert.equal(error.reloading,true);
+  assert.equal(staged,false,'還沒重新載入之前不上傳');assert.equal(b.c.merged.length,1,'已要求重新載入');
+  assert.equal(JSON.parse(b.storage.getItem('students-A'))[0].points,15,'本機已經是合併後的內容');
+  assert.equal((await cloudOf(a)).students[0].points,12,'雲端還是另一台的版本，沒有被動到');
+  assert.equal(b.s.needsUpload('A'),true,'合併後的內容仍待上傳');assert.equal(b.syncConflicts.length,0);
+  await b.s.report(error,'A',false);assert.equal(b.syncConflicts.length,0,'不算衝突，不通知');
+  // 重新載入：畫面從本機重新讀資料，接著的同步把合併結果傳上去
+  b.c.students=JSON.parse(b.storage.getItem('students-A'));b.c.pointsHistory=JSON.parse(b.storage.getItem('pointsHistory-A'));
+  assert.equal(await b.s.publish('A',{autoMerge:'quiet'}),true);
+  const cloud=await cloudOf(a);assert.equal(cloud.students[0].points,15);assert.ok(cloud.pointsHistory.some(r=>r.id==='from-a')&&cloud.pointsHistory.some(r=>r.id==='from-b'));
+  assert.equal(b.s.status('A'),'synced');assert.equal(b.c.merged.length,1,'不會再重新載入一次');});
+ await test('背景合併其他班（不是畫面上這一班）照舊直接上傳，不重新載入',async()=>{const{a,b}=await mergePair();
+  addPoints(a,'from-a',2);await a.s.publish();addPoints(b,'from-b',3);away(b);
+  assert.equal(await b.s.publish('A',{autoMerge:'quiet'}),true);assert.equal(b.c.merged.length,0);assert.equal((await cloudOf(a)).students[0].points,15);});
+ await test('從雲端取回單一班級後會重新載入（公告、考試、座位表等也要從取回的資料啟動）',()=>{
+  const src=fs.readFileSync('js/firebase-sync.js','utf8');const fn=src.slice(src.indexOf('async function loadFromCloudData('),src.indexOf('async function loadFromCloud()'));
+  assert.match(fn,/location\.reload\(\)/);assert.ok(fn.indexOf('CloudSafety.restore')<fn.indexOf('location.reload()'));});
  console.log(passed+' safety checks passed');
 })().catch(e=>{console.error(e);process.exitCode=1;});

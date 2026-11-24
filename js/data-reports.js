@@ -393,7 +393,7 @@
 
         let csv = '\uFEFF日期,學生,分數變動,原因\n';
         history.forEach(h => {
-            if (h && h.type === 'reset') { csv += `"${h.date || ''}","🔄 全班分數重置",,"分數歸零（之前的紀錄仍保留）"\n`; return; }
+            if (h && h.type === 'reset') { csv += h.archived ? `"${h.date || ''}","📦 學期封存",,"之前的紀錄已收進封存"\n` : `"${h.date || ''}","🔄 全班分數重置",,"分數歸零（之前的紀錄仍保留）"\n`; return; }
             csv +=`"${h.date || ''}","${h.studentName || ''}",${h.points > 0 ? '+' : ''}${h.points},"${h.reason || ''}"\n`;
         });
 

@@ -176,6 +176,9 @@
                 const shared = l.filter(x => remoteIds.has(String(x.id))).map(recordTime).filter(Number.isFinite);
                 const latestShared = shared.length ? Math.max(...shared) : -Infinity;
                 if (mine.some(x => !(recordTime(x) > latestShared))) throw blocked('no-base');
+                // 兩邊都有加扣分紀錄、卻沒有任何一筆相同：不是「各自多了幾筆」，而是其中一邊整批換過
+                // （另一台做過學期封存後又加了分）。這時把這台的舊紀錄補上去，封存清掉的分數與金幣會重複計算。
+                if (k === 'pointsHistory' && mine.length && r.length && !l.some(x => remoteIds.has(String(x.id)))) throw blocked('no-base');
                 lists[k] = { remote: r, mine };
                 added += mine.length;
             }
@@ -187,6 +190,9 @@
             if (ph.remote.some(x => x.type === 'reset' && recordTime(x) > firstMine)) throw blocked('no-base');
             const reversed = new Set(ph.remote.filter(x => x.petReverses != null).map(x => String(x.petReverses)));
             if (ph.mine.some(x => x.petReverses != null && reversed.has(String(x.petReverses)))) throw blocked('no-base');
+
+            // 寵物期初值只有學期封存會改：兩邊不同代表其中一邊封存過，補紀錄會重複計算
+            if (carryDiffers(read(local, 'students'), read(remote, 'students'))) throw blocked('no-base');
 
             const students = read(remote, 'students').map(s => ({ ...s }));
             const groupsRaw = parse('groups', remote.groups ?? null);
@@ -223,7 +229,43 @@
         }
     }
 
-    const api = { mergeValues, unionWithoutBase };
+    /** 同一位學生的寵物期初值（成長、金幣）兩邊不同。只有學期封存會改這兩個數字。 */
+    function carryDiffers(localStudents, remoteStudents) {
+        const carry = s => `${Number(s?.petCarryXp) || 0}/${Number(s?.petCarryCoins) || 0}`;
+        const remote = new Map((Array.isArray(remoteStudents) ? remoteStudents : []).map(s => [String(s?.id), carry(s)]));
+        return (Array.isArray(localStudents) ? localStudents : []).some(s => remote.has(String(s?.id)) && remote.get(String(s?.id)) !== carry(s));
+    }
+
+    /**
+     * 沒有共同舊版本時，「這台的紀錄完整包含雲端」不一定代表雲端只是比較舊：
+     * 另一台做過學期封存、清空紀錄，雲端的紀錄一樣會變少。這時整份採用這台，等於把封存悄悄復原
+     * （舊明細回到雲端、分數與寵物期初值被蓋回去，2026-11-23 全站檢測）。
+     * 下面任何一項成立，就看不出雲端是「比較舊」還是「被清過」，回傳 true 交給老師比較：
+     *  - 這台有加扣分紀錄，雲端一筆都沒有
+     *  - 這台多出來的加扣分，不是每一筆都比兩邊共有的最新一筆還晚（雲端少掉的是舊紀錄）
+     *  - 學生的寵物期初值兩邊不同
+     * （雲端有「重新計分／學期封存」標記而這台沒有的情況，呼叫端的「完整包含」判斷已經擋掉。）
+     */
+    function remoteLooksCleared(local, remote) {
+        const read = (src, k) => { const v = parse(k, src[k] ?? null); return v == null ? [] : v; };
+        try {
+            const l = read(local, 'pointsHistory'), r = read(remote, 'pointsHistory');
+            if (!Array.isArray(l) || !Array.isArray(r)) return true;
+            const remoteIds = new Set(r.map(x => String(x?.id)));
+            const mine = l.filter(x => !remoteIds.has(String(x?.id)));
+            if (mine.length) {
+                if (!r.length) return true;
+                const shared = l.filter(x => remoteIds.has(String(x?.id))).map(recordTime).filter(Number.isFinite);
+                const latestShared = shared.length ? Math.max(...shared) : -Infinity;
+                if (mine.some(x => !(recordTime(x) > latestShared))) return true;
+            }
+            return carryDiffers(read(local, 'students'), read(remote, 'students'));
+        } catch (error) {
+            return true;
+        }
+    }
+
+    const api = { mergeValues, unionWithoutBase, remoteLooksCleared };
     if (typeof window !== 'undefined') window.CloudMerge = api;
     if (typeof module !== 'undefined') module.exports = api;
 })();

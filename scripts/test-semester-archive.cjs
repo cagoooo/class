@@ -47,10 +47,12 @@ let passed=0;async function test(name,fn){await fn();console.log('PASS',name);pa
   const a=setup();pets(a.c);a.c.groups=[{id:'g',name:'一組',score:8,members:[]}];a.save();await a.s.publish();legacySeed(a.db);
   const r=await a.c.SemesterArchive.archiveSemester('2026-S1',{clearScores:true});
   assert.equal(JSON.stringify(r.cleared),'["清空分數"]');assert.equal(r.synced,true);
-  assert.equal(a.c.students[0].points,0);assert.equal(a.c.groups[0].score,0);assert.equal(a.c.pointsHistory.length,0);
+  assert.equal(a.c.students[0].points,0);assert.equal(a.c.groups[0].score,0);
+  // 只留下一筆「學期封存」標記（另一台久沒同步的電腦靠它知道雲端封存過，不會把舊紀錄補回來）
+  assert.equal(a.c.pointsHistory.length,1);assert.equal(a.c.pointsHistory[0].type,'reset');assert.equal(a.c.pointsHistory[0].archived,true);assert.equal(a.c.pointsHistory[0].studentId,null);assert.ok(Number.isFinite(a.c.pointsHistory[0].createdAtMs));
   assert.equal(a.c.students[0].petCarryXp,14);assert.equal(a.c.students[0].petCarryCoins,9);
   assert.equal(JSON.parse(a.storage.getItem('students-A'))[0].points,0);
-  const remote=a.s.dataFor((await a.s.read()).values);assert.equal(remote.students[0].points,0);assert.equal(remote.pointsHistory.length,0);
+  const remote=a.s.dataFor((await a.s.read()).values);assert.equal(remote.students[0].points,0);assert.equal(remote.pointsHistory.length,1);assert.equal(remote.pointsHistory[0].archived,true);
   const head=a.db.data.get(P+'archives/2026-S1');assert.equal(head.pointsHistoryCount,3);assert.equal(head.totalPoints,10);
   legacyIntact(a.db);assert.ok(a.recovery.get('teacher:A'),'清空前留還原前副本');
  });
@@ -109,7 +111,7 @@ let passed=0;async function test(name,fn){await fn();console.log('PASS',name);pa
   a.c.pointsHistory.unshift({id:'pending',studentId:1,points:0,petEvent:true,petXp:0,coinDelta:-2,petShopType:'redeem',productCost:2},{id:'done',studentId:1,points:0,petEvent:true,petXp:0,coinDelta:-1,petShopType:'redeem',productCost:1,petDeliveredAt:'2026-10-01'});a.save();await a.s.publish();
   const before=a.c.ClassPets.coinsFor(1,JSON.parse(a.storage.getItem('pointsHistory-A')),2);
   await a.c.SemesterArchive.archiveSemester('2026-S1',{clearScores:true});
-  const hist=JSON.parse(a.storage.getItem('pointsHistory-A'));assert.equal(hist.length,1);assert.equal(hist[0].id,'pending');
+  const hist=JSON.parse(a.storage.getItem('pointsHistory-A'));assert.equal(hist.length,2);assert.equal(hist[0].archived,true);assert.equal(hist[1].id,'pending');
   const s=JSON.parse(a.storage.getItem('students-A'))[0];assert.equal(a.c.ClassPets.coinsFor(1,hist,s.petCarryCoins),before,'清空前後可用金幣一樣');
  });
  await test('沒用 Google 登入（匿名）不能封存',async()=>{

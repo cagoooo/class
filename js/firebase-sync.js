@@ -308,7 +308,12 @@ async function loadFromCloudData(cloudData) {
     try {
         if (cloudData.__snapshot.classId !== CloudSafety.current()) throw Error('預覽後已切換班級，請重新讀取雲端');
         const ok = await CloudSafety.restore(cloudData.__snapshot);
-        if (ok) NotificationSystem.success('已從雲端取回；這台原本的資料已另存副本');
+        if (ok) {
+            NotificationSystem.success('已從雲端取回；這台原本的資料已另存副本');
+            // 取回只會就地換掉名單、加扣分、聯絡簿、作業、抽籤；公告、考試、座位表等功能手上還是舊資料，
+            // 下次存檔會把舊內容寫回去。和「取回所有班級」一樣重新載入，讓整頁都從取回的資料啟動。
+            setTimeout(() => { try { window.LeaveSyncGuard?.allowInternalNavigation?.(); } catch (e) { /* 沒有也照常重新載入 */ } location.reload(); }, 900);
+        }
         return ok;
     } catch (error) { NotificationSystem.error(error.message); return false; }
     finally { syncStatus.isSyncing = false; }
@@ -715,6 +720,13 @@ async function syncAllClassesToCloud(onProgress) {
                 results.push({ name: cls.name, status: 'ok', count });
                 onProgress?.(++done, all.length, cls.name, 'ok', count, '', i);
             } catch (error) {
+                // 目前開著的班合併了別台的更新：頁面馬上會重新載入，合併後的內容由重新載入後的同步接著上傳
+                if (error?.code === 'sync-merge-deferred') {
+                    const count = CloudSafety.dataFor(CloudSafety.capture(String(cls.id))).students.length;
+                    results.push({ name: cls.name, status: 'ok', count, mergedPending: true });
+                    onProgress?.(++done, all.length, cls.name, 'ok', count, '', i);
+                    continue;
+                }
                 // 這台這一班是空白的、也沒同步過（例如新電腦上還沒開過的班），雲端卻有資料：
                 // 不是衝突，直接換成雲端版本（能不能換由 fastForward 自己把關，這台有任何內容就不會動）
                 if (error?.code === 'sync-conflict') {

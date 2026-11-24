@@ -274,6 +274,14 @@
                             announceMerge(c, autoMerged);
                             return true;
                         }
+                        // 目前開著的班、合併帶進了別台的內容：這一頁各個功能手上還是合併前的舊資料。
+                        // 以前先花幾秒上傳、傳完才重新載入，這幾秒內老師改座號、勾作業、寫聯絡簿，
+                        // 舊資料會整包寫回去，把別台剛併進來的內容洗掉（2026-11-23 全站檢測）。
+                        // 改成合併結果一寫進本機就立刻重新載入；合併後的內容仍標記為待上傳，重新載入後接著上傳。
+                        if (c.id === current() && result.newCloud) {
+                            announceMerge(c, autoMerged);
+                            throw Object.assign(Error('已合併其他裝置的更新，重新整理後接著上傳'), { code: 'sync-merge-deferred', reloading: true });
+                        }
                         values = result.values; before = fingerprint(values); expected = remote.token;
                     }
                 }
@@ -406,6 +414,8 @@
     async function withoutBase(c, values, remote) {
         const localWins = containsRecords(values, remote.values), remoteWins = containsRecords(remote.values, values);
         if (localWins === remoteWins) return localWins ? { block: 'no-base' } : unionWithoutBase(c, values, remote);
+        // 雲端的紀錄比較少，也可能是另一台做過學期封存或清空紀錄：看不出來就不整份採用這台（否則封存會被悄悄復原）
+        if (localWins && window.CloudMerge?.remoteLooksCleared?.(values, remote.values) !== false) return { block: 'no-base' };
         const loser = localWins ? remote.values : values;
         try { await window.LocalRecovery.put(`no-base:${c.uid}:${c.id}`, { version: '1.2', classId: c.id, exportDate: new Date().toISOString(), replaced: localWins ? 'cloud' : 'local', ...dataFor(loser) }); }
         catch { return { block: 'no-recovery' }; }

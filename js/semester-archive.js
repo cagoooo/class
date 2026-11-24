@@ -229,7 +229,18 @@ const SemesterArchive = (() => {
                 return copy;
             });
             next.groups = (Array.isArray(data.groups) ? data.groups : []).map(g => ({ ...g, score: 0 }));
-            next.pointsHistory = kept;
+            // 留一筆「學期封存」標記（和「分數歸零」同一種標記，各處畫面與統計本來就認得）。
+            // 沒有它的話，另一台久沒同步的電腦分不出雲端是「紀錄比較少的舊版本」還是「封存清空過」，
+            // 會把清掉的舊紀錄整批補回雲端，分數與金幣重複計算（2026-11-23 全站檢測）。
+            // 時間要比所有既有紀錄都晚，之後的統計才會從這裡重新算起。
+            const stamp = Math.max(Date.now(), ...history.map(r => (Number(r && (r.createdAtMs || r.id)) || 0) + 1));
+            const when = new Date();
+            const marker = {
+                id: stamp, createdAtMs: stamp, type: 'reset', archived: true, studentId: null, studentName: '📦 學期封存',
+                points: 0, reason: '學期封存：分數歸零，之前的紀錄已收進封存',
+                date: when.toLocaleDateString('zh-TW'), timestamp: when.toLocaleString('zh-TW', { hour12: false }),
+            };
+            next.pointsHistory = [marker, ...kept];
             ops.push([keyFor('students'), JSON.stringify(next.students)]);
             ops.push([keyFor('groups'), JSON.stringify(next.groups)]);
             ops.push([keyFor('pointsHistory'), JSON.stringify(next.pointsHistory)]);

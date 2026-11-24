@@ -95,7 +95,7 @@ class DataBackup {
         const ph = (data.pointsHistory || []).slice().reverse();
         const s2 = [['時間', '座號', '姓名', '加/扣分', '原因']];
         ph.forEach(r => PointsReset.isReset(r)
-            ? s2.push([r.timestamp || r.date || '', '', '🔄 全班分數重置', '', '分數歸零，以下為重置後紀錄'])
+            ? s2.push([r.timestamp || r.date || '', '', r.archived ? '📦 學期封存' : '🔄 全班分數重置', '', r.archived ? '之前的紀錄已收進封存，以下為封存後紀錄' : '分數歸零，以下為重置後紀錄'])
             : s2.push([r.timestamp || r.date || '', (numById[r.studentId] != null ? numById[r.studentId] : ''), r.studentName || '', r.points, r.reason || '']));
         const ws2 = XLSX.utils.aoa_to_sheet(s2);
         ws2['!cols'] = [{ wch: 20 }, { wch: 6 }, { wch: 12 }, { wch: 8 }, { wch: 22 }];

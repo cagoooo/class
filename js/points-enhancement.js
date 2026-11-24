@@ -790,7 +790,7 @@
             const day = dayLabel(t);
             if (day !== lastDay) { box.append(el('div', 'pt-hday', day)); lastDay = day; }
             if (first.type === 'reset') {
-                box.append(el('div', 'pt-hreset', `🔄 分數歸零（之前的紀錄仍保留）${t != null ? '　' + hhmm(t) : ''}`));
+                box.append(el('div', 'pt-hreset', `${first.archived ? '📦 學期封存（之前的紀錄已收進封存）' : '🔄 分數歸零（之前的紀錄仍保留）'}${t != null ? '　' + hhmm(t) : ''}`));
                 return;
             }
             const pts = Number(row.points) || 0;
