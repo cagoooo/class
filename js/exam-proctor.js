@@ -3127,10 +3127,12 @@
      * 取得學生總數
      */
     function getStudentCount() {
-        if (typeof AppState !== 'undefined' && AppState.students && AppState.students.length > 0) {
-            return AppState.students.length;
-        } else if (window.students && window.students.length > 0) {
+        // 以這一頁現在的名單（window.students）為準。AppState 那份是開頁時另外讀的副本：
+        // 新增學生後不會更新，以前還固定讀預設班級，在其他班級會拿到別班的人數（v3.73.1）
+        if (Array.isArray(window.students)) {
             return window.students.length;
+        } else if (typeof AppState !== 'undefined' && AppState.students && AppState.students.length > 0) {
+            return AppState.students.length;
         } else {
             try {
                 const savedStudents = JSON.parse(localStorage.getItem(window.STUDENTS_KEY || 'students') || '[]');
@@ -3158,10 +3160,10 @@
 
         // 從多個來源取得學生名單
         let students = [];
-        if (typeof AppState !== 'undefined' && AppState.students && AppState.students.length > 0) {
+        if (Array.isArray(window.students)) {
+            students = window.students;      // 這一頁現在的名單（目前班級、含剛新增的學生）
+        } else if (typeof AppState !== 'undefined' && AppState.students && AppState.students.length > 0) {
             students = AppState.students;
-        } else if (window.students && window.students.length > 0) {
-            students = window.students;
         } else {
             // 嘗試從 localStorage 讀取
             try {

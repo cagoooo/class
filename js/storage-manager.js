@@ -210,10 +210,11 @@
         }
 
         // 讀取資料並確保類型正確
-        AppState.students = StorageManager.get('students', []);
+        // 鍵名帶班級編號：固定讀 'students' 在其他班級會讀到預設班級的資料（v3.73.1）
+        AppState.students = StorageManager.get(window.STUDENTS_KEY || 'students', []);
         if (!Array.isArray(AppState.students)) AppState.students = [];
 
-        AppState.groups = StorageManager.get('groups', []);
+        AppState.groups = StorageManager.get(window.GROUPS_KEY || 'groups', []);
         if (!Array.isArray(AppState.groups)) AppState.groups = [];
 
         AppState.homeworkList = StorageManager.get('homeworkList', []);
@@ -224,7 +225,7 @@
             AppState.homeworkChecks = {};
         }
 
-        AppState.pointsHistory = StorageManager.get('pointsHistory', []);
+        AppState.pointsHistory = StorageManager.get(window.POINTS_HISTORY_KEY || 'pointsHistory', []);
         if (!Array.isArray(AppState.pointsHistory)) AppState.pointsHistory = [];
 
         AppState.lotteryHistory = StorageManager.get('lotteryHistory', []);

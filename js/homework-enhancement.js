@@ -28,7 +28,7 @@
             if (Array.isArray(c) && c.length > 0) return c;
         }
         try {
-            const raw = JSON.parse(localStorage.getItem('students') || '[]');
+            const raw = JSON.parse(localStorage.getItem(window.STUDENTS_KEY || 'students') || '[]');
             if (Array.isArray(raw)) return raw;
         } catch (e) { /* ignore */ }
         return [];

@@ -564,7 +564,69 @@
 
     const BACKUP_KEY = 'classManager_autoBackup';
     const BACKUP_INTERVAL = 5 * 60 * 1000; // 5 分鐘
-    const BACKUP_MAX_COUNT = 2;  // v3.1.4：5 → 2，大幅減少 localStorage 用量
+    const BACKUP_MAX_COUNT = 2;  // 每個班級保留幾份（v3.1.4：5 → 2，大幅減少 localStorage 用量）
+    const BACKUP_MAX_TOTAL = 8;  // 全部班級合計上限；超過時先丟其他班級最舊的
+    const LEGACY_KEEP_MS = 7 * 24 * 60 * 60 * 1000;   // 沒記班級的舊版快照最多留 7 天
+
+    // ───── 每份快照都記下是哪一班的（v3.73.1）─────
+    // 以前所有班級共用同一份清單、快照也沒記班級：在乙班按「恢復」會把甲班的學生寫進乙班；
+    // 分組還固定讀寫預設班級的那一份，在其他班級還原時改到的是預設班的分組。
+    function backupClassId() {
+        try { return String((window.ClassAwareStorage?.pageClassId?.()) || localStorage.getItem('currentClassId') || 'default'); }
+        catch (e) { return 'default'; }
+    }
+    function backupClassName(id) {
+        try {
+            const list = window.ClassProfiles?.list?.() || [];
+            const hit = list.find(p => String(p.id) === String(id));
+            return hit && hit.name ? String(hit.name) : '';
+        } catch (e) { return ''; }
+    }
+    function backupClassCount() {
+        try { return (window.ClassProfiles?.list?.() || []).length || 1; } catch (e) { return 1; }
+    }
+    function readBackups() {
+        try {
+            const list = JSON.parse(localStorage.getItem(BACKUP_KEY) || '[]');
+            return Array.isArray(list) ? list.filter(b => b && typeof b === 'object') : [];
+        } catch (e) { return []; }
+    }
+    function readJson(key, fallback) {
+        try { const v = JSON.parse(localStorage.getItem(key) || 'null'); return v == null ? fallback : v; }
+        catch (e) { return fallback; }
+    }
+    /**
+     * 這份快照是不是目前這一班的。
+     * @returns {'here'|'other'|'unknown'} unknown＝舊版快照沒記班級，而且看不出是哪一班的
+     */
+    function backupOwner(backup) {
+        if (backup.classId != null) return String(backup.classId) === backupClassId() ? 'here' : 'other';
+        if (backupClassCount() <= 1) return 'here';
+        const key = s => String(s && s.id) + '|' + String(s && s.name);
+        const mine = new Set((Array.isArray(window.students) ? window.students : []).map(key));
+        const theirs = (Array.isArray(backup.students) ? backup.students : []).map(key);
+        if (!mine.size || !theirs.length) return 'unknown';
+        return theirs.some(k => mine.has(k)) ? 'here' : 'other';
+    }
+    const backupContent = b => JSON.stringify([b.students, b.pointsHistory, b.notebookEntries, b.groups, b.seatingConfig]);
+    /** 每班留最新的幾份；沒記班級的舊快照另外算、過期就丟；總數超過上限時先丟其他班級最舊的。 */
+    function pruneBackups(list, here, now) {
+        const counts = {};
+        let kept = list.filter(b => {
+            const legacy = b.classId == null;
+            if (legacy && now - new Date(b.timestamp).getTime() > LEGACY_KEEP_MS) return false;
+            const bucket = legacy ? '(legacy)' : 'class:' + String(b.classId);
+            counts[bucket] = (counts[bucket] || 0) + 1;
+            return counts[bucket] <= BACKUP_MAX_COUNT;
+        });
+        while (kept.length > BACKUP_MAX_TOTAL) {
+            let drop = -1;
+            for (let i = kept.length - 1; i >= 0; i--) { if (String(kept[i].classId) !== here) { drop = i; break; } }
+            if (drop < 0) drop = kept.length - 1;
+            kept.splice(drop, 1);
+        }
+        return kept;
+    }
 
     /**
      * 執行自動備份
@@ -587,27 +649,34 @@
             }
         } catch (e) { /* FirebaseConfig 可能尚未載入，繼續備份 */ }
 
+        const here = backupClassId();
         const backupData = {
             timestamp: new Date().toISOString(),
-            students: JSON.parse(localStorage.getItem(window.STUDENTS_KEY || 'students') || '[]'),
-            pointsHistory: JSON.parse(localStorage.getItem(window.POINTS_HISTORY_KEY || 'pointsHistory') || '[]'),
-            notebookEntries: JSON.parse(localStorage.getItem('notebookEntries') || '[]'),
-            groups: JSON.parse(localStorage.getItem('groups') || '[]'),
-            seatingConfig: JSON.parse(localStorage.getItem('seatingConfig') || '{}')
+            classId: here,
+            className: backupClassName(here),
+            students: readJson(window.STUDENTS_KEY || 'students', []),
+            pointsHistory: readJson(window.POINTS_HISTORY_KEY || 'pointsHistory', []),
+            notebookEntries: readJson('notebookEntries', []),
+            groups: readJson(window.GROUPS_KEY || 'groups', []),
+            seatingConfig: readJson('seatingConfig', {})
         };
 
-        // 保留最近 N 個備份
-        let backups = JSON.parse(localStorage.getItem(BACKUP_KEY) || '[]');
+        let backups = readBackups();
+        // 內容和這一班最新的那份一樣就不再存：兩份快照才會是「最近兩個不同的狀態」，
+        // 不會在閒置十分鐘後兩份都變成現在的內容，誤刪時反而沒有舊的可以回復
+        const latestHere = backups.find(b => b.classId != null && String(b.classId) === here);
+        if (latestHere && backupContent(latestHere) === backupContent(backupData)) return;
         backups.unshift(backupData);
-        backups = backups.slice(0, BACKUP_MAX_COUNT);
+        backups = pruneBackups(backups, here, Date.now());
 
         try {
             localStorage.setItem(BACKUP_KEY, JSON.stringify(backups));
             showBackupToast();
         } catch (e) {
             console.warn('自動備份失敗（localStorage 可能已滿）：', e);
-            // 失敗時主動清空備份，避免每次都卡
-            try { localStorage.removeItem(BACKUP_KEY); } catch (_) { }
+            // 空間不夠：只留這一班最新的一份再試一次，還是不行才清空（避免每次都卡）
+            try { localStorage.setItem(BACKUP_KEY, JSON.stringify([backupData])); showBackupToast(); }
+            catch (_) { try { localStorage.removeItem(BACKUP_KEY); } catch (__) { } }
         }
     }
 
@@ -632,7 +701,7 @@
      * 恢復備份
      */
     window.restoreBackup = function (index = 0) {
-        const backups = JSON.parse(localStorage.getItem(BACKUP_KEY) || '[]');
+        const backups = readBackups();
         if (backups.length === 0 || !backups[index]) {
             if (typeof NotificationSystem !== 'undefined') {
                 NotificationSystem.warning('沒有可用的備份');
@@ -641,16 +710,30 @@
         }
 
         const backup = backups[index];
+        const owner = backupOwner(backup);
+        // 別班的快照不能還原進這一班（會把這一班的學生換成別班的）
+        if (owner === 'other') {
+            const name = backup.className || backupClassName(backup.classId);
+            const msg = '這份備份是' + (name ? '「' + name + '」' : '其他班級') + '的，不能還原到目前的班級。請先切換到那個班級再還原。';
+            if (typeof NotificationSystem !== 'undefined') NotificationSystem.warning(msg); else alert(msg);
+            return;
+        }
+        const legacy = backup.classId == null;
+        const doubt = owner === 'unknown'
+            ? '\n\n⚠️ 這是舊版留下的備份，沒有記錄是哪個班級的；如果不是目前這一班的資料，請按取消。'
+            : '';
 
-        if (confirm(`確定要恢復 ${new Date(backup.timestamp).toLocaleString()} 的備份嗎？\n\n⚠️ 目前資料將被覆蓋！`)) {
+        if (confirm(`確定要恢復 ${new Date(backup.timestamp).toLocaleString()} 的備份嗎？\n\n⚠️ 目前資料將被覆蓋！${doubt}`)) {
             // 五個 key 一起還原：中途失敗會整批退回，不會只還原一半
-            if (!window.SafeStorage.write([
-                [window.STUDENTS_KEY || 'students', JSON.stringify(backup.students)],
-                [window.POINTS_HISTORY_KEY || 'pointsHistory', JSON.stringify(backup.pointsHistory)],
-                ['notebookEntries', JSON.stringify(backup.notebookEntries)],
-                ['groups', JSON.stringify(backup.groups)],
-                ['seatingConfig', JSON.stringify(backup.seatingConfig)]
-            ], { context: '還原本機備份' })) return;
+            const ops = [
+                [window.STUDENTS_KEY || 'students', JSON.stringify(backup.students || [])],
+                [window.POINTS_HISTORY_KEY || 'pointsHistory', JSON.stringify(backup.pointsHistory || [])],
+                ['notebookEntries', JSON.stringify(backup.notebookEntries || [])],
+                ['seatingConfig', JSON.stringify(backup.seatingConfig || {})]
+            ];
+            // 舊版快照的分組一律是預設班級的那一份：只有在預設班級才還原分組
+            if (!legacy || backupClassId() === 'default') ops.push([window.GROUPS_KEY || 'groups', JSON.stringify(backup.groups || [])]);
+            if (!window.SafeStorage.write(ops, { context: '還原本機備份' })) return;
 
             if (typeof NotificationSystem !== 'undefined') {
                 NotificationSystem.success('已恢復備份，重新載入頁面...');
@@ -672,7 +755,13 @@
      * 顯示備份管理
      */
     window.showBackupManager = function () {
-        const backups = JSON.parse(localStorage.getItem(BACKUP_KEY) || '[]');
+        // 只列目前這一班的快照（保留在整份清單裡的位置，恢復時用得到）
+        const all = readBackups();
+        const backups = all.map((b, i) => ({ b, i, owner: backupOwner(b) })).filter(x => x.owner !== 'other');
+        const others = all.length - backups.length;
+        const esc = s => (typeof window.escapeHtml === 'function' ? window.escapeHtml(s) : String(s).replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0) + ';'));
+        const here = backupClassId();
+        const hereName = backupClassName(here);
 
         document.getElementById('backup-modal')?.remove();
 
@@ -690,20 +779,22 @@
 
                 <div class="p-4 space-y-3">
                     <div style="font-size:0.78rem;color:#64748b;background:#f8fafc;border-radius:0.5rem;padding:0.5rem 0.6rem;">
-                        💡 系統每 5 分鐘自動在<strong>本機</strong>存一份快照，誤刪時可回復。
+                        💡 系統每 5 分鐘自動在<strong>本機</strong>存一份快照（內容有變才存），誤刪時可回復。
                         換裝置不會跟著走——要帶著走請用「匯出完整備份」。
+                        ${hereName ? `<br>這裡只列出目前班級「${esc(hereName)}」的備份。` : ''}
                     </div>
-                    ${backups.length > 0 ? backups.map((b, i) => `
+                    ${backups.length > 0 ? backups.map(({ b, i, owner }) => `
                         <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                             <div>
                                 <div class="font-medium">${new Date(b.timestamp).toLocaleString()}</div>
-                                <div class="text-xs text-gray-500">${b.students?.length || 0} 位學生</div>
+                                <div class="text-xs text-gray-500">${Array.isArray(b.students) ? b.students.length : 0} 位學生${owner === 'unknown' ? '・舊版備份，未記錄班級' : ''}</div>
                             </div>
                             <button onclick="restoreBackup(${i})" class="px-3 py-1 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600">
                                 恢復
                             </button>
                         </div>
-                    `).join('') : '<div class="text-center text-gray-500 py-8">尚無備份</div>'}
+                    `).join('') : '<div class="text-center text-gray-500 py-8">這個班級尚無備份</div>'}
+                    ${others > 0 ? `<div class="text-xs text-gray-500">另有 ${others} 份是其他班級的備份，切換到那個班級才會列出。</div>` : ''}
                     
                     <button onclick="performManualBackup()" class="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600">
                         📦 立即備份

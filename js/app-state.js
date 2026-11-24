@@ -85,10 +85,11 @@ const AppState = {
      */
     init() {
         // 載入資料狀態
-        this.students = this._loadFromStorage('students', []);
-        this.pointsHistory = this._loadFromStorage('pointsHistory', []);
+        // 鍵名帶班級編號（主頁面開機時算好放在 window）：固定讀 'students' 在其他班級會讀到預設班級的資料（v3.73.1）
+        this.students = this._loadFromStorage(window.STUDENTS_KEY || 'students', []);
+        this.pointsHistory = this._loadFromStorage(window.POINTS_HISTORY_KEY || 'pointsHistory', []);
         this.lotteryHistory = this._loadFromStorage('lotteryHistory', []);
-        this.groups = this._loadFromStorage('groups', []);
+        this.groups = this._loadFromStorage(window.GROUPS_KEY || 'groups', []);
         this.notebookEntries = this._loadFromStorage('notebookEntries', []);
         this.homeworkList = this._loadFromStorage('homeworkList', []);
         this.homeworkChecks = this._loadFromStorage('homeworkChecks', {});
