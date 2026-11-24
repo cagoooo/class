@@ -141,6 +141,31 @@
     };
 
     /**
+     * 只記「今天」的資料（潔牙勾選表 {date, ids}）：網站只讀日期是今天的那份，舊日期的內容等於沒有。
+     * 兩邊日期不同就採用日期較新的；同一天才把兩邊勾的座號合在一起。看不懂的一邊當成最舊。
+     * 以前另一台把它清成空的、這台又勾了新的一天，整班合併就停下來（柏老師 11/23～11/25，v3.74.6）。
+     */
+    const DAILY_KEYS = ['brushChecked'];
+    function mergeDaily(key, b, l, r) {
+        const read = text => { try { const v = JSON.parse(text); return isObject(v) ? v : null; } catch { return null; } };
+        const day = v => {
+            const m = v && typeof v.date === 'string' ? v.date.match(/\d+/g) : null;
+            return m && m.length === 3 ? m[0].padStart(4, '0') + m[1].padStart(2, '0') + m[2].padStart(2, '0') : '';
+        };
+        const L = read(l), R = read(r), dl = day(L), dr = day(R);
+        if (dl !== dr) return dl > dr ? l : r;
+        if (!dl) return l;
+        const B = read(b);
+        try {
+            const merged = merge(key, day(B) === dl ? B : null, L, R);
+            return merged === undefined ? l : JSON.stringify(merged);
+        } catch (error) {
+            if (error?.code !== 'merge-blocked') throw error;
+            return l;
+        }
+    }
+
+    /**
      * @param {Object<string, string|null>} base 上次共同版本（各鍵原始字串）
      * @param {Object<string, string|null>} local 本機
      * @param {Object<string, string|null>} remote 雲端
@@ -155,6 +180,7 @@
                 const b = base[key] ?? null, l = local[key] ?? null, r = remote[key] ?? null;
                 if (deviceKeys.includes(key) || l === r || b === r) values[key] = l;
                 else if (b === l) values[key] = r;
+                else if (DAILY_KEYS.includes(key)) values[key] = mergeDaily(key, b, l, r);
                 else if (SCREEN_KEYS.includes(key)) {
                     // 白板文字等「這台螢幕上顯示的東西」兩邊都改過：能合併就合併，合不了保留這台的，
                     // 不能因為一段白板文字讓整班的加扣分都傳不上去（柏老師 11/12～11/20 卡了 9 天）。

@@ -180,4 +180,23 @@ test('白板文字兩邊都改過：保留這台的白板，加扣分照常合�
     const clash = mergeValues({ boardNoteStyle: '{"size":1}' }, { boardNoteStyle: '{"size":2}' }, { boardNoteStyle: '{"size":3}' }, ['boardNoteStyle']);
     assert.equal(clash.values.boardNoteStyle, '{"size":2}', '合不了就保留這台的');
 });
+test('潔牙勾選表：雲端被清空、這台勾了新的一天，採用新的一天，加扣分照常合併（柏老師 11/23～11/25 實際情況）', () => {
+    const keys = ['brushChecked', 'students'];
+    const base = { brushChecked: '{"date":"2026/11/10","ids":[5,4,9]}', students: '[{"id":1,"points":1}]' };
+    const local = { brushChecked: '{"date":"2026/11/23","ids":[3,7]}', students: '[{"id":1,"points":2}]' };
+    const remote = { brushChecked: null, students: base.students };
+    const result = mergeValues(base, local, remote, keys);
+    assert.equal(result.ok, true);
+    assert.equal(result.values.brushChecked, local.brushChecked);
+    assert.equal(JSON.parse(result.values.students)[0].points, 2);
+});
+test('潔牙勾選表：日期較新的一邊勝出；同一天把兩邊勾的座號合在一起；看不懂的當成最舊', () => {
+    const one = (b, l, r) => mergeValues({ brushChecked: b }, { brushChecked: l }, { brushChecked: r }, ['brushChecked']).values.brushChecked;
+    const d = (date, ids) => JSON.stringify({ date, ids });
+    assert.equal(one(d('2026/11/10', [1]), d('2026/11/9', [2]), d('2026/11/24', [3])), d('2026/11/24', [3]), '雲端的日期較新（11/24 > 11/9，不是字串比大小）');
+    assert.deepEqual(JSON.parse(one(d('2026/11/25', [1]), d('2026/11/25', [1, 2]), d('2026/11/25', [3]))).ids.sort(), [2, 3], '同一天：兩邊新增的都留，雲端取消的 1 號拿掉');
+    assert.deepEqual(JSON.parse(one(d('2026/11/20', [9]), d('2026/11/25', [1]), d('2026/11/25', [2]))).ids.sort(), [1, 2], '共同版本是舊日期：同一天兩邊勾的都留');
+    assert.equal(one(d('2026/11/10', [1]), '壞掉', d('2026/11/25', [2])), d('2026/11/25', [2]));
+    assert.equal(one(d('2026/11/10', [1]), '壞掉', null), '壞掉', '兩邊都看不懂：保留這台的，不擋合併');
+});
 console.log(`${passed} cloud-merge checks passed`);

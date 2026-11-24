@@ -1,12 +1,12 @@
 /**
  * 班級小管家 Service Worker
- * @version 3.74.5
+ * @version 3.74.6
  * @description PWA 離線支援與快取策略優化
  */
 
-const CACHE_NAME = 'class-manager-v3.74.5';
-const STATIC_CACHE = 'class-manager-static-v3.74.5';
-const DYNAMIC_CACHE = 'class-manager-dynamic-v3.74.5';
+const CACHE_NAME = 'class-manager-v3.74.6';
+const STATIC_CACHE = 'class-manager-static-v3.74.6';
+const DYNAMIC_CACHE = 'class-manager-dynamic-v3.74.6';
 // v3.69.1：寵物、安靜挑戰小幫手等圖片放在不跟著版本清掉的快取。
 // 原本放在 DYNAMIC_CACHE，每次發新版就整個清空，老師幾乎每次更新後都要重新下載一次，小幫手要等很久才出現。
 const ART_CACHE = 'class-manager-art-v1';
