@@ -93,7 +93,7 @@
                 gap: 6px;
                 padding: 6px 14px;
                 border-radius: 999px;
-                background: rgba(0, 0, 0, 0.35);
+                background: rgba(0, 0, 0, 0.62);   /* 原本 0.35：白字疊在白色時鐘上太淡 */
                 color: rgba(255,255,255,0.85);
                 font-size: 13px;
                 font-family: 'Noto Sans TC', sans-serif;

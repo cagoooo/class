@@ -28,7 +28,9 @@ test('每一條底色規則配白字的對比都在 4.5 以上', () => {
     for (const line of CSS.split('\n')) {
         // 只看「底色」的規則：設定字色的規則（深棕色字、拉霸小字改白色）另外檢查
         if (!line.includes('{') || line.includes(`color: ${DARK_TEXT}`) || /\{\s*color:/.test(line)) continue;
-        const colors = [...line.slice(line.indexOf('{')).matchAll(/#[0-9a-f]{6}/g)].map((m) => m[0]);
+        // 只取「底色」宣告裡的顏色（同一條規則也可能指定字色，例如大時鐘選取中的按鈕）
+        const declarations = line.slice(line.indexOf('{') + 1).split(';').filter((d) => /^\s*(background|--tw-gradient)/.test(d));
+        const colors = declarations.flatMap((d) => [...d.matchAll(/#[0-9a-f]{6}/g)].map((m) => m[0]));
         for (const c of colors) {
             const ratio = contrast('#ffffff', c);
             assert.ok(ratio >= 4.5, `${line.slice(0, 60)}… 的 ${c} 配白字只有 ${ratio.toFixed(2)}`);

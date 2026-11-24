@@ -122,6 +122,42 @@ const MODULES = [
     ['開運拉霸：抽同學上台的按鈕', [
         ['.zslot-pick-btn', { gradient: ['135deg', '#f43f5e', '#e11d48'] }],
     ]],
+    // ── 2026-11-24 補量彈出視窗與全螢幕畫面後加入 ──
+    ['提示訊息（右上角跳出的通知）：成功、失敗、一般；提醒是黃色，底色不動、字改深棕色', [
+        ['.notification.success', { gradient: ['135deg', '#10b981', '#059669'] }],
+        ['.notification.error', { gradient: ['135deg', '#ef4444', '#dc2626'] }],
+        ['.notification.info', { gradient: ['135deg', '#3b82f6', '#2563eb'] }],
+        ['.notification.warning, .notification.warning *', { raw: `color: ${DARK_TEXT} !important;` }],
+    ]],
+    ['全螢幕監考：考試進行中的狀態列（剩餘時間那一塊原本疊一層白，改成疊一層深色）、考試設定、缺考記錄', [
+        ['.exam-status-bar:not(.waiting):not(.finished)', { solid: '#22c55e' }],
+        ['.exam-status-remaining', { raw: 'background: rgba(0, 0, 0, 0.18) !important;' }],
+        ['.exam-settings-header', { gradient: ['135deg', '#667eea 0%', '#764ba2 100%'] }],
+        ['.exam-settings-close', { raw: 'background: rgba(0, 0, 0, 0.22) !important;' }],
+        ['.exam-settings-add-btn', { gradient: ['135deg', '#3b82f6 0%', '#8b5cf6 100%'] }],
+        ['.absence-add-btn', { gradient: ['135deg', '#22c55e 0%', '#16a34a 100%'] }],
+        ['.absence-export-btn', { solid: '#3b82f6' }],
+        // 深色的監考畫面上：應到／實到人數的藍字調亮、右下角提示調亮；淺色的監考畫面提示調深
+        ['.exam-fullscreen-modal:not(.light-mode) .exam-attendance-value', { raw: 'color: #93c5fd !important;' }],
+        ['.exam-fullscreen-modal:not(.light-mode) .exam-fullscreen-hint', { raw: 'color: rgba(255, 255, 255, 0.78) !important;' }],
+        ['.exam-fullscreen-modal.light-mode .exam-fullscreen-hint', { raw: 'color: rgba(0, 0, 0, 0.64) !important;' }],
+    ]],
+    ['全螢幕計時：開始（綠）調深；計時中是琥珀色，字改深棕色', [
+        ['.timer-fullscreen-btn-primary:not(.running)', { gradient: ['135deg', '#10b981 0%', '#059669 100%'] }],
+        ['.timer-fullscreen-btn-primary.running', { raw: `color: ${DARK_TEXT} !important;` }],
+    ]],
+    ['大時鐘（時鐘自己的淺色外觀）：選取中的樣式與開關', [
+        // 網站深色模式下這兩顆的字會被改成淺灰（不是純白），所以連字色一起指定
+        ['#clock-modal:not(.dark) .clock-style-btn.active, #clock-modal:not(.dark) .clock-toggle-btn.active', { raw: `background-color: ${darken('#3b82f6')} !important; color: #ffffff !important;` }],
+        ['#clock-modal:not(.dark) .clock-toggle-btn.active span', { raw: 'color: #ffffff !important;' }],
+    ]],
+    ['版本與健康狀態、備份提醒、抽籤結果、白板全螢幕的提示', [
+        ['.hp-head', { gradient: ['135deg', '#0ea5e9', '#6366f1'] }],
+        ['.hp-btn.primary', { solid: '#3b82f6' }],
+        ['.dsg-bn-backup', { gradient: ['135deg', '#dc2626', '#ef4444'] }],
+        ['.lt-fbtn.lt-main', { solid: '#8b5cf6', border: true }],
+        ['.cb-fs-hint', { raw: 'color: rgba(0, 0, 0, 0.64) !important;' }],
+    ]],
 ];
 
 function build() {
@@ -265,6 +301,20 @@ const TEXTS = [
     ]],
     ['排行榜：正分（金牌列的底最暗）', [
         ['.leaderboard-score.positive', '#059669', '#fde68a'],
+    ]],
+    // ── 2026-11-24 補量彈出視窗與全螢幕畫面後加入 ──
+    ['抽籤結果：已抽過的名字、籤筒剩餘人數、紀錄的時間', [
+        ['.lt-stu[data-state="drawn"]', '#64748b', '#f1f5f9'],
+        ['.lt-foot-info', '#6b7280', '#f5f3ff'],
+        ['.lt-htime', '#94a3b8', '#ffffff'],
+    ]],
+    ['備份提醒（底色在深色模式也是淺的）', [
+        ['.dsg-bn-sub, .dsg-bn-dismiss', '#6b7280', '#eff6ff', 'both'],
+    ]],
+    ['版本與健康狀態的連結、缺考記錄的空白提示、考試設定的休息提醒標題（這幾個視窗在深色模式也是白底）', [
+        ['.hp-link', '#6366f1', '#ffffff', 'both'],
+        ['.absence-empty', '#9ca3af', '#ffffff', 'both'],
+        ['.exam-settings-column-title.break-type, #breakReminderCount', '#059669', '#ffffff', 'both'],
     ]],
 ];
 

@@ -296,6 +296,34 @@
 .cg-btn.cg-copy { background: linear-gradient(135deg, #178640, #12863d) !important; }
 /* 開運拉霸：抽同學上台的按鈕 */
 .zslot-pick-btn { background: linear-gradient(135deg, #e80d33, #e11d48) !important; }
+/* 提示訊息（右上角跳出的通知）：成功、失敗、一般；提醒是黃色，底色不動、字改深棕色 */
+.notification.success { background: linear-gradient(135deg, #0c855d, #04855d) !important; }
+.notification.error { background: linear-gradient(135deg, #e71414, #dc2626) !important; }
+.notification.info { background: linear-gradient(135deg, #196cf4, #2563eb) !important; }
+.notification.warning, .notification.warning * { color: #422006 !important; }
+/* 全螢幕監考：考試進行中的狀態列（剩餘時間那一塊原本疊一層白，改成疊一層深色）、考試設定、缺考記錄 */
+.exam-status-bar:not(.waiting):not(.finished) { background: #178640 !important; }
+.exam-status-remaining { background: rgba(0, 0, 0, 0.18) !important; }
+.exam-settings-header { background: linear-gradient(135deg, #4d69e7 0%, #764ba2 100%) !important; }
+.exam-settings-close { background: rgba(0, 0, 0, 0.22) !important; }
+.exam-settings-add-btn { background: linear-gradient(135deg, #196cf4 0%, #8452f5 100%) !important; }
+.absence-add-btn { background: linear-gradient(135deg, #178640 0%, #12863d 100%) !important; }
+.absence-export-btn { background: #196cf4 !important; }
+.exam-fullscreen-modal:not(.light-mode) .exam-attendance-value { color: #93c5fd !important; }
+.exam-fullscreen-modal:not(.light-mode) .exam-fullscreen-hint { color: rgba(255, 255, 255, 0.78) !important; }
+.exam-fullscreen-modal.light-mode .exam-fullscreen-hint { color: rgba(0, 0, 0, 0.64) !important; }
+/* 全螢幕計時：開始（綠）調深；計時中是琥珀色，字改深棕色 */
+.timer-fullscreen-btn-primary:not(.running) { background: linear-gradient(135deg, #0c855d 0%, #04855d 100%) !important; }
+.timer-fullscreen-btn-primary.running { color: #422006 !important; }
+/* 大時鐘（時鐘自己的淺色外觀）：選取中的樣式與開關 */
+#clock-modal:not(.dark) .clock-style-btn.active, #clock-modal:not(.dark) .clock-toggle-btn.active { background-color: #196cf4 !important; color: #ffffff !important; }
+#clock-modal:not(.dark) .clock-toggle-btn.active span { color: #ffffff !important; }
+/* 版本與健康狀態、備份提醒、抽籤結果、白板全螢幕的提示 */
+.hp-head { background: linear-gradient(135deg, #0b7caf, #5e61f1) !important; }
+.hp-btn.primary { background: #196cf4 !important; }
+.dsg-bn-backup { background: linear-gradient(135deg, #dc2626, #e71414) !important; }
+.lt-fbtn.lt-main { background: #8452f5 !important; border-color: #8452f5 !important; }
+.cb-fs-hint { color: rgba(0, 0, 0, 0.64) !important; }
 /* 開運拉霸：拉桿旁的小字原本是淡粉色，改成白色 */
 .zslot-lever-hint { color: #ffffff !important; }
 
@@ -390,3 +418,13 @@
 .zf-credit { color: #5e6775 !important; }
 /* 排行榜：正分（金牌列的底最暗） */
 :where(html:not(.dark)) body .leaderboard-score.positive { color: #047351 !important; }
+/* 抽籤結果：已抽過的名字、籤筒剩餘人數、紀錄的時間 */
+:where(html:not(.dark)) body .lt-stu[data-state="drawn"] { color: #606f85 !important; }
+:where(html:not(.dark)) body .lt-foot-info { color: #686e7c !important; }
+:where(html:not(.dark)) body .lt-htime { color: #617592 !important; }
+/* 備份提醒（底色在深色模式也是淺的） */
+.dsg-bn-sub, .dsg-bn-dismiss { color: #686e7c !important; }
+/* 版本與健康狀態的連結、缺考記錄的空白提示、考試設定的休息提醒標題（這幾個視窗在深色模式也是白底） */
+.hp-link { color: #5e61f1 !important; }
+.absence-empty { color: #6c7586 !important; }
+.exam-settings-column-title.break-type, #breakReminderCount { color: #04855d !important; }

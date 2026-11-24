@@ -312,6 +312,12 @@
         .dark .bg-red-50 .text-red-500,
         .dark .bg-red-50 .text-red-600,
         .dark .bg-red-50 .text-red-700 { color: #fca5a5 !important; }
+        /* 大時鐘：網站是深色模式、時鐘本身沒有另外切成深色時，底是深的，數位樣式的時間與日期要用淺色（原本深色字配深色底，完全看不到） */
+        .dark #clock-modal:not(.dark) .clock-style-digital .time-display { color: #f9fafb !important; }
+        .dark #clock-modal:not(.dark) .clock-style-digital .date-display { color: #d1d5db !important; }
+        /* 快捷鍵說明 */
+        .dark .shortcut-desc { color: var(--text-primary) !important; }
+        .dark .shortcuts-section-title { color: var(--text-secondary) !important; }
 
         /*
          * 二、淺色字落在沒有變深的淺色卡片上：上面的規則把 text-gray-600／700／800 一律改成淺色，

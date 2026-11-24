@@ -810,7 +810,7 @@ async function showAllClassSyncModal() {
             `<div id="acsm-row-${i}" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0f0;">
                 <span id="acsm-icon-${i}" style="font-size:1.2rem;width:24px;text-align:center;">⬜</span>
                 <span style="flex:1;font-weight:600;color:#374151;">${escapeHtml(cls.name)}</span>
-                <span id="acsm-info-${i}" style="color:#9ca3af;font-size:.85rem;"></span>
+                <span id="acsm-info-${i}" style="color:#6b7280;font-size:.85rem;"></span>
             </div>`
         ).join('');
 
@@ -872,7 +872,7 @@ async function showAllClassSyncModal() {
             const icon = document.getElementById(`acsm-icon-${rowIdx}`);
             const info = document.getElementById(`acsm-info-${rowIdx}`);
             if (icon) icon.textContent = '❌';
-            if (info) { info.textContent = errorMessage ? `未上傳：${String(errorMessage).slice(0, 42)}` : '未上傳'; info.style.color = '#ef4444'; info.title = errorMessage || '同步失敗'; }
+            if (info) { info.textContent = errorMessage ? `未上傳：${String(errorMessage).slice(0, 42)}` : '未上傳'; info.style.color = '#dc2626'; info.title = errorMessage || '同步失敗'; }
         }
     };
 
@@ -891,8 +891,8 @@ async function showAllClassSyncModal() {
         // 另一個同步遲遲沒結束：這次沒有上傳任何班級，不能顯示成功。
         if (bar) bar.style.width = '0%';
         if (counter) counter.textContent = `0 / ${total}`;
-        if (label) { label.textContent = '⚠️ 另一個同步還在進行，這次沒有上傳。請稍候再按一次。'; label.style.color = '#d97706'; }
-        if (closeBtn) { closeBtn.textContent = '關閉'; closeBtn.style.background = '#d97706'; }
+        if (label) { label.textContent = '⚠️ 另一個同步還在進行，這次沒有上傳。請稍候再按一次。'; label.style.color = '#b45309'; }
+        if (closeBtn) { closeBtn.textContent = '關閉'; closeBtn.style.background = '#b45309'; }
         return;
     }
     const failed = results.filter(r => r.status === 'fail').length;
@@ -900,11 +900,11 @@ async function showAllClassSyncModal() {
         label.textContent = failed === 0
             ? `✅ 所有 ${total} 個班級同步完成！`
             : `⚠️ ${total - failed} 班成功，${failed} 班沒有上傳（原因寫在該班那一列）`;
-        label.style.color = failed === 0 ? '#16a34a' : '#d97706';
+        label.style.color = failed === 0 ? '#15803d' : '#b45309';
     }
     if (closeBtn) {
         closeBtn.textContent = '完成';
-        closeBtn.style.background = failed === 0 ? '#16a34a' : '#d97706';
+        closeBtn.style.background = failed === 0 ? '#15803d' : '#b45309';
     }
     if (failed === 0) NotificationSystem && NotificationSystem.success(`所有班級同步完成 🌐`);
 }
@@ -1390,7 +1390,7 @@ async function showAllClassDownloadModal() {
         `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0f0;">
             <span id="acdm-icon-${i}" style="font-size:1.2rem;width:24px;text-align:center;">⬜</span>
             <span style="flex:1;font-weight:600;color:#374151;">${escapeHtml(cls.name)}</span>
-            <span id="acdm-info-${i}" style="color:#9ca3af;font-size:.85rem;"></span>
+            <span id="acdm-info-${i}" style="color:#6b7280;font-size:.85rem;"></span>
         </div>`
     ).join('');
 
@@ -1449,7 +1449,7 @@ async function showAllClassDownloadModal() {
             const icon = document.getElementById(`acdm-icon-${idx}`);
             const info = document.getElementById(`acdm-info-${idx}`);
             if (icon) icon.textContent = '❌';
-            if (info) { info.textContent = '失敗'; info.style.color = '#ef4444'; }
+            if (info) { info.textContent = '失敗'; info.style.color = '#dc2626'; }
         }
     };
 
@@ -1466,8 +1466,8 @@ async function showAllClassDownloadModal() {
         // 另一個同步遲遲沒結束：這次沒有還原任何班級，不能顯示成功。
         if (bar) bar.style.width = '0%';
         if (counter) counter.textContent = `0 / ${total}`;
-        if (label) { label.textContent = '⚠️ 另一個同步還在進行，這次沒有取回。請稍候再按一次。'; label.style.color = '#d97706'; }
-        if (closeBtn) { closeBtn.textContent = '關閉'; closeBtn.style.background = '#d97706'; }
+        if (label) { label.textContent = '⚠️ 另一個同步還在進行，這次沒有取回。請稍候再按一次。'; label.style.color = '#b45309'; }
+        if (closeBtn) { closeBtn.textContent = '關閉'; closeBtn.style.background = '#b45309'; }
         return;
     }
     const failed = results.filter(r => r.status === 'fail').length;
@@ -1476,11 +1476,11 @@ async function showAllClassDownloadModal() {
         label.textContent = failed === 0
             ? `✅ 所有 ${total} 個班級已取回這台電腦！`
             : `⚠️ ${restored} 班成功，${failed} 班失敗`;
-        label.style.color = failed === 0 ? '#16a34a' : '#d97706';
+        label.style.color = failed === 0 ? '#15803d' : '#b45309';
     }
     if (closeBtn) {
         closeBtn.textContent = restored ? '完成並重新整理畫面' : '完成';
-        closeBtn.style.background = failed === 0 ? '#16a34a' : '#d97706';
+        closeBtn.style.background = failed === 0 ? '#15803d' : '#b45309';
         // 還原只會就地更新目前班級的名單與寵物；公告、考試、座位等模組仍握著舊資料。
         // 重新載入讓整個畫面都以還原後的資料啟動（與首次登入的還原流程一致）。
         if (restored) closeBtn.onclick = () => { document.getElementById(existId)?.remove(); location.reload(); };

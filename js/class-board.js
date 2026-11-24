@@ -262,7 +262,7 @@
             const s = getStyle();
             const so = sizeObj(s.size);
             if (!text) {
-                const html = `<div class="cb-fs-note" style="color:#9ca3af;font-size:6vmin">（白板還沒有內容，先在白板上打字吧！）</div>`;
+                const html = `<div class="cb-fs-note" style="color:#6b7280;font-size:6vmin">（白板還沒有內容，先在白板上打字吧！）</div>`;
                 openFs(html, 'linear-gradient(135deg,#fdf4ff,#eff6ff)');
                 return;
             }
@@ -273,7 +273,7 @@
             injectCSS();
             const a = actByKey(lsGet(K_ACT, ''));
             if (!a) {
-                openFs(`<div class="cb-fs-note" style="color:#9ca3af;font-size:6vmin">（先在下方點一個班級狀態圖示）</div>`, '#f8fafc');
+                openFs(`<div class="cb-fs-note" style="color:#6b7280;font-size:6vmin">（先在下方點一個班級狀態圖示）</div>`, '#f8fafc');
                 return;
             }
             const html = `<div class="cb-fs-emoji">${a.emoji}</div>

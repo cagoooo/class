@@ -807,7 +807,7 @@
 
         if (grid) {
             if (active.length === 0) {
-                grid.innerHTML = `<div style="color:rgba(255,255,255,0.4);text-align:center;padding:4rem;grid-column:1/-1;">
+                grid.innerHTML = `<div style="color:rgba(255,255,255,0.78);text-align:center;padding:4rem;grid-column:1/-1;">
                     <div style="font-size:4rem;margin-bottom:1rem;">📭</div>
                     <div style="font-size:1.2rem;">目前沒有有效的班級公告</div>
                 </div>`;
