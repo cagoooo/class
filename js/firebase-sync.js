@@ -3,6 +3,9 @@
  * - 完整涵蓋所有功能模組的資料同步
  * - 新增同步前詳細差異預覽 Modal
  */
+// 主頁面是舊版（快取或離線時留下的）就沒有這個函式：自帶一份相同的，避免整段畫面出錯（v3.73.3）
+var escapeHtml = window.escapeHtml || ((text) => (text === null || text === undefined ? '' : String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')));
+
 console.log('✅ firebase-sync.js v3.0.4 載入完成');
 
 // 資料集合名稱

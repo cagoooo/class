@@ -5,6 +5,8 @@
 
 (function () {
     'use strict';
+    // 主頁面是舊版（快取或離線時留下的）就沒有這個函式：自帶一份相同的，避免整段畫面出錯（v3.73.3）
+    const safeId = window.safeId || ((id) => (typeof id === 'number' ? (Number.isFinite(id) ? id : 0) : (typeof id === 'string' && /^[A-Za-z0-9_-]+$/.test(id) ? id : 0)));
 
     // 狀態配置
     const STATUS_CONFIG = {

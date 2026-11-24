@@ -10,6 +10,8 @@
  */
 (function () {
     'use strict';
+    // 主頁面是舊版（快取或離線時留下的）就沒有這個函式：自帶一份相同的，避免整段畫面出錯（v3.73.3）
+    const escapeHtml = window.escapeHtml || ((text) => (text === null || text === undefined ? '' : String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')));
 
     function fmtTime(iso) {
         if (!iso) return '從未';
