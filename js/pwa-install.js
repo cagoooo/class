@@ -432,15 +432,24 @@
 
         // 顯示安裝提示彈窗
         showInstallPrompt() {
-            if (this.isInstalled || localStorage.getItem('pwaPromptSeen') || localStorage.getItem('pwaInstallDismissed')) return;
+            if (this.isInstalled) return;
+            // 看過或按「稍後再說」：30 天內不再跳（以前是永遠不再出現）。改版前存的 'true' 沒有時間，維持不跳（v3.74.3）
+            const recently = key => {
+                const v = localStorage.getItem(key);
+                if (!v) return false;
+                const at = Number(v);
+                return !Number.isFinite(at) || Date.now() - at < 30 * 24 * 60 * 60 * 1000;
+            };
+            if (recently('pwaPromptSeen') || recently('pwaInstallDismissed')) return;
             const blocked = document.visibilityState !== 'visible' || !this._hasInteracted ||
                 document.querySelector('#gauth-welcome-overlay, .confirm-dialog-overlay, dialog[open], .pwa-install-modal') ||
                 document.activeElement?.matches('input, textarea, select');
             if (blocked) { setTimeout(() => this.showInstallPrompt(), 30000); return; }
 
-            localStorage.setItem('pwaPromptSeen', 'true');
+            localStorage.setItem('pwaPromptSeen', String(Date.now()));
 
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            // iPadOS 的 Safari 自稱是 Mac：用「Mac＋觸控」辨認，iPad 才看得到「加入主畫面」教學（v3.74.3）
+            const isIOS = (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) && !window.MSStream;
 
             if (isIOS) {
                 this.showIOSGuide();
@@ -517,7 +526,6 @@
               <li>📱 從主畫面快速開啟</li>
               <li>🚀 載入速度更快</li>
               <li>📴 離線也能使用</li>
-              <li>🔔 接收即時通知</li>
             </ul>
           </div>
           <div class="pwa-modal-footer">
@@ -611,6 +619,8 @@
                 }
 
                 this.deferredPrompt = null;
+                // 原生提示只能用一次：老師按了取消，📲 按鈕就沒有作用了，先收起來，等瀏覽器下次再提供時再出現（v3.74.3）
+                if (outcome !== 'accepted' && this.installButton) { this.installButton.remove(); this.installButton = null; }
                 return outcome === 'accepted';
             } catch (error) {
                 console.error('[PWA] 安裝提示錯誤:', error);

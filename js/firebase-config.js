@@ -119,9 +119,15 @@ function completeGoogleSignIn(user, isNewUser) {
 /**
  * Google 帳號登入（Popup 方式）
  */
+// 上一次登入失敗的原因（使用者自己取消時是空的）：讓畫面告訴老師該怎麼辦，不要一律當成取消（v3.74.3）
+let lastSignInError = '';
+function getLastSignInError() { return lastSignInError; }
+
 async function signInWithGoogle() {
+    lastSignInError = '';
     if (!firebaseAuth) {
         console.error('Firebase Auth 尚未初始化');
+        lastSignInError = navigator.onLine === false ? 'auth/network-request-failed' : 'not-ready';
         return null;
     }
     if (stopLateSignInWatch) stopLateSignInWatch();
@@ -141,6 +147,7 @@ async function signInWithGoogle() {
             watchLateGoogleSignIn(previousUid);
         } else {
             console.error('Google 登入失敗:', error);
+            lastSignInError = String(error && error.code || 'unknown');
         }
         return null;
     }
@@ -278,6 +285,7 @@ window.FirebaseConfig = {
     initialize: initializeFirebase,
     signIn: signInAnonymously,      // 舊相容性
     signInWithGoogle: signInWithGoogle,
+    getLastSignInError: getLastSignInError,
     signOut: signOutGoogle,
     onAuthStateChanged: onAuthStateChanged,
     getCurrentUserId: getCurrentUserId,

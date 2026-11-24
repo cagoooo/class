@@ -126,7 +126,17 @@
         control.textContent = text;
         setTimeout(() => { if (control.textContent === text) control.textContent = control.dataset.label; }, 2000);
     }
+    /**
+     * 學校 Wi-Fi 連著但出不了外網時，雲端寫入會一直等不到回應：以前按鈕就永遠卡在「處理中」（v3.74.3）。
+     * 20 秒沒完成就當成失敗，讓老師可以再按一次。
+     */
+    function withTimeout(promise, ms = 20000) {
+        let timer;
+        const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(Object.assign(new Error('連線逾時'), { code: 'timeout' })), ms); });
+        return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+    }
     function describe(error) {
+        if (error?.code === 'timeout') return '連線太久沒有回應（可能是學校網路連不到外面）。請確認網路後再試一次。';
         if (error?.code === 'permission-denied') return '雲端拒絕這次操作：這個連結可能屬於另一個帳號，或雲端規則尚未更新。請重新產生連結，或稍後再試。';
         if (error?.code === 'unavailable' || navigator.onLine === false) return '目前離線，恢復連線後再試一次。';
         return '這次操作沒有完成，請稍後再試。';
@@ -176,9 +186,9 @@
         if (publishing) { queued = true; return false; }
         publishing = true;
         try {
-            await db().collection(COLLECTION).doc(share.id).set({
+            await withTimeout(db().collection(COLLECTION).doc(share.id).set({
                 ownerUid: uid(), classId: cid(), className: className().slice(0, 80), nameMode: share.nameMode, showCoins: !!share.showCoins,
-                schema: SCHEMA, payload, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                schema: SCHEMA, payload, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }));
             published[share.id] = digest; writeJson(PUBLISHED_KEY, published);
             share.updatedAt = Date.now(); share.className = className(); saveIndex();
             if (notice.startsWith('學生頁更新失敗')) notice = '';
@@ -221,7 +231,7 @@
     }
     async function remove(classId) {
         const share = shares()[classId]; if (!share) return;
-        await db().collection(COLLECTION).doc(share.id).delete();
+        await withTimeout(db().collection(COLLECTION).doc(share.id).delete());
         delete index.shares[classId]; saveIndex();
         const published = readJson(PUBLISHED_KEY, {}); delete published[share.id]; writeJson(PUBLISHED_KEY, published);
         sessionBaseline.delete(share.id);

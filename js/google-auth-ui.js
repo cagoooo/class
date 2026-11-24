@@ -1137,9 +1137,17 @@ ${cloudMenuItemsHTML()}
         if (event.detail) afterGoogleLogin(event.detail);
     });
 
+    let loginInFlight = false;
     window.GoogleAuthUI = {
 
         async login() {
+            // 連按兩下只開一個登入視窗（v3.74.3）
+            if (loginInFlight) return;
+            loginInFlight = true;
+            try { await window.GoogleAuthUI._login(); } finally { loginInFlight = false; }   // 不靠 this：有地方會把 login 單獨拿出來呼叫
+        },
+
+        async _login() {
             // 桌面版按鈕顯示「登入中...」
             const loginBtn = document.getElementById('gauth-btn');
             const loginBtnM = document.getElementById('gauth-btn-mobile');
@@ -1164,7 +1172,20 @@ ${cloudMenuItemsHTML()}
                 loginBtnM.disabled = false;
             }
 
-            if (!profile) return; // 使用者取消（手機慢一步完成的登入由 gauth:late-signin 補接）
+            if (!profile) {
+                // 使用者自己取消就不說話（手機慢一步完成的登入由 gauth:late-signin 補接）；
+                // 其他原因以前也當成取消、什麼都不說，老師不知道為什麼登不進去（v3.74.3）
+                const reason = window.FirebaseConfig.getLastSignInError?.() || '';
+                if (reason) {
+                    const msg = reason === 'auth/popup-blocked' ? '瀏覽器擋住了登入視窗。請在網址列右邊允許這個網站開啟彈出式視窗，再按一次「登入」。'
+                        : reason === 'auth/network-request-failed' ? '目前連不到網路，請連上網路後再登入。'
+                        : reason === 'not-ready' ? '登入功能還在載入，請稍候幾秒再按一次。'
+                        : reason === 'auth/unauthorized-domain' ? '這個網址不能登入，請改用正式網址 cagoooo.github.io/class 開啟。'
+                        : `登入沒有成功（${reason}），請再試一次；一直不行請聯絡資訊組。`;
+                    try { window.NotificationSystem?.warning?.(msg); } catch (e) { alert(msg); }
+                }
+                return;
+            }
             await afterGoogleLogin(profile);
         },
 

@@ -1,12 +1,12 @@
 /**
  * 班級小管家 Service Worker
- * @version 3.74.2
+ * @version 3.74.3
  * @description PWA 離線支援與快取策略優化
  */
 
-const CACHE_NAME = 'class-manager-v3.74.2';
-const STATIC_CACHE = 'class-manager-static-v3.74.2';
-const DYNAMIC_CACHE = 'class-manager-dynamic-v3.74.2';
+const CACHE_NAME = 'class-manager-v3.74.3';
+const STATIC_CACHE = 'class-manager-static-v3.74.3';
+const DYNAMIC_CACHE = 'class-manager-dynamic-v3.74.3';
 // v3.69.1：寵物、安靜挑戰小幫手等圖片放在不跟著版本清掉的快取。
 // 原本放在 DYNAMIC_CACHE，每次發新版就整個清空，老師幾乎每次更新後都要重新下載一次，小幫手要等很久才出現。
 const ART_CACHE = 'class-manager-art-v1';
@@ -34,6 +34,20 @@ const STATIC_ASSETS = [
     './css/rwd-breakpoints.css',
     './css/pwa-install.css',
     './css/contrast.css',
+    // v3.74.3：主頁面用到、以前沒有預先存好的檔案（離線第一次開啟會缺）
+    './css/skeleton.css',
+    './js/skeleton.js',
+    './js/firebase-config.js',
+    './js/firebase-sync.js',
+    './js/firebase-ui.js',
+    './js/navigation-enhancement.js',
+    './js/exam-sounds.js',
+    './js/announcement.js',
+    './js/clock-settings-toggle.js',
+    './js/semester-archive.js',
+    './js/class-profiles.js',
+    './js/google-auth-ui.js',
+    './js/classroom-ux.js',
     // 核心 JS
     './js/class-aware-storage.js',
     './js/backup-integrity.js',
@@ -165,6 +179,7 @@ self.addEventListener('activate', (event) => {
                         })
                 );
             })
+            .then(() => trimArtCache())
             .then(() => {
                 console.log('[SW] 啟用完成（僅接管新開啟的頁面，舊頁面維持舊 SW）');
             })
@@ -200,7 +215,11 @@ self.addEventListener('fetch', (event) => {
     // 否則 cacheFirst 內 cache.put(POST) 會丟錯，請求被攔截成 503（會讓 callable 通知失敗）。
     if (request.method !== 'GET') return;
 
-    // 判斷是否需要網路優先
+    // 資料庫與登入的連線（*.googleapis.com）一律交給瀏覽器：以前也會被存進快取，
+    // 存的是某位老師的資料回應，既占空間又可能在離線時拿出過期內容（v3.74.3）
+    if (/(^|\.)googleapis\.com$/.test(url.hostname)) return;
+
+    // 判斷是否需要網路優先（Firebase 程式庫等）
     const needsNetworkFirst = NETWORK_FIRST_PATTERNS.some(pattern =>
         pattern.test(request.url)
     );
@@ -219,6 +238,24 @@ self.addEventListener('fetch', (event) => {
 
 // ==================== 快取策略 ====================
 
+/** 同網站的檔案：不看網址後面的 ?v= 找預先存好的那一份（只在離線時用） */
+async function matchSameOrigin(request) {
+    try {
+        if (new URL(request.url).origin !== self.location.origin) return undefined;
+        return await caches.match(request, { ignoreSearch: true });
+    } catch (e) { return undefined; }
+}
+
+/** 寵物圖快取不跟著版本清掉，但重新繪製後舊版圖會一直留著：超過上限時先刪最早存的（v3.74.3） */
+const ART_CACHE_MAX = 900;
+async function trimArtCache() {
+    try {
+        const cache = await caches.open(ART_CACHE);
+        const keys = await cache.keys();
+        for (let i = 0; i < keys.length - ART_CACHE_MAX; i++) await cache.delete(keys[i]);
+    } catch (e) { /* 清不掉不影響使用 */ }
+}
+
 /**
  * 快取優先策略
  * 適用於：CSS、JS、圖片等靜態資源
@@ -228,9 +265,10 @@ async function cacheFirst(request) {
         // 先嘗試快取
         const cachedResponse = await caches.match(request);
         if (cachedResponse) {
-            // 在背景更新快取（Stale While Revalidate）；網址帶版本號（?v=）的圖片內容不會變，不用每次重抓
+            // 在背景更新快取（Stale While Revalidate）。網址帶版本號（?v=）的檔案內容不該變，不用每次重抓：
+            // 而且 GitHub Pages 不看 ?v=，重抓會把「新版內容」存在「舊版網址」底下，舊頁面就載到新程式（v3.74.3）
             const u = new URL(request.url);
-            if (!(isArt(u) && u.searchParams.has('v'))) updateCache(request);
+            if (!(u.origin === self.location.origin && u.searchParams.has('v'))) updateCache(request);
             return cachedResponse;
         }
 
@@ -247,18 +285,11 @@ async function cacheFirst(request) {
     } catch (error) {
         console.error('[SW] cacheFirst 錯誤:', error);
 
-        // 返回離線頁面或預設回應
-        const cachedResponse = await caches.match(request);
+        // 離線：先找完全相同的網址，再找預先存好的同一個檔案（預快取的網址沒有 ?v=，以前因此對不上、離線開不起來）
+        const cachedResponse = await caches.match(request) || await matchSameOrigin(request);
         if (cachedResponse) return cachedResponse;
 
-        // 如果是圖片請求，返回預設圖片
-        if (request.destination === 'image') {
-            return new Response(
-                '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="#999">📷</text></svg>',
-                { headers: { 'Content-Type': 'image/svg+xml' } }
-            );
-        }
-
+        // 圖片拿不到就回報失敗：以前回一張 📷 圖假裝成功，寵物圖等會一直顯示成相機、也不會再重試（v3.74.3）
         return new Response('離線', { status: 503, statusText: 'Offline' });
     }
 }
@@ -281,15 +312,23 @@ async function networkFirst(request) {
     } catch (error) {
         console.warn('[SW] 網路請求失敗，嘗試快取:', request.url);
 
-        const cachedResponse = await caches.match(request);
+        const cachedResponse = await caches.match(request) || await matchSameOrigin(request);
         if (cachedResponse) {
             return cachedResponse;
         }
 
-        // 如果是文件請求，返回離線頁面
+        // 主頁面（含首頁）離線時用預先存好的主頁面；其他頁面（例如學生的寵物分享頁）不要換成老師的主程式（v3.74.3）
         if (request.destination === 'document') {
-            const offlinePage = await caches.match('./classnew.html');
-            if (offlinePage) return offlinePage;
+            const path = new URL(request.url).pathname;
+            if (/\/(classnew\.html|index\.html)?$/.test(path)) {
+                const offlinePage = await caches.match('./classnew.html');
+                if (offlinePage) return offlinePage;
+            }
+            return new Response('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>離線</title>' +
+                '<body style="font-family:sans-serif;text-align:center;padding:3rem 1rem;color:#334155"><h1 style="font-size:1.4rem">目前沒有網路</h1>' +
+                '<p>這個頁面需要網路才能開啟，請連上網路後重新整理。</p></body>', {
+                status: 503, statusText: 'Offline', headers: { 'Content-Type': 'text/html; charset=utf-8' }
+            });
         }
 
         return new Response('離線 - 請檢查網路連線', {

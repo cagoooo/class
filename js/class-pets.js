@@ -201,7 +201,9 @@
     const blankRule = () => ({ name: '', points: '2' });
     let ruleDraft = blankRule();
     let onlySelected = false;
-    let viewMode = ['compact', 'cards'].includes(localStorage.getItem('petViewMode')) ? localStorage.getItem('petViewMode') : (window.matchMedia?.('(max-width: 600px)').matches ? 'compact' : 'cards');
+    // 瀏覽器不准用本機儲存（無痕、隱私設定）時 getItem 會丟例外：以前整支程式就此停住，學生的寵物分享頁只剩「載入失敗」（v3.74.3）
+    const savedViewMode = (() => { try { return localStorage.getItem('petViewMode'); } catch (e) { return null; } })();
+    let viewMode = ['compact', 'cards'].includes(savedViewMode) ? savedViewMode : (window.matchMedia?.('(max-width: 600px)').matches ? 'compact' : 'cards');
     let feedbackTimer;
     let expected = null;
     let expectedClass = cid();
@@ -1230,7 +1232,11 @@
                 check.addEventListener('change', () => { check.checked ? selectedDeliveries.add(r.id) : selectedDeliveries.delete(r.id); batch.disabled = !selectedDeliveries.size; batch.textContent = '交付勾選項目（' + selectedDeliveries.size + '）'; });
                 label.prepend(check); row.append(label);
             }
-            if (state !== 'refunded') row.append(button('退回金幣', async () => { if (await confirmAction(`取消 ${r.studentName} 的「${r.productName}」兌換，退回 ${r.productCost} 金幣？`)) { if (await refund(r.id)) { shopReceipt = ''; render(); window.NotificationSystem?.success?.('退幣已存本機'); } } }));
+            // 已經交付的獎品：退幣後學生會同時有獎品又拿回金幣，要說清楚（v3.74.3）
+            const refundAsk = state === 'delivered'
+                ? `「${r.productName}」已經交給 ${r.studentName} 了。確定還要退回 ${r.productCost} 金幣嗎？（獎品不會自動收回，請自行確認）`
+                : `取消 ${r.studentName} 的「${r.productName}」兌換，退回 ${r.productCost} 金幣？`;
+            if (state !== 'refunded') row.append(button('退回金幣', async () => { if (await confirmAction(refundAsk)) { if (await refund(r.id)) { shopReceipt = ''; render(); window.NotificationSystem?.success?.('退幣已存本機'); } } }));
             panel.append(row);
         });
         if (!history.length) panel.append(el('p', '還沒有符合條件的兌換紀錄。', 'pet-shop-note'));
@@ -1469,6 +1475,12 @@
             }
         });
         window.addEventListener('storage', () => { /* 保留快照，下一次操作會阻擋過期分頁。 */ });
+        // 登入狀態比畫面晚確定（重新整理時常見）：登入或登出後重畫，商店底部的「存在這台裝置／同步到帳號」說明才會正確（v3.74.3）
+        (function watchAuth(attempt) {
+            const config = window.FirebaseConfig;
+            if (!config?.onAuthStateChanged || !config.getDb?.()) { if (attempt < 60) setTimeout(() => watchAuth(attempt + 1), 500); return; }
+            try { config.onAuthStateChanged(() => { if (!busy && !document.getElementById('pets-section')?.classList.contains('hidden')) render(); }); } catch (e) { /* ignore */ }
+        })(0);
         render();
         if (location.hash === '#pets') window.showSection('pets');
     }
