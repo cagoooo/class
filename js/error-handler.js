@@ -292,6 +292,17 @@ const ErrorHandler = (function () {
                 }
                 return;
             }
+            // Firebase App Check 套件（9.22.0）定時換新票證的程式重新排程時，會用 reject("cancelled")
+            // 取消上一輪還在等的工作，但那個 Promise 沒有人接住，瀏覽器就當成未處理錯誤。
+            // 2026-11-26 04:15、06:13 兩位匿名訪客（Mac Chrome 145）各推一張「錯誤: cancelled」Chat 卡。
+            // 只排除「單純一串 cancelled 文字」；本站與 Firebase 自己的錯誤都是錯誤物件，照常通報。
+            if (event.reason === 'cancelled') {
+                event.preventDefault();
+                if (config.logToConsole) {
+                    console.warn('[ErrorHandler] 忽略 App Check 套件取消換票的拒絕（不影響網站使用）');
+                }
+                return;
+            }
             const reason = event.reason instanceof Error
                 ? event.reason
                 : new Error(String(event.reason || '未提供 Promise rejection 原因'));

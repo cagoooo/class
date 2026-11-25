@@ -131,6 +131,20 @@ assert.equal(context.ErrorHandler.getHistory().length, 1, '帶了文字原因的
 context.ErrorHandler.clearHistory();
 console.log('PASS 沒帶原因的 Promise 拒絕不產生 webhook 錯誤，帶原因的照常通報');
 
+// 2026-11-26 Firebase App Check 定時換票程式取消上一輪：reject("cancelled") 沒人接住
+let cancelledPrevented = false;
+listeners.get('unhandledrejection')({ reason: 'cancelled', preventDefault() { cancelledPrevented = true; } });
+assert.equal(cancelledPrevented, true, 'App Check 取消換票的拒絕應被辨識');
+assert.equal(context.ErrorHandler.getHistory().length, 0, 'App Check 取消換票的拒絕不得送出錯誤 webhook');
+const ownCancelled = vm.runInContext("new Error('cancelled')", context);
+ownCancelled.stack = 'Error: cancelled\n    at save (https://cagoooo.github.io/class/js/points.js:3:1)';
+listeners.get('unhandledrejection')({ reason: ownCancelled, preventDefault() {} });
+assert.equal(context.ErrorHandler.getHistory().length, 1, '錯誤物件形式的 cancelled（例如 Firestore 或本站程式）仍要通報');
+listeners.get('unhandledrejection')({ reason: 'cancelled upload', preventDefault() {} });
+assert.equal(context.ErrorHandler.getHistory().length, 2, '只排除完全等於 cancelled 的文字');
+context.ErrorHandler.clearHistory();
+console.log('PASS App Check 取消換票的拒絕不產生 webhook 錯誤，其他 cancelled 照常通報');
+
 context.ErrorHandler.handle(new Error('真正的資料寫入失敗'), 'STORAGE', 'students/save');
 assert.equal(context.ErrorHandler.getHistory().length, 1, '真正錯誤仍應保留紀錄');
 console.log('PASS 真正資料錯誤仍保留紀錄');
