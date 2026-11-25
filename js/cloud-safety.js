@@ -262,11 +262,15 @@
                 const hasKnownBaseline = !!known?.token;
                 const explicitlyConfirmed = Object.hasOwn(options, 'expectedToken') || options.allowRemoteOverwrite === true;
                 let mergeBlock = '';
+                // 這台從來沒有同步基準（例如在同步版本機制上線前就和雲端分岔的教室電腦）：和「共同舊版本已被清理」
+                // 是同一種處境，用同一套無基準規則判斷（withoutBase），能確定的才自動處理，其餘照舊交給老師。
+                // 以前這種情況一律停車，而且不即時通知，一位老師的兩台電腦各卡了 2 個班、最久從 10/5 起沒上傳過（2026-11-25）。
+                const noBaseline = !hasKnownBaseline && !String(remote.token || '').startsWith('legacy:');
                 // 只有同步流程會要求合併（autoMerge）：學期封存等其他呼叫者遇到差異仍要停下來
-                if (options.autoMerge && hasKnownBaseline && !explicitlyConfirmed) {
+                if (options.autoMerge && (hasKnownBaseline || noBaseline) && !explicitlyConfirmed) {
                     // 目前開著的班要等安靜的時機：合併後必須重新載入，才不會被模組手上的舊資料寫回去
                     if (id === current() && options.autoMerge !== 'now') { mergeWaiting.add(recoveryKey(c)); throw Object.assign(Error('等老師告一段落再合併'), { code: 'sync-merge-deferred' }); }
-                    const result = await threeWay(c, known, values, remote);
+                    const result = hasKnownBaseline ? await threeWay(c, known, values, remote) : await withoutBase(c, values, remote);
                     mergeBlock = result.block || '';
                     if (result.values) {
                         if (fingerprint(capture(id)) !== before) throw syncBusy();   // 比對期間老師又有新操作，下次重新比對
