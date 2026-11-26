@@ -232,6 +232,16 @@ const ErrorHandler = (function () {
             && !/cagoooo\.github\.io\/class\//i.test(`${context} ${error?.stack || ''}`);
     }
 
+    // 瀏覽器擴充功能（例如 MetaMask 錢包）自己注入網頁的程式出錯：堆疊只有擴充功能的位址、
+    // 沒有任何一般網址，跟班級小管家無關、也修不到。2026-11-26 10:17 Windows Chrome
+    // 推了一張「Failed to connect to MetaMask」（chrome-extension://…/scripts/inpage.js）。
+    // 全域 error 事件早就排除擴充功能腳本，這裡補上 Promise 拒絕這一路。
+    const EXTENSION_URL = /(?:chrome|moz|safari|safari-web|ms-browser)-extension:\/\//i;
+    function isExtensionRejection(error) {
+        const stack = String(error?.stack || '');
+        return EXTENSION_URL.test(stack) && !/(?:https?|file|blob):\/\//i.test(stack);
+    }
+
     function promiseRejectionContext(error) {
         const stack = formatStack(error);
         const frame = stack.split('\n').slice(1).find(line =>
@@ -311,6 +321,13 @@ const ErrorHandler = (function () {
                 event.preventDefault();
                 if (config.logToConsole) {
                     console.warn('[ErrorHandler] 忽略 App 內建瀏覽器自己的樣式載入逾時：' + reason.message);
+                }
+                return;
+            }
+            if (isExtensionRejection(reason)) {
+                event.preventDefault();
+                if (config.logToConsole) {
+                    console.warn('[ErrorHandler] 忽略瀏覽器擴充功能自己的錯誤：' + reason.message);
                 }
                 return;
             }

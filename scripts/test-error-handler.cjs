@@ -145,6 +145,33 @@ assert.equal(context.ErrorHandler.getHistory().length, 2, '只排除完全等於
 context.ErrorHandler.clearHistory();
 console.log('PASS App Check 取消換票的拒絕不產生 webhook 錯誤，其他 cancelled 照常通報');
 
+// 2026-11-26 10:17 MetaMask 擴充功能自己的錯誤：堆疊只有 chrome-extension:// 位址
+const makeErr = (msg, stack) => { const e = vm.runInContext('new Error(' + JSON.stringify(msg) + ')', context); e.stack = stack; return e; };
+let extPrevented = false;
+listeners.get('unhandledrejection')({
+    reason: makeErr('Failed to connect to MetaMask', [
+        'Error: Failed to connect to MetaMask',
+        '    at Object.connect (chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/inpage.js:9:5361)',
+        '    at async o (chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/inpage.js:9:3005)'
+    ].join('\n')),
+    preventDefault() { extPrevented = true; }
+});
+assert.equal(extPrevented, true, '擴充功能自己的拒絕應被辨識');
+assert.equal(context.ErrorHandler.getHistory().length, 0, '擴充功能自己的拒絕不得送出錯誤 webhook');
+listeners.get('unhandledrejection')({ reason: makeErr('x', 'Error: x\n    at a (moz-extension://abc/content.js:1:1)'), preventDefault() {} });
+assert.equal(context.ErrorHandler.getHistory().length, 0, 'Firefox 擴充功能同樣排除');
+listeners.get('unhandledrejection')({
+    reason: makeErr('寫入失敗', [
+        'Error: 寫入失敗',
+        '    at hook (chrome-extension://abc/inpage.js:1:1)',
+        '    at save (https://cagoooo.github.io/class/js/points.js:3:1)'
+    ].join('\n')),
+    preventDefault() {}
+});
+assert.equal(context.ErrorHandler.getHistory().length, 1, '堆疊裡有本站程式就照常通報');
+context.ErrorHandler.clearHistory();
+console.log('PASS 瀏覽器擴充功能自己的 Promise 拒絕不產生 webhook 錯誤，經過本站程式的照常通報');
+
 context.ErrorHandler.handle(new Error('真正的資料寫入失敗'), 'STORAGE', 'students/save');
 assert.equal(context.ErrorHandler.getHistory().length, 1, '真正錯誤仍應保留紀錄');
 console.log('PASS 真正資料錯誤仍保留紀錄');
